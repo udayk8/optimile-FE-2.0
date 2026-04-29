@@ -1,0 +1,334 @@
+// ==================== COMMON TYPES ====================
+export interface PaginationMeta {
+  page: number
+  pageSize: number
+  totalItems: number
+  totalPages: number
+}
+
+export interface PaginatedResponse<T> {
+  data: T[]
+  meta: PaginationMeta
+}
+
+export interface ApiResponse<T> {
+  data: T
+  message?: string
+}
+
+export interface Location {
+  name: string
+  city: string
+  state: string
+  pincode?: string
+}
+
+export interface LaneDetails {
+  origin: Location
+  destination: Location
+  routeSummary?: string
+  distanceKm?: number
+}
+
+export interface VolumeRequirement {
+  estimatedVolume: number
+  unit: string
+  frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY'
+}
+
+// ==================== AUTH TYPES ====================
+export interface Vendor {
+  id: string
+  tradingName: string
+  legalName: string
+  gstin: string
+  pan: string
+  status: VendorStatus
+  primaryContact: {
+    name: string
+    phone: string
+    email: string
+  }
+  profileImageUrl?: string
+}
+
+export type VendorStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED' | 'BLACKLISTED'
+
+export interface AuthState {
+  vendor: Vendor | null
+  token: string | null
+  isAuthenticated: boolean
+}
+
+// ==================== NOTIFICATION TYPES ====================
+export type NotificationCategory = 'ONBOARDING' | 'SOURCING' | 'CONTRACTS' | 'TRIPS' | 'EXPENSES' | 'INVOICES'
+
+export interface Notification {
+  id: string
+  type: NotificationCategory
+  title: string
+  message: string
+  deepLink: string
+  isRead: boolean
+  createdAt: string
+}
+
+// ==================== DASHBOARD TYPES ====================
+export interface DashboardData {
+  pendingIndents: { count: number; items: IndentSummary[] }
+  uninvoicedBookings: { count: number; totalBillableAmount: number }
+  invoicePaymentStatus: {
+    submitted: number
+    approved: number
+    rejected: number
+    paid: number
+  }
+}
+
+// ==================== SOURCING TYPES ====================
+
+
+export type AuctionType = 'SPOT' | 'LOT' | 'BULK'
+export type AuctionState = 'UPCOMING' | 'LIVE' | 'EXTENDED' | 'CLOSED' | 'AWARDED' | 'NOT_AWARDED'
+
+export interface AuctionLane {
+  id: string
+  laneDetails: LaneDetails
+  volumeRequirement?: VolumeRequirement
+  currentBestBid?: number
+  minBidDecrement?: number
+}
+
+export interface Auction {
+  id: string
+  type: AuctionType
+  customerName: string
+  vehicleTypeRequired: string
+  startTime: string
+  endTime: string
+  state: AuctionState
+  lanes: AuctionLane[]
+  vendorBids: AuctionBid[]
+  pricingUnit?: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
+  awardDate?: string
+  contractReference?: string
+  createdAt: string
+}
+
+export interface AuctionBid {
+  id: string
+  laneId: string
+  amount: number
+  placedAt: string
+  status: 'ACTIVE' | 'REVISED' | 'SUPERSEDED'
+}
+
+// ==================== CONTRACT TYPES ====================
+export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED'
+
+export interface Contract {
+  id: string
+  customerName: string
+  customerGSTIN: string
+  laneDetails: LaneDetails
+  rateCard: RateCardEntry[]
+  volumeAllocation: { volume: number; unit: string; frequency: string }
+  paymentTerms: { creditPeriodDays: number; billingCycle: string }
+  slaClauses: { name: string; valueHours: number; description: string }[]
+  penaltyClauses: { breachType: string; penaltyType: 'FIXED' | 'PERCENTAGE'; penaltyValue: number; description: string }[]
+  validityFrom: string
+  validityTo: string
+  renewalTerms: string
+  status: ContractStatus
+  amendments: Amendment[]
+  signedAt?: string
+  pdfUrl: string
+  createdAt: string
+}
+
+export interface RateCardEntry {
+  vehicleType: string
+  rateType: 'PER_TRIP' | 'PER_KM'
+  rate: number
+  surcharges: { name: string; amount: number }[]
+}
+
+export interface Amendment {
+  id: string
+  description: string
+  changedFields: { field: string; oldValue: string; newValue: string }[]
+  amendedAt: string
+}
+
+// ==================== TRIP TYPES ====================
+export type IndentStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED'
+
+export interface IndentSummary {
+  id: string
+  contractId: string
+  lane: string
+  vehicleType: string
+  reportingDate: string
+  slaDeadline: string
+  status: IndentStatus
+}
+
+export interface Indent {
+  id: string
+  contractId: string
+  contractReference: string
+  laneDetails: LaneDetails
+  loadDetails: { commodity: string; weightKg: number; volumeCbm: number }
+  vehicleTypeRequired: string
+  reportingDateTime: string
+  slaDeadline: string
+  status: IndentStatus
+  createdAt: string
+}
+
+export type TripStatus = 'DISPATCHED' | 'IN_TRANSIT' | 'AT_DELIVERY' | 'EXCEPTION' | 'DELIVERED'
+
+export interface Trip {
+  id: string
+  contractId: string
+  indentId: string
+  laneDetails: LaneDetails
+  assignedVehicle: { id: string; registrationNumber: string; type: string }
+  assignedDriver: { id: string; name: string; mobile: string }
+  status: TripStatus
+  deliveredDate?: string
+  podStatus?: 'PENDING' | 'CONFIRMED'
+  podReference?: string
+  freightRate: number
+  expenseSummary: { total: number; approved: number; pending: number }
+  isInvoiced: boolean
+  createdAt: string
+}
+
+// ==================== EXPENSE TYPES ====================
+export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type ExpenseType = 'TOLL' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
+
+export interface Expense {
+  id: string
+  tripId: string
+  tripReference: string
+  expenseType: ExpenseType
+  amount: number
+  description?: string
+  supportingDocumentUrl?: string
+  status: ExpenseStatus
+  rejectionReason?: string
+  submittedAt: string
+}
+
+// ==================== FLEET TYPES ====================
+export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED'
+export type OperationalStatus = 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE'
+export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
+
+export interface Vehicle {
+  id: string
+  registrationNumber: string
+  vehicleType: string
+  baseLocation: string
+  operationalStatus: OperationalStatus
+  complianceStatus: ComplianceStatus
+  gpsDeviceId?: string
+  complianceDocuments: ComplianceDocument[]
+  blackoutDates: { from: string; to: string }[]
+}
+
+export interface Driver {
+  id: string
+  name: string
+  mobile: string
+  licenseNumber: string
+  licenseExpiry: string
+  licenseClass: string[]
+  complianceStatus: ComplianceStatus
+  currentStatus: DriverStatus
+  complianceDocuments: ComplianceDocument[]
+}
+
+export interface ComplianceDocument {
+  id: string
+  type: string
+  fileName: string
+  fileUrl: string
+  expiryDate: string
+  status: 'VALID' | 'EXPIRING_SOON' | 'EXPIRED'
+  uploadedAt: string
+}
+
+export interface CapacityDeclaration {
+  id: string
+  vehicleType: string
+  availableQuantity: number
+  baseOperatingHubs: string[]
+  blackoutDates: { from: string; to: string }[]
+}
+
+// ==================== INVOICE TYPES ====================
+export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID'
+
+export interface Invoice {
+  id: string
+  invoiceNumber: string
+  invoiceDate: string
+  vendorGstin: string
+  customerGstin: string
+  billingPeriod: { from: string; to: string }
+  paymentDueDate: string
+  lineItems: InvoiceLineItem[]
+  subtotal: number
+  gstAmount: number
+  grandTotal: number
+  status: InvoiceStatus
+  paymentDate?: string
+  notes?: string
+  pdfUrl: string
+  createdAt: string
+}
+
+export interface InvoiceLineItem {
+  tripId: string
+  tripReference: string
+  freightCharge: number
+  expenses: { type: ExpenseType; amount: number }[]
+  lineTotal: number
+}
+
+export type LedgerEntryType = 'INVOICE_APPROVED' | 'PAYMENT_RECEIVED' | 'SLA_PENALTY' | 'OTHER_DEDUCTION' | 'TDS_DEDUCTION'
+
+export interface LedgerEntry {
+  id: string
+  date: string
+  entryType: LedgerEntryType
+  description: string
+  credit: number
+  debit: number
+  runningBalance: number
+  documentUrl?: string
+}
+
+// ==================== PROFILE TYPES ====================
+export interface CompanyInfo {
+  tradingName: string
+  legalName: string
+  registeredAddress: { street: string; city: string; state: string; pincode: string }
+  gstin: string
+  pan: string
+  primaryContact: { name: string; phone: string; email: string }
+  serviceRegions: string[]
+  supportedVehicleTypes: string[]
+}
+
+export interface BankDetails {
+  bankName: string
+  branch: string
+  accountNumber: string
+  ifscCode: string
+  accountType: 'SAVINGS' | 'CURRENT'
+  supportingDocumentUrl?: string
+}

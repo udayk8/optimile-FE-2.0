@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": {
+      "@admin/*": ["./src/*"],
+      "@shared-auth": ["../../packages/shared-auth/src"],
+      "@shared-auth/*": ["../../packages/shared-auth/src/*"],
+      "@shared-api": ["../../packages/shared-api/src"],
+      "@shared-api/*": ["../../packages/shared-api/src/*"],
+      "@shared-ui": ["../../packages/shared-ui/src"],
+      "@shared-ui/*": ["../../packages/shared-ui/src/*"],
+      "@shared-utils": ["../../packages/shared-utils/src"],
+      "@shared-utils/*": ["../../packages/shared-utils/src/*"]
+    }
+  },
+  "include": ["src", "../../packages"]
+}

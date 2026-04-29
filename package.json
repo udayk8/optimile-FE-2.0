@@ -1,0 +1,38 @@
+{
+  "name": "frontend-main",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "dev:admin:standalone": "npm run dev -w @optimile/admin-web",
+    "dev:vendor:standalone": "npm run dev -w @optimile/vendor-web",
+    "dev:fleet:standalone": "npm run dev -w @optimile/fleet-web",
+    "dev:driver:standalone": "npm run dev -w @optimile/driver-web",
+    "dev:customer:standalone": "npm run dev -w @optimile/customer-web",
+    "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/admin-web && npm run build -w @optimile/vendor-web && npm run build -w @optimile/fleet-web"
+  },
+  "dependencies": {
+    "@optimile/admin-web": "file:apps/admin-web",
+    "@optimile/fleet-web": "file:apps/fleet-web",
+    "@optimile/shared-auth": "file:packages/shared-auth",
+    "@optimile/shared-ui": "file:packages/shared-ui",
+    "@optimile/vendor-web": "file:apps/vendor-web",
+    "@vitejs/plugin-react": "^4.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "vite": "^6.0.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}
