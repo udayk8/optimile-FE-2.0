@@ -6,6 +6,8 @@ export const ROLE_MODULE_PERMISSIONS: Record<DemoRole, ModulePermission[] | 'all
   'CEO (All Access)': 'all',
   'Fleet Manager': ['dashboard', 'fleet-management', 'ftl-booking', 'fleet', 'trips'],
   'Finance Manager': ['dashboard', 'finance', 'expenses', 'invoices'],
+  'Auction Head': ['dashboard', 'auction', 'vendor-management', 'sourcing', 'contracts', 'profile'],
+  'Vendor': ['dashboard', 'sourcing', 'contracts', 'trips', 'expenses', 'fleet', 'invoices', 'profile'],
   'Procurement Head': ['dashboard', 'auction', 'vendor-management', 'sourcing', 'contracts', 'profile'],
   'Ops Head': ['dashboard', 'fleet-management', 'track-and-trace', 'fleet', 'trips'],
   'Regional Manager': ['dashboard', 'sourcing', 'contracts', 'trips', 'fleet', 'profile'],

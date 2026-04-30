@@ -1,12 +1,13 @@
 import { isDemoRole, type DemoRole } from '../roles'
 
-export const PORTALS = ['admin', 'vendor', 'fleet', 'driver', 'customer'] as const
+export const PORTALS = ['auction', 'admin', 'vendor', 'fleet', 'driver', 'customer'] as const
 export type Portal = (typeof PORTALS)[number]
 
 export const AUTH_MODES = ['demo', 'token'] as const
 export type AuthMode = (typeof AUTH_MODES)[number]
 
 export const PORTAL_DASHBOARD_PATHS: Record<Portal, string> = {
+  auction: '/auction',
   admin: '/admin',
   vendor: '/vendor',
   fleet: '/fleet',

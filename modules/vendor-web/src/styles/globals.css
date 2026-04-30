@@ -1,0 +1,128 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fleet design tokens */
+    --background: 210 20% 98%;
+    --foreground: 221 39% 11%;
+    --text: 221 39% 11%;
+
+    /* Cards */
+    --card: 0 0% 100%;
+    --card-foreground: 221 39% 11%;
+
+    /* Popover */
+    --popover: 0 0% 100%;
+    --popover-foreground: 221 39% 11%;
+
+    --primary: 207 59% 30%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 207 59% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Muted */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 23 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --accent-hover: 23 100% 45%;
+
+    --danger: 0 84% 60%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success — Green */
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning — Amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Borders & Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 207 59% 30%;
+    --radius: 0.5rem;                /* 8px base */
+
+    /* Sidebar — White */
+    --sidebar: 0 0% 100%;            /* White */
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-active: 207 59% 30%;
+    --sidebar-active-text: 207 59% 30%;
+
+    /* Orange Accent */
+    --accent-orange: 23 100% 50%;
+    --accent-orange-bg: 33 100% 96%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-text font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+/* Utility classes for the design system */
+@layer components {
+  .text-primary-navy {
+    color: hsl(var(--text));
+  }
+  .text-secondary-slate {
+    @apply text-gray-600;
+  }
+  .text-muted-slate {
+    @apply text-gray-500;
+  }
+  .bg-page {
+    background-color: hsl(var(--background));
+  }
+  .border-light {
+    @apply border-gray-200;
+  }
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-wider;
+    color: hsl(var(--accent-orange));
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-200 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-300;
+}
+
+/* Page transition */
+.page-enter {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

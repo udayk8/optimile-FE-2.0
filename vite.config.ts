@@ -9,11 +9,11 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@admin': path.resolve(rootDir, 'apps/admin-web/src'),
-      '@vendor': path.resolve(rootDir, 'apps/vendor-web/src'),
-      '@fleet': path.resolve(rootDir, 'apps/fleet-web/src'),
-      '@driver': path.resolve(rootDir, 'apps/driver-web/src'),
-      '@customer': path.resolve(rootDir, 'apps/customer-web/src'),
+      '@admin': path.resolve(rootDir, 'modules/auction-web/src'),
+      '@vendor': path.resolve(rootDir, 'modules/vendor-web/src'),
+      '@fleet': path.resolve(rootDir, 'modules/fleet-web/src'),
+      '@driver': path.resolve(rootDir, 'modules/driver-web/src'),
+      '@customer': path.resolve(rootDir, 'modules/customer-web/src'),
       '@shared-api': path.resolve(rootDir, 'packages/shared-api/src'),
       '@shared-auth': path.resolve(rootDir, 'packages/shared-auth/src'),
       '@shared-ui': path.resolve(rootDir, 'packages/shared-ui/src'),

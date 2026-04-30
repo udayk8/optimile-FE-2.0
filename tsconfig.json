@@ -14,16 +14,16 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@admin": ["apps/admin-web/src"],
-      "@admin/*": ["apps/admin-web/src/*"],
-      "@vendor": ["apps/vendor-web/src"],
-      "@vendor/*": ["apps/vendor-web/src/*"],
-      "@fleet": ["apps/fleet-web/src"],
-      "@fleet/*": ["apps/fleet-web/src/*"],
-      "@driver": ["apps/driver-web/src"],
-      "@driver/*": ["apps/driver-web/src/*"],
-      "@customer": ["apps/customer-web/src"],
-      "@customer/*": ["apps/customer-web/src/*"],
+      "@admin": ["modules/auction-web/src"],
+      "@admin/*": ["modules/auction-web/src/*"],
+      "@vendor": ["modules/vendor-web/src"],
+      "@vendor/*": ["modules/vendor-web/src/*"],
+      "@fleet": ["modules/fleet-web/src"],
+      "@fleet/*": ["modules/fleet-web/src/*"],
+      "@driver": ["modules/driver-web/src"],
+      "@driver/*": ["modules/driver-web/src/*"],
+      "@customer": ["modules/customer-web/src"],
+      "@customer/*": ["modules/customer-web/src/*"],
       "@shared-api": ["packages/shared-api/src"],
       "@shared-api/*": ["packages/shared-api/src/*"],
       "@shared-auth": ["packages/shared-auth/src"],
@@ -34,5 +34,5 @@
       "@shared-utils/*": ["packages/shared-utils/src/*"]
     }
   },
-  "include": ["src", "apps", "packages", "vite.config.ts"]
+  "include": ["src", "modules", "packages", "vite.config.ts"]
 }

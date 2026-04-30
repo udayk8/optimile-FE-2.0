@@ -1,8 +1,16 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import type { ModulePermission } from '../permissions'
-import { canAccessModule } from '../modulePermissions'
-import { getPortalDashboardPath, hasValidAuthState, type Portal } from '../utils/authStorage'
+import { useAuth } from '../context/AuthContext'
+import type { ERPModule } from '../types'
+
+const PORTAL_MODULES: Record<string, ERPModule> = {
+  admin: 'ams',
+  auction: 'ams',
+  vendor: 'vendor',
+  fleet: 'fleet',
+  driver: 'driver',
+  customer: 'customer',
+}
 
 export function RouteGuard({
   children,
@@ -10,15 +18,23 @@ export function RouteGuard({
   module,
 }: {
   children: ReactNode
-  portal: Portal
-  module?: ModulePermission
+  portal?: string
+  module?: string
 }) {
-  if (!hasValidAuthState(portal)) {
+  const { hasModuleAccess, isAuthenticated, loading } = useAuth()
+
+  if (loading) return null
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
 
-  if (module && !canAccessModule(module)) {
-    return <Navigate to={getPortalDashboardPath(portal)} replace />
+  const requiredModule = portal ? PORTAL_MODULES[portal] : module
+  if (requiredModule && PORTAL_MODULES[requiredModule]) {
+    const normalizedModule = PORTAL_MODULES[requiredModule]
+    if (!hasModuleAccess(normalizedModule)) return <Navigate to="/modules" replace />
+  } else if (!portal && module && hasModuleAccess(module as ERPModule) === false) {
+    return <Navigate to="/modules" replace />
   }
 
   return <>{children}</>

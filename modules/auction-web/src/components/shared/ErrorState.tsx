@@ -1,0 +1,46 @@
+import { cn } from '@admin/utils/cn'
+import { Button } from '@shared-ui/button'
+import { AlertCircle, RefreshCw } from 'lucide-react'
+
+interface ErrorStateProps {
+  title?: string
+  message?: string
+  onRetry?: () => void
+  retryLabel?: string
+  className?: string
+}
+
+/**
+ * Reusable error state component.
+ * 
+ * Per Rule 20:
+ * - Every failed API call must show a clear error message
+ * - Must include a retry action
+ * - Must provide fallback UI
+ * - Never expose raw backend errors to users
+ */
+export function ErrorState({
+  title = 'Something went wrong',
+  message = 'Unable to load data. Please try again.',
+  onRetry,
+  retryLabel = 'Retry',
+  className,
+}: ErrorStateProps) {
+  return (
+    <div className={cn('rounded-xl border border-destructive/20 bg-destructive/10 p-5', className)}>
+      <div className="flex gap-3">
+        <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
+        <div>
+          <h3 className="font-bold text-destructive">{title}</h3>
+          <p className="mt-1 max-w-md text-sm text-destructive">{message}</p>
+          {onRetry && (
+            <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              {retryLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -3,18 +3,18 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from './utils/cn'
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground',
-        outline: 'text-foreground',
-        success: 'border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-        warning: 'border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-        info: 'border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-        muted: 'border-transparent bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+        default: 'bg-primary/10 text-primary ring-primary/20',
+        secondary: 'bg-secondary text-secondary-foreground ring-gray-200',
+        destructive: 'bg-danger/10 text-danger ring-danger/20',
+        outline: 'text-text ring-gray-200',
+        success: 'bg-success/10 text-success ring-success/20',
+        warning: 'bg-warning/10 text-warning ring-warning/20',
+        info: 'bg-primary/10 text-primary ring-primary/20',
+        muted: 'bg-gray-100 text-gray-600 ring-gray-200',
       },
     },
     defaultVariants: {

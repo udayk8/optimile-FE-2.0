@@ -6,7 +6,7 @@ import {
   type Portal,
 } from '../utils/authStorage'
 
-export function useAuth(portal?: Portal) {
+export function useLegacyAuth(portal?: Portal) {
   return {
     authMode: getAuthMode(),
     selectedPortal: getSelectedPortal(),
