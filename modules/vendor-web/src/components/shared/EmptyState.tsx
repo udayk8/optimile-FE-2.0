@@ -1,4 +1,4 @@
-import { cn } from '@vendor/utils/cn'
+import { cn } from '@vendor/lib/cn'
 
 interface EmptyStateProps {
   icon?: React.ReactNode
@@ -10,10 +10,10 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center', className)}>
-      {icon && <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-gray-500">{icon}</div>}
-      <h3 className="text-base font-bold text-text">{title}</h3>
-      {description && <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">{description}</p>}
+    <div className={cn('flex flex-col items-center justify-center py-12 px-4 text-center', className)}>
+      {icon && <div className="mb-4 text-muted-foreground/50">{icon}</div>}
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      {description && <p className="mt-1 text-sm text-muted-foreground max-w-md">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   )

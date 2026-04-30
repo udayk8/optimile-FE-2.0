@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { cn } from '@vendor/utils/cn'
-import { getCountdown, formatCountdown } from '@vendor/utils/date-utils'
+import { cn } from '@vendor/lib/cn'
+import { getCountdown, formatCountdown } from '@vendor/lib/date-utils'
 
 interface SLACountdownProps {
   deadline: string
@@ -20,7 +20,7 @@ export function SLACountdown({ deadline, className, showLabel = true }: SLACount
 
   if (countdown.isExpired) {
     return (
-      <span className={cn('text-sm font-mono font-semibold text-danger', className)}>
+      <span className={cn('text-sm font-mono font-semibold text-destructive', className)}>
         {showLabel && <span className="text-xs font-sans mr-1">SLA</span>}
         EXPIRED
       </span>
@@ -31,7 +31,7 @@ export function SLACountdown({ deadline, className, showLabel = true }: SLACount
     <span
       className={cn(
         'text-sm font-mono font-semibold',
-        countdown.isUrgent ? 'text-danger' : 'text-warning',
+        countdown.isUrgent ? 'text-destructive' : 'text-warning',
         className
       )}
     >

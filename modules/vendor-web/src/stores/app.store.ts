@@ -10,10 +10,11 @@ import {
   MOCK_INVOICES,
   MOCK_LEDGER,
   MOCK_CAPACITY,
-} from '@vendor/utils/mock-data'
+  MOCK_NOTIFICATIONS,
+} from '@vendor/lib/mock-data'
 import { 
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
-  Contract, Invoice, LedgerEntry, CapacityDeclaration 
+  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification
 } from '@vendor/types'
 
 interface AppState {
@@ -27,17 +28,22 @@ interface AppState {
   invoices: Invoice[]
   ledger: LedgerEntry[]
   capacity: CapacityDeclaration[]
+  notifications: Notification[]
 
   // Actions
   acceptIndent: (indentId: string, vehicleId: string, driverId: string) => void
   declineIndent: (indentId: string) => void
   submitBid: (auctionId: string, laneId: string, amount: number) => void
   addVehicle: (vehicle: Vehicle) => void
+  updateVehicle: (vehicle: Vehicle) => void
   addDriver: (driver: Driver) => void
+  updateDriver: (driver: Driver) => void
   addExpense: (expense: Expense) => void
-  signContract: (contractId: string) => void
   generateInvoice: (tripIds: string[]) => void
   addCapacityDeclaration: (declaration: CapacityDeclaration) => void
+  markNotificationRead: (notificationId: string) => void
+  markAllNotificationsRead: () => void
+  addNotification: (notification: Notification) => void
   resetStore: () => void
 }
 
@@ -52,6 +58,7 @@ export const useAppStore = create<AppState>((set) => ({
   invoices: [...MOCK_INVOICES],
   ledger: [...MOCK_LEDGER],
   capacity: [...MOCK_CAPACITY],
+  notifications: [...MOCK_NOTIFICATIONS],
 
   acceptIndent: (indentId, vehicleId, driverId) =>
     set((state) => {
@@ -141,42 +148,51 @@ export const useAppStore = create<AppState>((set) => ({
   addVehicle: (vehicle) =>
     set((state) => ({ vehicles: [vehicle, ...state.vehicles] })),
 
+  updateVehicle: (vehicle) =>
+    set((state) => ({
+      vehicles: state.vehicles.map((item) => (item.id === vehicle.id ? vehicle : item)),
+    })),
+
   addDriver: (driver) =>
     set((state) => ({ drivers: [driver, ...state.drivers] })),
 
+  updateDriver: (driver) =>
+    set((state) => ({
+      drivers: state.drivers.map((item) => (item.id === driver.id ? driver : item)),
+    })),
+
   addExpense: (expense) =>
     set((state) => {
-      // Also update trip expense summary
       const tripIndex = state.trips.findIndex((t) => t.id === expense.tripId)
+      const existingExpense = state.expenses.find((item) => item.tripId === expense.tripId)
       let updatedTrips = state.trips
-      
+
       if (tripIndex !== -1) {
         const trip = state.trips[tripIndex] as Trip
+        const previousPending = existingExpense?.status === 'PENDING' ? existingExpense.amount : 0
+        const previousApproved = existingExpense?.status === 'APPROVED' ? existingExpense.amount : 0
+        const nextPending = expense.status === 'PENDING' ? expense.amount : 0
+        const nextApproved = expense.status === 'APPROVED' ? expense.amount : 0
+
         updatedTrips = [...state.trips]
         updatedTrips[tripIndex] = {
           ...trip,
           expenseSummary: {
-            ...trip.expenseSummary,
-            total: trip.expenseSummary.total + expense.amount,
-            pending: trip.expenseSummary.pending + expense.amount,
-          }
+            total: trip.expenseSummary.total - (existingExpense?.amount ?? 0) + expense.amount,
+            approved: trip.expenseSummary.approved - previousApproved + nextApproved,
+            pending: trip.expenseSummary.pending - previousPending + nextPending,
+          },
         }
       }
 
-      return { 
-        expenses: [expense, ...state.expenses],
-        trips: updatedTrips 
-      }
-    }),
+      const updatedExpenses = existingExpense
+        ? [expense, ...state.expenses.filter((item) => item.tripId !== expense.tripId)]
+        : [expense, ...state.expenses]
 
-  signContract: (contractId) =>
-    set((state) => {
-      const index = state.contracts.findIndex(c => c.id === contractId)
-      if (index === -1) return state
-      
-      const updatedContracts = [...state.contracts]
-      updatedContracts[index] = { ...updatedContracts[index], status: 'ACTIVE' } as Contract
-      return { contracts: updatedContracts }
+      return {
+        expenses: updatedExpenses,
+        trips: updatedTrips,
+      }
     }),
 
   generateInvoice: (tripIds) =>
@@ -209,6 +225,21 @@ export const useAppStore = create<AppState>((set) => ({
   addCapacityDeclaration: (declaration) =>
     set((state) => ({ capacity: [declaration, ...state.capacity] })),
 
+  markNotificationRead: (notificationId) =>
+    set((state) => ({
+      notifications: state.notifications.map((notification) =>
+        notification.id === notificationId ? { ...notification, isRead: true } : notification
+      ),
+    })),
+
+  markAllNotificationsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
+    })),
+
+  addNotification: (notification) =>
+    set((state) => ({ notifications: [notification, ...state.notifications] })),
+
   resetStore: () =>
     set(() => ({
       indents: [...MOCK_INDENTS],
@@ -221,5 +252,6 @@ export const useAppStore = create<AppState>((set) => ({
       invoices: [...MOCK_INVOICES],
       ledger: [...MOCK_LEDGER],
       capacity: [...MOCK_CAPACITY],
+      notifications: [...MOCK_NOTIFICATIONS],
     }))
 }))

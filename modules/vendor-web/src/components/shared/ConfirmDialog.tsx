@@ -5,8 +5,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@shared-ui/dialog'
-import { Button } from '@shared-ui/button'
+} from '@vendor/components/ui/dialog'
+import { Button } from '@vendor/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -47,8 +47,8 @@ export function ConfirmDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             {isDestructive && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-danger/10">
-                <AlertTriangle className="h-5 w-5 text-danger" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
               </div>
             )}
             <div>

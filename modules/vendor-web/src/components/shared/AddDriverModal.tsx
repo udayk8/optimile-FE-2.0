@@ -1,142 +1,254 @@
-import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@shared-ui/dialog'
-import { Button } from '@shared-ui/button'
-import { Input } from '@shared-ui/input'
+import { useEffect, useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
+import { Button } from '@vendor/components/ui/button'
+import { Input } from '@vendor/components/ui/input'
 import { useAppStore } from '@vendor/stores/app.store'
-import { Driver } from '@vendor/types'
+import type { Driver, DriverTrackingSelection } from '@vendor/types'
 
 interface AddDriverModalProps {
   isOpen: boolean
   onClose: () => void
+  initialDriver?: Driver | null
 }
 
-export function AddDriverModal({ isOpen, onClose }: AddDriverModalProps) {
-  const { addDriver } = useAppStore()
-  const [name, setName] = useState('')
-  const [mobile, setMobile] = useState('')
-  const [licenseNumber, setLicenseNumber] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
+type DriverFormState = {
+  name: string
+  dateOfBirth: string
+  dlNumber: string
+  dlName: string
+  mobile: string
+  dlValidTillDate: string
+  gender: Driver['gender'] | ''
+  email: string
+  dlCopyFileName: string
+  licenseClasses: string
+}
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {}
-    if (!name.trim()) {
-      newErrors.name = 'Driver name is required.'
+const DEFAULT_FORM: DriverFormState = {
+  name: '',
+  dateOfBirth: '',
+  dlNumber: '',
+  dlName: '',
+  mobile: '',
+  dlValidTillDate: '',
+  gender: '',
+  email: '',
+  dlCopyFileName: '',
+  licenseClasses: 'HCV, LCV',
+}
+
+export function AddDriverModal({ isOpen, onClose, initialDriver }: AddDriverModalProps) {
+  const { addDriver, updateDriver } = useAppStore()
+  const isEditMode = !!initialDriver
+  const [form, setForm] = useState<DriverFormState>(DEFAULT_FORM)
+  const [trackingSelections, setTrackingSelections] = useState<DriverTrackingSelection[]>([
+    { type: 'SIM Tracking', checked: true, primarySet: true },
+    { type: 'Driver App Tracking', checked: true, primarySet: false },
+  ])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (initialDriver) {
+      setForm({
+        name: initialDriver.name ?? '',
+        dateOfBirth: initialDriver.dateOfBirth ?? '',
+        dlNumber: initialDriver.licenseNumber ?? '',
+        dlName: initialDriver.dlName ?? initialDriver.name ?? '',
+        mobile: initialDriver.mobile ?? '',
+        dlValidTillDate: initialDriver.dlValidTillDate ?? initialDriver.licenseExpiry ?? '',
+        gender: initialDriver.gender ?? '',
+        email: initialDriver.email ?? '',
+        dlCopyFileName: initialDriver.dlCopyFileName ?? '',
+        licenseClasses: initialDriver.licenseClass?.join(', ') ?? 'HCV, LCV',
+      })
+      setTrackingSelections(
+        initialDriver.trackingSelections ?? [
+          { type: 'SIM Tracking', checked: true, primarySet: true },
+          { type: 'Driver App Tracking', checked: true, primarySet: false },
+        ]
+      )
+    } else {
+      setForm(DEFAULT_FORM)
+      setTrackingSelections([
+        { type: 'SIM Tracking', checked: true, primarySet: true },
+        { type: 'Driver App Tracking', checked: true, primarySet: false },
+      ])
     }
-    if (!mobile.trim()) {
-      newErrors.mobile = 'Mobile number is required.'
-    } else if (!/^\+?[\d\s-]{10,}$/.test(mobile.trim())) {
-      newErrors.mobile = 'Enter a valid mobile number (at least 10 digits).'
-    }
-    if (!licenseNumber.trim()) {
-      newErrors.licenseNumber = 'License number is required.'
-    } else if (licenseNumber.trim().length < 8) {
-      newErrors.licenseNumber = 'License number must be at least 8 characters.'
-    }
-    return newErrors
+  }, [initialDriver, isOpen])
+
+  const setField = <K extends keyof DriverFormState>(key: K, value: DriverFormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }))
-    setErrors(validate())
+  const updateTrackingSelection = (index: number, patch: Partial<DriverTrackingSelection>) => {
+    setTrackingSelections((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
   }
+
+  const handleClose = () => onClose()
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const newErrors = validate()
-    setErrors(newErrors)
-    setTouched({ name: true, mobile: true, licenseNumber: true })
 
-    if (Object.keys(newErrors).length > 0) return
-
-    const newDriver: Driver = {
-      id: `DR-${Math.floor(1000 + Math.random() * 9000)}`,
-      name,
-      mobile,
-      licenseNumber: licenseNumber.toUpperCase(),
-      licenseExpiry: new Date(Date.now() + 31536000000 * 2).toISOString(), // 2 years from now
-      licenseClass: ['HCV', 'LCV'],
+    const nextDriver: Driver = {
+      id: initialDriver?.id ?? `DR-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: form.name,
+      dateOfBirth: form.dateOfBirth,
+      dlName: form.dlName,
+      dlVerified: true,
+      mobile: form.mobile,
+      licenseNumber: form.dlNumber,
+      dlValidTillDate: form.dlValidTillDate,
+      gender: form.gender || undefined,
+      email: form.email,
+      dlCopyFileName: form.dlCopyFileName,
+      trackingSelections,
+      licenseExpiry: form.dlValidTillDate || new Date(Date.now() + 31536000000 * 2).toISOString(),
+      licenseClass: form.licenseClasses.split(',').map((value) => value.trim()).filter(Boolean),
       complianceStatus: 'COMPLIANT',
       currentStatus: 'ACTIVE',
-      complianceDocuments: []
+      complianceDocuments: initialDriver?.complianceDocuments ?? [],
     }
 
-    addDriver(newDriver)
-    resetForm()
-    onClose()
-  }
+    if (isEditMode) {
+      updateDriver(nextDriver)
+      window.alert(`Mock driver updated: ${nextDriver.name}`)
+    } else {
+      addDriver(nextDriver)
+      window.alert(`Mock driver added: ${nextDriver.name}`)
+    }
 
-  const resetForm = () => {
-    setName('')
-    setMobile('')
-    setLicenseNumber('')
-    setErrors({})
-    setTouched({})
-  }
-
-  const handleClose = () => {
-    resetForm()
-    onClose()
+    handleClose()
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Driver</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
           <DialogDescription>
-            Register a new driver to your fleet.
+            Mirror the mobile driver onboarding flow with DL verification, tracking, and document fields.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Driver Name <span className="text-danger">*</span>
-            </label>
-            <Input 
-              placeholder="e.g. Ramesh Kumar" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)}
-              onBlur={() => handleBlur('name')}
-              className={touched.name && errors.name ? 'border-danger focus-visible:ring-danger/20' : ''}
-            />
-            {touched.name && errors.name && (
-              <p className="text-xs text-danger">{errors.name}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              Mobile Number <span className="text-danger">*</span>
-            </label>
-            <Input 
-              placeholder="e.g. +91 9876543210" 
-              value={mobile} 
-              onChange={(e) => setMobile(e.target.value)}
-              onBlur={() => handleBlur('mobile')}
-              className={touched.mobile && errors.mobile ? 'border-danger focus-visible:ring-danger/20' : ''}
-            />
-            {touched.mobile && errors.mobile && (
-              <p className="text-xs text-danger">{errors.mobile}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              License Number <span className="text-danger">*</span>
-            </label>
-            <Input 
-              placeholder="e.g. MH0420210012345" 
-              value={licenseNumber} 
-              onChange={(e) => setLicenseNumber(e.target.value)}
-              onBlur={() => handleBlur('licenseNumber')}
-              className={touched.licenseNumber && errors.licenseNumber ? 'border-danger focus-visible:ring-danger/20' : ''}
-            />
-            {touched.licenseNumber && errors.licenseNumber && (
-              <p className="text-xs text-danger">{errors.licenseNumber}</p>
-            )}
-          </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          <section className="space-y-4 rounded-xl border p-4">
+            <h3 className="font-semibold">Driver details</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium">Driver Name *</label>
+                <Input value={form.name} onChange={(e) => setField('name', e.target.value)} className="mt-1" placeholder="Ramesh Kumar" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Date of Birth *</label>
+                <Input value={form.dateOfBirth} onChange={(e) => setField('dateOfBirth', e.target.value)} className="mt-1" placeholder="YYYY-MM-DD" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">DL Number *</label>
+                <Input value={form.dlNumber} onChange={(e) => setField('dlNumber', e.target.value.toUpperCase())} className="mt-1" placeholder="MH0420210012345" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">DL Holder Name</label>
+                <Input value={form.dlName} onChange={(e) => setField('dlName', e.target.value)} className="mt-1" placeholder="Matches driving license" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Phone Number *</label>
+                <Input value={form.mobile} onChange={(e) => setField('mobile', e.target.value)} className="mt-1" placeholder="+91 9876543210" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email</label>
+                <Input value={form.email} onChange={(e) => setField('email', e.target.value)} className="mt-1" placeholder="driver@vendor.com" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">DL Valid Till Date</label>
+                <Input value={form.dlValidTillDate} onChange={(e) => setField('dlValidTillDate', e.target.value)} className="mt-1" placeholder="YYYY-MM-DD" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Gender</label>
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={form.gender}
+                  onChange={(e) => setField('gender', e.target.value as Driver['gender'])}
+                >
+                  <option value="">Select</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">DL Copy File Name</label>
+                <Input value={form.dlCopyFileName} onChange={(e) => setField('dlCopyFileName', e.target.value)} className="mt-1" placeholder="dl.pdf" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">License Classes</label>
+                <Input value={form.licenseClasses} onChange={(e) => setField('licenseClasses', e.target.value)} className="mt-1" placeholder="HCV, LCV" />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4 rounded-xl border p-4">
+            <h3 className="font-semibold">Tracking setup</h3>
+            {trackingSelections.map((selection, index) => (
+              <div key={`${index}-${selection.type}`} className="rounded-lg border bg-muted/20 p-3">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-medium uppercase text-muted-foreground">Type</label>
+                    <Input value={selection.type} onChange={(e) => updateTrackingSelection(index, { type: e.target.value })} className="mt-1" />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={selection.checked} onChange={(e) => updateTrackingSelection(index, { checked: e.target.checked })} />
+                      Enabled
+                    </label>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={selection.primarySet} onChange={(e) => updateTrackingSelection(index, { primarySet: e.target.checked })} />
+                      Primary
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="space-y-4 rounded-xl border p-4">
+            <h3 className="font-semibold">Status</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="text-sm font-medium">Current Status</label>
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  defaultValue="ACTIVE"
+                  disabled
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Compliance Status</label>
+                <select
+                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  defaultValue="COMPLIANT"
+                  disabled
+                >
+                  <option value="COMPLIANT">COMPLIANT</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">DL Verified</label>
+                <select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" defaultValue="true" disabled>
+                  <option value="true">Yes</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit">Add Driver</Button>
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button type="submit">{isEditMode ? 'Save Driver' : 'Add Driver'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

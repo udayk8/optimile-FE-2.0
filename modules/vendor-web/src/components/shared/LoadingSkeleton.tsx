@@ -1,4 +1,4 @@
-import { cn } from '@vendor/utils/cn'
+import { cn } from '@vendor/lib/cn'
 
 interface LoadingSkeletonProps {
   className?: string
@@ -6,7 +6,7 @@ interface LoadingSkeletonProps {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-lg bg-gray-100', className)} />
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />
 }
 
 export function LoadingSkeleton({ className, lines = 3 }: LoadingSkeletonProps) {
@@ -21,7 +21,7 @@ export function LoadingSkeleton({ className, lines = 3 }: LoadingSkeletonProps) 
 
 export function CardSkeleton() {
   return (
-    <div className="rounded-xl border bg-white p-6 space-y-4">
+    <div className="rounded-xl border bg-card p-6 space-y-4">
       <div className="flex items-center justify-between">
         <Skeleton className="h-5 w-32" />
         <Skeleton className="h-5 w-20 rounded-full" />
@@ -29,8 +29,8 @@ export function CardSkeleton() {
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-2/3" />
       <div className="flex gap-2 pt-2">
-        <Skeleton className="h-8 w-24 rounded-lg" />
-        <Skeleton className="h-8 w-24 rounded-lg" />
+        <Skeleton className="h-8 w-24 rounded-md" />
+        <Skeleton className="h-8 w-24 rounded-md" />
       </div>
     </div>
   )
@@ -39,9 +39,9 @@ export function CardSkeleton() {
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-2">
-      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-md" />
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        <Skeleton key={i} className="h-12 w-full rounded-md" />
       ))}
     </div>
   )

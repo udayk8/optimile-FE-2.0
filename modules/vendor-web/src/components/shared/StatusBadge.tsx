@@ -1,5 +1,5 @@
-import { Badge } from '@shared-ui/badge'
-import type { BadgeProps } from '@shared-ui/badge'
+import { Badge } from '@vendor/components/ui/badge'
+import type { BadgeProps } from '@vendor/components/ui/badge'
 
 type StatusVariant = 'success' | 'warning' | 'destructive' | 'info' | 'muted'
 
@@ -16,6 +16,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   AVAILABLE: { variant: 'success', label: 'Available' },
   VALID: { variant: 'success', label: 'Valid' },
   ACCEPTED: { variant: 'success', label: 'Accepted' },
+  VERIFIED: { variant: 'success', label: 'Verified' },
   // Blue statuses
   SUBMITTED: { variant: 'info', label: 'Submitted' },
   QUOTE_SUBMITTED: { variant: 'info', label: 'Quote Submitted' },
@@ -25,11 +26,13 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   AT_DELIVERY: { variant: 'info', label: 'At Delivery' },
   LIVE: { variant: 'info', label: 'Live' },
   EXTENDED: { variant: 'info', label: 'Extended' },
+  UNDER_REVIEW: { variant: 'info', label: 'Under Review' },
   // Amber statuses
   PENDING: { variant: 'warning', label: 'Pending' },
   INVITED: { variant: 'warning', label: 'Invited' },
   UPCOMING: { variant: 'warning', label: 'Upcoming' },
   PENDING_VERIFICATION: { variant: 'warning', label: 'Pending Verification' },
+  ONBOARDING_INCOMPLETE: { variant: 'warning', label: 'Onboarding Incomplete' },
   EXPIRING_SOON: { variant: 'warning', label: 'Expiring Soon' },
   PARTIALLY_AVAILABLE: { variant: 'warning', label: 'Partially Available' },
   UNDER_MAINTENANCE: { variant: 'warning', label: 'Under Maintenance' },

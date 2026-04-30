@@ -1,76 +1,65 @@
-import { lazy, Suspense, type ReactNode } from 'react'
-import { Navigate, useRoutes } from 'react-router-dom'
-import { ProtectedRoute } from '@shared-auth'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from '@vendor/components/layout/AppShell'
-import LoginPage from '@vendor/auth/LoginPage'
+import OnboardingPage from '@vendor/features/auth/pages/OnboardingPage'
+import DashboardPage from '@vendor/features/home/pages/DashboardPage'
+import SourcingPage from '@vendor/features/sourcing/pages/SourcingPage'
+import AuctionDetailPage from '@vendor/features/sourcing/pages/AuctionDetailPage'
+import ContractsPage from '@vendor/features/contracts/pages/ContractsPage'
+import TripsPage from '@vendor/features/trips/pages/TripsPage'
+import TripDetailPage from '@vendor/features/trips/pages/TripDetailPage'
+import ExpensesPage from '@vendor/features/expenses/pages/ExpensesPage'
+import FleetPage from '@vendor/features/fleet/pages/FleetPage'
+import InvoicesPage from '@vendor/features/invoices/pages/InvoicesPage'
+import InvoiceDetailPage from '@vendor/features/invoices/pages/InvoiceDetailPage'
+import ProfilePage from '@vendor/features/profile/pages/ProfilePage'
+import NotificationsPage from '@vendor/features/notifications/pages/NotificationsPage'
 
-const DashboardPage = lazy(() => import('@vendor/modules/home/pages/DashboardPage'))
-const SourcingPage = lazy(() => import('@vendor/modules/sourcing/pages/SourcingPage'))
-const AuctionDetailPage = lazy(() => import('@vendor/modules/sourcing/pages/AuctionDetailPage'))
-const ContractsPage = lazy(() => import('@vendor/modules/contracts/pages/ContractsPage'))
-const TripsPage = lazy(() => import('@vendor/modules/trips/pages/TripsPage'))
-const ExpensesPage = lazy(() => import('@vendor/modules/expenses/pages/ExpensesPage'))
-const FleetPage = lazy(() => import('@vendor/modules/fleet/pages/FleetPage'))
-const InvoicesPage = lazy(() => import('@vendor/modules/invoices/pages/InvoicesPage'))
-const ProfilePage = lazy(() => import('@vendor/modules/profile/pages/ProfilePage'))
+const routes = [
+  {
+    path: '/onboarding',
+    element: <OnboardingPage />,
+  },
+  {
+    path: '/',
+    element: <AppShell />,
+    children: [
+      { index: true, element: <Navigate to="/home" replace /> },
+      { path: 'home', element: <DashboardPage /> },
+      { path: 'sourcing', element: <SourcingPage /> },
+      { path: 'sourcing/auctions/:id', element: <AuctionDetailPage /> },
+      { path: 'contracts', element: <ContractsPage /> },
+      { path: 'contracts/:id', element: <ContractsPage /> },
+      { path: 'trips', element: <TripsPage /> },
+      { path: 'trips/indents/:id', element: <TripDetailPage /> },
+      { path: 'trips/active/:id', element: <TripDetailPage /> },
+      { path: 'trips/completed/:id', element: <TripDetailPage /> },
+      { path: 'expenses', element: <ExpensesPage /> },
+      { path: 'expenses/add/:tripId', element: <ExpensesPage /> },
+      { path: 'expenses/:id', element: <ExpensesPage /> },
+      { path: 'fleet', element: <FleetPage /> },
+      { path: 'fleet/vehicles', element: <FleetPage /> },
+      { path: 'fleet/vehicles/add', element: <FleetPage /> },
+      { path: 'fleet/vehicles/:id', element: <FleetPage /> },
+      { path: 'fleet/drivers', element: <FleetPage /> },
+      { path: 'fleet/drivers/add', element: <FleetPage /> },
+      { path: 'fleet/drivers/:id', element: <FleetPage /> },
+      { path: 'fleet/capacity', element: <FleetPage /> },
+      { path: 'invoices', element: <InvoicesPage /> },
+      { path: 'invoices/create', element: <InvoicesPage /> },
+      { path: 'invoices/list', element: <InvoicesPage /> },
+      { path: 'invoices/:id', element: <InvoiceDetailPage /> },
+      { path: 'invoices/ledger', element: <InvoicesPage /> },
+      { path: 'profile', element: <ProfilePage /> },
+      { path: 'profile/company', element: <ProfilePage /> },
+      { path: 'profile/bank', element: <ProfilePage /> },
+      { path: 'profile/verification', element: <Navigate to="/profile/company" replace /> },
+      { path: 'profile/notifications', element: <Navigate to="/profile" replace /> },
+      { path: 'notifications', element: <NotificationsPage /> },
+      { path: '*', element: <Navigate to="/home" replace /> },
+    ],
+  },
+]
 
-function LazyPage({ children }: { children: ReactNode }) {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-600">Loading module...</div>}>
-      {children}
-    </Suspense>
-  )
-}
-
-export function VendorRoutes({ standalone = false }: { standalone?: boolean }) {
-  const dashboardPath = '/vendor/dashboard'
-
-  const routes = [
-    ...(standalone
-      ? [
-          { path: '/login', element: <LoginPage /> },
-          { path: '/', element: <Navigate to="/vendor" replace /> },
-        ]
-      : []),
-    {
-      ...(standalone ? { path: '/vendor' } : {}),
-      element: <ProtectedRoute portal="vendor"><AppShell /></ProtectedRoute>,
-      children: [
-        { index: true, element: <Navigate to={dashboardPath} replace /> },
-        { path: 'dashboard', element: <LazyPage><DashboardPage /></LazyPage> },
-        { path: 'home', element: <LazyPage><DashboardPage /></LazyPage> },
-        { path: 'sourcing', element: <ProtectedRoute portal="vendor" module="sourcing"><LazyPage><SourcingPage /></LazyPage></ProtectedRoute> },
-        { path: 'sourcing/auctions/:id', element: <ProtectedRoute portal="vendor" module="sourcing"><LazyPage><AuctionDetailPage /></LazyPage></ProtectedRoute> },
-        { path: 'contracts', element: <ProtectedRoute portal="vendor" module="contracts"><LazyPage><ContractsPage /></LazyPage></ProtectedRoute> },
-        { path: 'contracts/:id', element: <ProtectedRoute portal="vendor" module="contracts"><LazyPage><ContractsPage /></LazyPage></ProtectedRoute> },
-        { path: 'trips', element: <ProtectedRoute portal="vendor" module="trips"><LazyPage><TripsPage /></LazyPage></ProtectedRoute> },
-        { path: 'trips/indents/:id', element: <ProtectedRoute portal="vendor" module="trips"><LazyPage><TripsPage /></LazyPage></ProtectedRoute> },
-        { path: 'trips/active/:id', element: <ProtectedRoute portal="vendor" module="trips"><LazyPage><TripsPage /></LazyPage></ProtectedRoute> },
-        { path: 'trips/completed/:id', element: <ProtectedRoute portal="vendor" module="trips"><LazyPage><TripsPage /></LazyPage></ProtectedRoute> },
-        { path: 'expenses', element: <ProtectedRoute portal="vendor" module="expenses"><LazyPage><ExpensesPage /></LazyPage></ProtectedRoute> },
-        { path: 'expenses/add/:tripId', element: <ProtectedRoute portal="vendor" module="expenses"><LazyPage><ExpensesPage /></LazyPage></ProtectedRoute> },
-        { path: 'expenses/:id', element: <ProtectedRoute portal="vendor" module="expenses"><LazyPage><ExpensesPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/vehicles', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/vehicles/add', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/vehicles/:id', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/drivers', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/drivers/add', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/drivers/:id', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'fleet/capacity', element: <ProtectedRoute portal="vendor" module="fleet"><LazyPage><FleetPage /></LazyPage></ProtectedRoute> },
-        { path: 'invoices', element: <ProtectedRoute portal="vendor" module="invoices"><LazyPage><InvoicesPage /></LazyPage></ProtectedRoute> },
-        { path: 'invoices/create', element: <ProtectedRoute portal="vendor" module="invoices"><LazyPage><InvoicesPage /></LazyPage></ProtectedRoute> },
-        { path: 'invoices/list', element: <ProtectedRoute portal="vendor" module="invoices"><LazyPage><InvoicesPage /></LazyPage></ProtectedRoute> },
-        { path: 'invoices/:id', element: <ProtectedRoute portal="vendor" module="invoices"><LazyPage><InvoicesPage /></LazyPage></ProtectedRoute> },
-        { path: 'invoices/ledger', element: <ProtectedRoute portal="vendor" module="invoices"><LazyPage><InvoicesPage /></LazyPage></ProtectedRoute> },
-        { path: 'profile', element: <ProtectedRoute portal="vendor" module="profile"><LazyPage><ProfilePage /></LazyPage></ProtectedRoute> },
-        { path: 'profile/company', element: <ProtectedRoute portal="vendor" module="profile"><LazyPage><ProfilePage /></LazyPage></ProtectedRoute> },
-        { path: 'profile/bank', element: <ProtectedRoute portal="vendor" module="profile"><LazyPage><ProfilePage /></LazyPage></ProtectedRoute> },
-        { path: 'profile/notifications', element: <Navigate to="/vendor/profile" replace /> },
-        { path: '*', element: <Navigate to={dashboardPath} replace /> },
-      ],
-    },
-  ]
-
-  return useRoutes(routes)
+export function createVendorPortalRouter(basename?: string) {
+  return createBrowserRouter(routes, { basename })
 }

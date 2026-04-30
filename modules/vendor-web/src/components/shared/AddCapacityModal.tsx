@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@shared-ui/dialog'
-import { Button } from '@shared-ui/button'
-import { Input } from '@shared-ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
+import { Button } from '@vendor/components/ui/button'
+import { Input } from '@vendor/components/ui/input'
 import { useAppStore } from '@vendor/stores/app.store'
 import { CapacityDeclaration } from '@vendor/types'
 
@@ -50,7 +50,7 @@ export function AddCapacityModal({ isOpen, onClose }: AddCapacityModalProps) {
           <div className="space-y-2">
             <label className="text-sm font-medium">Vehicle Type</label>
             <select 
-              className="flex h-10 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
               value={vehicleType}
               onChange={(e) => setVehicleType(e.target.value)}
             >

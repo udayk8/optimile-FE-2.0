@@ -4,27 +4,26 @@ import {
   Search,
   FileText,
   Truck,
-  Receipt,
   Ship,
-  CreditCard,
+  Receipt,
+  ReceiptText,
   User,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { getAllowedModules } from '@shared-auth'
-import { cn } from '@vendor/utils/cn'
+import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
 
 const NAV_ITEMS = [
-  { path: '/vendor/dashboard', label: 'Home', subtitle: 'Executive overview', icon: Home, module: 'dashboard' },
-  { path: '/vendor/sourcing', label: 'Sourcing', subtitle: 'Auctions and bids', icon: Search, module: 'sourcing' },
-  { path: '/vendor/contracts', label: 'Contracts', subtitle: 'Active agreements', icon: FileText, module: 'contracts' },
-  { path: '/vendor/trips', label: 'Trips', subtitle: 'Indents and deliveries', icon: Truck, module: 'trips' },
-  { path: '/vendor/expenses', label: 'Expenses', subtitle: 'Trip-linked costs', icon: Receipt, module: 'expenses' },
-  { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship, module: 'fleet' },
-  { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Billing and payments', icon: CreditCard, module: 'invoices' },
-  { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User, module: 'profile' },
-] as const
+  { path: '/home', label: 'Home', subtitle: 'Executive overview', icon: Home },
+  { path: '/sourcing', label: 'Sourcing', subtitle: 'Auctions and bids', icon: Search },
+  { path: '/contracts', label: 'Contracts', subtitle: 'Active agreements', icon: FileText },
+  { path: '/trips', label: 'Trips', subtitle: 'Indents and deliveries', icon: Truck },
+  { path: '/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
+  { path: '/expenses', label: 'Expenses', subtitle: 'Trip-linked costs', icon: Receipt },
+  { path: '/invoices', label: 'Invoices', subtitle: 'Billing and payments', icon: ReceiptText },
+  { path: '/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
+]
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
@@ -33,28 +32,28 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'sticky top-0 z-40 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300',
-        sidebarCollapsed ? 'w-20' : 'w-80'
+        'flex flex-col bg-white border-r border-[#E5E7EB] transition-all duration-300 h-screen sticky top-0 z-40',
+        sidebarCollapsed ? 'w-16' : 'w-[270px]'
       )}
     >
       {/* Logo */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-4">
+      <div className="flex items-center h-[68px] px-4 border-b border-[#E5E7EB]">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-white">
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-sm shrink-0">
             VP
           </div>
           {!sidebarCollapsed && (
             <div>
-              <span className="text-sm font-bold text-text">Vendor Portal</span>
-              <p className="text-[11px] leading-tight text-gray-500">Optimile ERP</p>
+              <span className="text-sm font-semibold text-[#0F172A] tracking-tight">Vendor Portal</span>
+              <p className="text-[11px] text-[#94A3B8] leading-tight">Optimile ERP</p>
             </div>
           )}
         </div>
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 space-y-1.5 overflow-y-auto px-2.5 py-3">
-        {getAllowedModules(NAV_ITEMS).map((item) => {
+      <nav className="flex-1 py-3 px-2.5 space-y-1.5 overflow-y-auto">
+        {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname.startsWith(item.path)
 
@@ -63,18 +62,18 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               className={cn(
-                'flex items-center gap-3 rounded-lg border-l-4 px-3 py-3 text-sm transition-colors',
+                'flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-all duration-200',
                 isActive
-                  ? 'border-l-primary bg-primary/10 font-bold text-primary shadow-sm'
-                  : 'border-l-transparent text-gray-600 hover:border-l-gray-300 hover:bg-gray-50 hover:text-primary'
+                  ? 'bg-[#EFF6FF] text-[#2563EB] font-semibold'
+                  : 'text-[#475569] hover:bg-[#F8FAFC] hover:text-[#0F172A]'
               )}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <Icon className={cn('h-5 w-5 shrink-0', isActive ? 'text-primary' : 'text-gray-400')} />
+              <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-[#2563EB]' : 'text-[#94A3B8]')} />
               {!sidebarCollapsed && (
                 <div className="min-w-0">
                   <div className="truncate leading-tight">{item.label}</div>
-                  <div className={cn('mt-0.5 truncate text-[11px] leading-tight', isActive ? 'text-primary/70' : 'text-gray-500')}>
+                  <div className={cn('text-[11px] truncate leading-tight mt-0.5', isActive ? 'text-[#2563EB]/60' : 'text-[#94A3B8]')}>
                     {item.subtitle}
                   </div>
                 </div>
@@ -87,8 +86,7 @@ export function Sidebar() {
       {/* Collapse toggle */}
       <button
         onClick={toggleSidebar}
-        className="flex h-12 items-center justify-center border-t border-gray-200 text-gray-500 transition-colors hover:text-primary"
-        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className="flex items-center justify-center h-12 border-t border-[#E5E7EB] text-[#94A3B8] hover:text-[#475569] transition-colors"
       >
         {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>

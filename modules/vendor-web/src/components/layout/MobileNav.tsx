@@ -1,19 +1,19 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Truck, Receipt, CreditCard, MoreHorizontal, Search, FileText, Ship, User, X } from 'lucide-react'
-import { cn } from '@vendor/utils/cn'
+import { Home, Truck, Ship, Receipt, ReceiptText, MoreHorizontal, Search, FileText, User, X } from 'lucide-react'
+import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
 
 const BOTTOM_NAV = [
   { path: '/home', label: 'Home', icon: Home },
   { path: '/trips', label: 'Trips', icon: Truck },
+  { path: '/fleet', label: 'Fleet', icon: Ship },
   { path: '/expenses', label: 'Expenses', icon: Receipt },
-  { path: '/invoices', label: 'Invoices', icon: CreditCard },
 ]
 
 const MORE_NAV = [
   { path: '/sourcing', label: 'Sourcing', icon: Search },
   { path: '/contracts', label: 'Contracts', icon: FileText },
-  { path: '/fleet', label: 'Fleet', icon: Ship },
+  { path: '/invoices', label: 'Invoices', icon: ReceiptText },
   { path: '/profile', label: 'Profile', icon: User },
 ]
 
@@ -26,7 +26,7 @@ export function MobileNav() {
   return (
     <>
       {/* Bottom nav bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t flex items-center justify-around h-16 px-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background border-t flex items-center justify-around h-16 px-2">
         {BOTTOM_NAV.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname.startsWith(item.path)
@@ -36,7 +36,7 @@ export function MobileNav() {
               to={item.path}
               className={cn(
                 'flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-lg text-xs transition-colors',
-                isActive ? 'text-primary font-semibold' : 'text-gray-500'
+                isActive ? 'text-primary font-semibold' : 'text-muted-foreground'
               )}
             >
               <Icon className="h-5 w-5" />
@@ -48,7 +48,7 @@ export function MobileNav() {
           onClick={() => setMobileNavOpen(true)}
           className={cn(
             'flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-lg text-xs transition-colors',
-            isMoreActive ? 'text-primary font-semibold' : 'text-gray-500'
+            isMoreActive ? 'text-primary font-semibold' : 'text-muted-foreground'
           )}
         >
           <MoreHorizontal className="h-5 w-5" />
@@ -60,7 +60,7 @@ export function MobileNav() {
       {mobileNavOpen && (
         <div className="md:hidden fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-black/50" onClick={() => setMobileNavOpen(false)} />
-          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-4 pb-8 animate-slide-in">
+          <div className="absolute bottom-0 left-0 right-0 bg-background rounded-t-2xl p-4 pb-8 animate-slide-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">More</h3>
               <button onClick={() => setMobileNavOpen(false)}>
@@ -78,7 +78,7 @@ export function MobileNav() {
                     onClick={() => setMobileNavOpen(false)}
                     className={cn(
                       'flex flex-col items-center gap-2 p-3 rounded-xl transition-colors',
-                      isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent text-gray-500'
+                      isActive ? 'bg-primary/10 text-primary' : 'hover:bg-accent text-muted-foreground'
                     )}
                   >
                     <Icon className="h-6 w-6" />

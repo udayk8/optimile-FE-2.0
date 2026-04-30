@@ -44,6 +44,14 @@ export interface Vendor {
   gstin: string
   pan: string
   status: VendorStatus
+  onboardingStep?: VendorOnboardingStep
+  kycStatus?: VendorKycStatus
+  profileCompletion?: number
+  rejectionReason?: string
+  bankStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED'
+  serviceRegions?: string[]
+  supportedVehicleTypes?: string[]
+  documents?: VendorDocument[]
   primaryContact: {
     name: string
     phone: string
@@ -52,7 +60,26 @@ export interface Vendor {
   profileImageUrl?: string
 }
 
-export type VendorStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'SUSPENDED' | 'BLACKLISTED'
+export type VendorStatus =
+  | 'ONBOARDING_INCOMPLETE'
+  | 'PENDING_VERIFICATION'
+  | 'UNDER_REVIEW'
+  | 'ACTIVE'
+  | 'REJECTED'
+  | 'SUSPENDED'
+  | 'BLACKLISTED'
+
+export type VendorOnboardingStep = 'REGISTER' | 'OTP' | 'SETUP' | 'DOCUMENTS' | 'REVIEW' | 'COMPLETE'
+export type VendorKycStatus = 'NOT_STARTED' | 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'REJECTED' | 'APPROVED'
+
+export interface VendorDocument {
+  id: string
+  type: 'GST' | 'PAN' | 'BANK' | 'COMPANY' | 'AADHAAR_FRONT' | 'AADHAAR_BACK'
+  fileName: string
+  fileUrl?: string
+  uploadedAt: string
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED'
+}
 
 export interface AuthState {
   vendor: Vendor | null
@@ -71,6 +98,23 @@ export interface Notification {
   deepLink: string
   isRead: boolean
   createdAt: string
+}
+
+export interface VendorSetupDraft {
+  companyName: string
+  legalName: string
+  gstin: string
+  pan: string
+  registeredAddress: { street: string; city: string; state: string; pincode: string }
+  primaryContact: { name: string; phone: string; email: string }
+  serviceRegions: string[]
+  supportedVehicleTypes: string[]
+  bankName: string
+  branch: string
+  accountNumber: string
+  ifscCode: string
+  accountType: 'SAVINGS' | 'CURRENT'
+  rejectionReason?: string
 }
 
 // ==================== DASHBOARD TYPES ====================
@@ -183,6 +227,9 @@ export interface Indent {
   reportingDateTime: string
   slaDeadline: string
   status: IndentStatus
+  assignedVehicleId?: string
+  assignedDriverId?: string
+  rejectionReason?: string
   createdAt: string
 }
 
@@ -199,24 +246,53 @@ export interface Trip {
   deliveredDate?: string
   podStatus?: 'PENDING' | 'CONFIRMED'
   podReference?: string
+  documents?: TripDocument[]
+  timeline?: TripTimelineEvent[]
   freightRate: number
   expenseSummary: { total: number; approved: number; pending: number }
   isInvoiced: boolean
   createdAt: string
 }
 
+export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
+
+export interface TripDocument {
+  id: string
+  type: TripDocumentType
+  title: string
+  fileName: string
+  fileUrl?: string
+  fileBase64?: string
+  createdAt: string
+  note?: string
+}
+
+export interface TripTimelineEvent {
+  id: string
+  title: string
+  description: string
+  timestamp: string
+  status?: string
+}
+
 // ==================== EXPENSE TYPES ====================
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type ExpenseType = 'TOLL' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
+
+export interface ExpenseLineItem {
+  id: string
+  expenseType: ExpenseType
+  amount: number
+  description?: string
+  supportingDocumentUrl?: string
+}
 
 export interface Expense {
   id: string
   tripId: string
   tripReference: string
-  expenseType: ExpenseType
+  lineItems: ExpenseLineItem[]
   amount: number
-  description?: string
-  supportingDocumentUrl?: string
   status: ExpenseStatus
   rejectionReason?: string
   submittedAt: string
@@ -230,7 +306,26 @@ export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
 export interface Vehicle {
   id: string
   registrationNumber: string
+  model?: string
+  engineNumber?: string
+  chassisNumber?: string
+  odometerReading?: string
+  manufacturer?: string
+  manufactureDate?: string
+  registrationDate?: string
   vehicleType: string
+  permitType?: string
+  capacityKg?: string
+  capacityCubicMeter?: string
+  capacityLiters?: string
+  length?: string
+  width?: string
+  height?: string
+  rcStartDate?: string
+  rcEndDate?: string
+  rcFileName?: string
+  trackingSelections?: VehicleTrackingSelection[]
+  additionalDocuments?: VehicleAdditionalDocument[]
   baseLocation: string
   operationalStatus: OperationalStatus
   complianceStatus: ComplianceStatus
@@ -242,13 +337,43 @@ export interface Vehicle {
 export interface Driver {
   id: string
   name: string
+  dateOfBirth?: string
+  dlName?: string
+  dlVerified?: boolean
   mobile: string
   licenseNumber: string
+  dlValidTillDate?: string
+  gender?: 'Male' | 'Female' | 'Other'
+  email?: string
+  dlCopyFileName?: string
+  trackingSelections?: DriverTrackingSelection[]
   licenseExpiry: string
   licenseClass: string[]
   complianceStatus: ComplianceStatus
   currentStatus: DriverStatus
   complianceDocuments: ComplianceDocument[]
+}
+
+export interface VehicleTrackingSelection {
+  type: string
+  checked: boolean
+  primarySet: boolean
+  gpsOption?: string
+  gpsDeviceID?: string
+}
+
+export interface VehicleAdditionalDocument {
+  id: string
+  type: string
+  fileName: string
+  startDate?: string
+  endDate?: string
+}
+
+export interface DriverTrackingSelection {
+  type: string
+  checked: boolean
+  primarySet: boolean
 }
 
 export interface ComplianceDocument {
@@ -288,6 +413,7 @@ export interface Invoice {
   paymentDate?: string
   notes?: string
   pdfUrl: string
+  tripReferences?: string[]
   createdAt: string
 }
 
@@ -310,6 +436,10 @@ export interface LedgerEntry {
   debit: number
   runningBalance: number
   documentUrl?: string
+}
+
+export interface AppNotification extends Notification {
+  severity?: 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR'
 }
 
 // ==================== PROFILE TYPES ====================
