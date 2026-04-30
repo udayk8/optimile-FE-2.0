@@ -12,7 +12,6 @@ export default defineConfig({
       '@admin': path.resolve(rootDir, 'modules/auction-web/src'),
       '@vendor': path.resolve(rootDir, 'modules/vendor-web/src'),
       '@fleet': path.resolve(rootDir, 'modules/fleet-web/src'),
-      '@driver': path.resolve(rootDir, 'modules/driver-web/src'),
       '@customer': path.resolve(rootDir, 'modules/customer-web/src'),
       '@shared-api': path.resolve(rootDir, 'packages/shared-api/src'),
       '@shared-auth': path.resolve(rootDir, 'packages/shared-auth/src'),

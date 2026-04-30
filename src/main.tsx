@@ -15,7 +15,6 @@ import './styles.css'
 const AdminApp    = lazy(() => import('@admin/app/AdminApp'))
 const VendorApp   = lazy(() => import('@vendor/app/VendorApp'))
 const FleetApp    = lazy(() => import('@fleet/app/FleetApp'))
-const DriverApp   = lazy(() => import('@driver/app/DriverApp'))
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
 
 const Fallback = (
@@ -54,7 +53,6 @@ function HostRouter() {
             <Route path="/auction/*"  element={<ProtectedRoute portal="auction"><AdminApp /></ProtectedRoute>} />
             <Route path="/vendor/*"   element={<ProtectedRoute portal="vendor"><VendorApp /></ProtectedRoute>} />
             <Route path="/fleet/*"    element={<ProtectedRoute portal="fleet"><FleetApp /></ProtectedRoute>} />
-            <Route path="/driver/*"   element={<ProtectedRoute portal="driver"><DriverApp /></ProtectedRoute>} />
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
 
             {/* Legacy redirects */}

@@ -33,16 +33,16 @@ export function LoginShell() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary via-secondary to-primary/80 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
 
         {/* Brand */}
         <div className="text-center mb-8">
           <OptimileLogo
-            className="text-white mx-auto mb-4"
+            className="text-primary mx-auto mb-4"
             style={{ height: 44, width: 'auto', display: 'block' }}
           />
-          <p className="text-white/70 text-sm">Logistics Enterprise Resource Planning</p>
+          <p className="text-gray-500 text-sm">Logistics Enterprise Resource Planning</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-5">

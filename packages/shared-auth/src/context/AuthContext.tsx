@@ -16,7 +16,7 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
-    modules: ['ams', 'fleet', 'vendor', 'customer', 'driver'],
+    modules: ['ams', 'fleet', 'vendor', 'customer'],
   },
   // Fleet Manager — only fleet → goes directly to /fleet
   'fleet@uday.ts.com': {
@@ -64,7 +64,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ENV_TENANT_HINT = (import.meta.env.VITE_AUTH_TENANT_ID as string | undefined)?.trim() ?? ''
-const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'driver', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl']
+const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl']
 const TENANT_STATUSES: Tenant['status'][] = ['active', 'suspended', 'trial']
 const USER_STATUSES: User['status'][] = ['active', 'inactive']
 
@@ -120,7 +120,6 @@ function getPrimaryPortal(modules: ERPModule[]): Portal {
   if (modules.includes('admin')) return 'admin'
   if (modules.includes('fleet')) return 'fleet'
   if (modules.includes('vendor')) return 'vendor'
-  if (modules.includes('driver')) return 'driver'
   if (modules.includes('customer')) return 'customer'
   return 'admin'
 }

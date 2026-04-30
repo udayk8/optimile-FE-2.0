@@ -2,7 +2,7 @@
 
 One Vite host serves route-based portals from a scalable monorepo. Each portal keeps its own app, modules, stores, styles, and types; shared code lives in packages.
 
-`driver-web` and `customer-web` are scaffold-only placeholders and are not production-ready.
+`customer-web` is a scaffold-only placeholder and is not production-ready.
 
 ## Commands
 
@@ -11,7 +11,7 @@ npm install
 npm run dev
 npm run dev:admin:standalone
 npm run dev:vendor:standalone
-npm run dev:driver:standalone
+npm run dev:fleet:standalone
 npm run dev:customer:standalone
 npm run build
 ```
@@ -22,11 +22,12 @@ npm run build
 
 - `/login`
 - `/admin/*`
+- `/auction/*`
 - `/vendor/*`
 - `/fleet/*`
-- `/driver/*`
 - `/customer/*`
-- `/auction/*` redirects to `/admin/auction/dashboard`
+
+`/admin/*` redirects to `/auction/dashboard`.
 
 ## Shared Packages
 

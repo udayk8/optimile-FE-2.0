@@ -20,8 +20,6 @@
       "@vendor/*": ["modules/vendor-web/src/*"],
       "@fleet": ["modules/fleet-web/src"],
       "@fleet/*": ["modules/fleet-web/src/*"],
-      "@driver": ["modules/driver-web/src"],
-      "@driver/*": ["modules/driver-web/src/*"],
       "@customer": ["modules/customer-web/src"],
       "@customer/*": ["modules/customer-web/src/*"],
       "@shared-api": ["packages/shared-api/src"],

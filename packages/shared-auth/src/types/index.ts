@@ -3,7 +3,6 @@ export type ERPModule =
   | 'fleet'       // Fleet Management
   | 'ams'         // Auction / Procurement
   | 'vendor'      // Vendor Management
-  | 'driver'      // Driver Management
   | 'customer'    // Customer Management
   | 'tms'         // Booking / Transport Management
   | 'tracking'    // Live Tracking

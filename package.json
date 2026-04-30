@@ -11,7 +11,6 @@
     "dev:admin:standalone": "npm run dev -w @optimile/auction-web",
     "dev:vendor:standalone": "npm run dev -w @optimile/vendor-web",
     "dev:fleet:standalone": "npm run dev -w @optimile/fleet-web",
-    "dev:driver:standalone": "npm run dev -w @optimile/driver-web",
     "dev:customer:standalone": "npm run dev -w @optimile/customer-web",
     "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/auction-web && npm run build -w @optimile/vendor-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web"
   },

@@ -8,7 +8,6 @@ const PORTAL_MODULES: Record<string, ERPModule> = {
   auction: 'ams',
   vendor: 'vendor',
   fleet: 'fleet',
-  driver: 'driver',
   customer: 'customer',
 }
 
