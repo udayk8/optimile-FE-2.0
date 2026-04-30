@@ -12,9 +12,11 @@
     "dev:vendor:standalone": "npm run dev -w @optimile/vendor-web",
     "dev:fleet:standalone": "npm run dev -w @optimile/fleet-web",
     "dev:customer:standalone": "npm run dev -w @optimile/customer-web",
-    "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/auction-web && npm run build -w @optimile/vendor-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web"
+    "dev:admin-booking-driver:standalone": "npm run dev -w @optimile/admin-booking-driver-web",
+    "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/auction-web && npm run build -w @optimile/vendor-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web && npm run build -w @optimile/admin-booking-driver-web"
   },
   "dependencies": {
+    "@optimile/admin-booking-driver-web": "file:modules/admin-booking-driver-web",
     "@optimile/auction-web": "file:modules/auction-web",
     "@optimile/fleet-web": "file:modules/fleet-web",
     "@optimile/shared-auth": "file:packages/shared-auth",
