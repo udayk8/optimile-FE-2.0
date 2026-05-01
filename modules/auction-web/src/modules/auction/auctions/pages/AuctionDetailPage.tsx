@@ -42,7 +42,7 @@ export default function AuctionDetailPage() {
   )
 
   if (!auction) {
-    return <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-600">Auction not found.</div>
+    return <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-600 shadow-sm">Auction not found.</div>
   }
 
   const actor = user?.name ?? 'Demo User'
@@ -125,7 +125,7 @@ export default function AuctionDetailPage() {
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="Auction Detail"
+        eyebrow="Auction Operations"
         title={auction.title}
         subtitle={`${auction.id} · ${auction.type} · ${auction.lanes.length} lane${auction.lanes.length > 1 ? 's' : ''}`}
         action={
@@ -186,7 +186,7 @@ export default function AuctionDetailPage() {
                 </p>
               )}
               {linkedContracts.map((contract) => (
-                <Link key={contract.id} to={`/auction/contracts/${contract.id}`} className="block rounded-xl border border-gray-200 p-4 transition hover:bg-gray-50">
+                <Link key={contract.id} to={`/auction/contracts/${contract.id}`} className="block rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:bg-white">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-semibold">{contract.id}</span>
                     <StatusBadge status={contract.status} />
@@ -247,7 +247,7 @@ export default function AuctionDetailPage() {
               <CardContent className="space-y-3">
                 {lane.ranking.length === 0 && <p className="text-sm text-gray-600">No valid bids recorded on this lane.</p>}
                 {lane.ranking.map((bid) => (
-                  <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
+                  <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div>
                       <p className="text-sm font-bold text-text">R{bid.rank} · {bid.vendorName}</p>
                       <p className="mt-1 text-xs text-gray-600">{formatDateTime(bid.timestamp)}</p>
@@ -291,14 +291,14 @@ export default function AuctionDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {lane.ranking.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
+                  <div className="rounded-xl border border-dashed border-gray-300 bg-white p-4 text-sm text-gray-600">
                     No valid bids. Procurement can keep this lane unawarded.
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="space-y-3">
                       {lane.ranking.map((bid) => (
-                        <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-gray-200 p-4">
+                        <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4">
                           <div>
                             <p className="text-sm font-bold text-text">R{bid.rank} · {bid.vendorName}</p>
                             <p className="mt-1 text-xs text-gray-600">{formatDateTime(bid.timestamp)}</p>
@@ -308,7 +308,7 @@ export default function AuctionDetailPage() {
                       ))}
                     </div>
 
-                    <div className="rounded-xl border border-gray-200 p-4">
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                       <p className="text-sm font-bold text-text">Award Selection</p>
                       <p className="mt-1 text-xs text-gray-600">R1, R2, and R3 are the auction ranks used across auctions, awards, and contracts.</p>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
@@ -319,7 +319,7 @@ export default function AuctionDetailPage() {
                         ]
                           .filter((entry) => entry.allocation > 0)
                           .map((entry) => (
-                            <div key={`${lane.id}-${entry.rank}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                            <div key={`${lane.id}-${entry.rank}`} className="rounded-xl border border-gray-200 bg-white p-4">
                               <p className="text-sm font-bold text-text">{entry.rank}</p>
                               <p className="mt-1 text-xs text-gray-600">{entry.allocation}% allocation</p>
                               <Select
@@ -404,7 +404,7 @@ export default function AuctionDetailPage() {
           </DialogHeader>
           {awardModal && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-gray-200 p-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p className="text-sm font-bold text-text">
                   {awardModal.scope === 'SPOT' ? spotLane?.lane : auction.lanes.find((lane) => lane.id === awardModal.laneId)?.lane}
                 </p>
@@ -443,7 +443,7 @@ export default function AuctionDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {getLaneSelectionRows(awardModal.laneId).map((entry) => (
-                    <div key={`${awardModal.laneId}-${entry.allocationRank}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div key={`${awardModal.laneId}-${entry.allocationRank}`} className="rounded-xl border border-gray-200 bg-white p-4">
                       <p className="text-sm font-bold text-text">
                         {entry.allocationRank} · {entry.vendorName}
                       </p>

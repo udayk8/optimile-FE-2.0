@@ -45,7 +45,7 @@ export function LoginShell() {
           <p className="text-gray-500 text-sm">Logistics Enterprise Resource Planning</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-5">
+        <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm space-y-5">
           <div>
             <h1 className="text-2xl font-extrabold text-text">Welcome back</h1>
             <p className="text-sm text-gray-500 mt-1">Sign in to your Optimile account</p>
@@ -132,7 +132,7 @@ export function LoginShell() {
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="h-10 w-full inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white transition hover:bg-secondary hover:border-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-10 w-full inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white transition hover:bg-secondary hover:border-secondary disabled:cursor-not-allowed disabled:border-primary/70 disabled:bg-primary/70 disabled:text-white disabled:opacity-100"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>

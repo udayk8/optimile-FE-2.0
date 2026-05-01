@@ -23,6 +23,7 @@ export type Department =
 export type SystemRole =
   | 'Super Admin'
   | 'CEO'
+  | 'Administration'
   | 'Admin'
   | 'Administrator'
   | 'Operations Head'
@@ -30,6 +31,8 @@ export type SystemRole =
   | 'Fleet Manager'
   | 'Finance Manager'
   | 'Auction Head'
+  | 'CBD'
+  | 'TMS'
   | 'Vendor'
   | 'Accountant'
   | 'Procurement Head'

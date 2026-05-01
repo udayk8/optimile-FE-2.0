@@ -6,15 +6,15 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@admin': path.resolve(__dirname, './src'),
-      '@shared-auth': path.resolve(__dirname, '../../packages/shared-auth/src'),
-      '@shared-api': path.resolve(__dirname, '../../packages/shared-api/src'),
-      '@shared-ui': path.resolve(__dirname, '../../packages/shared-ui/src'),
+      '@auction':      path.resolve(__dirname, './src'),
+      '@admin':        path.resolve(__dirname, './src'),
+      '@shared-auth':  path.resolve(__dirname, '../../packages/shared-auth/src'),
+      '@shared-ui':    path.resolve(__dirname, '../../packages/shared-ui/src'),
       '@shared-utils': path.resolve(__dirname, '../../packages/shared-utils/src'),
     },
   },
   server: {
-    port: 3000,
+    port: 3002,
     open: false,
   },
 })

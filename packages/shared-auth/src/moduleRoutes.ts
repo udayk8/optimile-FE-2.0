@@ -7,7 +7,7 @@ export const MODULE_ROUTES: Record<ERPModule, string> = {
   vendor:   '/vendor',
   customer: '/customer',
   // reserved — not yet built
-  admin:     '/auction/dashboard',
+  admin:     '/admin/dashboard',
   tms:       '/booking',
   tracking:  '/tracking',
   finance:   '/finance',
@@ -22,7 +22,7 @@ export function canUserAccessModule(user: User | null, module: ERPModule): boole
 }
 
 export function getAccessibleModules(user: User | null) {
-  const active: ERPModule[] = ['ams', 'fleet', 'vendor', 'customer']
+  const active: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer']
   return active
     .filter(m => canUserAccessModule(user, m))
     .map(m => ({ id: m, dashboardPath: MODULE_ROUTES[m] }))

@@ -52,60 +52,59 @@ export default function LoginPage() {
       },
       'mock-jwt-token-xyz'
     )
-    navigate(nextStatus === 'ACTIVE' ? '/home' : '/onboarding')
+    navigate(nextStatus === 'ACTIVE' ? '/vendor' : '/vendor/onboarding')
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 text-text">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mb-4">
+        <div className="mb-8 text-center">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
             <Truck className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Vendor Portal</h1>
-          <p className="text-blue-300 mt-2">Sign in with mobile number and OTP to manage your operations</p>
+          <p className="text-sm font-bold uppercase tracking-wide text-accent">Vendor Portal</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-text">Sign in to continue</h1>
+          <p className="mt-2 text-sm text-gray-600">Use mobile number and OTP to continue to onboarding or the vendor workspace.</p>
         </div>
 
-        {/* Login form */}
-        <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-8 shadow-2xl">
+        <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-blue-200">Mobile Number</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Mobile Number</label>
               <Input
                 type="tel"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="Enter your mobile number"
-                className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:ring-primary"
+                className="mt-1 bg-white"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-blue-200">OTP</label>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">OTP</label>
               <Input
                 inputMode="numeric"
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
                 placeholder="Enter OTP"
-                className="mt-1 bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:ring-primary"
+                className="mt-1 bg-white"
               />
             </div>
             <Button
               type="button"
               variant="outline"
-              className="w-full h-11 border-white/20 bg-transparent text-white hover:bg-white/10"
+              className="h-10 w-full"
               onClick={() => setOtpSent(true)}
             >
               Send OTP
             </Button>
-            <Button type="submit" className="w-full h-11 text-base" size="lg">
+            <Button type="submit" className="h-10 w-full" size="default">
               <LogIn className="h-4 w-4 mr-2" /> Verify OTP and Sign In
             </Button>
-            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-blue-100/70">
+            <div className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
               Vendor users are pre-registered. Use OTP login to continue to onboarding or the portal.
             </div>
           </form>
-          <p className="text-center text-xs text-blue-300/50 mt-4">
+          <p className="mt-4 text-center text-xs text-gray-500">
             Hardcoded OTP: 123456. {otpSent ? 'OTP marked as sent.' : 'Use Send OTP first for the mock flow.'}
           </p>
         </div>

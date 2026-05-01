@@ -11,6 +11,7 @@ import { useAppStore } from '@vendor/stores/app.store'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
+import { PageHero } from '@shared-ui/page-hero'
 import { ArrowLeft, Download, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange } from 'lucide-react'
 
 function getTripMode(pathname: string) {
@@ -50,52 +51,50 @@ export default function TripDetailPage() {
       <button
         type="button"
         onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+        className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-primary"
       >
         <ArrowLeft className="h-4 w-4" /> Back
       </button>
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-lg font-semibold">{mode === 'indents' ? indent?.id : trip?.id}</span>
-                <StatusBadge status={mode === 'indents' ? indent?.status ?? 'PENDING' : trip?.status ?? 'DISPATCHED'} />
-                {mode !== 'indents' && trip?.podStatus === 'CONFIRMED' && <StatusBadge status="CONFIRMED" label="POD confirmed" />}
-                {mode !== 'indents' && trip?.isInvoiced && <StatusBadge status="INVOICED" />}
-              </div>
-              <h1 className="mt-2 text-3xl font-semibold">Trip details</h1>
-              <p className="mt-2 text-muted-foreground">
-                {mode === 'indents'
-                  ? 'Review the indent, assign fleet, or decline it with a reason.'
-                  : 'View trip timeline, document links, and invoicing status in one place.'}
-              </p>
-            </div>
+      <PageHero
+        eyebrow={mode === 'indents' ? 'Indent Detail' : 'Trip Detail'}
+        title="Trip details"
+        subtitle={
+          mode === 'indents'
+            ? 'Review the indent, assign fleet, or decline it with a reason.'
+            : 'View trip timeline, document links, and invoicing status in one place.'
+        }
+        icon={<Route className="h-5 w-5 text-primary" />}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <span className="font-mono text-sm font-semibold text-text">{mode === 'indents' ? indent?.id : trip?.id}</span>
+            <StatusBadge status={mode === 'indents' ? indent?.status ?? 'PENDING' : trip?.status ?? 'DISPATCHED'} />
+            {mode !== 'indents' && trip?.podStatus === 'CONFIRMED' && <StatusBadge status="CONFIRMED" label="POD confirmed" />}
+            {mode !== 'indents' && trip?.isInvoiced && <StatusBadge status="INVOICED" />}
             {mode === 'indents' ? (
-              <div className="flex flex-wrap gap-2">
+              <>
                 <Button onClick={() => setSelectedIndentId(indent!.id)}>
                   <Truck className="mr-2 h-4 w-4" /> Accept & Assign
                 </Button>
                 <Button variant="outline" onClick={() => setDeclineConfirmId(indent!.id)}>
                   Decline
                 </Button>
-              </div>
+              </>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <>
                 {trip?.status === 'DELIVERED' && trip.podStatus === 'CONFIRMED' && !trip.isInvoiced && (
                   <Button variant="outline" onClick={() => setSelectedTripForExpense(trip.id)}>
                     Add Expense
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => navigate('/invoices/list')}>
+                <Button variant="outline" onClick={() => navigate('/vendor/invoices/list')}>
                   View invoices
                 </Button>
-              </div>
+              </>
             )}
           </div>
-        </CardContent>
-      </Card>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <div className="space-y-6">
@@ -106,27 +105,27 @@ export default function TripDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /> Lane</div>
-                <div className="mt-2 font-medium">{(mode === 'indents' ? indent?.laneDetails : trip?.laneDetails)?.origin.city} → {(mode === 'indents' ? indent?.laneDetails : trip?.laneDetails)?.destination.city}</div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500"><MapPin className="h-4 w-4" /> Lane</div>
+                <div className="mt-2 font-bold text-text">{(mode === 'indents' ? indent?.laneDetails : trip?.laneDetails)?.origin.city} → {(mode === 'indents' ? indent?.laneDetails : trip?.laneDetails)?.destination.city}</div>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Package className="h-4 w-4" /> Load</div>
-                <div className="mt-2 font-medium">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500"><Package className="h-4 w-4" /> Load</div>
+                <div className="mt-2 font-bold text-text">
                   {mode === 'indents'
                     ? `${indent?.loadDetails.commodity}, ${(indent?.loadDetails.weightKg ?? 0) / 1000}T`
                     : `${trip?.assignedVehicle.type} with ${trip?.assignedDriver.name}`}
                 </div>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock3 className="h-4 w-4" /> SLA</div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500"><Clock3 className="h-4 w-4" /> SLA</div>
                 <div className="mt-2">
                   {mode === 'indents' ? <SLACountdown deadline={indent!.slaDeadline} /> : <span>{trip?.podStatus === 'CONFIRMED' ? 'POD confirmed' : 'In execution'}</span>}
                 </div>
               </div>
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground"><CalendarRange className="h-4 w-4" /> Reporting / Delivery</div>
-                <div className="mt-2 font-medium">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500"><CalendarRange className="h-4 w-4" /> Reporting / Delivery</div>
+                <div className="mt-2 font-bold text-text">
                   {mode === 'indents' ? formatDateTime(indent!.reportingDateTime) : formatDate(trip?.deliveredDate || trip?.createdAt || '')}
                 </div>
               </div>
@@ -145,15 +144,15 @@ export default function TripDetailPage() {
                   <EmptyState title="No timeline events" />
                 ) : (
                   timeline.map((event) => (
-                    <div key={event.id} className="flex gap-3 rounded-xl border p-4">
+                    <div key={event.id} className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
                       <div className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{event.title}</span>
+                          <span className="font-bold text-text">{event.title}</span>
                           {event.status && <StatusBadge status={event.status} />}
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</p>
+                        <p className="mt-1 text-sm text-gray-600">{event.description}</p>
+                        <p className="mt-2 text-xs text-gray-500">{formatDateTime(event.timestamp)}</p>
                       </div>
                     </div>
                   ))
@@ -172,11 +171,11 @@ export default function TripDetailPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div><span className="text-muted-foreground">Vehicle: </span>{trip.assignedVehicle.registrationNumber}</div>
-                <div><span className="text-muted-foreground">Driver: </span>{trip.assignedDriver.name}</div>
-                <div><span className="text-muted-foreground">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
-                <div><span className="text-muted-foreground">Expenses approved: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
-                <div><span className="text-muted-foreground">Invoiced: </span>{trip.isInvoiced ? 'Yes' : 'No'}</div>
+                <div><span className="text-gray-500">Vehicle: </span>{trip.assignedVehicle.registrationNumber}</div>
+                <div><span className="text-gray-500">Driver: </span>{trip.assignedDriver.name}</div>
+                <div><span className="text-gray-500">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
+                <div><span className="text-gray-500">Expenses approved: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
+                <div><span className="text-gray-500">Invoiced: </span>{trip.isInvoiced ? 'Yes' : 'No'}</div>
               </CardContent>
             </Card>
           )}
@@ -192,12 +191,12 @@ export default function TripDetailPage() {
                 <EmptyState title="No documents attached" />
               ) : (
                 docs.map((doc) => (
-                  <div key={doc.id} className="rounded-xl border p-4">
+                  <div key={doc.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-medium">{doc.title}</div>
-                        <div className="text-sm text-muted-foreground">{doc.fileName}</div>
-                        {doc.note && <div className="mt-1 text-xs text-muted-foreground">{doc.note}</div>}
+                        <div className="font-bold text-text">{doc.title}</div>
+                        <div className="text-sm text-gray-600">{doc.fileName}</div>
+                        {doc.note && <div className="mt-1 text-xs text-gray-500">{doc.note}</div>}
                       </div>
                       <Button
                         size="sm"
@@ -233,7 +232,7 @@ export default function TripDetailPage() {
         onConfirm={() => {
           if (declineConfirmId) declineIndent(declineConfirmId)
           setDeclineConfirmId(null)
-          navigate('/trips?tab=penalties')
+          navigate('/vendor/trips?tab=penalties')
         }}
         title="Decline indent?"
         description="This will mark the indent as declined and apply the standard penalty in mock data."

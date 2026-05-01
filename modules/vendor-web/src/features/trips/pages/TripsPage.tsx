@@ -55,13 +55,13 @@ export default function TripsPage() {
         eyebrow="TRIPS & INDENTS"
         title="Trips" 
         subtitle="Manage your operational indents, active trips, and completed journeys"
-        icon={<Truck className="h-5 w-5 text-[#2563EB]" />}
+        icon={<Truck className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-6 w-fit">
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
-          <button key={tab.key} onClick={() => navigate(`/trips?tab=${tab.key}`)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+          <button key={tab.key} onClick={() => navigate(`/vendor/trips?tab=${tab.key}`)}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
             {tab.label}
             <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">{tab.count}</span>
           </button>
@@ -75,7 +75,7 @@ export default function TripsPage() {
             <EmptyState icon={<Package className="h-12 w-12" />} title="No pending indents" />
           ) : (
             pendingIndents.map((indent) => (
-              <Card key={indent.id} className="border-l-4 border-l-warning cursor-pointer hover:border-primary/40" onClick={() => navigate(`/trips/indents/${indent.id}`)}>
+              <Card key={indent.id} className="border-l-4 border-l-warning cursor-pointer hover:border-primary/40" onClick={() => navigate(`/vendor/trips/indents/${indent.id}`)}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div>
@@ -103,7 +103,7 @@ export default function TripsPage() {
                     <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setDeclineConfirmId(indent.id) }}>
                       <XCircle className="h-3.5 w-3.5 mr-1" /> Decline
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); navigate(`/trips/indents/${indent.id}`) }}>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); navigate(`/vendor/trips/indents/${indent.id}`) }}>
                       View details
                     </Button>
                   </div>
@@ -129,7 +129,7 @@ export default function TripsPage() {
             <EmptyState icon={<Truck className="h-12 w-12" />} title="No active trips" />
           ) : (
             activeTrips.map((trip) => (
-              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/trips/active/${trip.id}`)}>
+              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/trips/active/${trip.id}`)}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -157,7 +157,7 @@ export default function TripsPage() {
             <EmptyState icon={<CheckCircle className="h-12 w-12" />} title="No completed trips" />
           ) : (
             completedTrips.map((trip) => (
-              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/trips/completed/${trip.id}`)}>
+              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/trips/completed/${trip.id}`)}>
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">

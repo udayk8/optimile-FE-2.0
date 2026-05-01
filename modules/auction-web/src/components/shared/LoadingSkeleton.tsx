@@ -1,4 +1,4 @@
-import { cn } from '@admin/utils/cn'
+import { cn } from '@auction/lib/cn'
 
 interface LoadingSkeletonProps {
   className?: string
@@ -6,7 +6,7 @@ interface LoadingSkeletonProps {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-lg bg-muted', className)} />
+  return <div className={cn('animate-pulse rounded-md bg-muted', className)} />
 }
 
 export function LoadingSkeleton({ className, lines = 3 }: LoadingSkeletonProps) {
@@ -29,8 +29,8 @@ export function CardSkeleton() {
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-2/3" />
       <div className="flex gap-2 pt-2">
-        <Skeleton className="h-8 w-24 rounded-lg" />
-        <Skeleton className="h-8 w-24 rounded-lg" />
+        <Skeleton className="h-8 w-24 rounded-md" />
+        <Skeleton className="h-8 w-24 rounded-md" />
       </div>
     </div>
   )
@@ -39,9 +39,9 @@ export function CardSkeleton() {
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-2">
-      <Skeleton className="h-10 w-full rounded-lg" />
+      <Skeleton className="h-10 w-full rounded-md" />
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-12 w-full rounded-lg" />
+        <Skeleton key={i} className="h-12 w-full rounded-md" />
       ))}
     </div>
   )

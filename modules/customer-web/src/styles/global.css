@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root,
+  .optimile-customer-root {
     --background: 210 20% 98%;
     --foreground: 221 39% 11%;
     --text: 221 39% 11%;
@@ -40,6 +41,12 @@
     --input: 220 13% 91%;
     --ring: 207 59% 30%;
     --radius: 0.5rem;
+
+    background-color: hsl(var(--background));
+    color: hsl(var(--text));
+    font-family: inherit;
+    min-height: 100vh;
+    min-width: 320px;
   }
 
   * {

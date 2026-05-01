@@ -59,7 +59,7 @@ export default function InvoicesPage() {
   const handleGenerateInvoice = () => {
     generateInvoice(selectedTrips)
     setSelectedTrips([])
-    navigate('/invoices/list')
+    navigate('/vendor/invoices/list')
   }
 
   return (
@@ -68,13 +68,13 @@ export default function InvoicesPage() {
         eyebrow="FINANCE"
         title="Invoices" 
         subtitle="Manage your billing, track payments, and create new invoices"
-        icon={<CreditCard className="h-5 w-5 text-[#2563EB]" />}
+        icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-6 w-fit">
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
-          <button key={tab.key} onClick={() => navigate(`/invoices/${tab.key}`)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === tab.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+          <button key={tab.key} onClick={() => navigate(`/vendor/invoices/${tab.key}`)}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
             {tab.icon} {tab.label}
           </button>
         ))}
@@ -83,7 +83,7 @@ export default function InvoicesPage() {
       {/* Create Invoice */}
       {activeTab === 'create' && (
         <div>
-          <h3 className="text-lg font-semibold mb-4">Select Uninvoiced Bookings</h3>
+          <h3 className="mb-4 text-lg font-extrabold text-text">Select Uninvoiced Bookings</h3>
           {uninvoicedTrips.length === 0 ? (
             <EmptyState icon={<CreditCard className="h-12 w-12" />} title="No uninvoiced bookings" description="Complete trips with confirmed POD and approved expenses will appear here." />
           ) : (
@@ -103,11 +103,11 @@ export default function InvoicesPage() {
                           <span className="font-mono text-sm font-semibold">{trip.id}</span>
                           <StatusBadge status="DELIVERED" />
                         </div>
-                        <p className="text-sm text-muted-foreground">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city} · {trip.deliveredDate ? formatDate(trip.deliveredDate) : ''}</p>
+                        <p className="text-sm text-gray-500">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city} · {trip.deliveredDate ? formatDate(trip.deliveredDate) : ''}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-muted-foreground">Freight + Expenses</div>
+                      <div className="text-sm text-gray-500">Freight + Expenses</div>
                       <CurrencyDisplay amount={trip.freightRate + trip.expenseSummary.approved} className="text-lg font-semibold" />
                     </div>
                   </CardContent>
@@ -128,10 +128,10 @@ export default function InvoicesPage() {
       {/* My Invoices */}
       {activeTab === 'list' && (
         <div>
-          <div className="flex gap-1 p-1 bg-muted rounded-lg mb-4 overflow-x-auto">
+          <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
             {STATUS_FILTERS.map((f) => (
               <button key={f.value} onClick={() => setStatusFilter(f.value)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${statusFilter === f.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
                 {f.label}
               </button>
             ))}
@@ -141,7 +141,7 @@ export default function InvoicesPage() {
               <EmptyState icon={<FileText className="h-12 w-12" />} title="No invoices found" />
             ) : (
               filteredInvoices.map((inv) => (
-                <Card key={inv.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/invoices/${inv.id}`)}>
+                <Card key={inv.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/invoices/${inv.id}`)}>
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -152,11 +152,11 @@ export default function InvoicesPage() {
                         <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}><Download className="h-3.5 w-3.5" /></Button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                      <div><span className="text-muted-foreground">Date: </span>{formatDate(inv.invoiceDate)}</div>
-                      <div><span className="text-muted-foreground">Bookings: </span>{inv.lineItems?.length || 0}</div>
-                      <div><span className="text-muted-foreground">Total: </span><CurrencyDisplay amount={inv.grandTotal} className="font-semibold" /></div>
-                      {inv.paymentDate && <div><span className="text-muted-foreground">Paid: </span>{formatDate(inv.paymentDate)}</div>}
+                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                      <div><span className="text-gray-500">Date: </span>{formatDate(inv.invoiceDate)}</div>
+                      <div><span className="text-gray-500">Bookings: </span>{inv.lineItems?.length || 0}</div>
+                      <div><span className="text-gray-500">Total: </span><CurrencyDisplay amount={inv.grandTotal} className="font-semibold" /></div>
+                      {inv.paymentDate && <div><span className="text-gray-500">Paid: </span>{formatDate(inv.paymentDate)}</div>}
                     </div>
                   </CardContent>
                 </Card>
@@ -171,19 +171,19 @@ export default function InvoicesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="text-left p-3 font-medium">Date</th>
-                <th className="text-left p-3 font-medium">Type</th>
-                <th className="text-left p-3 font-medium">Description</th>
-                <th className="text-right p-3 font-medium">Credit</th>
-                <th className="text-right p-3 font-medium">Debit</th>
-                <th className="text-right p-3 font-medium">Balance</th>
-                <th className="text-center p-3 font-medium">Doc</th>
+              <tr className="border-b bg-gray-50">
+                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
+                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Type</th>
+                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Description</th>
+                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Credit</th>
+                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Debit</th>
+                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Balance</th>
+                <th className="p-3 text-center text-xs font-bold uppercase tracking-wide text-gray-500">Doc</th>
               </tr>
             </thead>
             <tbody>
               {ledger.map((entry) => (
-                <tr key={entry.id} className="border-b hover:bg-accent/50">
+                <tr key={entry.id} className="border-b hover:bg-gray-50">
                   <td className="p-3">{formatDate(entry.date)}</td>
                   <td className="p-3"><StatusBadge status={entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'INVOICE_APPROVED' ? 'APPROVED' : 'REJECTED'} label={entry.entryType.replace(/_/g, ' ')} /></td>
                   <td className="p-3">{entry.description}</td>

@@ -47,8 +47,8 @@ export function ConfirmDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             {isDestructive && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-danger/10">
+                <AlertTriangle className="h-5 w-5 text-danger" />
               </div>
             )}
             <div>
@@ -57,7 +57,7 @@ export function ConfirmDialog({
             </div>
           </div>
         </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={onClose} disabled={loading}>
             {cancelLabel}
           </Button>

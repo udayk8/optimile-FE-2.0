@@ -42,7 +42,7 @@ export default function DashboardPage() {
         eyebrow="OPTIMILE VENDOR PORTAL"
         title="Dashboard"
         subtitle="Executive overview of your operations and key metrics"
-        icon={<Home className="h-6 w-6 text-[#2563EB]" />}
+        icon={<Home className="h-6 w-6 text-primary" />}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -52,13 +52,13 @@ export default function DashboardPage() {
           title="Pending Indents"
           value={pendingIndents.length}
           insight={pendingIndents.length > 0 ? "Requires action" : "All caught up"}
-          icon={<Clock className="h-4 w-4 text-[#F59E0B]" />}
-          onClick={() => navigate('/trips?tab=indents')}
+          icon={<Clock className="h-4 w-4 text-warning" />}
+          onClick={() => navigate('/vendor/trips?tab=indents')}
         >
            <div className="space-y-2 mt-2">
             {pendingIndents.slice(0, 2).map((indent) => (
               <div key={indent.id} className="flex items-center justify-between text-xs">
-                <span className="text-[#475569] truncate max-w-[120px]">{indent.laneDetails.origin.city} &rarr; {indent.laneDetails.destination.city}</span>
+                <span className="max-w-[120px] truncate text-gray-600">{indent.laneDetails.origin.city} &rarr; {indent.laneDetails.destination.city}</span>
                 <SLACountdown deadline={indent.slaDeadline} showLabel={false} />
               </div>
             ))}
@@ -70,13 +70,13 @@ export default function DashboardPage() {
           title="Active Auctions"
           value={activeAuctions.length}
           insight={activeAuctions.length > 0 ? "Bidding open" : "No live events"}
-          icon={<Gavel className="h-4 w-4 text-[#2563EB]" />}
-          onClick={() => navigate('/sourcing?tab=auctions')}
+          icon={<Gavel className="h-4 w-4 text-primary" />}
+          onClick={() => navigate('/vendor/sourcing?tab=auctions')}
         >
           <div className="space-y-2 mt-2">
             {activeAuctions.slice(0, 2).map((auction) => (
               <div key={auction.id} className="flex items-center justify-between text-xs">
-                 <span className="font-medium text-[#0F172A] truncate max-w-[120px]">{auction.customerName}</span>
+                 <span className="max-w-[120px] truncate font-medium text-text">{auction.customerName}</span>
                  <SLACountdown deadline={auction.endTime} showLabel={false} />
               </div>
             ))}
@@ -88,12 +88,12 @@ export default function DashboardPage() {
           title="Uninvoiced Bookings"
           value={uninvoicedTrips.length}
           insight="Ready to be billed"
-          icon={<Package className="h-4 w-4 text-[#64748B]" />}
-          onClick={() => navigate('/invoices/create')}
+          icon={<Package className="h-4 w-4 text-gray-500" />}
+          onClick={() => navigate('/vendor/invoices/create')}
         >
-           <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-[#E5E7EB]">
-              <span className="text-[#64748B]">Total Billable</span>
-              <CurrencyDisplay amount={totalBillableAmount} className="font-semibold text-[#0F172A]" />
+           <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
+              <span className="text-gray-600">Total Billable</span>
+              <CurrencyDisplay amount={totalBillableAmount} className="font-semibold text-text" />
            </div>
         </KPICard>
 
@@ -103,8 +103,8 @@ export default function DashboardPage() {
           value={invoicePaymentStatus.paid}
           unit="paid"
           insight="Current payment standing"
-          icon={<CreditCard className="h-4 w-4 text-[#16A34A]" />}
-          onClick={() => navigate('/invoices/list')}
+          icon={<CreditCard className="h-4 w-4 text-success" />}
+          onClick={() => navigate('/vendor/invoices/list')}
         >
            <div className="flex flex-wrap gap-1.5 mt-2">
               <StatusBadge status="SUBMITTED" label={`${invoicePaymentStatus.submitted} Submitted`} />
@@ -119,13 +119,13 @@ export default function DashboardPage() {
           title="Active Trips"
           value={activeTrips.length}
           insight="Currently in execution"
-          icon={<Truck className="h-4 w-4 text-[#2563EB]" />}
-          onClick={() => navigate('/trips?tab=active')}
+          icon={<Truck className="h-4 w-4 text-primary" />}
+          onClick={() => navigate('/vendor/trips?tab=active')}
         >
            <div className="space-y-2 mt-2">
               {activeTrips.slice(0, 2).map((trip) => (
                 <div key={trip.id} className="flex items-center justify-between text-xs">
-                  <span className="text-[#475569] truncate max-w-[120px]">{trip.laneDetails.origin.city} &rarr; {trip.laneDetails.destination.city}</span>
+                  <span className="max-w-[120px] truncate text-gray-600">{trip.laneDetails.origin.city} &rarr; {trip.laneDetails.destination.city}</span>
                   <StatusBadge status={trip.status} />
                 </div>
               ))}
@@ -137,17 +137,17 @@ export default function DashboardPage() {
           title="Fleet Compliance"
           value={complianceAlerts}
           insight="Requires attention"
-          icon={<AlertTriangle className="h-4 w-4 text-[#EF4444]" />}
-          onClick={() => navigate('/fleet')}
+          icon={<AlertTriangle className="h-4 w-4 text-danger" />}
+          onClick={() => navigate('/vendor/fleet')}
         >
            <div className="space-y-2 mt-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#64748B]">Vehicle Alerts</span>
-                <span className="font-medium text-[#EF4444]">{nonCompliantVehicles.length}</span>
+                <span className="text-gray-600">Vehicle Alerts</span>
+                <span className="font-medium text-danger">{nonCompliantVehicles.length}</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-[#64748B]">Driver Alerts</span>
-                <span className="font-medium text-[#EF4444]">{nonCompliantDrivers.length}</span>
+                <span className="text-gray-600">Driver Alerts</span>
+                <span className="font-medium text-danger">{nonCompliantDrivers.length}</span>
               </div>
             </div>
         </KPICard>

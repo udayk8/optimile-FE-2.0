@@ -9,7 +9,9 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@admin': path.resolve(rootDir, 'modules/auction-web/src'),
+      '@admin':   path.resolve(rootDir, 'modules/auction-web/src'),
+      '@admin-web': path.resolve(rootDir, 'modules/admin-web/src'),
+      '@auction': path.resolve(rootDir, 'modules/auction-web/src'),
       '@vendor': path.resolve(rootDir, 'modules/vendor-web/src'),
       '@fleet': path.resolve(rootDir, 'modules/fleet-web/src'),
       '@customer': path.resolve(rootDir, 'modules/customer-web/src'),

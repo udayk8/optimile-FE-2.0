@@ -38,26 +38,26 @@ export default function ContractsPage() {
         eyebrow="CONTRACTS"
         title="Contracts" 
         subtitle="Manage your active rate contracts and historical agreements"
-        icon={<FileText className="h-5 w-5 text-[#2563EB]" />}
+        icon={<FileText className="h-5 w-5 text-primary" />}
       />
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex gap-1 p-1 bg-muted rounded-lg overflow-x-auto">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
           {STATUS_FILTERS.map((f) => (
             <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${statusFilter === f.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
               {f.label}
             </button>
           ))}
         </div>
         <input type="text" placeholder="Search by ID or customer..." value={search} onChange={(e) => setSearch(e.target.value)}
-          className="h-9 px-3 rounded-md border border-input bg-transparent text-sm w-60 focus:outline-none focus:ring-1 focus:ring-ring" />
+          className="h-10 w-60 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
       </div>
       <div className="space-y-4">
         {filtered.length === 0 ? (
           <EmptyState icon={<FileText className="h-12 w-12" />} title="No contracts found" />
         ) : (
           filtered.map((contract) => (
-            <Card key={contract.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/contracts/${contract.id}`)}>
+            <Card key={contract.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/contracts/${contract.id}`)}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -65,17 +65,17 @@ export default function ContractsPage() {
                       <span className="font-mono text-sm font-semibold">{contract.id}</span>
                       <StatusBadge status={contract.status} />
                     </div>
-                    <p className="text-base font-medium">{contract.customerName}</p>
+                      <p className="text-base font-bold text-text">{contract.customerName}</p>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  <ArrowRight className="h-4 w-4 text-gray-400" />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
                     {contract.laneDetails.origin.city} → {contract.laneDetails.destination.city}
                   </div>
-                  <div><span className="text-muted-foreground">Validity: </span>{formatDate(contract.validityFrom)} — {formatDate(contract.validityTo)}</div>
-                  <div><span className="text-muted-foreground">Rate: </span><span className="font-mono">₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}/{contract.rateCard[0]?.rateType === 'PER_TRIP' ? 'trip' : 'km'}</span></div>
+                  <div><span className="text-gray-500">Validity: </span>{formatDate(contract.validityFrom)} — {formatDate(contract.validityTo)}</div>
+                  <div><span className="text-gray-500">Rate: </span><span className="font-mono">₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}/{contract.rateCard[0]?.rateType === 'PER_TRIP' ? 'trip' : 'km'}</span></div>
                 </div>
               </CardContent>
             </Card>

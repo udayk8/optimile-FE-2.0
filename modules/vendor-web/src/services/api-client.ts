@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { clearStoredAuthSession, getStoredAuthSession } from '@shared-auth/services/authStorage'
 import { useAuthStore } from '@vendor/stores/auth.store'
 
 const apiClient = axios.create({
@@ -9,7 +10,7 @@ const apiClient = axios.create({
 
 // Request interceptor — attach auth token
 apiClient.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token
+  const token = getStoredAuthSession()?.tokens.accessToken ?? useAuthStore.getState().token
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -22,7 +23,8 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       useAuthStore.getState().logout()
-      window.location.hash = '#/login'
+      clearStoredAuthSession()
+      window.location.assign('/login')
     }
     return Promise.reject(error)
   }

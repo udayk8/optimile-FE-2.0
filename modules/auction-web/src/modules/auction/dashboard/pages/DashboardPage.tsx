@@ -20,7 +20,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHero
         eyebrow="Auction Control Tower"
-        title="Customer Procurement Dashboard"
+        title="Procurement Control Dashboard"
         subtitle="Monitor live auctions, award deadlines, and contract outcomes from a single operational view."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
@@ -64,7 +64,7 @@ export default function DashboardPage() {
               <Link
                 key={auction.id}
                 to={`/auction/auctions/${auction.id}`}
-                className="flex items-start justify-between rounded-xl border border-gray-200 p-4 transition hover:bg-gray-50"
+                className="flex items-start justify-between rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:bg-white"
               >
                 <div>
                   <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export default function DashboardPage() {
               <Link
                 key={contract.id}
                 to={`/auction/contracts/${contract.id}`}
-                className="block rounded-xl border border-gray-200 p-4 transition hover:bg-gray-50"
+                className="block rounded-xl border border-gray-200 bg-gray-50 p-4 transition hover:bg-white"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-sm font-semibold">{contract.id}</span>

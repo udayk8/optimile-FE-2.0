@@ -12,7 +12,8 @@ import {
 } from '@shared-auth'
 import './styles.css'
 
-const AdminApp    = lazy(() => import('@admin/app/AdminApp'))
+const AuctionApp  = lazy(() => import('@auction/app/AdminApp'))
+const AdminApp    = lazy(() => import('@admin-web/app/AdminApp'))
 const VendorApp   = lazy(() => import('@vendor/app/VendorApp'))
 const FleetApp    = lazy(() => import('@fleet/app/FleetApp'))
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
@@ -50,13 +51,13 @@ function HostRouter() {
             } />
 
             {/* Module apps — all protected */}
-            <Route path="/auction/*"  element={<ProtectedRoute portal="auction"><AdminApp /></ProtectedRoute>} />
+            <Route path="/admin/*"    element={<ProtectedRoute portal="admin"><AdminApp /></ProtectedRoute>} />
+            <Route path="/auction/*"  element={<ProtectedRoute portal="auction"><AuctionApp /></ProtectedRoute>} />
             <Route path="/vendor/*"   element={<ProtectedRoute portal="vendor"><VendorApp /></ProtectedRoute>} />
             <Route path="/fleet/*"    element={<ProtectedRoute portal="fleet"><FleetApp /></ProtectedRoute>} />
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
 
             {/* Legacy redirects */}
-            <Route path="/admin/*"                  element={<Navigate to="/auction/dashboard" replace />} />
             <Route path="/admin/fleet-management/*" element={<Navigate to="/fleet" replace />} />
 
             {/* Default */}

@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
-import { RouterProvider } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
-import { createVendorPortalRouter } from './router'
+import { AuthProvider } from '@shared-auth'
+import { VendorRoutes } from './router'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,13 +14,15 @@ const queryClient = new QueryClient({
   },
 })
 
-export default function App({ basename }: { basename?: string }) {
-  const router = useMemo(() => createVendorPortalRouter(basename), [basename])
-
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster position="top-right" richColors closeButton />
+      <BrowserRouter>
+        <AuthProvider>
+          <VendorRoutes standalone />
+          <Toaster position="top-right" richColors closeButton />
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }

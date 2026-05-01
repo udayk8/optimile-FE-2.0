@@ -7,7 +7,7 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/utils/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
-import { FileText, ArrowRight, MapPin, PenLine } from 'lucide-react'
+import { FileText, ArrowRight, MapPin } from 'lucide-react'
 import type { Contract, ContractStatus } from '@vendor/types'
 
 const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
@@ -24,7 +24,7 @@ export default function ContractsPage() {
   const navigate = useNavigate()
   const { id: selectedContractId } = useParams()
   
-  const { contracts, signContract } = useAppStore()
+  const { contracts } = useAppStore()
 
   const filtered = contracts.filter((c) => {
     if (selectedContractId && c.id !== selectedContractId) return false
@@ -81,19 +81,8 @@ export default function ContractsPage() {
       key: 'actions',
       header: '',
       align: 'right' as const,
-      render: (contract: Contract) => (
+      render: (_contract: Contract) => (
         <div className="flex items-center justify-end gap-2">
-          {contract.status === 'DRAFT' && (
-            <Button
-              size="sm"
-              onClick={(event) => {
-                event.stopPropagation()
-                signContract(contract.id)
-              }}
-            >
-              <PenLine className="h-3.5 w-3.5" /> Sign Contract
-            </Button>
-          )}
           <ArrowRight className="h-4 w-4 text-gray-500" />
         </div>
       ),

@@ -1,19 +1,23 @@
-import { Link, Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
-import { useAuthStore } from '@vendor/stores/auth.store'
+import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
 
 export function AppShell() {
-  const { vendor, isAuthenticated } = useAuthStore()
+  const navigate = useNavigate()
+  const { isAuthenticated, loading, vendor } = useVendorAuth()
 
-  const isDemoSession = localStorage.getItem('authMode') === 'demo' && localStorage.getItem('selectedPortal') === 'vendor'
-  if (!isAuthenticated && !isDemoSession) {
-    window.location.replace('/login')
-    return null
-  }
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      navigate('/login', { replace: true })
+    }
+  }, [isAuthenticated, loading, navigate])
+
+  if (loading || !isAuthenticated) return null
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="optimile-vendor-root flex min-h-screen bg-background text-text">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-h-screen">
@@ -26,7 +30,7 @@ export function AppShell() {
         {vendor?.status === 'ONBOARDING_INCOMPLETE' && (
           <div className="bg-blue-50 border-b border-blue-200 px-6 py-2.5 text-center text-sm text-blue-700 flex items-center justify-center gap-3">
             <span>Your vendor profile is incomplete. Finish onboarding to unlock full access.</span>
-            <Link to="/onboarding" className="font-medium underline">
+            <Link to="/vendor/onboarding" className="font-medium underline">
               Continue setup
             </Link>
           </div>

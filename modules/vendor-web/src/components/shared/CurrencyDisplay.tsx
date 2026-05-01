@@ -13,8 +13,8 @@ export function CurrencyDisplay({ amount, className, showSign = false, type = 'n
     <span
       className={cn(
         'font-mono font-medium',
-        type === 'credit' && 'text-emerald-600 dark:text-emerald-400',
-        type === 'debit' && 'text-red-600 dark:text-red-400',
+        type === 'credit' && 'text-success',
+        type === 'debit' && 'text-danger',
         className
       )}
     >

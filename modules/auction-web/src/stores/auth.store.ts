@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { UserProfile } from '@admin/types'
+import type { UserProfile } from '@auction/types'
 import { useAppStore } from './app.store'
 
 interface AuthStore {

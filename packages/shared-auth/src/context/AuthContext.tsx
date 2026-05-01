@@ -5,7 +5,14 @@ import { authApi, AuthTenantDto, AuthUserDto } from '../services/authApi'
 import { clearStoredAuthSession, getStoredAuthSession, persistAuthSession } from '../services/authStorage'
 import { ApiError, checkBackendHealth } from '../services/apiClient'
 import { canUserAccessModule, getPostLoginRouteForUser } from '../moduleRoutes'
-import { clearAuthState, storeDemoLogin, type Portal } from '../utils/authStorage'
+import {
+  clearAuthState,
+  clearDemoSession,
+  getStoredDemoSessionEmail,
+  storeDemoLogin,
+  storeDemoSession,
+  type Portal,
+} from '../utils/authStorage'
 
 // ── Mock users for demo mode ─────────────────────────────────
 interface MockUser { name: string; role: SystemRole; modules: ERPModule[]; permissions: string[] }
@@ -17,6 +24,13 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     role: 'CEO',
     permissions: ['all'],
     modules: ['ams', 'fleet', 'vendor', 'customer'],
+  },
+  // Administration — new admin workspace role, pending host mount
+  'administration@optimile.com': {
+    name: 'Admin Operations',
+    role: 'Administration',
+    permissions: ['admin:read', 'admin:write', 'ams:read', 'ams:write'],
+    modules: ['admin'],
   },
   // Fleet Manager — only fleet → goes directly to /fleet
   'fleet@uday.ts.com': {
@@ -31,6 +45,20 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     role: 'Auction Head',
     permissions: ['ams:read', 'ams:write'],
     modules: ['ams'],
+  },
+  // Customer Booking Dashboard — only customer → goes directly to /customer
+  'cbd@optimile.com': {
+    name: 'Customer Booking Desk',
+    role: 'CBD',
+    permissions: ['customer:read', 'customer:write'],
+    modules: ['customer'],
+  },
+  // TMS — booking / driver workspace role, pending module scaffold + host mount
+  'tms@optimile.com': {
+    name: 'Transport Management',
+    role: 'TMS',
+    permissions: ['tms:read', 'tms:write'],
+    modules: ['tms'],
   },
   // Vendor Manager — only vendor → goes directly to /vendor
   'vendor@pranay.ts.com': {
@@ -124,6 +152,20 @@ function getPrimaryPortal(modules: ERPModule[]): Portal {
   return 'admin'
 }
 
+function buildDemoUser(emailKey: string, mock: MockUser): User {
+  return {
+    id: `demo-${emailKey}`,
+    tenantId: 'demo-tenant',
+    email: emailKey,
+    name: mock.name,
+    role: mock.role,
+    department: 'Management',
+    permissions: mock.permissions,
+    modules: mock.modules,
+    status: 'active',
+  }
+}
+
 // ── Provider ─────────────────────────────────────────────────
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser]                     = useState<User | null>(null)
@@ -137,7 +179,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     checkBackendHealth().then(ok => { if (mounted) setBackendAvailable(ok) })
 
     const restore = async () => {
-      if (!getStoredAuthSession()) { if (mounted) setLoading(false); return }
+      const storedSession = getStoredAuthSession()
+      if (!storedSession) {
+        const storedDemoEmail = getStoredDemoSessionEmail()?.trim().toLowerCase() ?? ''
+        const storedDemoUser = DEMO_CREDENTIALS[storedDemoEmail]
+        if (storedDemoUser && mounted) {
+          setUser(buildDemoUser(storedDemoEmail, storedDemoUser))
+          setTenant(DEMO_TENANT)
+        }
+        if (mounted) setLoading(false)
+        return
+      }
       try {
         const me = await authApi.me()
         if (!mounted) return
@@ -164,21 +216,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const emailKey = email.trim().toLowerCase()
     const mock = DEMO_CREDENTIALS[emailKey]
     if (mock && (password === DEMO_PASSWORD || backendAvailable === false)) {
-      const demoUser: User = {
-        id: `demo-${emailKey}`,
-        tenantId: 'demo-tenant',
-        email: emailKey,
-        name: mock.name,
-        role: mock.role,
-        department: 'Management',
-        permissions: mock.permissions,
-        modules: mock.modules,
-        status: 'active',
-      }
+      const demoUser = buildDemoUser(emailKey, mock)
 
       setUser(demoUser)
       setTenant(DEMO_TENANT)
       storeDemoLogin(getPrimaryPortal(mock.modules), mock.role)
+      storeDemoSession(emailKey, rememberMe)
       setLoading(false)
       return getPostLoginRouteForUser(demoUser)
     }
@@ -210,7 +253,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const token = getStoredAuthSession()?.tokens.refreshToken
     void authApi.logout(token).catch(() => {})
     setUser(null); setTenant(null); setError(null)
-    clearStoredAuthSession(); clearLegacyKeys(); clearAuthState()
+    clearStoredAuthSession(); clearLegacyKeys(); clearDemoSession(); clearAuthState()
   }
 
   const hasPermission = (required: string | string[]): boolean => {

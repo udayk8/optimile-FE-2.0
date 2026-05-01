@@ -8,6 +8,7 @@ interface AuthStore {
   token: string | null
   isAuthenticated: boolean
   onboardingDraft: VendorSetupDraft | null
+  hydrateVendor: (vendor: Vendor) => void
   setAuth: (vendor: Vendor, token: string) => void
   setOnboardingDraft: (draft: VendorSetupDraft) => void
   updateOnboardingDraft: (draft: Partial<VendorSetupDraft>) => void
@@ -24,6 +25,9 @@ export const useAuthStore = create<AuthStore>()(
       token: null,
       isAuthenticated: false,
       onboardingDraft: null,
+      hydrateVendor: (vendor) => set((state) => ({
+        vendor: state.vendor ?? vendor,
+      })),
       setAuth: (vendor, token) => set({ vendor, token, isAuthenticated: true }),
       setOnboardingDraft: (draft) => set({ onboardingDraft: draft }),
       updateOnboardingDraft: (draft) => set((state) => ({

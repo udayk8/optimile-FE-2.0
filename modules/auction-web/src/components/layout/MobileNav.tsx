@@ -1,20 +1,20 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { Home, Truck, Receipt, CreditCard, MoreHorizontal, Search, FileText, Ship, User, X } from 'lucide-react'
-import { cn } from '@admin/utils/cn'
-import { useUIStore } from '@admin/stores/ui.store'
+import { cn } from '@auction/lib/cn'
+import { useUIStore } from '@auction/stores/ui.store'
 
 const BOTTOM_NAV = [
-  { path: '/home', label: 'Home', icon: Home },
-  { path: '/trips', label: 'Trips', icon: Truck },
-  { path: '/expenses', label: 'Expenses', icon: Receipt },
-  { path: '/invoices', label: 'Invoices', icon: CreditCard },
+  { path: '/auction/dashboard', label: 'Home', icon: Home },
+  { path: '/auction/auctions', label: 'Auctions', icon: Truck },
+  { path: '/auction/contracts', label: 'Contracts', icon: Receipt },
+  { path: '/auction/auctions/new', label: 'Create', icon: CreditCard },
 ]
 
 const MORE_NAV = [
-  { path: '/sourcing', label: 'Sourcing', icon: Search },
-  { path: '/contracts', label: 'Contracts', icon: FileText },
-  { path: '/fleet', label: 'Fleet', icon: Ship },
-  { path: '/profile', label: 'Profile', icon: User },
+  { path: '/auction/auctions', label: 'Sourcing', icon: Search },
+  { path: '/auction/contracts', label: 'Contracts', icon: FileText },
+  { path: '/auction/dashboard', label: 'Fleet', icon: Ship },
+  { path: '/auction/dashboard', label: 'Profile', icon: User },
 ]
 
 export function MobileNav() {

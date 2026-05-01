@@ -39,12 +39,12 @@ export const MOCK_DASHBOARD: DashboardData = {
 }
 
 export const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: 'n1', type: 'ONBOARDING', title: 'Complete vendor setup', message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/profile/company', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
-  { id: 'n2', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/trips?tab=indents', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
-  { id: 'n3', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
-  { id: 'n4', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense bundle ₹5,500 for TRP-043 approved', deepLink: '/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'n5', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 7200000).toISOString() },
-  { id: 'n6', type: 'CONTRACTS', title: 'Contract Updated', message: 'Contract CNT-001 rate card and SLA details were updated', deepLink: '/contracts/CNT-001', isRead: false, createdAt: new Date(Date.now() - 10800000).toISOString() },
+  { id: 'n1', type: 'ONBOARDING', title: 'Complete vendor setup', message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/vendor/profile/company', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
+  { id: 'n2', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/trips?tab=indents', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
+  { id: 'n3', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/vendor/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
+  { id: 'n4', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense bundle ₹5,500 for TRP-043 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'n5', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 7200000).toISOString() },
+  { id: 'n6', type: 'CONTRACTS', title: 'Contract Updated', message: 'Contract CNT-001 rate card and SLA details were updated', deepLink: '/vendor/contracts/CNT-001', isRead: false, createdAt: new Date(Date.now() - 10800000).toISOString() },
 ]
 
 

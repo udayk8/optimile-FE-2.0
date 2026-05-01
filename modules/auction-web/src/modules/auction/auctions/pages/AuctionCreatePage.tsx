@@ -211,7 +211,7 @@ export default function AuctionCreatePage() {
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="Auction Builder"
+        eyebrow="Auction Control"
         title={effectiveType ? `Create ${titleCase(effectiveType)} Auction` : 'Create Auction'}
         subtitle="Single entry point. Select the auction type, configure lanes, rate units, ceilings, and launch when ready."
       />
@@ -239,7 +239,7 @@ export default function AuctionCreatePage() {
             </div>
 
             {!effectiveType && (
-              <div className="rounded-xl border border-dashed border-gray-300 p-6 text-sm text-gray-600">
+              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-600">
                 Select `Spot`, `Bulk`, or `Lot` to start configuring the auction.
               </div>
             )}
@@ -286,7 +286,7 @@ export default function AuctionCreatePage() {
                 )}
 
                 {effectiveType === 'LOT' && (
-                  <div className="rounded-xl border border-gray-200 p-4">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <Field label="Region" description="Choose the region first, then pick lanes from that region below.">
                     <Select
                       value={auctionRegion}
@@ -302,10 +302,10 @@ export default function AuctionCreatePage() {
                   </div>
                 )}
 
-                <div className="rounded-xl border border-gray-200 p-4">
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <div className="mb-4">
                     <h3 className="text-sm font-bold text-text">Auction Settings</h3>
-                    <p className="mt-1 text-xs text-gray-600">All auction-level defaults are editable here.</p>
+                    <p className="mt-1 text-xs text-gray-500">All auction-level defaults are editable here.</p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     <div>
@@ -373,7 +373,7 @@ export default function AuctionCreatePage() {
 
                 <div className="space-y-4">
                   {lanes.map((lane, index) => (
-                    <div key={`lane-config-${index}`} className="rounded-xl border border-gray-200 p-4">
+                    <div key={`lane-config-${index}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                       <div className="mb-4 flex items-center justify-between">
                         <p className="text-sm font-bold text-text">{effectiveType === 'SPOT' ? 'Lane' : `Lane ${index + 1}`}</p>
                         {effectiveType !== 'SPOT' && lanes.length > 1 && (
@@ -489,11 +489,25 @@ export default function AuctionCreatePage() {
             <CardTitle>Review</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-gray-600">
-            <div className="rounded-xl border border-gray-200 p-4">
-              <p><span className="font-medium text-text">Type:</span> {effectiveType || 'Not selected'}</p>
-              <p className="mt-2"><span className="font-medium text-text">Lanes:</span> {effectiveType ? lanes.length : 0}</p>
-              <p className="mt-2"><span className="font-medium text-text">Vendors:</span> {vendors.length} invited vendors</p>
-              <p className="mt-2"><span className="font-medium text-text">Window:</span> {auctionSettings.biddingWindowMinutes} minutes</p>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Type</p>
+                  <p className="mt-1 text-sm font-bold text-text">{effectiveType || 'Not selected'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Lanes</p>
+                  <p className="mt-1 text-sm font-bold text-text">{effectiveType ? lanes.length : 0}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Vendors</p>
+                  <p className="mt-1 text-sm font-bold text-text">{vendors.length} invited vendors</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Window</p>
+                  <p className="mt-1 text-sm font-bold text-text">{auctionSettings.biddingWindowMinutes} minutes</p>
+                </div>
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Button variant="outline" disabled={!effectiveType} onClick={() => handleCreate(false)}>Save Draft</Button>

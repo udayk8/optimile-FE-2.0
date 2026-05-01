@@ -1,5 +1,5 @@
-import { Badge } from '@shared-ui/badge'
-import type { BadgeProps } from '@shared-ui/badge'
+import { Badge } from '@auction/components/ui/badge'
+import type { BadgeProps } from '@auction/components/ui/badge'
 
 type StatusVariant = 'success' | 'warning' | 'destructive' | 'info' | 'muted'
 

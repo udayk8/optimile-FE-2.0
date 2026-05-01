@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { MOCK_AUCTIONS, MOCK_BOOKINGS, MOCK_CONTRACTS, MOCK_VENDORS } from '@admin/utils/mock-data'
+import { MOCK_AUCTIONS, MOCK_BOOKINGS, MOCK_CONTRACTS, MOCK_VENDORS } from '@auction/lib/mock-data'
 import type {
   Auction,
   AuctionEvent,
@@ -8,7 +8,7 @@ import type {
   BookingReference,
   Contract,
   VendorOption,
-} from '@admin/types'
+} from '@auction/types'
 
 interface CreateAuctionInput {
   type: AuctionType

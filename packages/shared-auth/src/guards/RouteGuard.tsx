@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import type { ERPModule } from '../types'
 
 const PORTAL_MODULES: Record<string, ERPModule> = {
-  admin: 'ams',
+  admin: 'admin',
   auction: 'ams',
   vendor: 'vendor',
   fleet: 'fleet',

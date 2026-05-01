@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { cn } from '@admin/utils/cn'
-import { getCountdown, formatCountdown } from '@admin/utils/date-utils'
+import { cn } from '@auction/lib/cn'
+import { getCountdown, formatCountdown } from '@auction/lib/date-utils'
 
 interface SLACountdownProps {
   deadline: string

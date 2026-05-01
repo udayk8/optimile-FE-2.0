@@ -1,39 +1,44 @@
 import { Navigate, useRoutes } from 'react-router-dom'
 import { ProtectedRoute } from '@shared-auth'
-import { AppShell } from '@admin/components/layout/AppShell'
-import LoginPage from '@admin/auth/LoginPage'
-import DashboardPage from '@admin/modules/auction/dashboard/pages/DashboardPage'
-import AuctionsPage from '@admin/modules/auction/auctions/pages/AuctionsPage'
-import AuctionCreatePage from '@admin/modules/auction/auctions/pages/AuctionCreatePage'
-import AuctionDetailPage from '@admin/modules/auction/auctions/pages/AuctionDetailPage'
-import ContractsPage from '@admin/modules/auction/contracts/pages/ContractsPage'
+import { AppShell } from '@auction/components/layout/AppShell'
+import LoginPage from '@auction/features/auth/pages/LoginPage'
+import DashboardPage from '@auction/features/dashboard/pages/DashboardPage'
+import AuctionsPage from '@auction/features/auctions/pages/AuctionsPage'
+import AuctionCreatePage from '@auction/features/auctions/pages/AuctionCreatePage'
+import AuctionDetailPage from '@auction/features/auctions/pages/AuctionDetailPage'
+import ContractsPage from '@auction/features/contracts/pages/ContractsPage'
 
-export function AdminRoutes({ standalone = false }: { standalone?: boolean }) {
-  const dashboardPath = '/auction/dashboard'
-
-  const routes = [
-    ...(standalone
-      ? [
-          { path: '/login', element: <LoginPage /> },
-          { path: '/', element: <Navigate to={dashboardPath} replace /> },
-          { path: '/admin/*', element: <Navigate to={dashboardPath} replace /> },
-        ]
-      : []),
-    {
-      ...(standalone ? { path: '/auction' } : {}),
-      element: <ProtectedRoute portal="auction"><AppShell /></ProtectedRoute>,
-      children: [
-        { index: true, element: <Navigate to={dashboardPath} replace /> },
-        { path: 'dashboard', element: <DashboardPage /> },
-        { path: 'auctions', element: <ProtectedRoute portal="auction" module="auction"><AuctionsPage /></ProtectedRoute> },
-        { path: 'auctions/new', element: <ProtectedRoute portal="auction" module="auction"><AuctionCreatePage /></ProtectedRoute> },
-        { path: 'auctions/new/:type', element: <ProtectedRoute portal="auction" module="auction"><AuctionCreatePage /></ProtectedRoute> },
-        { path: 'auctions/:id', element: <ProtectedRoute portal="auction" module="auction"><AuctionDetailPage /></ProtectedRoute> },
-        { path: 'contracts', element: <ProtectedRoute portal="auction" module="contracts"><ContractsPage /></ProtectedRoute> },
-        { path: 'contracts/:id', element: <ProtectedRoute portal="auction" module="contracts"><ContractsPage /></ProtectedRoute> },
-      ],
-    },
+export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) {
+  const protectedChildren = [
+    { index: true, element: <Navigate to="dashboard" replace /> },
+    { path: 'dashboard', element: <DashboardPage /> },
+    { path: 'auctions', element: <AuctionsPage /> },
+    { path: 'auctions/new', element: <AuctionCreatePage /> },
+    { path: 'auctions/new/:type', element: <AuctionCreatePage /> },
+    { path: 'auctions/:id', element: <AuctionDetailPage /> },
+    { path: 'contracts', element: <ContractsPage /> },
+    { path: 'contracts/:id', element: <ContractsPage /> },
+    { path: '*', element: <Navigate to="dashboard" replace /> },
   ]
+
+  const routes = standalone
+    ? [
+        { path: '/login', element: <LoginPage /> },
+        { path: '/', element: <Navigate to="/auction" replace /> },
+        {
+          path: '/auction',
+          element: <ProtectedRoute portal="auction"><AppShell /></ProtectedRoute>,
+          children: protectedChildren,
+        },
+        { path: '*', element: <Navigate to="/auction/dashboard" replace /> },
+      ]
+    : [
+        {
+          path: '/',
+          element: <AppShell />,
+          children: protectedChildren,
+        },
+      ]
 
   return useRoutes(routes)
 }

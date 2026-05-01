@@ -72,7 +72,7 @@ export default function ContractsPage() {
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="Contract Outputs"
+        eyebrow="Contract Control"
         title="Contracts"
         subtitle="Contracts are created after auction awards. Use this tab to review R1/R2/R3 allocations, override reasons, rate units, and expiry."
       />
@@ -116,13 +116,13 @@ export default function ContractsPage() {
 
               {selectedContract.r1OverrideReason && (
                 <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
-                  <p className="text-sm font-semibold text-warning">Winner override reason</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-warning">Winner override reason</p>
                   <p className="mt-2 text-sm text-warning">{selectedContract.r1OverrideReason}</p>
                 </div>
               )}
 
-              <div className="rounded-xl border border-gray-200 p-4">
-                <p className="text-sm font-semibold text-text">TMS Sync</p>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">TMS Sync</p>
                 <p className="mt-2 text-sm text-gray-600">
                   {selectedContract.rateSyncedToTms ? 'Rates synced and available for downstream booking suggestion.' : 'Sync pending.'}
                 </p>

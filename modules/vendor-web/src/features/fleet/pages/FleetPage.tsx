@@ -17,9 +17,9 @@ function getFleetTab(pathname: string): FleetTab {
 }
 
 function ComplianceIcon({ status }: { status: string }) {
-  if (status === 'COMPLIANT') return <ShieldCheck className="h-4 w-4 text-emerald-500" />
-  if (status === 'EXPIRING_SOON') return <AlertTriangle className="h-4 w-4 text-amber-500" />
-  return <ShieldX className="h-4 w-4 text-red-500" />
+  if (status === 'COMPLIANT') return <ShieldCheck className="h-4 w-4 text-success" />
+  if (status === 'EXPIRING_SOON') return <AlertTriangle className="h-4 w-4 text-warning" />
+  return <ShieldX className="h-4 w-4 text-danger" />
 }
 
 export default function FleetPage() {
@@ -52,37 +52,37 @@ export default function FleetPage() {
     if (activeTab === 'vehicles') {
       setEditingVehicleId(null)
       setIsAddVehicleOpen(true)
-      navigate('/fleet/vehicles/add')
+      navigate('/vendor/fleet/vehicles/add')
       return
     }
 
     setEditingDriverId(null)
     setIsAddDriverOpen(true)
-    navigate('/fleet/drivers/add')
+    navigate('/vendor/fleet/drivers/add')
   }
 
   const openEditVehicle = (id: string) => {
-    navigate(`/fleet/vehicles/${id}`)
+    navigate(`/vendor/fleet/vehicles/${id}`)
   }
 
   const openEditDriver = (id: string) => {
-    navigate(`/fleet/drivers/${id}`)
+    navigate(`/vendor/fleet/drivers/${id}`)
   }
 
   const closeVehicleModal = () => {
     setIsAddVehicleOpen(false)
     setEditingVehicleId(null)
-    navigate('/fleet/vehicles')
+    navigate('/vendor/fleet/vehicles')
   }
 
   const closeDriverModal = () => {
     setIsAddDriverOpen(false)
     setEditingDriverId(null)
-    navigate('/fleet/drivers')
+    navigate('/vendor/fleet/drivers')
   }
 
   useEffect(() => {
-    if (location.pathname === '/fleet/vehicles/add') {
+    if (location.pathname === '/vendor/fleet/vehicles/add') {
       setEditingVehicleId(null)
       setIsAddVehicleOpen(true)
       return
@@ -95,7 +95,7 @@ export default function FleetPage() {
       } else {
         setEditingVehicleId(null)
         setIsAddVehicleOpen(false)
-        navigate('/fleet/vehicles', { replace: true })
+        navigate('/vendor/fleet/vehicles', { replace: true })
       }
       return
     }
@@ -104,7 +104,7 @@ export default function FleetPage() {
   }, [activeTab, location.pathname, navigate, params.id, vehicles])
 
   useEffect(() => {
-    if (location.pathname === '/fleet/drivers/add') {
+    if (location.pathname === '/vendor/fleet/drivers/add') {
       setEditingDriverId(null)
       setIsAddDriverOpen(true)
       return
@@ -117,7 +117,7 @@ export default function FleetPage() {
       } else {
         setEditingDriverId(null)
         setIsAddDriverOpen(false)
-        navigate('/fleet/drivers', { replace: true })
+        navigate('/vendor/fleet/drivers', { replace: true })
       }
       return
     }
@@ -131,7 +131,7 @@ export default function FleetPage() {
         eyebrow="FLEET MANAGEMENT"
         title="Fleet"
         subtitle="Manage vehicles and drivers with compliance-heavy mock data."
-        icon={<Ship className="h-5 w-5 text-[#2563EB]" />}
+        icon={<Ship className="h-5 w-5 text-primary" />}
         action={
           <Button onClick={handleAddClick}>
             <Plus className="h-4 w-4 mr-1" /> Add {activeTab === 'vehicles' ? 'Vehicle' : 'Driver'}
@@ -139,13 +139,13 @@ export default function FleetPage() {
         }
       />
 
-      <div className="flex gap-1 p-1 bg-muted rounded-lg mb-6 w-fit">
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => navigate(`/fleet/${tab.key}`)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === tab.key ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            onClick={() => navigate(`/vendor/fleet/${tab.key}`)}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${
+              activeTab === tab.key ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'
             }`}
           >
             {tab.icon} {tab.label}
@@ -164,16 +164,16 @@ export default function FleetPage() {
                     <ComplianceIcon status={vehicle.complianceStatus} />
                     <div>
                       <span className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</span>
-                      <p className="text-sm text-muted-foreground">{vehicle.vehicleType}</p>
+                      <p className="text-sm text-gray-500">{vehicle.vehicleType}</p>
                     </div>
                   </div>
                   <StatusBadge status={vehicle.operationalStatus} />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <div><span className="text-muted-foreground">Base: </span>{vehicle.baseLocation}</div>
-                  <div><span className="text-muted-foreground">Compliance: </span><StatusBadge status={vehicle.complianceStatus} /></div>
-                  <div><span className="text-muted-foreground">GPS: </span>{vehicle.gpsDeviceId || '—'}</div>
-                  <div><span className="text-muted-foreground">RC End: </span>{vehicle.rcEndDate ? formatDate(vehicle.rcEndDate) : '—'}</div>
+                  <div><span className="text-gray-500">Base: </span>{vehicle.baseLocation}</div>
+                  <div><span className="text-gray-500">Compliance: </span><StatusBadge status={vehicle.complianceStatus} /></div>
+                  <div><span className="text-gray-500">GPS: </span>{vehicle.gpsDeviceId || '—'}</div>
+                  <div><span className="text-gray-500">RC End: </span>{vehicle.rcEndDate ? formatDate(vehicle.rcEndDate) : '—'}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEditVehicle(vehicle.id)}>
@@ -181,7 +181,7 @@ export default function FleetPage() {
                   </Button>
                 </div>
                 {vehicle.complianceStatus === 'EXPIRED' && (
-                  <div className="mt-3 flex items-center gap-2 rounded-md bg-red-50 p-2 text-xs text-red-700 dark:bg-red-900/10 dark:text-red-400">
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-danger/20 bg-danger/10 p-2 text-xs text-danger">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     Blocked from indent nomination - compliance documents expired (BR-06)
                   </div>
@@ -201,17 +201,17 @@ export default function FleetPage() {
                   <div className="flex items-center gap-3">
                     <ComplianceIcon status={driver.complianceStatus} />
                     <div>
-                      <span className="text-base font-medium">{driver.name}</span>
-                      <p className="text-sm text-muted-foreground">{driver.mobile}</p>
+                      <span className="text-base font-bold text-text">{driver.name}</span>
+                      <p className="text-sm text-gray-500">{driver.mobile}</p>
                     </div>
                   </div>
                   <StatusBadge status={driver.currentStatus} />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <div><span className="text-muted-foreground">License: </span><span className="font-mono text-xs">{driver.licenseNumber}</span></div>
-                  <div><span className="text-muted-foreground">Expiry: </span>{formatDate(driver.licenseExpiry)}</div>
-                  <div><span className="text-muted-foreground">Class: </span>{driver.licenseClass.join(', ')}</div>
-                  <div><span className="text-muted-foreground">Tracking: </span>{driver.trackingSelections?.length || 0}</div>
+                  <div><span className="text-gray-500">License: </span><span className="font-mono text-xs">{driver.licenseNumber}</span></div>
+                  <div><span className="text-gray-500">Expiry: </span>{formatDate(driver.licenseExpiry)}</div>
+                  <div><span className="text-gray-500">Class: </span>{driver.licenseClass.join(', ')}</div>
+                  <div><span className="text-gray-500">Tracking: </span>{driver.trackingSelections?.length || 0}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => openEditDriver(driver.id)}>

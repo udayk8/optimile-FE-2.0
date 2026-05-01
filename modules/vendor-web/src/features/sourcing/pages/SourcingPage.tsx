@@ -47,19 +47,18 @@ export default function SourcingPage() {
         eyebrow="SOURCING"
         title="Auctions & Bidding" 
         subtitle="Participate in live sourcing events and manage your awarded contracts"
-        icon={<Search className="h-5 w-5 text-[#2563EB]" />}
+        icon={<Search className="h-5 w-5 text-primary" />}
       />
 
-      {/* Sub-tabs for Auction Types */}
-      <div className="flex gap-1 p-1 bg-muted rounded-lg mt-6 mb-6 w-fit">
+      <div className="mb-6 mt-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => navigate(`/sourcing?tab=${tab.key.toLowerCase()}`)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+            onClick={() => navigate(`/vendor/sourcing?tab=${tab.key.toLowerCase()}`)}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${
               activeTab === tab.key
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-white text-text shadow-sm'
+                : 'text-gray-600 hover:text-primary'
             }`}
           >
             {tab.icon}
@@ -81,14 +80,14 @@ export default function SourcingPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-mono text-sm font-semibold">{auction.id}</span>
                       <StatusBadge status={auction.state} />
-                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded dark:bg-purple-900/30 dark:text-purple-400 font-semibold">
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                         {auction.type}
                       </span>
                     </div>
-                    <p className="text-base font-medium">{auction.customerName}</p>
+                    <p className="text-base font-bold text-text">{auction.customerName}</p>
                   </div>
                   {['LIVE', 'UPCOMING'].includes(auction.state) && (
-                    <Button size="sm" onClick={() => navigate(`/sourcing/auctions/${auction.id}`)}>
+                    <Button size="sm" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
                       <Gavel className="h-4 w-4 mr-2" /> {auction.state === 'LIVE' ? 'Enter Auction' : 'View Details'}
                     </Button>
                   )}
@@ -96,7 +95,7 @@ export default function SourcingPage() {
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm mb-4">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
                     <span>
                       {auction.lanes.length === 1 && auction.lanes[0]
                         ? `${auction.lanes[0].laneDetails.origin.city} → ${auction.lanes[0].laneDetails.destination.city}`
@@ -104,17 +103,17 @@ export default function SourcingPage() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Vehicle: </span>{auction.vehicleTypeRequired}
+                    <span className="text-gray-500">Vehicle: </span>{auction.vehicleTypeRequired}
                   </div>
                   <div>
-                    <span className="text-muted-foreground">
+                    <span className="text-gray-500">
                       {auction.state === 'UPCOMING' ? 'Starts: ' : 'Ends: '}
                     </span>
                     {formatDateTime(auction.state === 'UPCOMING' ? auction.startTime : auction.endTime)}
                   </div>
                   {auction.state === 'LIVE' && (
                     <div className="flex items-center gap-2">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Clock className="h-3.5 w-3.5 text-gray-400" />
                       <SLACountdown deadline={auction.endTime} showLabel={false} />
                     </div>
                   )}

@@ -35,11 +35,11 @@ export default function ExpensesPage() {
 
   const closeAddExpenseModal = () => {
     setIsAddExpenseOpen(false)
-    if (location.pathname.startsWith('/expenses/add/')) navigate('/expenses')
+    if (location.pathname.startsWith('/vendor/expenses/add/')) navigate('/vendor/expenses')
   }
 
   useEffect(() => {
-    if (location.pathname.startsWith('/expenses/add/')) setIsAddExpenseOpen(true)
+    if (location.pathname.startsWith('/vendor/expenses/add/')) setIsAddExpenseOpen(true)
   }, [location.pathname])
 
   return (
@@ -57,22 +57,22 @@ export default function ExpensesPage() {
       />
 
       {/* Summary bar */}
-      <div className="bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 rounded-lg p-4 mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between rounded-xl border border-success/20 bg-success/10 p-4">
         <div>
-          <p className="text-sm text-muted-foreground">Approved Expense Claims</p>
-          <CurrencyDisplay amount={totalApproved} className="text-2xl font-bold text-emerald-700 dark:text-emerald-400" />
+          <p className="text-sm text-gray-600">Approved Expense Claims</p>
+          <CurrencyDisplay amount={totalApproved} className="text-2xl font-bold text-success" />
         </div>
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-gray-600">
           {approvedExpenses.length} approved trip claim{approvedExpenses.length !== 1 ? 's' : ''}
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3 mb-6">
-        <div className="flex gap-1 p-1 bg-muted rounded-lg">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
           {STATUS_FILTERS.map((f) => (
             <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${statusFilter === f.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
               {f.label}
             </button>
           ))}
@@ -91,21 +91,21 @@ export default function ExpensesPage() {
                   <div className="flex-1">
                     <div className="mb-1 flex flex-wrap items-center gap-2">
                       <span className="font-mono text-sm">{expense.tripReference}</span>
-                      <span className="rounded bg-muted px-2 py-0.5 text-xs">{expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}</span>
+                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}</span>
                       <StatusBadge status={expense.status} />
                     </div>
-                    <p className="text-xs text-muted-foreground">Submitted: {formatDate(expense.submittedAt)}</p>
-                    {expense.rejectionReason && <p className="mt-2 text-sm text-destructive">Rejected: {expense.rejectionReason}</p>}
+                    <p className="text-xs text-gray-500">Submitted: {formatDate(expense.submittedAt)}</p>
+                    {expense.rejectionReason && <p className="mt-2 text-sm text-danger">Rejected: {expense.rejectionReason}</p>}
                   </div>
                   <CurrencyDisplay amount={expense.amount} className="text-lg font-semibold" />
                 </div>
 
-                <div className="mt-4 space-y-2 rounded-lg bg-muted/40 p-3">
+                <div className="mt-4 space-y-2 rounded-lg bg-gray-50 p-3">
                   {expense.lineItems.map((line) => (
-                    <div key={line.id} className="flex flex-col gap-1 rounded-md border bg-background p-3 md:flex-row md:items-center md:justify-between">
+                    <div key={line.id} className="flex flex-col gap-1 rounded-md border border-gray-200 bg-white p-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <div className="text-sm font-medium">{line.expenseType.replace(/_/g, ' / ')}</div>
-                        {line.description && <p className="text-sm text-muted-foreground">{line.description}</p>}
+                        <div className="text-sm font-bold text-text">{line.expenseType.replace(/_/g, ' / ')}</div>
+                        {line.description && <p className="text-sm text-gray-500">{line.description}</p>}
                       </div>
                       <CurrencyDisplay amount={line.amount} className="text-sm font-semibold" />
                     </div>

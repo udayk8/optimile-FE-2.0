@@ -42,6 +42,8 @@ export default function ExpensesPage() {
     if (location.pathname.startsWith('/vendor/expenses/add/')) setIsAddExpenseOpen(true)
   }, [location.pathname])
 
+  const formatExpenseType = (value: string) => value.replace(/_/g, ' / ')
+
   return (
     <div className="space-y-6">
       <PageHero 
@@ -90,11 +92,24 @@ export default function ExpensesPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-mono text-sm">{expense.tripReference}</span>
-                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">{expense.expenseType.replace('_', '/')}</span>
+                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded">
+                      {expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}
+                    </span>
                     <StatusBadge status={expense.status} />
                   </div>
-                  {expense.description && <p className="text-sm text-gray-500">{expense.description}</p>}
                   <p className="text-xs text-gray-500 mt-1">Submitted: {formatDate(expense.submittedAt)}</p>
+                  <div className="mt-3 space-y-2">
+                    {expense.lineItems.map((lineItem) => (
+                      <div key={lineItem.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-text">{formatExpenseType(lineItem.expenseType)}</span>
+                          <CurrencyDisplay amount={lineItem.amount} className="text-sm font-semibold" />
+                        </div>
+                        {lineItem.description && <p className="mt-1 text-sm text-gray-500">{lineItem.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  {expense.rejectionReason && <p className="mt-2 text-sm text-danger">Rejected: {expense.rejectionReason}</p>}
                 </div>
                 <CurrencyDisplay amount={expense.amount} className="text-lg font-semibold" />
               </CardContent>

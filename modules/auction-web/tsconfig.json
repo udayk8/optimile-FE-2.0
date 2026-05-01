@@ -18,16 +18,17 @@
     "noUncheckedIndexedAccess": true,
     "baseUrl": ".",
     "paths": {
-      "@admin/*": ["./src/*"],
-      "@shared-auth": ["../../packages/shared-auth/src"],
-      "@shared-auth/*": ["../../packages/shared-auth/src/*"],
-      "@shared-api": ["../../packages/shared-api/src"],
-      "@shared-api/*": ["../../packages/shared-api/src/*"],
-      "@shared-ui": ["../../packages/shared-ui/src"],
-      "@shared-ui/*": ["../../packages/shared-ui/src/*"],
-      "@shared-utils": ["../../packages/shared-utils/src"],
+      "@auction":        ["./src"],
+      "@auction/*":      ["./src/*"],
+      "@admin":          ["./src"],
+      "@admin/*":        ["./src/*"],
+      "@shared-auth":    ["../../packages/shared-auth/src"],
+      "@shared-auth/*":  ["../../packages/shared-auth/src/*"],
+      "@shared-ui":      ["../../packages/shared-ui/src"],
+      "@shared-ui/*":    ["../../packages/shared-ui/src/*"],
+      "@shared-utils":   ["../../packages/shared-utils/src"],
       "@shared-utils/*": ["../../packages/shared-utils/src/*"]
     }
   },
-  "include": ["src", "../../packages"]
+  "include": ["src"]
 }

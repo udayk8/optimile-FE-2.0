@@ -243,20 +243,49 @@ export const MOCK_TRIPS: Trip[] = [
 
 export const MOCK_EXPENSES: Expense[] = [
   {
-    id: 'EXP-101', tripId: 'TRP-043', tripReference: 'TRP-043', expenseType: 'TOLL',
-    amount: 3000, description: 'Mumbai-Delhi highway toll', status: 'APPROVED', submittedAt: '2026-04-21T10:00:00Z',
+    id: 'EXP-101',
+    tripId: 'TRP-043',
+    tripReference: 'TRP-043',
+    lineItems: [
+      { id: 'EXP-101-1', expenseType: 'TOLL', amount: 3000, description: 'Mumbai-Delhi highway toll' },
+    ],
+    amount: 3000,
+    status: 'APPROVED',
+    submittedAt: '2026-04-21T10:00:00Z',
   },
   {
-    id: 'EXP-102', tripId: 'TRP-043', tripReference: 'TRP-043', expenseType: 'DETENTION',
-    amount: 2500, description: 'Detention at delivery — 4 hours', status: 'APPROVED', submittedAt: '2026-04-21T10:00:00Z',
+    id: 'EXP-102',
+    tripId: 'TRP-043',
+    tripReference: 'TRP-043',
+    lineItems: [
+      { id: 'EXP-102-1', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
+    ],
+    amount: 2500,
+    status: 'APPROVED',
+    submittedAt: '2026-04-21T10:00:00Z',
   },
   {
-    id: 'EXP-103', tripId: 'TRP-042', tripReference: 'TRP-042', expenseType: 'TOLL',
-    amount: 1800, status: 'PENDING', submittedAt: '2026-04-22T14:00:00Z',
+    id: 'EXP-103',
+    tripId: 'TRP-042',
+    tripReference: 'TRP-042',
+    lineItems: [
+      { id: 'EXP-103-1', expenseType: 'TOLL', amount: 1800 },
+    ],
+    amount: 1800,
+    status: 'PENDING',
+    submittedAt: '2026-04-22T14:00:00Z',
   },
   {
-    id: 'EXP-104', tripId: 'TRP-045', tripReference: 'TRP-045', expenseType: 'WEIGHBRIDGE',
-    amount: 500, description: 'Weighbridge mismatch', status: 'REJECTED', rejectionReason: 'Receipt illegible', submittedAt: '2026-04-22T15:00:00Z',
+    id: 'EXP-104',
+    tripId: 'TRP-045',
+    tripReference: 'TRP-045',
+    lineItems: [
+      { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
+    ],
+    amount: 500,
+    status: 'REJECTED',
+    rejectionReason: 'Receipt illegible',
+    submittedAt: '2026-04-22T15:00:00Z',
   }
 ]
 

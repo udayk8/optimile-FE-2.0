@@ -42,27 +42,27 @@ export default function OnboardingPage() {
 
   const finish = () => {
     completeOnboarding()
-    navigate('/profile/company')
+    navigate('/vendor/profile/company')
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] px-4 py-8 text-[#0F172A]">
+    <div className="min-h-screen bg-background px-4 py-8 text-text">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm uppercase tracking-[0.25em] text-[#2563EB]/75">Vendor onboarding</p>
-            <h1 className="mt-2 text-3xl font-bold">Complete your setup</h1>
-            <p className="mt-2 max-w-2xl text-[#475569]">
+            <p className="text-sm font-bold uppercase tracking-wide text-accent">Vendor onboarding</p>
+            <h1 className="mt-2 text-3xl font-extrabold text-text">Complete your setup</h1>
+            <p className="mt-2 max-w-2xl text-gray-600">
               Finish the web onboarding flow with the same business data the mobile app collects, but using the existing web layout.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#E5E7EB] bg-white px-4 py-3 text-right shadow-soft">
-            <div className="text-xs text-[#64748B]">Current status</div>
+          <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-right shadow-sm">
+            <div className="text-xs text-gray-600">Current status</div>
             <div className="mt-1">{vendor?.status ? <StatusBadge status={vendor.status} /> : <Badge variant="muted">Draft</Badge>}</div>
           </div>
         </div>
 
-        <div className="mb-6 rounded-full bg-[#DBEAFE] p-1">
+        <div className="mb-6 rounded-full bg-primary/10 p-1">
           <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
         </div>
 
@@ -71,10 +71,10 @@ export default function OnboardingPage() {
             <button
               key={label}
               onClick={() => setStep(index)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 step === index
-                  ? 'bg-[#2563EB] text-white shadow-sm'
-                  : 'border border-[#E5E7EB] bg-white text-[#475569] hover:border-[#BFDBFE] hover:bg-[#EFF6FF]'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 hover:text-primary'
               }`}
             >
               {index + 1}. {label}
@@ -87,12 +87,12 @@ export default function OnboardingPage() {
             {step === 0 && (
               <div className="space-y-5">
                 <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-[#2563EB]" />
-                  <h2 className="text-xl font-semibold">Company details</h2>
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-extrabold text-text">Company details</h2>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm text-[#475569]">Trading name</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Trading name</label>
                     <Input
                       value={draft.companyName}
                       onChange={(e) => updateOnboardingDraft({ companyName: e.target.value })}
@@ -100,7 +100,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">Legal name</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Legal name</label>
                     <Input
                       value={draft.legalName}
                       onChange={(e) => updateOnboardingDraft({ legalName: e.target.value })}
@@ -108,7 +108,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">GSTIN</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">GSTIN</label>
                     <Input
                       value={draft.gstin}
                       onChange={(e) => updateOnboardingDraft({ gstin: e.target.value.toUpperCase() })}
@@ -116,7 +116,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">PAN</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">PAN</label>
                     <Input
                       value={draft.pan}
                       onChange={(e) => updateOnboardingDraft({ pan: e.target.value.toUpperCase() })}
@@ -125,7 +125,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-sm text-[#475569]">Registered address</label>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Registered address</label>
                   <Textarea
                     value={`${draft.registeredAddress.street}, ${draft.registeredAddress.city}, ${draft.registeredAddress.state} - ${draft.registeredAddress.pincode}`}
                     readOnly
@@ -138,21 +138,21 @@ export default function OnboardingPage() {
             {step === 1 && (
               <div className="space-y-5">
                 <div className="flex items-center gap-3">
-                  <FileBadge2 className="h-5 w-5 text-[#2563EB]" />
-                  <h2 className="text-xl font-semibold">Service coverage</h2>
+                  <FileBadge2 className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-extrabold text-text">Service coverage</h2>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm text-[#475569]">Service regions</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Service regions</label>
                     <Input
                       value={draft.serviceRegions.join(', ')}
                       onChange={(e) => updateOnboardingDraft({ serviceRegions: e.target.value.split(',').map((value) => value.trim()).filter(Boolean) })}
                       className="mt-1 bg-white"
                     />
-                    <p className="mt-2 text-xs text-[#64748B]">Comma-separated for mock testing.</p>
+                    <p className="mt-2 text-xs text-gray-500">Comma-separated for mock testing.</p>
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">Supported vehicle types</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Supported vehicle types</label>
                     <Input
                       value={draft.supportedVehicleTypes.join(', ')}
                       onChange={(e) => updateOnboardingDraft({ supportedVehicleTypes: e.target.value.split(',').map((value) => value.trim()).filter(Boolean) })}
@@ -160,7 +160,7 @@ export default function OnboardingPage() {
                     />
                   </div>
                 </div>
-                <div className="rounded-2xl border border-[#DBEAFE] bg-[#EFF6FF] p-4 text-sm text-[#1D4ED8]">
+                <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm text-primary">
                   This page mirrors the data collection from the mobile setup flow, but keeps the web form style intact.
                 </div>
               </div>
@@ -169,24 +169,24 @@ export default function OnboardingPage() {
             {step === 2 && (
               <div className="space-y-5">
                 <div className="flex items-center gap-3">
-                  <Wallet className="h-5 w-5 text-[#2563EB]" />
-                  <h2 className="text-xl font-semibold">Bank details</h2>
+                  <Wallet className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-extrabold text-text">Bank details</h2>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <label className="text-sm text-[#475569]">Bank name</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Bank name</label>
                     <Input value={draft.bankName} onChange={(e) => updateOnboardingDraft({ bankName: e.target.value })} className="mt-1 bg-white" />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">Branch</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label>
                     <Input value={draft.branch} onChange={(e) => updateOnboardingDraft({ branch: e.target.value })} className="mt-1 bg-white" />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">Account number</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account number</label>
                     <Input value={draft.accountNumber} onChange={(e) => updateOnboardingDraft({ accountNumber: e.target.value })} className="mt-1 bg-white font-mono" />
                   </div>
                   <div>
-                    <label className="text-sm text-[#475569]">IFSC code</label>
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">IFSC code</label>
                     <Input value={draft.ifscCode} onChange={(e) => updateOnboardingDraft({ ifscCode: e.target.value.toUpperCase() })} className="mt-1 bg-white font-mono" />
                   </div>
                 </div>
@@ -196,31 +196,31 @@ export default function OnboardingPage() {
             {step === 3 && (
               <div className="space-y-6">
                 <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-[#16A34A]" />
-                  <h2 className="text-xl font-semibold">Review and submit</h2>
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                  <h2 className="text-lg font-extrabold text-text">Review and submit</h2>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                    <div className="text-xs text-[#64748B]">Company</div>
-                    <div className="mt-1 font-medium">{draft.companyName}</div>
-                    <div className="mt-3 text-xs text-[#64748B]">Coverage</div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Company</div>
+                    <div className="mt-1 text-sm font-bold text-text">{draft.companyName}</div>
+                    <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Coverage</div>
                     <div className="mt-1 text-sm">{draft.serviceRegions.join(', ') || '—'}</div>
                   </div>
-                  <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
-                    <div className="text-xs text-[#64748B]">Bank</div>
-                    <div className="mt-1 font-medium">{draft.bankName}</div>
-                    <div className="mt-3 text-xs text-[#64748B]">Account</div>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Bank</div>
+                    <div className="mt-1 text-sm font-bold text-text">{draft.bankName}</div>
+                    <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Account</div>
                     <div className="mt-1 font-mono text-sm">****{draft.accountNumber.slice(-4)}</div>
                   </div>
                 </div>
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
                   Submitting activates the vendor account in local state and opens the normal portal UI.
                 </div>
               </div>
             )}
 
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-[#64748B]">
+              <div className="text-sm text-gray-500">
                 Step {step + 1} of {steps.length}
               </div>
               <div className="flex gap-2">

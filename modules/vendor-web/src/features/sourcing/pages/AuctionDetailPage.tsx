@@ -24,7 +24,7 @@ export default function AuctionDetailPage() {
     return (
       <div className="p-8 text-center">
         <h2 className="text-xl font-semibold mb-4">Auction not found</h2>
-        <Button onClick={() => navigate('/sourcing?tab=auctions')}><ArrowLeft className="h-4 w-4 mr-2"/> Back to Sourcing</Button>
+        <Button onClick={() => navigate('/vendor/sourcing?tab=auctions')}><ArrowLeft className="h-4 w-4 mr-2"/> Back to Sourcing</Button>
       </div>
     )
   }
@@ -65,7 +65,7 @@ export default function AuctionDetailPage() {
         submitBid(auction.id, laneId, amount)
       }
     })
-    navigate('/sourcing?tab=auctions')
+    navigate('/vendor/sourcing?tab=auctions')
   }
 
   const getPricingUnitLabel = () => {
@@ -83,13 +83,13 @@ export default function AuctionDetailPage() {
         title={`Auction ${auction.id}`}
         description={auction.customerName}
         breadcrumbs={[
-          { label: 'Sourcing', path: '/sourcing' },
+          { label: 'Sourcing', path: '/vendor/sourcing' },
           { label: `Auction ${auction.id}` },
         ]}
         action={
           <div className="flex items-center gap-3">
             <StatusBadge status={auction.state} />
-            <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-semibold dark:bg-purple-900/30 dark:text-purple-400">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary">
               {auction.type}
             </span>
           </div>
@@ -100,22 +100,22 @@ export default function AuctionDetailPage() {
       <Card className="mb-6">
         <CardContent className="p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <div className="text-sm text-muted-foreground mb-1">Vehicle Requirement</div>
-            <div className="font-medium flex items-center gap-2">
+            <div className="mb-1 text-sm text-gray-500">Vehicle Requirement</div>
+            <div className="flex items-center gap-2 font-bold text-text">
               <Truck className="h-4 w-4 text-primary" /> {auction.vehicleTypeRequired}
             </div>
           </div>
           <div>
-            <div className="text-sm text-muted-foreground mb-1">Pricing Model</div>
-            <div className="font-medium">{getPricingUnitLabel()}</div>
+            <div className="mb-1 text-sm text-gray-500">Pricing Model</div>
+            <div className="font-bold text-text">{getPricingUnitLabel()}</div>
           </div>
           <div>
-            <div className="text-sm text-muted-foreground mb-1">Total Lanes</div>
-            <div className="font-medium">{auction.lanes.length} Lanes</div>
+            <div className="mb-1 text-sm text-gray-500">Total Lanes</div>
+            <div className="font-bold text-text">{auction.lanes.length} Lanes</div>
           </div>
           <div>
-            <div className="text-sm text-muted-foreground mb-1">Ends In</div>
-            <div className="font-medium flex items-center gap-2">
+            <div className="mb-1 text-sm text-gray-500">Ends In</div>
+            <div className="flex items-center gap-2 font-bold text-text">
               <Clock className="h-4 w-4 text-warning" />
               {auction.state === 'LIVE' ? <SLACountdown deadline={auction.endTime} showLabel={false} /> : 'N/A'}
             </div>
@@ -124,7 +124,7 @@ export default function AuctionDetailPage() {
       </Card>
 
       {isLot && (
-        <div className="bg-blue-50 text-blue-800 p-4 rounded-lg mb-6 flex items-start gap-3 dark:bg-blue-900/20 dark:text-blue-300">
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4 text-primary">
           <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
           <p className="text-sm">
             <strong>LOT Auction Rules:</strong> You must submit a bid for <strong>all {auction.lanes.length} lanes</strong>. Partial bids are not allowed.
@@ -133,19 +133,19 @@ export default function AuctionDetailPage() {
       )}
 
       {/* Lanes Table */}
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground">
+            <thead className="bg-gray-50 text-gray-500">
               <tr>
-                <th className="px-4 py-3 font-medium">Lane Details</th>
-                <th className="px-4 py-3 font-medium">Volume</th>
-                <th className="px-4 py-3 font-medium">L1 Bid</th>
-                <th className="px-4 py-3 font-medium">Your Active Bid</th>
-                <th className="px-4 py-3 font-medium text-right min-w-[200px]">Enter New Bid (₹)</th>
+                <th className="min-w-[180px] px-4 py-3 text-xs font-bold uppercase tracking-wide">Lane Details</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Volume</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">L1 Bid</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Active Bid</th>
+                <th className="min-w-[200px] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide">Enter New Bid (₹)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-gray-200">
               {auction.lanes.map((lane) => {
                 // Find existing active bid
                 const activeBid = auction.vendorBids.find(b => b.laneId === lane.id && b.status === 'ACTIVE')
@@ -153,21 +153,21 @@ export default function AuctionDetailPage() {
                 const rank = activeBid ? (isL1 ? 1 : 2) : '-'
 
                 return (
-                  <tr key={lane.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={lane.id} className="transition-colors hover:bg-gray-50">
                     <td className="px-4 py-4">
                       <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                         <div>
-                          <div className="font-medium">{lane.laneDetails.origin.city} → {lane.laneDetails.destination.city}</div>
-                          <div className="text-xs text-muted-foreground">{lane.laneDetails.distanceKm} km</div>
+                          <div className="font-bold text-text">{lane.laneDetails.origin.city} → {lane.laneDetails.destination.city}</div>
+                          <div className="text-xs text-gray-500">{lane.laneDetails.distanceKm} km</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-4">
                       {lane.volumeRequirement ? (
                         <div>
-                          <div className="font-medium">{lane.volumeRequirement.estimatedVolume} {lane.volumeRequirement.unit}</div>
-                          <div className="text-xs text-muted-foreground">{lane.volumeRequirement.frequency}</div>
+                          <div className="font-bold text-text">{lane.volumeRequirement.estimatedVolume} {lane.volumeRequirement.unit}</div>
+                          <div className="text-xs text-gray-500">{lane.volumeRequirement.frequency}</div>
                         </div>
                       ) : '-'}
                     </td>
@@ -178,23 +178,23 @@ export default function AuctionDetailPage() {
                             <CurrencyDisplay amount={lane.currentBestBid} />
                           </div>
                           {lane.minBidDecrement && (
-                            <div className="text-xs text-muted-foreground">Dec: ₹{lane.minBidDecrement}</div>
+                            <div className="text-xs text-gray-500">Dec: ₹{lane.minBidDecrement}</div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">No bids yet</span>
+                        <span className="text-gray-500">No bids yet</span>
                       )}
                     </td>
                     <td className="px-4 py-4">
                       {activeBid ? (
                         <div>
-                          <div className="font-medium"><CurrencyDisplay amount={activeBid.amount} /></div>
-                          <span className={`inline-block mt-1 text-xs px-1.5 py-0.5 rounded font-semibold ${isL1 ? 'bg-success/20 text-success-foreground' : 'bg-muted text-muted-foreground'}`}>
+                          <div className="font-bold text-text"><CurrencyDisplay amount={activeBid.amount} /></div>
+                          <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isL1 ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}>
                             Rank {rank}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">-</span>
+                        <span className="text-gray-500">-</span>
                       )}
                     </td>
                     <td className="px-4 py-4 text-right">
@@ -202,17 +202,17 @@ export default function AuctionDetailPage() {
                         <div className="flex flex-col items-end gap-1">
                           <input 
                             type="number"
-                            className={`flex h-9 w-full max-w-[150px] rounded-md border ${bidErrors[lane.id] ? 'border-destructive focus-visible:ring-destructive' : 'border-input focus-visible:ring-ring'} bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1`}
+                            className={`h-10 w-full max-w-[150px] rounded-lg border bg-white px-3 text-sm outline-none transition ${bidErrors[lane.id] ? 'border-danger ring-danger/20 focus:border-danger focus:ring-4' : 'border-gray-300 ring-primary/20 focus:border-primary focus:ring-4'}`}
                             placeholder={`Rate ${getPricingUnitLabel()}`}
                             value={bids[lane.id] || ''}
                             onChange={(e) => handleBidChange(lane.id, e.target.value)}
                           />
                           {bidErrors[lane.id] && (
-                            <div className="text-xs text-destructive">{bidErrors[lane.id]}</div>
+                            <div className="text-xs text-danger">{bidErrors[lane.id]}</div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-xs italic">Auction not live</span>
+                        <span className="text-xs italic text-gray-500">Auction not live</span>
                       )}
                     </td>
                   </tr>
@@ -225,13 +225,13 @@ export default function AuctionDetailPage() {
 
       {/* Floating Action Bar */}
       {auction.state === 'LIVE' && (
-        <div className="fixed bottom-0 left-0 right-0 md:left-64 bg-background border-t p-4 shadow-lg flex items-center justify-between z-10">
+        <div className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-between border-t bg-background p-4 shadow-sm md:left-64">
           <div>
-            <div className="font-medium">
+            <div className="font-bold text-text">
               {Object.keys(bids).filter(k => (bids[k] || 0) > 0).length} of {auction.lanes.length} lanes bid
             </div>
             {isLot && !hasBidAll && (
-              <div className="text-xs text-destructive">You must bid on all lanes for this LOT auction.</div>
+              <div className="text-xs text-danger">You must bid on all lanes for this LOT auction.</div>
             )}
           </div>
           <div className="flex gap-3">
