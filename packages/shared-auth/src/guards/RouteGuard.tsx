@@ -33,11 +33,8 @@ export function RouteGuard({
     return <Navigate to="/login" replace />
   }
 
-  const requiredModule = portal ? PORTAL_MODULES[portal] : module
-  if (requiredModule && PORTAL_MODULES[requiredModule]) {
-    const normalizedModule = PORTAL_MODULES[requiredModule]
-    if (!hasModuleAccess(normalizedModule)) return <Navigate to="/modules" replace />
-  } else if (!portal && module && hasModuleAccess(module as ERPModule) === false) {
+  const requiredModule = portal ? PORTAL_MODULES[portal] : (module as ERPModule | undefined)
+  if (requiredModule && !hasModuleAccess(requiredModule)) {
     return <Navigate to="/modules" replace />
   }
 

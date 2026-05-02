@@ -18,7 +18,7 @@
     "dev:tenant-admin:standalone": "npm run dev -w @optimile/tenant-admin-web",
     "dev:tms-booking:standalone": "npm run dev -w @optimile/tms-booking-web",
     "dev:tms-driver-app:standalone": "npm run dev -w @optimile/tms-driver-app-web",
-    "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/admin-web && npm run build -w @optimile/auction-portal-web && npm run build -w @optimile/vendor-portal-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web && npm run build -w @optimile/console-web && npm run build -w @optimile/platform-admin-web && npm run build -w @optimile/tenant-admin-web && npm run build -w @optimile/tms-booking-web && npm run build -w @optimile/tms-driver-app-web"
+    "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/auction-portal-web && npm run build -w @optimile/vendor-portal-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web && npm run build -w @optimile/console-web && npm run build -w @optimile/platform-admin-web && npm run build -w @optimile/tenant-admin-web && npm run build -w @optimile/tms-booking-web && npm run build -w @optimile/tms-driver-app-web"
   },
   "dependencies": {
     "@optimile/admin-web": "file:modules/admin-web",
