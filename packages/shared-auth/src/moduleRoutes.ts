@@ -13,6 +13,11 @@ export const MODULE_ROUTES: Record<ERPModule, string> = {
   finance:   '/finance',
   reporting: '/reporting',
   ptl:       '/ptl',
+  // extracted console modules
+  'platform-admin': '/platform-admin/dashboard',
+  'tenant-admin':   '/tenant-admin/tenant/tenant-northstar/dashboard',
+  'tms-booking':    '/tms/booking/tenant/tenant-northstar/bookings',
+  'driver-app':     '/driver-app/tenant/tenant-northstar/driver-app/login',
 }
 
 export function canUserAccessModule(user: User | null, module: ERPModule): boolean {
@@ -22,8 +27,8 @@ export function canUserAccessModule(user: User | null, module: ERPModule): boole
 }
 
 export function getAccessibleModules(user: User | null) {
-  const active: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer']
-  return active
+  const enabledModules: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'platform-admin', 'tenant-admin', 'tms-booking', 'driver-app']
+  return enabledModules
     .filter(m => canUserAccessModule(user, m))
     .map(m => ({ id: m, dashboardPath: MODULE_ROUTES[m] }))
 }

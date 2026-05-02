@@ -25,13 +25,6 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['all'],
     modules: ['ams', 'fleet', 'vendor', 'customer'],
   },
-  // Administration — new admin workspace role, pending host mount
-  'administration@optimile.com': {
-    name: 'Admin Operations',
-    role: 'Administration',
-    permissions: ['admin:read', 'admin:write', 'ams:read', 'ams:write'],
-    modules: ['admin'],
-  },
   // Fleet Manager — only fleet → goes directly to /fleet
   'fleet@uday.ts.com': {
     name: 'Rahul Mehta',
@@ -53,19 +46,47 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['customer:read', 'customer:write'],
     modules: ['customer'],
   },
-  // TMS — booking / driver workspace role, pending module scaffold + host mount
-  'tms@optimile.com': {
-    name: 'Transport Management',
-    role: 'TMS',
-    permissions: ['tms:read', 'tms:write'],
-    modules: ['tms'],
-  },
   // Vendor Manager — only vendor → goes directly to /vendor
   'vendor@pranay.ts.com': {
     name: 'Pranay Verma',
     role: 'Vendor',
     permissions: ['vendor:read', 'vendor:write'],
     modules: ['vendor'],
+  },
+  // Platform Admin — platform administration console
+  'platform-admin@optimile.com': {
+    name: 'Platform Administrator',
+    role: 'Platform Admin',
+    permissions: ['platform-admin:read', 'platform-admin:write'],
+    modules: ['platform-admin'],
+  },
+  // Tenant Admin — tenant administration console
+  'tenant-admin@optimile.com': {
+    name: 'Tenant Administrator',
+    role: 'Tenant Admin',
+    permissions: ['tenant-admin:read', 'tenant-admin:write'],
+    modules: ['tenant-admin'],
+  },
+  // Track and Trace — standalone visibility module
+  'tracking@optimile.com': {
+    name: 'Track and Trace User',
+    role: 'Track and Trace',
+    permissions: ['tracking:read'],
+    modules: ['tracking'],
+  },
+  // TMS Booking — standalone booking module
+  'tms-booking@optimile.com': {
+    name: 'TMS Booking User',
+    role: 'TMS',
+    permissions: ['tms-booking:read', 'tms-booking:write'],
+    modules: ['tms-booking'],
+  },
+  // Driver — driver app
+  'driver@optimile.com': {
+    name: 'Driver User',
+    role: 'Driver',
+    permissions: ['driver-app:read'],
+    modules: ['driver-app'],
   },
 }
 
@@ -92,7 +113,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ENV_TENANT_HINT = (import.meta.env.VITE_AUTH_TENANT_ID as string | undefined)?.trim() ?? ''
-const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl']
+const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl', 'platform-admin', 'tenant-admin', 'tms-booking', 'driver-app']
 const TENANT_STATUSES: Tenant['status'][] = ['active', 'suspended', 'trial']
 const USER_STATUSES: User['status'][] = ['active', 'inactive']
 
@@ -146,6 +167,12 @@ const DEMO_TENANT: Tenant = {
 function getPrimaryPortal(modules: ERPModule[]): Portal {
   if (modules.includes('ams')) return 'auction'
   if (modules.includes('admin')) return 'admin'
+  if (modules.includes('platform-admin')) return 'platform-admin'
+  if (modules.includes('tenant-admin')) return 'tenant-admin'
+  if (modules.includes('tms-booking')) return 'tms-booking'
+  if (modules.includes('driver-app')) return 'driver-app'
+  if (modules.includes('tracking')) return 'tracking'
+  if (modules.includes('tms')) return 'tms'
   if (modules.includes('fleet')) return 'fleet'
   if (modules.includes('vendor')) return 'vendor'
   if (modules.includes('customer')) return 'customer'

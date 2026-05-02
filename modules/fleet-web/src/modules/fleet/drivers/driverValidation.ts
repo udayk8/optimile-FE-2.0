@@ -1,4 +1,4 @@
-import { AssignmentStatus, FleetDriver } from '../../../types';
+import { AssignmentStatus, DocumentUploadEntry, DriverDocumentType, FleetDriver } from '../../../types';
 
 export interface DriverFormValues {
   aadhaarMasked: string;
@@ -13,6 +13,7 @@ export interface DriverFormValues {
   medicalExpiryDate: string;
   name: string;
   phone: string;
+  driverDocs: Partial<Record<DriverDocumentType, DocumentUploadEntry>>;
 }
 
 export type DriverFormErrors = Partial<Record<keyof DriverFormValues, string>>;
@@ -31,6 +32,7 @@ export function valuesFromDriver(driver?: FleetDriver): DriverFormValues {
     medicalExpiryDate: driver?.medicalExpiryDate ?? '',
     name: driver?.name ?? '',
     phone: driver?.phone ?? '',
+    driverDocs: {},
   };
 }
 

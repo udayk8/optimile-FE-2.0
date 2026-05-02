@@ -1,4 +1,33 @@
 export type VehicleStatus = 'Active' | 'Maintenance' | 'Inactive';
+
+export type VehicleDocumentType = 'RC' | 'Insurance' | 'PUC' | 'FC' | 'NationalPermit' | 'FASTag' | 'RoutePermit';
+export type DriverDocumentType = 'DL' | 'MedicalCertificate' | 'Badge' | 'PSVBadge' | 'PoliceVerification' | 'Aadhaar';
+export type DocumentDispatchImpact = 'Block' | 'Warn' | 'None';
+
+export interface DocumentUploadEntry {
+  referenceNo: string;
+  expiryDate: string;
+  fileName: string;
+  fileSize: number;
+}
+
+export interface VehicleDocumentConfig {
+  type: VehicleDocumentType;
+  label: string;
+  alertLeadDays: number;
+  dispatchImpact: DocumentDispatchImpact;
+  hasExpiry: boolean;
+  renewalCycle: string;
+}
+
+export interface DriverDocumentConfig {
+  type: DriverDocumentType;
+  label: string;
+  alertLeadDays: number;
+  dispatchImpact: DocumentDispatchImpact;
+  hasExpiry: boolean;
+  renewalCycle: string;
+}
 export type DocumentStatus = 'Valid' | 'Expiring' | 'Expired';
 export type WorkOrderStatus = 'Open' | 'In Progress' | 'Pending Inspection' | 'Completed';
 export type WorkOrderApprovalStatus = 'Not Required' | 'Pending' | 'Approved';

@@ -1,15 +1,19 @@
 // All ERP modules available in Optimile
 export type ERPModule =
-  | 'fleet'       // Fleet Management
-  | 'ams'         // Auction / Procurement
-  | 'vendor'      // Vendor Management
-  | 'customer'    // Customer Management
-  | 'tms'         // Booking / Transport Management
-  | 'tracking'    // Live Tracking
-  | 'finance'     // Finance & Accounts
-  | 'reporting'   // Reporting / Dashboard
-  | 'admin'       // Administration
-  | 'ptl'         // Part Truck Load
+  | 'fleet'           // Fleet Management
+  | 'ams'             // Auction / Procurement
+  | 'vendor'          // Vendor Management
+  | 'customer'        // Customer Management
+  | 'tms'             // Booking / Transport Management
+  | 'tracking'        // Live Tracking
+  | 'finance'         // Finance & Accounts
+  | 'reporting'       // Reporting / Dashboard
+  | 'admin'           // Administration
+  | 'ptl'             // Part Truck Load
+  | 'platform-admin'  // Platform Administration (console)
+  | 'tenant-admin'    // Tenant Administration (console)
+  | 'tms-booking'     // TMS Booking (standalone)
+  | 'driver-app'      // Driver App (standalone)
 
 export type Department =
   | 'Management'
@@ -37,8 +41,11 @@ export type SystemRole =
   | 'Accountant'
   | 'Procurement Head'
   | 'Supervisor'
+  | 'Track and Trace'
   | 'Driver'
   | 'Viewer'
+  | 'Platform Admin'
+  | 'Tenant Admin'
 
 export interface Tenant {
   id: string

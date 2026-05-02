@@ -12,6 +12,7 @@ export function LoginShell() {
 
   const { login, loading, error, backendAvailable } = useAuth()
   const navigate = useNavigate()
+  const demoEntries = Object.entries(DEMO_CREDENTIALS).filter(([, info]) => info.role !== 'Driver')
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault()
@@ -23,18 +24,24 @@ export function LoginShell() {
     }
   }
 
-  const handleDemoLogin = async (demoEmail: string) => {
-    try {
-      const nextRoute = await login(demoEmail, DEMO_PASSWORD)
-      navigate(nextRoute, { replace: true })
-    } catch {
-      // error shown inline
-    }
+  const handleDemoAutofill = (demoEmail: string) => {
+    setEmail(demoEmail)
+    setPassword(DEMO_PASSWORD)
+  }
+
+  const getRoleHelper = (role: string) => {
+    if (role === 'CEO') return 'All Access'
+    return null
+  }
+
+  const getRoleLabel = (role: string) => {
+    if (role === 'Platform Admin') return 'Administration'
+    return role
   }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-2xl">
 
         {/* Brand */}
         <div className="text-center mb-8">
@@ -143,22 +150,31 @@ export function LoginShell() {
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-gray-400 text-center mb-3">
               Quick Demo Login · password: <span className="font-mono">{DEMO_PASSWORD}</span>
             </p>
-            <div className="space-y-2">
-              {Object.entries(DEMO_CREDENTIALS).map(([demoEmail, info]) => (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {demoEntries.map(([demoEmail, info]) => (
                 <button
                   key={demoEmail}
                   type="button"
-                  onClick={() => void handleDemoLogin(demoEmail)}
+                  onClick={() => handleDemoAutofill(demoEmail)}
                   disabled={loading}
-                  className="w-full flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-left transition hover:bg-primary/5 hover:border-primary/30 disabled:opacity-50"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"
                 >
-                  <div>
-                    <p className="text-xs font-bold text-text">{info.role}</p>
-                    <p className="text-[11px] text-gray-400 font-mono mt-0.5">{demoEmail}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-bold text-text">{getRoleLabel(info.role)}</p>
+                        {getRoleHelper(info.role) && (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                            {getRoleHelper(info.role)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 truncate font-mono text-[11px] text-gray-400">{demoEmail}</p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-500">
+                      {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400 bg-gray-100 rounded px-1.5 py-0.5 shrink-0 ml-2">
-                    {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
-                  </span>
                 </button>
               ))}
             </div>

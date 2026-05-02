@@ -1,6 +1,6 @@
 import { isDemoRole, type DemoRole } from '../roles'
 
-export const PORTALS = ['auction', 'admin', 'vendor', 'fleet', 'driver', 'customer'] as const
+export const PORTALS = ['auction', 'admin', 'tms', 'vendor', 'fleet', 'driver', 'customer', 'tracking', 'platform-admin', 'tenant-admin', 'tms-booking', 'driver-app'] as const
 export type Portal = (typeof PORTALS)[number]
 
 export const AUTH_MODES = ['demo', 'token'] as const
@@ -11,10 +11,16 @@ const DEMO_SESSION_EMAIL_KEY = 'optimile_demo_email'
 export const PORTAL_DASHBOARD_PATHS: Record<Portal, string> = {
   auction: '/auction',
   admin: '/admin',
+  tms: '/booking',
   vendor: '/vendor',
   fleet: '/fleet',
   driver: '/driver',
   customer: '/customer',
+  tracking: '/tracking',
+  'platform-admin': '/platform-admin/dashboard',
+  'tenant-admin':   '/tenant-admin/tenant/default/dashboard',
+  'tms-booking':    '/tms/booking/tenant/default/bookings',
+  'driver-app':     '/driver-app/tenant/default/driver-app/login',
 }
 
 export function isPortal(value: string | null): value is Portal {

@@ -1,4 +1,4 @@
-import { Vehicle, VehicleStatus } from '../../../types';
+import { DocumentUploadEntry, DriverDocumentType, Vehicle, VehicleDocumentType, VehicleStatus } from '../../../types';
 
 export interface VehicleFormValues {
   capacityKg: string;
@@ -16,6 +16,8 @@ export interface VehicleFormValues {
   utilization: string;
   vin: string;
   year: string;
+  vehicleDocs: Partial<Record<VehicleDocumentType, DocumentUploadEntry>>;
+  driverDocs: Partial<Record<DriverDocumentType, DocumentUploadEntry>>;
 }
 
 export type VehicleFormErrors = Partial<Record<keyof VehicleFormValues, string>>;
@@ -37,6 +39,8 @@ export function valuesFromVehicle(vehicle?: Vehicle): VehicleFormValues {
     utilization: vehicle?.utilization.toString() ?? '0',
     vin: vehicle?.specs.vin ?? '',
     year: vehicle?.year.toString() ?? new Date().getFullYear().toString(),
+    vehicleDocs: {},
+    driverDocs: {},
   };
 }
 

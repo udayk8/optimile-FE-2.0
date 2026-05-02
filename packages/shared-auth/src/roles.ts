@@ -10,6 +10,10 @@ export const DEMO_ROLES = [
   'Procurement Head',
   'Ops Head',
   'Regional Manager',
+  'Track and Trace',
+  'Platform Admin',
+  'Tenant Admin',
+  'Driver',
 ] as const
 
 export type DemoRole = (typeof DEMO_ROLES)[number]
@@ -26,6 +30,10 @@ export const ROLE_CONSTANTS = {
   procurementHead: 'Procurement Head',
   opsHead: 'Ops Head',
   regionalManager: 'Regional Manager',
+  trackAndTrace: 'Track and Trace',
+  platformAdmin: 'Platform Admin',
+  tenantAdmin: 'Tenant Admin',
+  driver: 'Driver',
 } as const
 
 export function isDemoRole(value: string | null): value is DemoRole {

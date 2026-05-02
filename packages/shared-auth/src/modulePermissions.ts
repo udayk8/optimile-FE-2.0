@@ -14,6 +14,10 @@ export const ROLE_MODULE_PERMISSIONS: Record<DemoRole, ModulePermission[] | 'all
   'Procurement Head': ['dashboard', 'auction', 'vendor-management', 'sourcing', 'contracts', 'profile'],
   'Ops Head': ['dashboard', 'fleet-management', 'track-and-trace', 'fleet', 'trips'],
   'Regional Manager': ['dashboard', 'sourcing', 'contracts', 'trips', 'fleet', 'profile'],
+  'Track and Trace': ['dashboard', 'track-and-trace', 'trips'],
+  'Platform Admin': ['dashboard'],
+  'Tenant Admin': ['dashboard'],
+  'Driver': ['dashboard', 'trips'],
 }
 
 export function canAccessModule(module: ModulePermission, role = getSelectedRole()) {
