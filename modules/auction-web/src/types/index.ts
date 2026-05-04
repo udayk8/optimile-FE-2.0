@@ -82,7 +82,7 @@ export interface AuctionLane {
 }
 
 export type AuctionType = 'SPOT' | 'BULK' | 'LOT'
-export type AuctionStatus = 'DRAFT' | 'LIVE' | 'COMPLETED' | 'AWARDED' | 'NO_BIDS' | 'CANCELLED'
+export type AuctionStatus = 'DRAFT' | 'UPCOMING' | 'LIVE' | 'COMPLETED' | 'AWARDED' | 'NO_BIDS' | 'CANCELLED'
 
 export interface Auction {
   id: string

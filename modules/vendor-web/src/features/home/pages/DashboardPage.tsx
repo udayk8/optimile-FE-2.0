@@ -20,12 +20,13 @@ export default function DashboardPage() {
   const pendingIndents = indents.filter(i => i.status === 'PENDING')
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
+  const expiringContracts = contracts.filter((contract) => contract.status === 'EXPIRING_SOON')
 
   const uninvoicedTrips = trips.filter(t => t.podStatus === 'CONFIRMED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
   const totalBillableAmount = uninvoicedTrips.reduce((sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0), 0)
 
   const activeTrips = trips.filter(t => ['DISPATCHED', 'IN_TRANSIT', 'AT_DELIVERY', 'EXCEPTION'].includes(t.status))
-  
+
   const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
   const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')
   const complianceAlerts = nonCompliantVehicles.length + nonCompliantDrivers.length
