@@ -10,6 +10,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   COMPLIANT: { variant: 'success', label: 'Compliant' },
   PAID: { variant: 'success', label: 'Paid' },
   AWARDED: { variant: 'success', label: 'Awarded' },
+  PENDING_AWARD: { variant: 'info', label: 'Pending Award' },
   RESPONDED: { variant: 'success', label: 'Responded' },
   DELIVERED: { variant: 'success', label: 'Delivered' },
   CONFIRMED: { variant: 'success', label: 'Confirmed' },
@@ -25,7 +26,6 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   QUOTE_REVISED: { variant: 'info', label: 'Quote Revised' },
   AT_DELIVERY: { variant: 'info', label: 'At Delivery' },
   LIVE: { variant: 'info', label: 'Live' },
-  EXTENDED: { variant: 'info', label: 'Extended' },
   UNDER_REVIEW: { variant: 'info', label: 'Under Review' },
   // Amber statuses
   PENDING: { variant: 'warning', label: 'Pending' },
@@ -42,6 +42,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   TERMINATED: { variant: 'destructive', label: 'Terminated' },
   BLOCKED: { variant: 'destructive', label: 'Blocked' },
   NOT_AWARDED: { variant: 'destructive', label: 'Not Awarded' },
+  NOT_PARTICIPATED: { variant: 'muted', label: 'Not Participated' },
   SUSPENDED: { variant: 'destructive', label: 'Suspended' },
   BLACKLISTED: { variant: 'destructive', label: 'Blacklisted' },
   DECLINED: { variant: 'destructive', label: 'Declined' },
@@ -49,7 +50,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   EXCEPTION: { variant: 'destructive', label: 'Exception' },
   // Gray statuses
   DRAFT: { variant: 'muted', label: 'Draft' },
-  CLOSED: { variant: 'muted', label: 'Closed' },
+  CANCELLED: { variant: 'muted', label: 'Cancelled' },
   INACTIVE: { variant: 'muted', label: 'Inactive' },
   INVOICED: { variant: 'muted', label: 'Invoiced' },
   REVISED: { variant: 'muted', label: 'Revised' },

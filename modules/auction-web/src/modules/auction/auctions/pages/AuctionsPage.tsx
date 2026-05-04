@@ -15,7 +15,7 @@ import { formatDateTime } from '@admin/utils/date-utils'
 import { useAppStore } from '@admin/stores/app.store'
 import type { Auction } from '@admin/types'
 
-const STATUS_FILTERS = ['ALL', 'DRAFT', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
+const STATUS_FILTERS = ['ALL', 'DRAFT', 'LIVE', 'COMPLETED', 'AWARDED', 'CANCELLED'] as const
 const TYPE_FILTERS = ['ALL', 'SPOT', 'BULK', 'LOT'] as const
 
 export default function AuctionsPage() {
@@ -24,6 +24,7 @@ export default function AuctionsPage() {
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('ALL')
   const [typeFilter, setTypeFilter] = useState<(typeof TYPE_FILTERS)[number]>('ALL')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   const filteredAuctions = useMemo(() => {
     return auctions.filter((auction) => {
@@ -39,6 +40,9 @@ export default function AuctionsPage() {
       return matchesStatus && matchesType && matchesSearch
     })
   }, [auctions, search, statusFilter, typeFilter])
+  const pageSize = 8
+  const totalPages = Math.max(1, Math.ceil(filteredAuctions.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
 
   const columns: DataTableColumn<Auction>[] = [
     {
@@ -62,7 +66,7 @@ export default function AuctionsPage() {
     },
     {
       key: 'created',
-      header: 'Created',
+      header: 'Created On',
       render: (auction) => (
         <div>
           <p className="font-semibold text-text">{formatDateTime(auction.createdAt)}</p>
@@ -72,7 +76,7 @@ export default function AuctionsPage() {
     },
     {
       key: 'window',
-      header: 'Contract Window',
+      header: 'Contract Window / Scope',
       render: (auction) => (
         <div>
           <p className="font-semibold text-text">{auction.contractStartDate ?? 'Spot'}</p>
@@ -82,7 +86,7 @@ export default function AuctionsPage() {
     },
     {
       key: 'sla',
-      header: 'Award SLA',
+      header: 'Award Deadline',
       render: (auction) =>
         auction.status === 'LIVE' || auction.status === 'COMPLETED' ? <SLACountdown deadline={auction.awardDeadline} /> : <span className="text-sm text-gray-600">Not active</span>,
     },
@@ -110,7 +114,7 @@ export default function AuctionsPage() {
       <PageHero
         eyebrow="Auction Operations"
         title="Auctions"
-        subtitle="Create Spot, Bulk, and Lot auctions, then move directly from monitoring into award decisions."
+        subtitle="Create Spot, Bulk, and Lot auctions, then review them with consistent paging and clear state labels."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
           <Button asChild>
@@ -167,6 +171,9 @@ export default function AuctionsPage() {
             getRowKey={(auction) => auction.id}
             onRowClick={(auction) => navigate(`/auction/auctions/${auction.id}`)}
             emptyState={<EmptyState title="No auctions found" description="No auctions match the current filters." />}
+            page={currentPage}
+            pageSize={pageSize}
+            onPageChange={setPage}
           />
         </CardContent>
       </Card>

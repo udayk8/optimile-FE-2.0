@@ -37,12 +37,20 @@ export default function InvoicesPage() {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL')
   const [selectedTrips, setSelectedTrips] = useState<string[]>([])
+  const [invoicePage, setInvoicePage] = useState(1)
+  const [ledgerPage, setLedgerPage] = useState(1)
   const activeTab = getInvoiceTab(location.pathname, location.search)
 
   const { trips, invoices, ledger, generateInvoice } = useAppStore()
 
   const uninvoicedTrips = trips.filter((t) => t.status === 'DELIVERED' && t.podStatus === 'CONFIRMED' && !t.isInvoiced)
   const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
+  const invoicePageSize = 5
+  const ledgerPageSize = 8
+  const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize))
+  const ledgerTotalPages = Math.max(1, Math.ceil(ledger.length / ledgerPageSize))
+  const pagedInvoices = filteredInvoices.slice((Math.min(invoicePage, invoiceTotalPages) - 1) * invoicePageSize, Math.min(invoicePage, invoiceTotalPages) * invoicePageSize)
+  const pagedLedger = ledger.slice((Math.min(ledgerPage, ledgerTotalPages) - 1) * ledgerPageSize, Math.min(ledgerPage, ledgerTotalPages) * ledgerPageSize)
 
   const tabs: { key: InvoiceTab; label: string; icon: React.ReactNode }[] = [
     { key: 'create', label: 'Create Invoice', icon: <Plus className="h-4 w-4" /> },
@@ -140,7 +148,7 @@ export default function InvoicesPage() {
             {filteredInvoices.length === 0 ? (
               <EmptyState icon={<FileText className="h-12 w-12" />} title="No invoices found" />
             ) : (
-              filteredInvoices.map((inv) => (
+              pagedInvoices.map((inv) => (
                 <Card key={inv.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/invoices/${inv.id}`)}>
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-2">
@@ -163,13 +171,24 @@ export default function InvoicesPage() {
               ))
             )}
           </div>
+          {filteredInvoices.length > 0 && (
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+              <span>Showing {(Math.min(invoicePage, invoiceTotalPages) - 1) * invoicePageSize + 1}-{Math.min(Math.min(invoicePage, invoiceTotalPages) * invoicePageSize, filteredInvoices.length)} of {filteredInvoices.length}</span>
+              <div className="flex items-center gap-2">
+                <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(invoicePage, invoiceTotalPages) === 1} onClick={() => setInvoicePage((p) => Math.max(1, p - 1))}>Previous</button>
+                <span className="rounded-lg bg-gray-50 px-3 py-1.5 font-semibold text-text">Page {Math.min(invoicePage, invoiceTotalPages)} of {invoiceTotalPages}</span>
+                <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(invoicePage, invoiceTotalPages) === invoiceTotalPages} onClick={() => setInvoicePage((p) => Math.min(invoiceTotalPages, p + 1))}>Next</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Ledger */}
       {activeTab === 'ledger' && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
@@ -182,7 +201,7 @@ export default function InvoicesPage() {
               </tr>
             </thead>
             <tbody>
-              {ledger.map((entry) => (
+              {pagedLedger.map((entry) => (
                 <tr key={entry.id} className="border-b hover:bg-gray-50">
                   <td className="p-3">{formatDate(entry.date)}</td>
                   <td className="p-3"><StatusBadge status={entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'INVOICE_APPROVED' ? 'APPROVED' : 'REJECTED'} label={entry.entryType.replace(/_/g, ' ')} /></td>
@@ -195,6 +214,15 @@ export default function InvoicesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+            <span>Showing {(Math.min(ledgerPage, ledgerTotalPages) - 1) * ledgerPageSize + 1}-{Math.min(Math.min(ledgerPage, ledgerTotalPages) * ledgerPageSize, ledger.length)} of {ledger.length}</span>
+            <div className="flex items-center gap-2">
+              <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(ledgerPage, ledgerTotalPages) === 1} onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}>Previous</button>
+              <span className="rounded-lg bg-gray-50 px-3 py-1.5 font-semibold text-text">Page {Math.min(ledgerPage, ledgerTotalPages)} of {ledgerTotalPages}</span>
+              <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(ledgerPage, ledgerTotalPages) === ledgerTotalPages} onClick={() => setLedgerPage((p) => Math.min(ledgerTotalPages, p + 1))}>Next</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

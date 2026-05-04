@@ -205,14 +205,19 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
  * Never throws — always resolves to true or false.
  */
 export async function checkBackendHealth(): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 1500)
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/health`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
     return res.ok;
   } catch {
     return false;
+  } finally {
+    window.clearTimeout(timeout)
   }
 }
 

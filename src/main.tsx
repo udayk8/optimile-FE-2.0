@@ -9,6 +9,7 @@ import {
   PostLoginDashboard,
   ProtectedRoute,
   useAuth,
+  type Portal,
 } from '@shared-auth'
 import './styles.css'
 
@@ -27,6 +28,32 @@ const Fallback = (
     Loading…
   </div>
 )
+
+const DEV_PORTAL = import.meta.env.VITE_START_PORTAL as Portal | undefined
+
+function seedDirectPortalSession(portal: Portal) {
+  const demoSessions: Record<Portal, { email: string; role: string }> = {
+    auction: { email: 'auction@pranay.ts.com', role: 'Auction Head' },
+    vendor: { email: 'vendor@pranay.ts.com', role: 'Vendor' },
+    fleet: { email: 'fleet@uday.ts.com', role: 'Fleet Manager' },
+    customer: { email: 'cbd@optimile.com', role: 'CBD' },
+    tracking: { email: 'tracking@optimile.com', role: 'Track and Trace' },
+    admin: { email: 'ceo@uday.ts.com', role: 'CEO' },
+    'platform-admin': { email: 'platform-admin@optimile.com', role: 'Platform Admin' },
+    'tenant-admin': { email: 'tenant-admin@optimile.com', role: 'Tenant Admin' },
+    'tms-booking': { email: 'tms-booking@optimile.com', role: 'TMS' },
+    'driver-app': { email: 'driver@optimile.com', role: 'Driver' },
+    tms: { email: 'tms-booking@optimile.com', role: 'TMS' },
+  }
+
+  const session = demoSessions[portal]
+  if (!session) return
+
+  localStorage.setItem('authMode', 'demo')
+  localStorage.setItem('selectedPortal', portal)
+  localStorage.setItem('userRole', session.role)
+  localStorage.setItem('optimile_demo_email', session.email)
+}
 
 function DefaultRedirect() {
   const { getPostLoginRoute, isAuthenticated, loading } = useAuth()
@@ -77,8 +104,29 @@ function HostRouter() {
   )
 }
 
+function DirectPortalBootstrap() {
+  if (DEV_PORTAL) {
+    seedDirectPortalSession(DEV_PORTAL)
+  }
+
+  switch (DEV_PORTAL) {
+    case 'vendor':
+      return <VendorApp standalone />
+    case 'auction':
+      return (
+        <BrowserRouter>
+          <AuthProvider>
+            <AuctionApp standalone />
+          </AuthProvider>
+        </BrowserRouter>
+      )
+    default:
+      return <HostRouter />
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <HostRouter />
+    <DirectPortalBootstrap />
   </React.StrictMode>
 )

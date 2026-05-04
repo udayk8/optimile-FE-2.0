@@ -133,7 +133,7 @@ export interface DashboardData {
 
 
 export type AuctionType = 'SPOT' | 'LOT' | 'BULK'
-export type AuctionState = 'UPCOMING' | 'LIVE' | 'EXTENDED' | 'CLOSED' | 'AWARDED' | 'NOT_AWARDED'
+export type AuctionState = 'UPCOMING' | 'LIVE' | 'PENDING_AWARD' | 'AWARDED' | 'NOT_AWARDED' | 'NOT_PARTICIPATED' | 'CANCELLED'
 
 export interface AuctionLane {
   id: string

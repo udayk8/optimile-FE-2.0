@@ -16,7 +16,7 @@ export function KpiCard({ title, value, unit, insight, icon, onClick, className,
   return (
     <section
       className={cn(
-        'rounded-xl border border-gray-200 bg-white p-5 shadow-sm',
+        'flex h-full flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm',
         onClick && 'cursor-pointer transition hover:shadow-card-hover',
         className
       )}
@@ -31,7 +31,7 @@ export function KpiCard({ title, value, unit, insight, icon, onClick, className,
         {unit && <span className="mb-0.5 text-sm text-gray-600">{unit}</span>}
       </div>
       {insight && <p className="mt-2 text-xs leading-relaxed text-gray-500">{insight}</p>}
-      {children && <div className="mt-3">{children}</div>}
+      {children && <div className="mt-3 flex-1">{children}</div>}
     </section>
   )
 }

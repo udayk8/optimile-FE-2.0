@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Truck, Ship, Receipt, ReceiptText, MoreHorizontal, Search, FileText, User, X } from 'lucide-react'
+import { Home, Truck, Ship, Receipt, MoreHorizontal, Search, FileText, User, X } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
 
@@ -13,7 +13,6 @@ const BOTTOM_NAV = [
 const MORE_NAV = [
   { path: '/vendor/sourcing', label: 'Sourcing', icon: Search },
   { path: '/vendor/contracts', label: 'Contracts', icon: FileText },
-  { path: '/vendor/invoices', label: 'Invoices', icon: ReceiptText },
   { path: '/vendor/profile', label: 'Profile', icon: User },
 ]
 

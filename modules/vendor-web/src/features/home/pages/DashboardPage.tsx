@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock, Package, CreditCard, Gavel, Truck, AlertTriangle, Home } from 'lucide-react'
+import { Clock, Package, Gavel, Truck, AlertTriangle, Home, CalendarClock } from 'lucide-react'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
+import { formatDateTime } from '@vendor/lib/date-utils'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { KPICard } from '@vendor/components/cards/KPICard'
 import { useAppStore } from '@vendor/stores/app.store'
@@ -13,22 +14,15 @@ export default function DashboardPage() {
   const indents = useAppStore(state => state.indents)
   const auctions = useAppStore(state => state.auctions)
   const trips = useAppStore(state => state.trips)
-  const invoices = useAppStore(state => state.invoices)
   const vehicles = useAppStore(state => state.vehicles)
   const drivers = useAppStore(state => state.drivers)
 
   const pendingIndents = indents.filter(i => i.status === 'PENDING')
-  const activeAuctions = auctions.filter(a => a.state === 'LIVE' || a.state === 'UPCOMING')
+  const liveAuctions = auctions.filter(a => a.state === 'LIVE')
+  const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
   const uninvoicedTrips = trips.filter(t => t.podStatus === 'CONFIRMED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
   const totalBillableAmount = uninvoicedTrips.reduce((sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0), 0)
-
-  const invoicePaymentStatus = {
-    submitted: invoices.filter(i => i.status === 'SUBMITTED').length,
-    approved: invoices.filter(i => i.status === 'APPROVED').length,
-    rejected: invoices.filter(i => i.status === 'REJECTED').length,
-    paid: invoices.filter(i => i.status === 'PAID').length,
-  }
 
   const activeTrips = trips.filter(t => ['DISPATCHED', 'IN_TRANSIT', 'AT_DELIVERY', 'EXCEPTION'].includes(t.status))
   
@@ -45,7 +39,7 @@ export default function DashboardPage() {
         icon={<Home className="h-6 w-6 text-primary" />}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="mt-6 grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
         
         {/* Pending Indents */}
         <KPICard
@@ -55,62 +49,83 @@ export default function DashboardPage() {
           icon={<Clock className="h-4 w-4 text-warning" />}
           onClick={() => navigate('/vendor/trips?tab=indents')}
         >
-           <div className="space-y-2 mt-2">
+           <div className="mt-3 space-y-2 px-1">
             {pendingIndents.slice(0, 2).map((indent) => (
-              <div key={indent.id} className="flex items-center justify-between text-xs">
-                <span className="max-w-[120px] truncate text-gray-600">{indent.laneDetails.origin.city} &rarr; {indent.laneDetails.destination.city}</span>
-                <SLACountdown deadline={indent.slaDeadline} showLabel={false} />
+              <div key={indent.id} className="text-xs text-gray-600">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="min-w-0 flex-1 truncate font-medium text-text">{indent.laneDetails.origin.city} &rarr; {indent.laneDetails.destination.city}</span>
+                  <SLACountdown deadline={indent.slaDeadline} showLabel={false} />
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
+                  <span className="truncate">{indent.loadDetails.commodity}</span>
+                  <span className="truncate">{indent.id}</span>
+                </div>
               </div>
             ))}
           </div>
         </KPICard>
 
-        {/* Active Auctions */}
+        {/* Live Auctions */}
         <KPICard
-          title="Active Auctions"
-          value={activeAuctions.length}
-          insight={activeAuctions.length > 0 ? "Bidding open" : "No live events"}
+          title="Live Auctions"
+          value={liveAuctions.length}
+          insight={liveAuctions.length > 0 ? 'Bidding open now' : 'No live events'}
           icon={<Gavel className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/vendor/sourcing?tab=auctions')}
+          onClick={() => navigate('/vendor/sourcing?tab=live')}
         >
-          <div className="space-y-2 mt-2">
-            {activeAuctions.slice(0, 2).map((auction) => (
-              <div key={auction.id} className="flex items-center justify-between text-xs">
-                 <span className="max-w-[120px] truncate font-medium text-text">{auction.customerName}</span>
-                 <SLACountdown deadline={auction.endTime} showLabel={false} />
+          <div className="mt-3 space-y-2 px-1">
+            {liveAuctions.slice(0, 2).map((auction) => (
+              <div key={auction.id} className="text-xs text-gray-600">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="min-w-0 flex-1 truncate font-medium text-text">{auction.customerName}</span>
+                  <SLACountdown deadline={auction.endTime} showLabel={false} />
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
+                  <span className="truncate">{auction.lanes.length === 1 ? `${auction.lanes[0]?.laneDetails.origin.city} → ${auction.lanes[0]?.laneDetails.destination.city}` : `${auction.lanes.length} lanes`}</span>
+                  <span className="truncate">Ends soon</span>
+                </div>
               </div>
             ))}
+            {liveAuctions.length === 0 && <p className="text-xs text-gray-500">No live auctions right now.</p>}
+          </div>
+        </KPICard>
+
+        {/* Upcoming Auctions */}
+        <KPICard
+          title="Upcoming Auctions"
+          value={upcomingAuctions.length}
+          insight={upcomingAuctions.length > 0 ? 'Coming soon' : 'None scheduled'}
+          icon={<CalendarClock className="h-4 w-4 text-accent" />}
+          onClick={() => navigate('/vendor/sourcing?tab=upcoming')}
+        >
+          <div className="mt-3 space-y-2 px-1">
+            {upcomingAuctions.slice(0, 2).map((auction) => (
+              <div key={auction.id} className="text-xs text-gray-600">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="min-w-0 flex-1 truncate font-medium text-text">{auction.customerName}</span>
+                  <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent">Starts soon</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
+                  <span className="truncate">{auction.lanes.length === 1 ? `${auction.lanes[0]?.laneDetails.origin.city} → ${auction.lanes[0]?.laneDetails.destination.city}` : `${auction.lanes.length} lanes`}</span>
+                  <span className="truncate">{formatDateTime(auction.startTime)}</span>
+                </div>
+              </div>
+            ))}
+            {upcomingAuctions.length === 0 && <p className="text-xs text-gray-500">No upcoming auctions scheduled.</p>}
           </div>
         </KPICard>
 
         {/* Uninvoiced Bookings */}
         <KPICard
-          title="Uninvoiced Bookings"
+          title="Expenses"
           value={uninvoicedTrips.length}
           insight="Ready to be billed"
           icon={<Package className="h-4 w-4 text-gray-500" />}
-          onClick={() => navigate('/vendor/invoices/create')}
+          onClick={() => navigate('/vendor/expenses')}
         >
-           <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3 text-sm">
-              <span className="text-gray-600">Total Billable</span>
+           <div className="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3 text-sm">
+              <span className="text-gray-600">Total billable</span>
               <CurrencyDisplay amount={totalBillableAmount} className="font-semibold text-text" />
-           </div>
-        </KPICard>
-
-        {/* Invoice Payment Status */}
-        <KPICard
-          title="Invoice Status"
-          value={invoicePaymentStatus.paid}
-          unit="paid"
-          insight="Current payment standing"
-          icon={<CreditCard className="h-4 w-4 text-success" />}
-          onClick={() => navigate('/vendor/invoices/list')}
-        >
-           <div className="flex flex-wrap gap-1.5 mt-2">
-              <StatusBadge status="SUBMITTED" label={`${invoicePaymentStatus.submitted} Submitted`} />
-              <StatusBadge status="APPROVED" label={`${invoicePaymentStatus.approved} Approved`} />
-              <StatusBadge status="REJECTED" label={`${invoicePaymentStatus.rejected} Rejected`} />
-              <StatusBadge status="PAID" label={`${invoicePaymentStatus.paid} Paid`} />
            </div>
         </KPICard>
 
@@ -122,11 +137,17 @@ export default function DashboardPage() {
           icon={<Truck className="h-4 w-4 text-primary" />}
           onClick={() => navigate('/vendor/trips?tab=active')}
         >
-           <div className="space-y-2 mt-2">
+           <div className="mt-3 space-y-2 px-1">
               {activeTrips.slice(0, 2).map((trip) => (
-                <div key={trip.id} className="flex items-center justify-between text-xs">
-                  <span className="max-w-[120px] truncate text-gray-600">{trip.laneDetails.origin.city} &rarr; {trip.laneDetails.destination.city}</span>
-                  <StatusBadge status={trip.status} />
+                <div key={trip.id} className="text-xs text-gray-600">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="min-w-0 flex-1 truncate font-medium text-text">{trip.laneDetails.origin.city} &rarr; {trip.laneDetails.destination.city}</span>
+                    <StatusBadge status={trip.status} />
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
+                    <span className="truncate">{trip.assignedVehicle.registrationNumber}</span>
+                    <span className="truncate">{trip.assignedDriver.name}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -140,13 +161,13 @@ export default function DashboardPage() {
           icon={<AlertTriangle className="h-4 w-4 text-danger" />}
           onClick={() => navigate('/vendor/fleet')}
         >
-           <div className="space-y-2 mt-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Vehicle Alerts</span>
+           <div className="mt-3 space-y-2 px-1">
+              <div className="flex items-center justify-between gap-4 text-xs">
+                <span className="text-gray-600">Vehicles needing action</span>
                 <span className="font-medium text-danger">{nonCompliantVehicles.length}</span>
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">Driver Alerts</span>
+              <div className="flex items-center justify-between gap-4 text-xs">
+                <span className="text-gray-600">Drivers needing action</span>
                 <span className="font-medium text-danger">{nonCompliantDrivers.length}</span>
               </div>
             </div>

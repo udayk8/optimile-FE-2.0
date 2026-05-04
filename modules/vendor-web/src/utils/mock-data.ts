@@ -110,7 +110,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     vendorBids: [], createdAt: new Date().toISOString(),
   },
   {
-    id: 'AUC-010', type: 'BULK', customerName: 'Nestle India', state: 'CLOSED', pricingUnit: 'PER_MT',
+    id: 'AUC-015', type: 'BULK', customerName: 'Nestle India', state: 'PENDING_AWARD', pricingUnit: 'PER_MT',
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Moga Factory', city: 'Moga', state: 'PB' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 400 },
@@ -120,6 +120,54 @@ export const MOCK_AUCTIONS: Auction[] = [
     vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 172800000).toISOString(), endTime: new Date(Date.now() - 86400000).toISOString(),
     vendorBids: [{ id: 'b5', laneId: 'L1', amount: 1500, placedAt: new Date(Date.now() - 90000000).toISOString(), status: 'ACTIVE' }],
     createdAt: new Date(Date.now() - 259200000).toISOString(),
+  },
+  {
+    id: 'AUC-016', type: 'SPOT', customerName: 'Mahindra Logistics', state: 'AWARDED', pricingUnit: 'PER_KM',
+    lanes: [{
+      id: 'L1',
+      laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'MH' }, distanceKm: 700 },
+      currentBestBid: 16500,
+      minBidDecrement: 250
+    }],
+    vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
+    awardDate: new Date(Date.now() - 86400000).toISOString(),
+    contractReference: 'CNT-008 / MAHINDRA',
+    vendorBids: [{ id: 'b6', laneId: 'L1', amount: 16500, placedAt: new Date(Date.now() - 200000000).toISOString(), status: 'ACTIVE' }],
+    createdAt: new Date(Date.now() - 345600000).toISOString(),
+  },
+  {
+    id: 'AUC-017', type: 'LOT', customerName: 'Adani Ports', state: 'NOT_AWARDED', pricingUnit: 'PER_TRIP',
+    lanes: [{
+      id: 'L1',
+      laneDetails: { origin: { name: 'Mundra Port', city: 'Mundra', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 320 },
+      currentBestBid: 9800,
+      minBidDecrement: 100
+    }],
+    vehicleTypeRequired: '32ft Container', startTime: new Date(Date.now() - 432000000).toISOString(), endTime: new Date(Date.now() - 345600000).toISOString(),
+    vendorBids: [],
+    createdAt: new Date(Date.now() - 432000000).toISOString(),
+  },
+  {
+    id: 'AUC-019', type: 'SPOT', customerName: 'Bharat Petroleum', state: 'NOT_PARTICIPATED', pricingUnit: 'PER_KM',
+    lanes: [{
+      id: 'L1',
+      laneDetails: { origin: { name: 'Refinery', city: 'Mumbai', state: 'MH' }, destination: { name: 'Depot', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 530 },
+      minBidDecrement: 100
+    }],
+    vehicleTypeRequired: '32ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
+    vendorBids: [],
+    createdAt: new Date(Date.now() - 302400000).toISOString(),
+  },
+  {
+    id: 'AUC-018', type: 'SPOT', customerName: 'Blue Dart', state: 'CANCELLED', pricingUnit: 'PER_KM',
+    lanes: [{
+      id: 'L1',
+      laneDetails: { origin: { name: 'Mumbai Hub', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat DC', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
+      minBidDecrement: 100
+    }],
+    vehicleTypeRequired: 'LCV', startTime: new Date(Date.now() - 86400000).toISOString(), endTime: new Date(Date.now() - 43200000).toISOString(),
+    vendorBids: [],
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
   }
 ]
 

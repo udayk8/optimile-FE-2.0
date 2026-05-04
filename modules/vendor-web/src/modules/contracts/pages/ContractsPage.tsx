@@ -15,7 +15,6 @@ const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
   { value: 'DRAFT', label: 'Draft' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'EXPIRED', label: 'Expired' },
-  { value: 'TERMINATED', label: 'Terminated' },
 ]
 
 export default function ContractsPage() {

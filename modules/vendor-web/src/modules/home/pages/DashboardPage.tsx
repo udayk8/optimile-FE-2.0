@@ -45,7 +45,7 @@ export default function DashboardPage() {
         icon={<Home className="h-6 w-6 text-primary" />}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         
         {/* Pending Indents */}
         <KpiCard

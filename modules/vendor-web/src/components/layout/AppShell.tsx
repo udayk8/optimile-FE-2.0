@@ -1,18 +1,24 @@
 import { useEffect } from 'react'
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
 
 export function AppShell() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated, loading, vendor } = useVendorAuth()
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/login', { replace: true })
+      return
     }
-  }, [isAuthenticated, loading, navigate])
+
+    if (!loading && isAuthenticated && vendor?.status === 'ONBOARDING_INCOMPLETE' && !location.pathname.startsWith('/vendor/onboarding')) {
+      navigate('/vendor/onboarding', { replace: true })
+    }
+  }, [isAuthenticated, loading, navigate, vendor?.status, location.pathname])
 
   if (loading || !isAuthenticated) return null
 

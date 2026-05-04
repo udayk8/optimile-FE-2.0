@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
-import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
@@ -139,7 +138,7 @@ export default function FleetPage() {
         }
       />
 
-      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mt-6 mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -155,71 +154,68 @@ export default function FleetPage() {
       </div>
 
       {activeTab === 'vehicles' && (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           {vehicles.map((vehicle) => (
-            <Card key={vehicle.id}>
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
+            <div key={vehicle.id} className="border-b border-gray-200 px-5 py-4 last:border-b-0">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-start">
+                <div>
                   <div className="flex items-center gap-3">
                     <ComplianceIcon status={vehicle.complianceStatus} />
                     <div>
-                      <span className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</span>
+                      <div className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</div>
                       <p className="text-sm text-gray-500">{vehicle.vehicleType}</p>
                     </div>
                   </div>
-                  <StatusBadge status={vehicle.operationalStatus} />
+                  {vehicle.complianceStatus === 'EXPIRED' && (
+                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-danger/20 bg-danger/10 p-2 text-xs text-danger">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Blocked from indent nomination - compliance documents expired (BR-06)
+                    </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <div><span className="text-gray-500">Base: </span>{vehicle.baseLocation}</div>
+                <div className="text-sm"><span className="text-gray-500">Base: </span>{vehicle.baseLocation}</div>
+                <div className="text-sm space-y-2">
                   <div><span className="text-gray-500">Compliance: </span><StatusBadge status={vehicle.complianceStatus} /></div>
                   <div><span className="text-gray-500">GPS: </span>{vehicle.gpsDeviceId || '—'}</div>
                   <div><span className="text-gray-500">RC End: </span>{vehicle.rcEndDate ? formatDate(vehicle.rcEndDate) : '—'}</div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex justify-end">
                   <Button size="sm" variant="outline" onClick={() => openEditVehicle(vehicle.id)}>
                     <Edit3 className="mr-2 h-4 w-4" /> Edit
                   </Button>
                 </div>
-                {vehicle.complianceStatus === 'EXPIRED' && (
-                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-danger/20 bg-danger/10 p-2 text-xs text-danger">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Blocked from indent nomination - compliance documents expired (BR-06)
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
       {activeTab === 'drivers' && (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           {drivers.map((driver) => (
-            <Card key={driver.id}>
-              <CardContent className="p-5">
-                <div className="mb-3 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <ComplianceIcon status={driver.complianceStatus} />
-                    <div>
-                      <span className="text-base font-bold text-text">{driver.name}</span>
-                      <p className="text-sm text-gray-500">{driver.mobile}</p>
-                    </div>
+            <div key={driver.id} className="border-b border-gray-200 px-5 py-4 last:border-b-0">
+              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-start">
+                <div className="flex items-center gap-3">
+                  <ComplianceIcon status={driver.complianceStatus} />
+                  <div>
+                    <div className="text-base font-bold text-text">{driver.name}</div>
+                    <p className="text-sm text-gray-500">{driver.mobile}</p>
                   </div>
-                  <StatusBadge status={driver.currentStatus} />
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <div><span className="text-gray-500">License: </span><span className="font-mono text-xs">{driver.licenseNumber}</span></div>
+                <div className="text-sm"><span className="text-gray-500">License: </span><span className="font-mono text-xs">{driver.licenseNumber}</span></div>
+                <div className="text-sm space-y-2">
                   <div><span className="text-gray-500">Expiry: </span>{formatDate(driver.licenseExpiry)}</div>
                   <div><span className="text-gray-500">Class: </span>{driver.licenseClass.join(', ')}</div>
                   <div><span className="text-gray-500">Tracking: </span>{driver.trackingSelections?.length || 0}</div>
+                  <div><span className="text-gray-500">Status: </span><StatusBadge status={driver.currentStatus} /></div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex justify-end">
                   <Button size="sm" variant="outline" onClick={() => openEditDriver(driver.id)}>
                     <Edit3 className="mr-2 h-4 w-4" /> Edit
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}

@@ -214,7 +214,7 @@ export default function AuctionDetailPage() {
                   <p className="mt-1 text-sm text-text">{lane.vehicleType}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Ceiling</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Ceiling Rate</p>
                   <p className="mt-1 text-sm text-text"><CurrencyDisplay amount={lane.ceilingRate} /></p>
                 </div>
                 <div>
@@ -228,7 +228,7 @@ export default function AuctionDetailPage() {
                   </div>
                 )}
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-gray-500">Lane Timer</p>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">Award Timer</p>
                   <div className="mt-1"><SLACountdown deadline={lane.timerEndsAt} showLabel={false} /></div>
                 </div>
               </CardContent>
@@ -246,6 +246,12 @@ export default function AuctionDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {lane.ranking.length === 0 && <p className="text-sm text-gray-600">No valid bids recorded on this lane.</p>}
+                {lane.ranking.length > 0 && (
+                  <div className="grid grid-cols-[1fr_auto] gap-3 rounded-lg bg-gray-50 px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+                    <span>Vendor / Rank</span>
+                    <span>Bid Amount</span>
+                  </div>
+                )}
                 {lane.ranking.map((bid) => (
                   <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div>

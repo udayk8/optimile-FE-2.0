@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import type {
   CustomerRateType,
   RateCardImportResult,
@@ -242,19 +242,15 @@ function parseStructuredRows(rows: RateCardSpreadsheetRow[]): RateCardImportResu
 }
 
 export function parseRateCardCsvText(csvText: string): RateCardImportResult {
-  const workbook = XLSX.read(csvText, { type: "string" });
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  return parseRateCardWorksheet(worksheet);
+  const rows = csvText
+    .split(/\r?\n/)
+    .filter((row) => row.trim().length > 0)
+    .map((row) => row.split(",").map((cell) => cell.trim()));
+
+  return parseRateCardWorksheet(rows);
 }
 
-function parseRateCardWorksheet(worksheet: XLSX.WorkSheet): RateCardImportResult {
-  const rows = XLSX.utils.sheet_to_json<(string | number | Date)[]>(worksheet, {
-    header: 1,
-    blankrows: false,
-    defval: "",
-    raw: false,
-  });
-
+function parseRateCardWorksheet(rows: unknown[][]): RateCardImportResult {
   if (!rows.length) {
     return { validRows: [], invalidRows: [] };
   }
@@ -305,11 +301,6 @@ function parseRateCardWorksheet(worksheet: XLSX.WorkSheet): RateCardImportResult
 export async function parseRateCardFile(file: File): Promise<RateCardImportResult> {
   const extension = file.name.split(".").pop()?.toLowerCase();
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
-  if (!workbook.SheetNames.length) {
-    return { validRows: [], invalidRows: [] };
-  }
-
   if (extension !== "csv" && extension !== "xlsx") {
     return {
       validRows: [],
@@ -339,14 +330,41 @@ export async function parseRateCardFile(file: File): Promise<RateCardImportResul
     };
   }
 
-  return parseRateCardWorksheet(workbook.Sheets[workbook.SheetNames[0]]);
+  if (extension === "csv") {
+    return parseRateCardCsvText(await file.text());
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(arrayBuffer);
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    return { validRows: [], invalidRows: [] };
+  }
+
+  const rows: unknown[][] = [];
+  worksheet.eachRow({ includeEmpty: true }, (row) => {
+    rows.push((row.values as unknown[]).slice(1));
+  });
+
+  return parseRateCardWorksheet(rows);
 }
 
-export function downloadRateCardTemplateWorkbook() {
-  const worksheet = XLSX.utils.json_to_sheet(customerRateCardTemplateRows, {
-    header: [...rateCardTemplateColumns],
+export async function downloadRateCardTemplateWorkbook() {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Rate Card Template");
+  worksheet.addRow([...rateCardTemplateColumns]);
+  customerRateCardTemplateRows.forEach((row) => {
+    worksheet.addRow(rateCardTemplateColumns.map((column) => row[column] ?? ""));
   });
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Rate Card Template");
-  XLSX.writeFile(workbook, "customer-rate-card-template.xlsx");
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "customer-rate-card-template.xlsx";
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

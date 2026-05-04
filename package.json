@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "dev:vendor": "vite --host 127.0.0.1 --mode vendor",
+    "dev:auction": "vite --host 127.0.0.1 --mode auction",
     "dev:admin:standalone": "npm run dev -w @optimile/admin-web",
     "dev:auction:standalone": "npm run dev -w @optimile/auction-portal-web",
     "dev:vendor:standalone": "npm run dev -w @optimile/vendor-portal-web",

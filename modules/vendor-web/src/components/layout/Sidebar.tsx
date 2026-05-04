@@ -6,7 +6,6 @@ import {
   Truck,
   Ship,
   Receipt,
-  ReceiptText,
   User,
   ChevronLeft,
   ChevronRight,
@@ -21,7 +20,6 @@ const NAV_ITEMS = [
   { path: '/vendor/trips', label: 'Trips', subtitle: 'Indents and deliveries', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
   { path: '/vendor/expenses', label: 'Expenses', subtitle: 'Trip-linked costs', icon: Receipt },
-  { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Billing and payments', icon: ReceiptText },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
 

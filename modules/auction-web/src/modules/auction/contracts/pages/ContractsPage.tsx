@@ -17,6 +17,7 @@ export default function ContractsPage() {
   const navigate = useNavigate()
   const { contracts } = useAppStore()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const selectedContract = contracts.find((item) => item.id === id) ?? contracts[0]
 
   const filteredContracts = useMemo(() => {
@@ -30,6 +31,9 @@ export default function ContractsPage() {
       )
     })
   }, [contracts, search])
+  const pageSize = 8
+  const totalPages = Math.max(1, Math.ceil(filteredContracts.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
 
   const columns: DataTableColumn<Contract>[] = [
     {
@@ -74,7 +78,7 @@ export default function ContractsPage() {
       <PageHero
         eyebrow="Contract Control"
         title="Contracts"
-        subtitle="Contracts are created after auction awards. Use this tab to review R1/R2/R3 allocations, override reasons, rate units, and expiry."
+        subtitle="Contracts are created after auction awards. Use this tab to review them with consistent paging and clear column labels."
       />
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -92,6 +96,9 @@ export default function ContractsPage() {
               getRowKey={(contract) => contract.id}
               onRowClick={(contract) => navigate(`/auction/contracts/${contract.id}`)}
               emptyState={<EmptyState title="No contracts found" description="No contracts match the current search." />}
+              page={currentPage}
+              pageSize={pageSize}
+              onPageChange={setPage}
             />
           </CardContent>
         </Card>
