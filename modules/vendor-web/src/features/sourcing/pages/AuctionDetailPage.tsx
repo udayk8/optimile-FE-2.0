@@ -29,6 +29,8 @@ export default function AuctionDetailPage() {
     )
   }
 
+  const isLot = auction.type === 'LOT'
+
   // Validation
   const bidErrors = useMemo(() => {
     const errors: Record<string, string> = {}
@@ -45,9 +47,10 @@ export default function AuctionDetailPage() {
   }, [bids, auction])
 
   const hasBidAny = Object.values(bids).some(v => v > 0)
+  const hasBidAll = auction.lanes.every(l => (bids[l.id] || 0) > 0)
   const hasErrors = Object.keys(bidErrors).length > 0
 
-  const isValid = hasBidAny && !hasErrors
+  const isValid = (isLot ? hasBidAll : hasBidAny) && !hasErrors
 
   const handleBidChange = (laneId: string, value: string) => {
     const numValue = Number(value)
@@ -120,12 +123,14 @@ export default function AuctionDetailPage() {
         </CardContent>
       </Card>
 
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4 text-primary">
-        <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
-        <p className="text-sm">
-          <strong>Lane bidding:</strong> You may bid on any lane you want. Leave the others blank if you do not want to participate on them.
-        </p>
-      </div>
+      {isLot && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4 text-primary">
+          <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
+          <p className="text-sm">
+            <strong>LOT Auction Rules:</strong> You must submit a bid for <strong>all {auction.lanes.length} lanes</strong>. Partial bids are not allowed.
+          </p>
+        </div>
+      )}
 
       {/* Lanes Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -135,7 +140,7 @@ export default function AuctionDetailPage() {
               <tr>
                 <th className="min-w-[180px] px-4 py-3 text-xs font-bold uppercase tracking-wide">Lane Details</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Volume</th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Base Price</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">L1 Bid</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Active Bid</th>
                 <th className="min-w-[200px] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide">Enter New Bid (₹)</th>
               </tr>
@@ -169,15 +174,15 @@ export default function AuctionDetailPage() {
                     <td className="px-4 py-4">
                       {lane.currentBestBid ? (
                         <div>
-                          <div className="font-semibold text-text">
+                          <div className="font-semibold text-success">
                             <CurrencyDisplay amount={lane.currentBestBid} />
                           </div>
                           {lane.minBidDecrement && (
-                            <div className="text-xs text-gray-500">Min decrement: ₹{lane.minBidDecrement}</div>
+                            <div className="text-xs text-gray-500">Dec: ₹{lane.minBidDecrement}</div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-500">Not set</span>
+                        <span className="text-gray-500">No bids yet</span>
                       )}
                     </td>
                     <td className="px-4 py-4">
@@ -225,7 +230,9 @@ export default function AuctionDetailPage() {
             <div className="font-bold text-text">
               {Object.keys(bids).filter(k => (bids[k] || 0) > 0).length} of {auction.lanes.length} lanes bid
             </div>
-            <div className="text-xs text-gray-500">Partial lane bids are allowed.</div>
+            {isLot && !hasBidAll && (
+              <div className="text-xs text-danger">You must bid on all lanes for this LOT auction.</div>
+            )}
           </div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setBids({})}>Clear</Button>

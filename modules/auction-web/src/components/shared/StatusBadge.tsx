@@ -9,7 +9,6 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   LIVE: { variant: 'info', label: 'Live' },
   COMPLETED: { variant: 'info', label: 'Pending Award' },
   DRAFT: { variant: 'muted', label: 'Draft' },
-  UPCOMING: { variant: 'muted', label: 'Upcoming' },
   NO_BIDS: { variant: 'warning', label: 'No Bids' },
   EXPIRING_SOON: { variant: 'warning', label: 'Expiring Soon' },
   CANCELLED: { variant: 'destructive', label: 'Cancelled' },
