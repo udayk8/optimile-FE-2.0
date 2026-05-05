@@ -42,13 +42,13 @@ export default function ExpensesPage() {
     <div>
       <HeroCard 
         eyebrow="FINANCE"
-        title="Expenses" 
-        subtitle="Submit one bundled expense claim per trip and track its approval status" 
+        title="Booking Expenses" 
+        subtitle="Submit one bundled expense claim per booking and track its approval status" 
         icon={<Receipt className="h-5 w-5" />}
         action={
-          <Button onClick={() => setIsAddExpenseOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add Trip Expense
-          </Button>
+            <Button onClick={() => setIsAddExpenseOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Booking Expense
+            </Button>
         }
       />
 
@@ -68,7 +68,7 @@ export default function ExpensesPage() {
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {filtered.length === 0 ? (
           <div className="p-8">
-            <EmptyState icon={<Receipt className="h-12 w-12" />} title="No expense claims found" description="Trip-level expense submissions will appear here once sent for approval." />
+            <EmptyState icon={<Receipt className="h-12 w-12" />} title="No expense claims found" description="Booking-level expense submissions will appear here once sent for approval." />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -76,7 +76,7 @@ export default function ExpensesPage() {
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-5 py-3 font-bold">Expense</th>
-                  <th className="px-5 py-3 font-bold">Trip</th>
+                  <th className="px-5 py-3 font-bold">Booking</th>
                   <th className="px-5 py-3 font-bold">Status</th>
                   <th className="px-5 py-3 font-bold">Line Items</th>
                   <th className="px-5 py-3 font-bold">Submitted</th>
@@ -92,7 +92,7 @@ export default function ExpensesPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="font-semibold text-text">{expense.tripReference}</div>
-                      <div className="mt-1 text-xs text-gray-500">Trip-level claim</div>
+                      <div className="mt-1 text-xs text-gray-500">Booking-level claim</div>
                     </td>
                     <td className="px-5 py-4"><StatusBadge status={expense.status} /></td>
                     <td className="px-5 py-4 text-sm text-text">{expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}</td>

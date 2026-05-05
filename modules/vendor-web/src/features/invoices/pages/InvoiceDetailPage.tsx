@@ -22,9 +22,9 @@ export default function InvoiceDetailPage() {
     return <EmptyState title="Invoice not found" description="The selected invoice is not available in mock data." />
   }
 
-  const linkedTrips = invoice.lineItems.reduce<Trip[]>((acc, line) => {
-    const trip = trips.find((item) => item.id === line.tripId || item.id === line.tripReference)
-    if (trip) acc.push(trip)
+  const linkedBookings = invoice.lineItems.reduce<Trip[]>((acc, line) => {
+    const booking = trips.find((item) => item.id === line.tripId || item.id === line.tripReference)
+    if (booking) acc.push(booking)
     return acc
   }, [])
 
@@ -41,7 +41,7 @@ export default function InvoiceDetailPage() {
       <PageHero
         eyebrow="Invoice Detail"
         title="Invoice detail"
-        subtitle="Full invoice drill-down with linked trips, billing summary, and reference information."
+        subtitle="Full invoice drill-down with linked bookings, billing summary, and reference information."
         icon={<ReceiptText className="h-5 w-5 text-primary" />}
         action={
           <div className="flex flex-wrap gap-2">
@@ -88,28 +88,28 @@ export default function InvoiceDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Route className="h-5 w-5 text-primary" /> Linked trips
+                <Route className="h-5 w-5 text-primary" /> Linked bookings
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {linkedTrips.length === 0 ? (
-                <EmptyState title="No linked trips" />
+              {linkedBookings.length === 0 ? (
+                <EmptyState title="No linked bookings" />
               ) : (
-                  linkedTrips.map((trip) => (
-                  <div key={trip.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  linkedBookings.map((booking) => (
+                  <div key={booking.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-semibold">{trip.id}</span>
-                          {trip.status && <StatusBadge status={trip.status} />}
-                          {trip.podStatus && <StatusBadge status={trip.podStatus} />}
+                          <span className="font-mono text-sm font-semibold">{booking.id}</span>
+                          {booking.status && <StatusBadge status={booking.status} />}
+                          {booking.podStatus && <StatusBadge status={booking.podStatus} />}
                         </div>
                         <p className="mt-1 text-sm text-gray-600">
-                          {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
+                          {booking.laneDetails.origin.city} → {booking.laneDetails.destination.city}
                         </p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/trips/completed/${trip.id}`)}>
-                        Open trip
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/completed/${booking.id}`)}>
+                        Open booking
                       </Button>
                     </div>
                   </div>

@@ -49,7 +49,7 @@ function buildCompanyForm(vendor: ReturnType<typeof useAuthStore.getState>['vend
 }
 
 function getProfileTab(pathname: string): ProfileTab {
-  const tab = pathname.split('/')[2]
+  const tab = pathname.split('/')[3]
   return PROFILE_TABS.some((item) => item.key === tab) ? (tab as ProfileTab) : 'company'
 }
 
@@ -184,9 +184,6 @@ export default function ProfilePage() {
             <CardTitle>Bank Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-              Bank details are locked in the portal. Raise a support request if the registered payout account needs to change.
-            </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Bank Name</label><Input value={MOCK_BANK.bankName} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
               <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label><Input value={MOCK_BANK.branch} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>

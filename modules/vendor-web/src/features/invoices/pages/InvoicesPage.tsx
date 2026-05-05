@@ -17,7 +17,7 @@ type InvoiceTab = 'create' | 'list' | 'ledger'
 const INVOICE_TABS: InvoiceTab[] = ['create', 'list', 'ledger']
 
 function getInvoiceTab(pathname: string, search: string): InvoiceTab {
-  const pathTab = pathname.split('/')[2]
+  const pathTab = pathname.split('/')[3]
   if (INVOICE_TABS.includes(pathTab as InvoiceTab)) return pathTab as InvoiceTab
 
   const searchTab = new URLSearchParams(search).get('tab')
@@ -36,14 +36,14 @@ export default function InvoicesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL')
-  const [selectedTrips, setSelectedTrips] = useState<string[]>([])
+  const [selectedBookings, setSelectedBookings] = useState<string[]>([])
   const [invoicePage, setInvoicePage] = useState(1)
   const [ledgerPage, setLedgerPage] = useState(1)
   const activeTab = getInvoiceTab(location.pathname, location.search)
 
   const { trips, invoices, ledger, generateInvoice } = useAppStore()
 
-  const uninvoicedTrips = trips.filter((t) => t.status === 'DELIVERED' && t.podStatus === 'CONFIRMED' && !t.isInvoiced)
+  const uninvoicedBookings = trips.filter((t) => t.status === 'DELIVERED' && t.podStatus === 'CONFIRMED' && !t.isInvoiced)
   const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
   const invoicePageSize = 5
   const ledgerPageSize = 8
@@ -58,20 +58,20 @@ export default function InvoicesPage() {
     { key: 'ledger', label: 'Ledger', icon: <BookOpen className="h-4 w-4" /> },
   ]
 
-  const handleToggleTrip = (tripId: string) => {
-    setSelectedTrips((prev) => 
-      prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId]
+  const handleToggleBooking = (bookingId: string) => {
+    setSelectedBookings((prev) =>
+      prev.includes(bookingId) ? prev.filter((id) => id !== bookingId) : [...prev, bookingId]
     )
   }
 
   const handleGenerateInvoice = () => {
-    generateInvoice(selectedTrips)
-    setSelectedTrips([])
+    generateInvoice(selectedBookings)
+    setSelectedBookings([])
     navigate('/vendor/invoices/list')
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <HeroCard 
         eyebrow="FINANCE"
         title="Invoices" 
@@ -79,7 +79,7 @@ export default function InvoicesPage() {
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mb-4 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button key={tab.key} onClick={() => navigate(`/vendor/invoices/${tab.key}`)}
             className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
@@ -92,38 +92,38 @@ export default function InvoicesPage() {
       {activeTab === 'create' && (
         <div>
           <h3 className="mb-4 text-lg font-extrabold text-text">Select Uninvoiced Bookings</h3>
-          {uninvoicedTrips.length === 0 ? (
-            <EmptyState icon={<CreditCard className="h-12 w-12" />} title="No uninvoiced bookings" description="Complete trips with confirmed POD and approved expenses will appear here." />
+          {uninvoicedBookings.length === 0 ? (
+            <EmptyState icon={<CreditCard className="h-12 w-12" />} title="No uninvoiced bookings" description="Completed bookings with confirmed POD and approved expenses will appear here." />
           ) : (
-            <div className="space-y-3">
-              {uninvoicedTrips.map((trip) => (
-                <Card key={trip.id} className="border-l-4 border-l-emerald-500 cursor-pointer hover:bg-accent/10" onClick={() => handleToggleTrip(trip.id)}>
+            <div className="space-y-4">
+              {uninvoicedBookings.map((booking) => (
+                <Card key={booking.id} className="border-l-4 border-l-emerald-500 cursor-pointer hover:bg-accent/10" onClick={() => handleToggleBooking(booking.id)}>
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <input 
                         type="checkbox" 
                         className="h-4 w-4 rounded border-gray-300" 
-                        checked={selectedTrips.includes(trip.id)}
+                        checked={selectedBookings.includes(booking.id)}
                         readOnly
                       />
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-semibold">{trip.id}</span>
+                          <span className="font-mono text-sm font-semibold">{booking.id}</span>
                           <StatusBadge status="DELIVERED" />
                         </div>
-                        <p className="text-sm text-gray-500">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city} · {trip.deliveredDate ? formatDate(trip.deliveredDate) : ''}</p>
+                        <p className="text-sm text-gray-500">{booking.laneDetails.origin.city} → {booking.laneDetails.destination.city} · {booking.deliveredDate ? formatDate(booking.deliveredDate) : ''}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-sm text-gray-500">Freight + Expenses</div>
-                      <CurrencyDisplay amount={trip.freightRate + trip.expenseSummary.approved} className="text-lg font-semibold" />
+                      <CurrencyDisplay amount={booking.freightRate + booking.expenseSummary.approved} className="text-lg font-semibold" />
                     </div>
                   </CardContent>
                 </Card>
               ))}
               <Button 
                 className="mt-4" 
-                disabled={selectedTrips.length === 0} 
+                disabled={selectedBookings.length === 0} 
                 onClick={handleGenerateInvoice}
               >
                 <Plus className="h-4 w-4 mr-1" /> Generate Invoice
@@ -144,31 +144,40 @@ export default function InvoicesPage() {
               </button>
             ))}
           </div>
-          <div className="space-y-4">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             {filteredInvoices.length === 0 ? (
-              <EmptyState icon={<FileText className="h-12 w-12" />} title="No invoices found" />
+              <div className="p-8"><EmptyState icon={<FileText className="h-12 w-12" />} title="No invoices found" /></div>
             ) : (
-              pagedInvoices.map((inv) => (
-                <Card key={inv.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/invoices/${inv.id}`)}>
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-semibold">{inv.invoiceNumber || inv.id}</span>
-                        <StatusBadge status={inv.status} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}><Download className="h-3.5 w-3.5" /></Button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                      <div><span className="text-gray-500">Date: </span>{formatDate(inv.invoiceDate)}</div>
-                      <div><span className="text-gray-500">Bookings: </span>{inv.lineItems?.length || 0}</div>
-                      <div><span className="text-gray-500">Total: </span><CurrencyDisplay amount={inv.grandTotal} className="font-semibold" /></div>
-                      {inv.paymentDate && <div><span className="text-gray-500">Paid: </span>{formatDate(inv.paymentDate)}</div>}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b bg-gray-50">
+                  <tr>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
+                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Paid Date</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {pagedInvoices.map((inv) => (
+                    <tr key={inv.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/vendor/invoices/${inv.id}`)}>
+                      <td className="p-4 font-mono font-semibold">{inv.invoiceNumber || inv.id}</td>
+                      <td className="p-4">{formatDate(inv.invoiceDate)}</td>
+                      <td className="p-4"><StatusBadge status={inv.status} /></td>
+                      <td className="p-4">{inv.lineItems?.length || 0}</td>
+                      <td className="p-4">{inv.paymentDate ? formatDate(inv.paymentDate) : '—'}</td>
+                      <td className="p-4 text-right"><CurrencyDisplay amount={inv.grandTotal} className="font-semibold" /></td>
+                      <td className="p-4 text-right">
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}>
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
           {filteredInvoices.length > 0 && (

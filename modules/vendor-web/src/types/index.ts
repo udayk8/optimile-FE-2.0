@@ -139,6 +139,7 @@ export interface AuctionLane {
   id: string
   laneDetails: LaneDetails
   volumeRequirement?: VolumeRequirement
+  basePrice?: number
   currentBestBid?: number
   minBidDecrement?: number
 }
@@ -233,7 +234,14 @@ export interface Indent {
   createdAt: string
 }
 
-export type TripStatus = 'DISPATCHED' | 'IN_TRANSIT' | 'AT_DELIVERY' | 'EXCEPTION' | 'DELIVERED'
+export type TripStatus =
+  | 'DISPATCHED'
+  | 'IN_TRANSIT'
+  | 'AT_DELIVERY'
+  | 'EXCEPTION'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'DISRUPTED'
 
 export interface Trip {
   id: string

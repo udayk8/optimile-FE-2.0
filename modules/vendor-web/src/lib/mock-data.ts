@@ -40,7 +40,7 @@ export const MOCK_DASHBOARD: DashboardData = {
 
 export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1', type: 'ONBOARDING', title: 'Complete vendor setup', message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/vendor/profile/company', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
-  { id: 'n2', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/trips?tab=indents', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
+  { id: 'n2', type: 'TRIPS', title: 'New Booking Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/bookings?tab=new', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
   { id: 'n3', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/vendor/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
   { id: 'n4', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense bundle ₹5,500 for TRP-043 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
   { id: 'n5', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 7200000).toISOString() },
@@ -57,6 +57,7 @@ export const MOCK_AUCTIONS: Auction[] = [
         id: 'L1',
         laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Bharuch', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'Bangalore', state: 'Karnataka' }, distanceKm: 1200 },
         volumeRequirement: { estimatedVolume: 50, unit: 'trucks/month', frequency: 'MONTHLY' },
+        basePrice: 28000,
         currentBestBid: 25000,
         minBidDecrement: 500
       },
@@ -64,6 +65,7 @@ export const MOCK_AUCTIONS: Auction[] = [
         id: 'L2',
         laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Bharuch', state: 'Gujarat' }, destination: { name: 'Chennai Hub', city: 'Chennai', state: 'Tamil Nadu' }, distanceKm: 1450 },
         volumeRequirement: { estimatedVolume: 20, unit: 'trucks/month', frequency: 'MONTHLY' },
+        basePrice: 34000,
         currentBestBid: 31000,
         minBidDecrement: 500
       }
@@ -76,6 +78,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Munger Factory', city: 'Munger', state: 'Bihar' }, destination: { name: 'Kolkata Depot', city: 'Kolkata', state: 'West Bengal' }, distanceKm: 320 },
+      basePrice: 21000,
       currentBestBid: 18500,
       minBidDecrement: 200
     }],
@@ -93,6 +96,7 @@ export const MOCK_AUCTIONS: Auction[] = [
         id: 'L1',
         laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Pune', city: 'Pune', state: 'MH' }, distanceKm: 150 },
         volumeRequirement: { estimatedVolume: 100, unit: 'trucks', frequency: 'MONTHLY' },
+        basePrice: 15000,
         currentBestBid: 12000,
         minBidDecrement: 500
       },
@@ -100,6 +104,7 @@ export const MOCK_AUCTIONS: Auction[] = [
         id: 'L2',
         laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Nashik', city: 'Nashik', state: 'MH' }, distanceKm: 165 },
         volumeRequirement: { estimatedVolume: 80, unit: 'trucks', frequency: 'MONTHLY' },
+        basePrice: 16500,
         currentBestBid: 13500,
         minBidDecrement: 500
       }
@@ -116,6 +121,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Pune Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Lucknow', city: 'Lucknow', state: 'UP' }, distanceKm: 1350 },
+      basePrice: 22000,
       minBidDecrement: 500
     }],
     vehicleTypeRequired: 'Car Carrier', startTime: new Date(Date.now() + 86400000).toISOString(), endTime: new Date(Date.now() + 172800000).toISOString(),
@@ -126,6 +132,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Moga Factory', city: 'Moga', state: 'PB' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 400 },
+      basePrice: 1800,
       currentBestBid: 1500,
       minBidDecrement: 50
     }],
@@ -138,6 +145,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'MH' }, distanceKm: 700 },
+      basePrice: 18500,
       currentBestBid: 16500,
       minBidDecrement: 250
     }],
@@ -152,6 +160,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Mundra Port', city: 'Mundra', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 320 },
+      basePrice: 11000,
       currentBestBid: 9800,
       minBidDecrement: 100
     }],
@@ -164,6 +173,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Refinery', city: 'Mumbai', state: 'MH' }, destination: { name: 'Depot', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 530 },
+      basePrice: 12500,
       minBidDecrement: 100
     }],
     vehicleTypeRequired: '32ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
@@ -175,6 +185,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Mumbai Hub', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat DC', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
+      basePrice: 14000,
       minBidDecrement: 100
     }],
     vehicleTypeRequired: 'LCV', startTime: new Date(Date.now() - 86400000).toISOString(), endTime: new Date(Date.now() - 43200000).toISOString(),
@@ -337,6 +348,50 @@ export const MOCK_TRIPS: Trip[] = [
     ],
     freightRate: 15000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'TRP-046', contractId: 'CNT-001', indentId: 'IND-100', status: 'DELIVERED',
+    laneDetails: { origin: { name: 'Navi Mumbai Yard', city: 'Navi Mumbai', state: 'Maharashtra' }, destination: { name: 'Jaipur DC', city: 'Jaipur', state: 'Rajasthan' }, distanceKm: 1150 },
+    assignedVehicle: { id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', type: 'LCV' },
+    assignedDriver: { id: 'DR-003', name: 'Ramesh Singh', mobile: '+91 9876500003' },
+    deliveredDate: '2026-04-26T09:00:00Z', podStatus: 'PENDING',
+    documents: [
+      { id: 'td-10', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-046.pdf', fileUrl: '/docs/pod-trp-046.pdf', createdAt: '2026-04-26T09:15:00Z', note: 'POD pending upload from consignee' },
+      { id: 'td-11', type: 'EWAY_BILL', title: 'E-way bill copy', fileName: 'ewaybill-trp-046.pdf', fileUrl: '/docs/ewaybill-trp-046.pdf', createdAt: '2026-04-25T07:00:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-8', title: 'Delivered', description: 'Shipment delivered to consignee', timestamp: '2026-04-26T09:00:00Z', status: 'DELIVERED' },
+    ],
+    freightRate: 32000, expenseSummary: { total: 1400, approved: 0, pending: 1400 }, isInvoiced: false,
+    createdAt: '2026-04-25T06:00:00Z',
+  },
+  {
+    id: 'TRP-047', contractId: 'CNT-001', indentId: 'IND-101', status: 'CANCELLED',
+    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Surat Depot', city: 'Surat', state: 'Gujarat' }, distanceKm: 280 },
+    assignedVehicle: { id: 'VH-003', registrationNumber: 'GJ-01-XY-9999', type: 'Tanker' },
+    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    documents: [
+      { id: 'td-12', type: 'REMARKS', title: 'Cancellation note', fileName: 'cancel-trp-047.json', fileUrl: '/docs/cancel-trp-047.json', createdAt: '2026-04-24T10:00:00Z', note: 'Cancelled before loading' },
+    ],
+    timeline: [
+      { id: 'tt-9', title: 'Cancelled', description: 'Booking cancelled before dispatch', timestamp: '2026-04-24T10:00:00Z', status: 'CANCELLED' },
+    ],
+    freightRate: 0, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    createdAt: '2026-04-24T08:00:00Z',
+  },
+  {
+    id: 'TRP-048', contractId: 'CNT-002', indentId: 'IND-102', status: 'DISRUPTED',
+    laneDetails: { origin: { name: 'Chennai Port', city: 'Chennai', state: 'Tamil Nadu' }, destination: { name: 'Bangalore Hub', city: 'Bangalore', state: 'Karnataka' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
+    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    documents: [
+      { id: 'td-13', type: 'REMARKS', title: 'Disruption remarks', fileName: 'disrupted-trp-048.json', fileUrl: '/docs/disrupted-trp-048.json', createdAt: '2026-04-27T12:00:00Z', note: 'Route disruption due to road closure' },
+    ],
+    timeline: [
+      { id: 'tt-10', title: 'Disrupted', description: 'Route disrupted during transit', timestamp: '2026-04-27T12:00:00Z', status: 'EXCEPTION' },
+    ],
+    freightRate: 18000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    createdAt: '2026-04-26T08:00:00Z',
   }
 ]
 

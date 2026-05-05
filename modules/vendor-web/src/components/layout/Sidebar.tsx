@@ -5,7 +5,6 @@ import {
   FileText,
   Truck,
   Ship,
-  Receipt,
   CreditCard,
   User,
   ChevronLeft,
@@ -18,9 +17,8 @@ const NAV_ITEMS = [
   { path: '/vendor', label: 'Home', subtitle: 'Executive overview', icon: Home },
   { path: '/vendor/sourcing', label: 'Sourcing', subtitle: 'Auctions and bids', icon: Search },
   { path: '/vendor/contracts', label: 'Contracts', subtitle: 'Active agreements', icon: FileText },
-  { path: '/vendor/trips', label: 'Trips', subtitle: 'Indents and deliveries', icon: Truck },
+  { path: '/vendor/bookings', label: 'Bookings', subtitle: 'Indents and deliveries', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
-  { path: '/vendor/expenses', label: 'Expenses', subtitle: 'Trip-linked costs', icon: Receipt },
   { path: '/vendor/invoices/list', label: 'Invoices', subtitle: 'Billing and payments', icon: CreditCard },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]

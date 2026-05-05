@@ -154,69 +154,94 @@ export default function FleetPage() {
       </div>
 
       {activeTab === 'vehicles' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {vehicles.map((vehicle) => (
-            <div key={vehicle.id} className="border-b border-gray-200 px-5 py-4 last:border-b-0">
-              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-start">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <ComplianceIcon status={vehicle.complianceStatus} />
-                    <div>
-                      <div className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</div>
-                      <p className="text-sm text-gray-500">{vehicle.vehicleType}</p>
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <table className="w-full min-w-[1000px] text-left text-sm">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Base Location</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance & RC</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">GPS Device</th>
+                <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {vehicles.map((vehicle) => (
+                <tr key={vehicle.id} className="hover:bg-gray-50">
+                  <td className="p-4 align-top">
+                    <div className="flex items-center gap-3">
+                      <ComplianceIcon status={vehicle.complianceStatus} />
+                      <div>
+                        <div className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</div>
+                        <p className="text-sm text-gray-500">{vehicle.vehicleType}</p>
+                      </div>
                     </div>
-                  </div>
-                  {vehicle.complianceStatus === 'EXPIRED' && (
-                    <div className="mt-3 flex items-center gap-2 rounded-lg border border-danger/20 bg-danger/10 p-2 text-xs text-danger">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Blocked from indent nomination - compliance documents expired (BR-06)
-                    </div>
-                  )}
-                </div>
-                <div className="text-sm"><span className="text-gray-500">Base: </span>{vehicle.baseLocation}</div>
-                <div className="text-sm space-y-2">
-                  <div><span className="text-gray-500">Compliance: </span><StatusBadge status={vehicle.complianceStatus} /></div>
-                  <div><span className="text-gray-500">GPS: </span>{vehicle.gpsDeviceId || '—'}</div>
-                  <div><span className="text-gray-500">RC End: </span>{vehicle.rcEndDate ? formatDate(vehicle.rcEndDate) : '—'}</div>
-                </div>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" onClick={() => openEditVehicle(vehicle.id)}>
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
+                    {vehicle.complianceStatus === 'EXPIRED' && (
+                      <div className="mt-2 flex items-center gap-1.5 rounded bg-danger/10 p-1.5 text-xs text-danger">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Blocked - documents expired
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4 align-top">{vehicle.baseLocation}</td>
+                  <td className="p-4 align-top space-y-1">
+                    <div><StatusBadge status={vehicle.complianceStatus} /></div>
+                    <div className="text-xs text-gray-500">RC End: {vehicle.rcEndDate ? formatDate(vehicle.rcEndDate) : '—'}</div>
+                  </td>
+                  <td className="p-4 align-top">{vehicle.gpsDeviceId || '—'}</td>
+                  <td className="p-4 align-top text-right">
+                    <Button size="sm" variant="outline" onClick={() => openEditVehicle(vehicle.id)}>
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       {activeTab === 'drivers' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {drivers.map((driver) => (
-            <div key={driver.id} className="border-b border-gray-200 px-5 py-4 last:border-b-0">
-              <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr_1fr_auto] lg:items-start">
-                <div className="flex items-center gap-3">
-                  <ComplianceIcon status={driver.complianceStatus} />
-                  <div>
-                    <div className="text-base font-bold text-text">{driver.name}</div>
-                    <p className="text-sm text-gray-500">{driver.mobile}</p>
-                  </div>
-                </div>
-                <div className="text-sm"><span className="text-gray-500">License: </span><span className="font-mono text-xs">{driver.licenseNumber}</span></div>
-                <div className="text-sm space-y-2">
-                  <div><span className="text-gray-500">Expiry: </span>{formatDate(driver.licenseExpiry)}</div>
-                  <div><span className="text-gray-500">Class: </span>{driver.licenseClass.join(', ')}</div>
-                  <div><span className="text-gray-500">Tracking: </span>{driver.trackingSelections?.length || 0}</div>
-                  <div><span className="text-gray-500">Status: </span><StatusBadge status={driver.currentStatus} /></div>
-                </div>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" onClick={() => openEditDriver(driver.id)}>
-                    <Edit3 className="mr-2 h-4 w-4" /> Edit
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Driver</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">License</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Class & Expiry</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
+                <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {drivers.map((driver) => (
+                <tr key={driver.id} className="hover:bg-gray-50">
+                  <td className="p-4 align-top">
+                    <div className="flex items-center gap-3">
+                      <ComplianceIcon status={driver.complianceStatus} />
+                      <div>
+                        <div className="text-base font-bold text-text">{driver.name}</div>
+                        <p className="text-sm text-gray-500">{driver.mobile}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-4 align-top font-mono text-xs">{driver.licenseNumber}</td>
+                  <td className="p-4 align-top space-y-1">
+                    <div>{driver.licenseClass.join(', ')}</div>
+                    <div className="text-xs text-gray-500">Expiry: {formatDate(driver.licenseExpiry)}</div>
+                  </td>
+                  <td className="p-4 align-top space-y-1">
+                    <div><StatusBadge status={driver.currentStatus} /></div>
+                    <div className="text-xs text-gray-500">Tracking: {driver.trackingSelections?.length || 0}</div>
+                  </td>
+                  <td className="p-4 align-top text-right">
+                    <Button size="sm" variant="outline" onClick={() => openEditDriver(driver.id)}>
+                      <Edit3 className="mr-2 h-4 w-4" /> Edit
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 

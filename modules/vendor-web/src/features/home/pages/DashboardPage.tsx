@@ -21,10 +21,10 @@ export default function DashboardPage() {
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
-  const uninvoicedTrips = trips.filter(t => t.podStatus === 'CONFIRMED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
-  const totalBillableAmount = uninvoicedTrips.reduce((sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0), 0)
+  const uninvoicedBookings = trips.filter(t => t.podStatus === 'CONFIRMED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
+  const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0) + (booking.expenseSummary.approved || 0), 0)
 
-  const activeTrips = trips.filter(t => ['DISPATCHED', 'IN_TRANSIT', 'AT_DELIVERY', 'EXCEPTION'].includes(t.status))
+  const activeBookings = trips.filter(t => ['DISPATCHED', 'IN_TRANSIT', 'AT_DELIVERY', 'EXCEPTION'].includes(t.status))
   
   const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
   const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')
@@ -47,7 +47,7 @@ export default function DashboardPage() {
           value={pendingIndents.length}
           insight={pendingIndents.length > 0 ? "Requires action" : "All caught up"}
           icon={<Clock className="h-4 w-4 text-warning" />}
-          onClick={() => navigate('/vendor/trips?tab=indents')}
+          onClick={() => navigate('/vendor/bookings?tab=indents')}
         >
            <div className="mt-3 space-y-2 px-1">
             {pendingIndents.slice(0, 2).map((indent) => (
@@ -117,11 +117,11 @@ export default function DashboardPage() {
 
         {/* Uninvoiced Bookings */}
         <KPICard
-          title="Expenses"
-          value={uninvoicedTrips.length}
+          title="Bookings to Invoice"
+          value={uninvoicedBookings.length}
           insight="Ready to be billed"
           icon={<Package className="h-4 w-4 text-gray-500" />}
-          onClick={() => navigate('/vendor/expenses')}
+          onClick={() => navigate('/vendor/invoices/create')}
         >
            <div className="mt-3 flex items-center justify-between gap-4 border-t border-gray-200 pt-3 text-sm">
               <span className="text-gray-600">Total billable</span>
@@ -129,24 +129,24 @@ export default function DashboardPage() {
            </div>
         </KPICard>
 
-        {/* Active Trips */}
+        {/* Active Bookings */}
         <KPICard
-          title="Active Trips"
-          value={activeTrips.length}
+          title="Active Bookings"
+          value={activeBookings.length}
           insight="Currently in execution"
           icon={<Truck className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/vendor/trips?tab=active')}
+          onClick={() => navigate('/vendor/bookings?tab=active')}
         >
            <div className="mt-3 space-y-2 px-1">
-              {activeTrips.slice(0, 2).map((trip) => (
-                <div key={trip.id} className="text-xs text-gray-600">
+              {activeBookings.slice(0, 2).map((booking) => (
+                <div key={booking.id} className="text-xs text-gray-600">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="min-w-0 flex-1 truncate font-medium text-text">{trip.laneDetails.origin.city} &rarr; {trip.laneDetails.destination.city}</span>
-                    <StatusBadge status={trip.status} />
+                    <span className="min-w-0 flex-1 truncate font-medium text-text">{booking.laneDetails.origin.city} &rarr; {booking.laneDetails.destination.city}</span>
+                    <StatusBadge status={booking.status} />
                   </div>
                   <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
-                    <span className="truncate">{trip.assignedVehicle.registrationNumber}</span>
-                    <span className="truncate">{trip.assignedDriver.name}</span>
+                    <span className="truncate">{booking.assignedVehicle.registrationNumber}</span>
+                    <span className="truncate">{booking.assignedDriver.name}</span>
                   </div>
                 </div>
               ))}
