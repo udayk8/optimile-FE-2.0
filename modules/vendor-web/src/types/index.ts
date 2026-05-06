@@ -423,6 +423,7 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
+  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED'
 }
 
 export interface InvoiceLineItem {
@@ -444,6 +445,54 @@ export interface LedgerEntry {
   debit: number
   runningBalance: number
   documentUrl?: string
+}
+
+export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED'
+
+export interface NBFCApplication {
+  id: string
+  invoiceId: string
+  invoiceNumber: string
+  customerName: string
+  partnerId?: string
+  partnerName?: string
+  status: NBFCDiscountingStatus
+  appliedAt?: string
+  approvedAt?: string
+  disbursedAt?: string
+  referenceNumber?: string
+  advanceAmount: number
+  charges: number
+  netDisbursement: number
+}
+
+export type ExceptionSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+export type ExceptionStatus = 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+export type ExceptionIssueType = 'Breakdown' | 'Delay' | 'Accident' | 'Route deviation' | 'Cargo issue'
+
+export interface ExceptionTimelineEntry {
+  id: string
+  action: string
+  notes: string
+  timestamp: string
+  by: string
+}
+
+export interface ExceptionRecord {
+  id: string
+  bookingId: string
+  route: string
+  vehicle: string
+  driver: string
+  issueType: ExceptionIssueType
+  severity: ExceptionSeverity
+  status: ExceptionStatus
+  slaDueAt: string
+  createdAt: string
+  updatedAt: string
+  description: string
+  evidence: string[]
+  timeline: ExceptionTimelineEntry[]
 }
 
 export interface AppNotification extends Notification {

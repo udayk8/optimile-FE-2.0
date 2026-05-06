@@ -160,3 +160,41 @@ export interface DashboardData {
   pendingAwards: DashboardMetric
   expiringContracts: DashboardMetric
 }
+
+export type RfiStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
+export type VendorResponseStatus = 'PENDING' | 'RESPONDED' | 'DECLINED'
+
+export interface SourcingVendorTracking {
+  vendorIdOrEmail: string
+  name?: string
+  status: VendorResponseStatus
+}
+
+export interface RfiType {
+  id: string
+  title: string
+  description: string
+  deadline: string
+  status: RfiStatus
+  targetEmails: string[]
+  messageToVendor?: string
+  templateFileName?: string
+  vendorTracking: SourcingVendorTracking[]
+  createdAt: string
+  createdBy: string
+}
+
+export type RfqStatus = 'DRAFT' | 'PUBLISHED' | 'EVALUATING' | 'AWARDED' | 'CANCELLED'
+
+export interface RfqType {
+  id: string
+  title: string
+  deadline: string
+  status: RfqStatus
+  targetEmails: string[]
+  messageToVendor?: string
+  templateFileName?: string
+  vendorTracking: SourcingVendorTracking[]
+  createdAt: string
+  createdBy: string
+}

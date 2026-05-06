@@ -11,10 +11,12 @@ import {
   MOCK_LEDGER,
   MOCK_CAPACITY,
   MOCK_NOTIFICATIONS,
+  MOCK_EXCEPTIONS,
 } from '@vendor/lib/mock-data'
 import { 
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
-  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification
+  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
+  ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType
 } from '@vendor/types'
 
 interface AppState {
@@ -27,6 +29,8 @@ interface AppState {
   contracts: Contract[]
   invoices: Invoice[]
   ledger: LedgerEntry[]
+  nbfcApplications: NBFCApplication[]
+  exceptions: ExceptionRecord[]
   capacity: CapacityDeclaration[]
   notifications: Notification[]
 
@@ -39,7 +43,35 @@ interface AppState {
   addDriver: (driver: Driver) => void
   updateDriver: (driver: Driver) => void
   addExpense: (expense: Expense) => void
-  generateInvoice: (tripIds: string[]) => void
+  generateInvoice: (payload: {
+    tripIds: string[]
+    invoiceDate?: string
+    dueDate?: string
+    gstRate?: number
+    invoiceNumber?: string
+  }) => void
+  submitNbfcApplication: (payload: {
+    invoiceId: string
+    invoiceNumber: string
+    customerName: string
+    partnerId: string
+    partnerName: string
+    advanceAmount: number
+    charges: number
+    netDisbursement: number
+  }) => void
+  markNbfcApplicationStatus: (invoiceId: string, status: Exclude<NBFCDiscountingStatus, 'ELIGIBLE'>) => void
+  createException: (payload: {
+    bookingId: string
+    route: string
+    vehicle: string
+    driver: string
+    issueType: ExceptionIssueType
+    severity: ExceptionSeverity
+    description: string
+    evidence?: string[]
+  }) => void
+  updateExceptionStatus: (exceptionId: string, status: ExceptionStatus, notes?: string) => void
   addCapacityDeclaration: (declaration: CapacityDeclaration) => void
   markNotificationRead: (notificationId: string) => void
   markAllNotificationsRead: () => void
@@ -57,6 +89,54 @@ export const useAppStore = create<AppState>((set) => ({
   contracts: [...MOCK_CONTRACTS],
   invoices: [...MOCK_INVOICES],
   ledger: [...MOCK_LEDGER],
+  exceptions: [...MOCK_EXCEPTIONS],
+  nbfcApplications: [
+    {
+      id: 'nbfc-app-001',
+      invoiceId: 'INV-2026-029',
+      invoiceNumber: 'INV-2026-029',
+      customerName: 'APL Logistics',
+      partnerId: 'nbfc-1',
+      partnerName: 'FinEdge Capital',
+      status: 'SUBMITTED',
+      appliedAt: '2026-05-02T10:00:00Z',
+      referenceNumber: 'NBFC-884211',
+      advanceAmount: 65300,
+      charges: 1250,
+      netDisbursement: 64050,
+    },
+    {
+      id: 'nbfc-app-002',
+      invoiceId: 'INV-2026-028',
+      invoiceNumber: 'INV-2026-028',
+      customerName: 'Mahindra CIE',
+      partnerId: 'nbfc-2',
+      partnerName: 'Prime Credit',
+      status: 'APPROVED',
+      appliedAt: '2026-05-03T09:00:00Z',
+      approvedAt: '2026-05-04T14:00:00Z',
+      referenceNumber: 'NBFC-884212',
+      advanceAmount: 97200,
+      charges: 1824,
+      netDisbursement: 95376,
+    },
+    {
+      id: 'nbfc-app-003',
+      invoiceId: 'INV-2026-027',
+      invoiceNumber: 'INV-2026-027',
+      customerName: 'DHL Supply Chain',
+      partnerId: 'nbfc-3',
+      partnerName: 'Axis Finance',
+      status: 'DISBURSED',
+      appliedAt: '2026-05-01T08:30:00Z',
+      approvedAt: '2026-05-02T13:00:00Z',
+      disbursedAt: '2026-05-04T11:00:00Z',
+      referenceNumber: 'NBFC-884213',
+      advanceAmount: 30100,
+      charges: 600,
+      netDisbursement: 29500,
+    },
+  ],
   capacity: [...MOCK_CAPACITY],
   notifications: [...MOCK_NOTIFICATIONS],
 
@@ -195,20 +275,63 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 
-  generateInvoice: (tripIds) =>
+  generateInvoice: (payload) =>
     set((state) => {
+      const { tripIds, invoiceDate = new Date().toISOString(), dueDate, gstRate = 12, invoiceNumber } = payload
       if (tripIds.length === 0) return state
 
+      const selectedTrips = tripIds
+        .map((id) => state.trips.find((trip) => trip.id === id))
+        .filter((trip): trip is Trip => Boolean(trip))
+
+      if (selectedTrips.length === 0) return state
+
+      const subtotal = selectedTrips.reduce(
+        (sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0),
+        0
+      )
+      const gstAmount = Math.round(subtotal * (gstRate / 100))
+      const finalDueDate = dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      const generatedInvoiceNumber = invoiceNumber ?? `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+
+      const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
+        const freightCharge = trip.freightRate || 0
+        const expenses: { type: ExpenseType; amount: number }[] = trip.expenseSummary.approved > 0
+          ? [{ type: 'OTHER', amount: trip.expenseSummary.approved }]
+          : []
+        const lineTotal = freightCharge + trip.expenseSummary.approved
+        return {
+          tripId: trip.id,
+          tripReference: trip.id,
+          freightCharge,
+          expenses,
+          lineTotal,
+        }
+      })
+
       const newInvoice = {
-        id: `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-        invoiceDate: new Date().toISOString(),
-        grandTotal: tripIds.reduce((sum, id) => {
-          const trip = state.trips.find(t => t.id === id)
-          return sum + (trip?.freightRate || 0) + (trip?.expenseSummary.approved || 0)
-        }, 0),
+        id: generatedInvoiceNumber,
+        invoiceNumber: generatedInvoiceNumber,
+        invoiceDate,
+        paymentDueDate: finalDueDate,
+        subtotal,
+        gstAmount,
+        grandTotal: subtotal + gstAmount,
         status: 'SUBMITTED' as any,
-        lineItems: tripIds.map(id => ({ tripId: id, description: 'Freight & Expenses', amount: 0 })),
+        lineItems,
+        vendorGstin: '29AABCF1234M1ZP',
+        customerGstin: selectedTrips[0]?.contractId ? '27AABCU9603R1ZM' : '27AABCU9603R1ZM',
+        billingPeriod: {
+          from: selectedTrips
+            .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
+            .sort()[0],
+          to: selectedTrips
+            .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
+            .sort().slice(-1)[0],
+        },
+        pdfUrl: `/invoices/${generatedInvoiceNumber}.pdf`,
+        tripReferences: selectedTrips.map((trip) => trip.id),
+        createdAt: invoiceDate,
       } as unknown as Invoice
 
       // Mark trips as invoiced
@@ -221,6 +344,135 @@ export const useAppStore = create<AppState>((set) => ({
         trips: updatedTrips
       }
     }),
+
+  submitNbfcApplication: ({ invoiceId, invoiceNumber, customerName, partnerId, partnerName, advanceAmount, charges, netDisbursement }) =>
+    set((state) => {
+      const application: NBFCApplication = {
+        id: `nbfc-app-${Math.floor(100 + Math.random() * 900)}`,
+        invoiceId,
+        invoiceNumber,
+        customerName,
+        partnerId,
+        partnerName,
+        status: 'SUBMITTED',
+        appliedAt: new Date().toISOString(),
+        referenceNumber: `NBFC-${Math.floor(100000 + Math.random() * 900000)}`,
+        advanceAmount,
+        charges,
+        netDisbursement,
+      }
+
+      return {
+        nbfcApplications: [
+          application,
+          ...state.nbfcApplications.filter((item) => item.invoiceId !== invoiceId),
+        ],
+        invoices: state.invoices.map((invoice) =>
+          invoice.id === invoiceId ? { ...invoice, nbfcDiscountingStatus: 'SUBMITTED' } : invoice
+        ),
+      }
+    }),
+
+  markNbfcApplicationStatus: (invoiceId, status) =>
+    set((state) => {
+      const updatedApplications = state.nbfcApplications.map((application) =>
+        application.invoiceId === invoiceId
+          ? {
+              ...application,
+              status,
+              approvedAt: status === 'APPROVED' && !application.approvedAt ? new Date().toISOString() : application.approvedAt,
+              disbursedAt: status === 'DISBURSED' ? new Date().toISOString() : application.disbursedAt,
+            }
+          : application
+      )
+
+      return {
+        nbfcApplications: updatedApplications,
+        invoices: state.invoices.map((invoice) =>
+          invoice.id === invoiceId
+            ? {
+                ...invoice,
+                nbfcDiscountingStatus: status === 'SUBMITTED' ? 'SUBMITTED' : status === 'APPROVED' ? 'APPROVED' : 'DISBURSED',
+              }
+            : invoice
+        ),
+      }
+    }),
+
+  createException: ({ bookingId, route, vehicle, driver, issueType, severity, description, evidence = [] }) =>
+    set((state) => {
+      const timestamp = new Date().toISOString()
+      const exception: ExceptionRecord = {
+        id: `EXC-${Math.floor(1000 + Math.random() * 9000)}`,
+        bookingId,
+        route,
+        vehicle,
+        driver,
+        issueType,
+        severity,
+        status: 'OPEN',
+        slaDueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        description,
+        evidence,
+        timeline: [
+          {
+            id: `exc-${Math.floor(1000 + Math.random() * 9000)}-1`,
+            action: 'Reported',
+            notes: description,
+            timestamp,
+            by: 'Vendor portal',
+          },
+        ],
+      }
+
+      return {
+        exceptions: [exception, ...state.exceptions],
+      }
+    }),
+
+  updateExceptionStatus: (exceptionId, status, notes) =>
+    set((state) => ({
+      exceptions: state.exceptions.map((exception) => {
+        if (exception.id !== exceptionId) return exception
+
+        const timestamp = new Date().toISOString()
+        const action =
+          status === 'ACKNOWLEDGED'
+            ? 'Acknowledged'
+            : status === 'IN_PROGRESS'
+              ? 'In Progress'
+              : status === 'RESOLVED'
+                ? 'Resolved'
+                : 'Closed'
+
+        const defaultNotes =
+          status === 'ACKNOWLEDGED'
+            ? 'Operations confirmed receipt and started triage.'
+            : status === 'IN_PROGRESS'
+              ? 'Working on recovery and customer communication.'
+              : status === 'RESOLVED'
+                ? 'Issue has been resolved.'
+                : 'Exception closed after resolution.'
+
+        return {
+          ...exception,
+          status,
+          updatedAt: timestamp,
+          timeline: [
+            ...exception.timeline,
+            {
+              id: `exc-${exception.id.toLowerCase()}-${exception.timeline.length + 1}`,
+              action,
+              notes: notes ?? defaultNotes,
+              timestamp,
+              by: 'Operations',
+            } as ExceptionTimelineEntry,
+          ],
+        }
+      }),
+    })),
 
   addCapacityDeclaration: (declaration) =>
     set((state) => ({ capacity: [declaration, ...state.capacity] })),
@@ -251,6 +503,54 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       invoices: [...MOCK_INVOICES],
       ledger: [...MOCK_LEDGER],
+      exceptions: [...MOCK_EXCEPTIONS],
+      nbfcApplications: [
+        {
+          id: 'nbfc-app-001',
+          invoiceId: 'INV-2026-029',
+          invoiceNumber: 'INV-2026-029',
+          customerName: 'APL Logistics',
+          partnerId: 'nbfc-1',
+          partnerName: 'FinEdge Capital',
+          status: 'SUBMITTED',
+          appliedAt: '2026-05-02T10:00:00Z',
+          referenceNumber: 'NBFC-884211',
+          advanceAmount: 65300,
+          charges: 1250,
+          netDisbursement: 64050,
+        },
+        {
+          id: 'nbfc-app-002',
+          invoiceId: 'INV-2026-028',
+          invoiceNumber: 'INV-2026-028',
+          customerName: 'Mahindra CIE',
+          partnerId: 'nbfc-2',
+          partnerName: 'Prime Credit',
+          status: 'APPROVED',
+          appliedAt: '2026-05-03T09:00:00Z',
+          approvedAt: '2026-05-04T14:00:00Z',
+          referenceNumber: 'NBFC-884212',
+          advanceAmount: 97200,
+          charges: 1824,
+          netDisbursement: 95376,
+        },
+        {
+          id: 'nbfc-app-003',
+          invoiceId: 'INV-2026-027',
+          invoiceNumber: 'INV-2026-027',
+          customerName: 'DHL Supply Chain',
+          partnerId: 'nbfc-3',
+          partnerName: 'Axis Finance',
+          status: 'DISBURSED',
+          appliedAt: '2026-05-01T08:30:00Z',
+          approvedAt: '2026-05-02T13:00:00Z',
+          disbursedAt: '2026-05-04T11:00:00Z',
+          referenceNumber: 'NBFC-884213',
+          advanceAmount: 30100,
+          charges: 600,
+          netDisbursement: 29500,
+        },
+      ],
       capacity: [...MOCK_CAPACITY],
       notifications: [...MOCK_NOTIFICATIONS],
     }))

@@ -8,6 +8,9 @@ import type {
   BookingReference,
   Contract,
   VendorOption,
+  RfiType,
+  RfqType,
+  VendorResponseStatus,
 } from '@auction/types'
 
 interface CreateAuctionInput {
@@ -29,12 +32,36 @@ interface CreateAuctionInput {
   launchNow?: boolean
 }
 
+interface CreateRfiInput {
+  title: string
+  description: string
+  deadline: string
+  targetEmails: string[]
+  messageToVendor?: string
+  templateFileName?: string
+  createdBy: string
+}
+
+interface CreateRfqInput {
+  title: string
+  deadline: string
+  targetEmails: string[]
+  messageToVendor?: string
+  templateFileName?: string
+  createdBy: string
+}
+
 interface AppState {
   auctions: Auction[]
   contracts: Contract[]
   bookings: BookingReference[]
   vendors: VendorOption[]
+  rfis: RfiType[]
+  rfqs: RfqType[]
   createAuction: (input: CreateAuctionInput) => string
+  createRfi: (input: CreateRfiInput) => string
+  createRfq: (input: CreateRfqInput) => string
+  updateSourcingVendorStatus: (type: 'RFI' | 'RFQ', id: string, vendorIdOrEmail: string, status: VendorResponseStatus) => void
   launchAuction: (auctionId: string, actor: string) => void
   cancelAuction: (auctionId: string, actor: string, reason: string) => void
   awardSpotAuction: (auctionId: string, actor: string, bidRank?: 'R1' | 'R2' | 'R3') => void
@@ -78,6 +105,42 @@ export const useAppStore = create<AppState>((set) => ({
   contracts: [...MOCK_CONTRACTS],
   bookings: [...MOCK_BOOKINGS],
   vendors: [...MOCK_VENDORS],
+  rfis: [
+    {
+      id: 'RFI-1001',
+      title: 'Q3 Pan-India Fleet Discovery',
+      description: 'Looking for vendors with 32ft closed body capacity in South India.',
+      deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'PUBLISHED',
+      targetEmails: ['vendor1@example.com', 'transport2@example.com'],
+      messageToVendor: 'Please fill out the attached matrix.',
+      templateFileName: 'RFI_Template_v2.xlsx',
+      vendorTracking: [
+        { vendorIdOrEmail: 'vendor1@example.com', status: 'RESPONDED' },
+        { vendorIdOrEmail: 'transport2@example.com', status: 'PENDING' },
+      ],
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: 'Procurement User',
+    }
+  ],
+  rfqs: [
+    {
+      id: 'RFQ-2001',
+      title: 'Dedicated capacity for Q3',
+      deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'PUBLISHED',
+      targetEmails: ['vendor1@example.com', 'vendor2@example.com', 'external_vendor@example.com'],
+      messageToVendor: 'Please quote your best rates.',
+      templateFileName: 'RFQ_Lane_Pricing.xlsx',
+      vendorTracking: [
+        { vendorIdOrEmail: 'vendor1@example.com', status: 'PENDING' },
+        { vendorIdOrEmail: 'vendor2@example.com', status: 'RESPONDED' },
+        { vendorIdOrEmail: 'external_vendor@example.com', status: 'PENDING' },
+      ],
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      createdBy: 'Procurement User',
+    }
+  ],
 
   createAuction: (input) => {
     const auctionId = `AUC-${input.type}-${Math.floor(100 + Math.random() * 900)}`
@@ -122,6 +185,62 @@ export const useAppStore = create<AppState>((set) => ({
 
     set((state) => ({ auctions: [createdAuction, ...state.auctions] }))
     return auctionId
+  },
+
+  createRfi: (input) => {
+    const rfiId = `RFI-${Math.floor(1000 + Math.random() * 9000)}`
+    const newRfi: RfiType = {
+      id: rfiId,
+      ...input,
+      status: 'PUBLISHED',
+      vendorTracking: input.targetEmails.map((email) => ({ vendorIdOrEmail: email, status: 'PENDING' as const })),
+      createdAt: new Date().toISOString(),
+    }
+    set((state) => ({ rfis: [newRfi, ...state.rfis] }))
+    return rfiId
+  },
+
+  createRfq: (input) => {
+    const rfqId = `RFQ-${Math.floor(1000 + Math.random() * 9000)}`
+    const newRfq: RfqType = {
+      id: rfqId,
+      ...input,
+      status: 'PUBLISHED',
+      vendorTracking: input.targetEmails.map((email) => ({ vendorIdOrEmail: email, status: 'PENDING' as const })),
+      createdAt: new Date().toISOString(),
+    }
+    set((state) => ({ rfqs: [newRfq, ...state.rfqs] }))
+    return rfqId
+  },
+
+  updateSourcingVendorStatus: (type, id, vendorIdOrEmail, status) => {
+    set((state) => {
+      if (type === 'RFI') {
+        return {
+          rfis: state.rfis.map(rfi => {
+            if (rfi.id !== id) return rfi
+            return {
+              ...rfi,
+              vendorTracking: rfi.vendorTracking.map(vt => 
+                vt.vendorIdOrEmail === vendorIdOrEmail ? { ...vt, status } : vt
+              )
+            }
+          })
+        }
+      } else {
+        return {
+          rfqs: state.rfqs.map(rfq => {
+            if (rfq.id !== id) return rfq
+            return {
+              ...rfq,
+              vendorTracking: rfq.vendorTracking.map(vt => 
+                vt.vendorIdOrEmail === vendorIdOrEmail ? { ...vt, status } : vt
+              )
+            }
+          })
+        }
+      }
+    })
   },
 
   launchAuction: (auctionId, actor) =>
@@ -425,5 +544,7 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       bookings: [...MOCK_BOOKINGS],
       vendors: [...MOCK_VENDORS],
+      rfis: [],
+      rfqs: [],
     })),
 }))

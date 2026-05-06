@@ -5,6 +5,7 @@ import { useUIStore } from '@auction/stores/ui.store'
 
 const NAV_ITEMS = [
   { path: '/auction/dashboard', label: 'Dashboard', subtitle: 'Operational overview', icon: LayoutDashboard },
+  { path: '/auction/sourcing', label: 'Client Hub', subtitle: 'RFI & RFQ Events', icon: FileText },
   { path: '/auction/auctions', label: 'Auctions', subtitle: 'Create, monitor, award', icon: Gavel },
   { path: '/auction/contracts', label: 'Contracts', subtitle: 'Award outputs and status', icon: FileText },
 ]

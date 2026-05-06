@@ -58,7 +58,7 @@ export default function InvoicesPage() {
   }
 
   const handleGenerateInvoice = () => {
-    generateInvoice(selectedTrips)
+    generateInvoice({ tripIds: selectedTrips })
     setSelectedTrips([])
     navigate('/vendor/invoices/list')
   }

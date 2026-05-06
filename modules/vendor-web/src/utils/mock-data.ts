@@ -427,10 +427,14 @@ export const MOCK_INVOICES: Invoice[] = [
 ]
 
 export const MOCK_LEDGER: LedgerEntry[] = [
-  { id: 'led1', date: '2026-04-18', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 115404 },
-  { id: 'led2', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 113096, documentUrl: '/tds/tds-apr-2026.pdf' },
-  { id: 'led3', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 0, documentUrl: '/payments/pa-2026-028.pdf' },
-  { id: 'led4', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: -5000 },
+  { id: 'led1', date: '2026-04-03', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-027 approved', credit: 35400, debit: 0, runningBalance: 35400 },
+  { id: 'led2', date: '2026-04-08', entryType: 'OTHER_DEDUCTION', description: 'Miscellaneous recovery against INV-2026-027', credit: 0, debit: 2400, runningBalance: 33000, documentUrl: '/deductions/od-apr-2026.pdf' },
+  { id: 'led3', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 148404 },
+  { id: 'led4', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 146096, documentUrl: '/tds/tds-apr-2026.pdf' },
+  { id: 'led5', date: '2026-05-02', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-029 approved', credit: 76700, debit: 0, runningBalance: 222796 },
+  { id: 'led6', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 335892, documentUrl: '/payments/pa-2026-028.pdf' },
+  { id: 'led7', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: 330892, documentUrl: '/penalties/sla-may-2026.pdf' },
+  { id: 'led8', date: '2026-05-18', entryType: 'PAYMENT_RECEIVED', description: 'Partial payment for INV-2026-029', credit: 35000, debit: 0, runningBalance: 365892, documentUrl: '/payments/pa-2026-029.pdf' },
 ]
 
 export const MOCK_COMPANY_INFO: CompanyInfo = {

@@ -7,14 +7,13 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
-import { formatCurrency } from '@vendor/lib/currency-utils'
 import { useAppStore } from '@vendor/stores/app.store'
-import { CreditCard, Plus, Download, FileText, BookOpen } from 'lucide-react'
+import { CreditCard, Plus, Download, FileText } from 'lucide-react'
 import type { InvoiceStatus } from '@vendor/types'
 
-type InvoiceTab = 'create' | 'list' | 'ledger'
+type InvoiceTab = 'create' | 'list'
 
-const INVOICE_TABS: InvoiceTab[] = ['create', 'list', 'ledger']
+const INVOICE_TABS: InvoiceTab[] = ['create', 'list']
 
 function getInvoiceTab(pathname: string, search: string): InvoiceTab {
   const pathTab = pathname.split('/')[3]
@@ -38,24 +37,19 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL')
   const [selectedBookings, setSelectedBookings] = useState<string[]>([])
   const [invoicePage, setInvoicePage] = useState(1)
-  const [ledgerPage, setLedgerPage] = useState(1)
   const activeTab = getInvoiceTab(location.pathname, location.search)
 
-  const { trips, invoices, ledger, generateInvoice } = useAppStore()
+  const { trips, invoices, generateInvoice } = useAppStore()
 
   const uninvoicedBookings = trips.filter((t) => t.status === 'DELIVERED' && t.podStatus === 'CONFIRMED' && !t.isInvoiced)
   const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
   const invoicePageSize = 5
-  const ledgerPageSize = 8
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize))
-  const ledgerTotalPages = Math.max(1, Math.ceil(ledger.length / ledgerPageSize))
   const pagedInvoices = filteredInvoices.slice((Math.min(invoicePage, invoiceTotalPages) - 1) * invoicePageSize, Math.min(invoicePage, invoiceTotalPages) * invoicePageSize)
-  const pagedLedger = ledger.slice((Math.min(ledgerPage, ledgerTotalPages) - 1) * ledgerPageSize, Math.min(ledgerPage, ledgerTotalPages) * ledgerPageSize)
 
   const tabs: { key: InvoiceTab; label: string; icon: React.ReactNode }[] = [
     { key: 'create', label: 'Create Invoice', icon: <Plus className="h-4 w-4" /> },
     { key: 'list', label: 'My Invoices', icon: <FileText className="h-4 w-4" /> },
-    { key: 'ledger', label: 'Ledger', icon: <BookOpen className="h-4 w-4" /> },
   ]
 
   const handleToggleBooking = (bookingId: string) => {
@@ -65,7 +59,7 @@ export default function InvoicesPage() {
   }
 
   const handleGenerateInvoice = () => {
-    generateInvoice(selectedBookings)
+    generateInvoice({ tripIds: selectedBookings })
     setSelectedBookings([])
     navigate('/vendor/invoices/list')
   }
@@ -190,48 +184,6 @@ export default function InvoicesPage() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Ledger */}
-      {activeTab === 'ledger' && (
-        <div className="space-y-4">
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
-                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Type</th>
-                <th className="p-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Description</th>
-                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Credit</th>
-                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Debit</th>
-                <th className="p-3 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Balance</th>
-                <th className="p-3 text-center text-xs font-bold uppercase tracking-wide text-gray-500">Doc</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedLedger.map((entry) => (
-                <tr key={entry.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3">{formatDate(entry.date)}</td>
-                  <td className="p-3"><StatusBadge status={entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'INVOICE_APPROVED' ? 'APPROVED' : 'REJECTED'} label={entry.entryType.replace(/_/g, ' ')} /></td>
-                  <td className="p-3">{entry.description}</td>
-                  <td className="p-3 text-right">{entry.credit > 0 ? <CurrencyDisplay amount={entry.credit} type="credit" showSign /> : '—'}</td>
-                  <td className="p-3 text-right">{entry.debit > 0 ? <CurrencyDisplay amount={entry.debit} type="debit" showSign /> : '—'}</td>
-                  <td className="p-3 text-right font-mono font-medium">{formatCurrency(entry.runningBalance)}</td>
-                  <td className="p-3 text-center">{entry.documentUrl && <Button size="sm" variant="ghost" onClick={() => window.alert('Downloading Receipt...')}><Download className="h-3.5 w-3.5" /></Button>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-          <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-            <span>Showing {(Math.min(ledgerPage, ledgerTotalPages) - 1) * ledgerPageSize + 1}-{Math.min(Math.min(ledgerPage, ledgerTotalPages) * ledgerPageSize, ledger.length)} of {ledger.length}</span>
-            <div className="flex items-center gap-2">
-              <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(ledgerPage, ledgerTotalPages) === 1} onClick={() => setLedgerPage((p) => Math.max(1, p - 1))}>Previous</button>
-              <span className="rounded-lg bg-gray-50 px-3 py-1.5 font-semibold text-text">Page {Math.min(ledgerPage, ledgerTotalPages)} of {ledgerTotalPages}</span>
-              <button className="rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-text disabled:opacity-50" disabled={Math.min(ledgerPage, ledgerTotalPages) === ledgerTotalPages} onClick={() => setLedgerPage((p) => Math.min(ledgerTotalPages, p + 1))}>Next</button>
-            </div>
-          </div>
         </div>
       )}
     </div>

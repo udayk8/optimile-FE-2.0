@@ -9,6 +9,10 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
+  Wallet,
+  AlertCircle,
+  ShieldAlert,
+  BadgeDollarSign
 } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
@@ -19,7 +23,10 @@ const NAV_ITEMS = [
   { path: '/vendor/contracts', label: 'Contracts', subtitle: 'Active agreements', icon: FileText },
   { path: '/vendor/bookings', label: 'Bookings', subtitle: 'Indents and deliveries', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
-  { path: '/vendor/invoices/list', label: 'Invoices', subtitle: 'Billing and payments', icon: CreditCard },
+  { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Create and track bills', icon: CreditCard },
+  { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Earnings and payments', icon: Wallet },
+  { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
+  { path: '/vendor/nbfc', label: 'Bill Discounting', subtitle: 'Early payment funding', icon: BadgeDollarSign },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
 

@@ -1,7 +1,7 @@
 import type {
   DashboardData, Auction, Contract, Indent, Trip, Expense,
   Vehicle, Driver, CapacityDeclaration, Invoice, LedgerEntry, Notification,
-  CompanyInfo, BankDetails, Vendor,
+  CompanyInfo, BankDetails, Vendor, ExceptionRecord,
 } from '@vendor/types'
 
 export const MOCK_VENDOR: Vendor = {
@@ -45,6 +45,108 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n4', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense bundle ₹5,500 for TRP-043 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 3600000).toISOString() },
   { id: 'n5', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 7200000).toISOString() },
   { id: 'n6', type: 'CONTRACTS', title: 'Contract Updated', message: 'Contract CNT-001 rate card and SLA details were updated', deepLink: '/vendor/contracts/CNT-001', isRead: false, createdAt: new Date(Date.now() - 10800000).toISOString() },
+]
+
+export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
+  {
+    id: 'EXC-2048',
+    bookingId: 'TRP-045',
+    route: 'Mumbai → Satara',
+    vehicle: 'MH-12-AB-4421',
+    driver: 'Suresh Yadav',
+    issueType: 'Breakdown',
+    severity: 'CRITICAL',
+    status: 'OPEN',
+    slaDueAt: '2026-05-06T12:45:00Z',
+    createdAt: '2026-05-06T09:24:00Z',
+    updatedAt: '2026-05-06T09:24:00Z',
+    description: 'Truck stalled near Satara bypass and requires roadside support.',
+    evidence: ['photo://breakdown-1', 'gps://satara-bypass'],
+    timeline: [
+      { id: 'exc-2048-1', action: 'Reported', notes: 'Driver raised a breakdown alert from the mobile app.', timestamp: '2026-05-06T09:24:00Z', by: 'Driver app' },
+    ],
+  },
+  {
+    id: 'EXC-1982',
+    bookingId: 'TRP-043',
+    route: 'Pune → Chennai',
+    vehicle: 'MH-14-KK-1007',
+    driver: 'Manoj Sharma',
+    issueType: 'Delay',
+    severity: 'HIGH',
+    status: 'ACKNOWLEDGED',
+    slaDueAt: '2026-05-06T14:30:00Z',
+    createdAt: '2026-05-06T10:02:00Z',
+    updatedAt: '2026-05-06T10:11:00Z',
+    description: 'Vehicle is stuck at a toll queue and the ETA is slipping by more than 90 minutes.',
+    evidence: ['gps://toll-plaza-delay'],
+    timeline: [
+      { id: 'exc-1982-1', action: 'Reported', notes: 'Operations received delay notification.', timestamp: '2026-05-06T10:02:00Z', by: 'Driver app' },
+      { id: 'exc-1982-2', action: 'Acknowledged', notes: 'Control tower confirmed monitoring and requested live updates.', timestamp: '2026-05-06T10:11:00Z', by: 'Operations' },
+    ],
+  },
+  {
+    id: 'EXC-2011',
+    bookingId: 'TRP-047',
+    route: 'Delhi → Jaipur',
+    vehicle: 'RJ-14-TR-7788',
+    driver: 'Ramesh Singh',
+    issueType: 'Route deviation',
+    severity: 'MEDIUM',
+    status: 'IN_PROGRESS',
+    slaDueAt: '2026-05-06T16:10:00Z',
+    createdAt: '2026-05-05T13:10:00Z',
+    updatedAt: '2026-05-05T14:22:00Z',
+    description: 'Driver exited the planned route to avoid congestion and needs route confirmation.',
+    evidence: ['gps://route-snap'],
+    timeline: [
+      { id: 'exc-2011-1', action: 'Reported', notes: 'Route deviation flagged by live tracking.', timestamp: '2026-05-05T13:10:00Z', by: 'System' },
+      { id: 'exc-2011-2', action: 'Acknowledged', notes: 'Trip owner reviewed the deviation and requested driver call-back.', timestamp: '2026-05-05T13:28:00Z', by: 'Operations' },
+      { id: 'exc-2011-3', action: 'In Progress', notes: 'Alternate route and time update are being coordinated.', timestamp: '2026-05-05T14:22:00Z', by: 'Support' },
+    ],
+  },
+  {
+    id: 'EXC-1934',
+    bookingId: 'TRP-041',
+    route: 'Nashik → Bangalore',
+    vehicle: 'KA-01-MN-5454',
+    driver: 'Sandeep Patil',
+    issueType: 'Accident',
+    severity: 'CRITICAL',
+    status: 'RESOLVED',
+    slaDueAt: '2026-05-04T18:30:00Z',
+    createdAt: '2026-05-04T16:40:00Z',
+    updatedAt: '2026-05-04T17:15:00Z',
+    description: 'Minor accident at highway turn; cargo inspected and trip restarted after assistance.',
+    evidence: ['photo://accident-1', 'photo://cargo-check'],
+    timeline: [
+      { id: 'exc-1934-1', action: 'Reported', notes: 'Accident reported at highway turn.', timestamp: '2026-05-04T16:40:00Z', by: 'Driver app' },
+      { id: 'exc-1934-2', action: 'Acknowledged', notes: 'Support team contacted roadside help and informed customer.', timestamp: '2026-05-04T16:48:00Z', by: 'Operations' },
+      { id: 'exc-1934-3', action: 'In Progress', notes: 'Cargo inspection and replacement coordination in motion.', timestamp: '2026-05-04T16:58:00Z', by: 'Support' },
+      { id: 'exc-1934-4', action: 'Resolved', notes: 'Vehicle resumed trip after replacement support arrived.', timestamp: '2026-05-04T17:15:00Z', by: 'Operations' },
+    ],
+  },
+  {
+    id: 'EXC-1888',
+    bookingId: 'TRP-039',
+    route: 'Kolkata → Guwahati',
+    vehicle: 'WB-02-PT-2201',
+    driver: 'Imran Ali',
+    issueType: 'Delay',
+    severity: 'HIGH',
+    status: 'CLOSED',
+    slaDueAt: '2026-05-03T15:10:00Z',
+    createdAt: '2026-05-03T11:20:00Z',
+    updatedAt: '2026-05-03T15:30:00Z',
+    description: 'Rain-related delay was resolved after detour approval and customer sign-off.',
+    evidence: ['gps://weather-delay'],
+    timeline: [
+      { id: 'exc-1888-1', action: 'Reported', notes: 'Weather delay detected on route.', timestamp: '2026-05-03T11:20:00Z', by: 'System' },
+      { id: 'exc-1888-2', action: 'Acknowledged', notes: 'Support confirmed delay and informed the destination team.', timestamp: '2026-05-03T11:44:00Z', by: 'Operations' },
+      { id: 'exc-1888-3', action: 'Resolved', notes: 'Detour approved and delivery completed.', timestamp: '2026-05-03T15:05:00Z', by: 'Operations' },
+      { id: 'exc-1888-4', action: 'Closed', notes: 'Customer accepted the resolution and case was closed.', timestamp: '2026-05-03T15:30:00Z', by: 'Support' },
+    ],
+  },
 ]
 
 
@@ -581,6 +683,15 @@ export const MOCK_INVOICES: Invoice[] = [
     subtotal: 65000, gstAmount: 11700, grandTotal: 76700, pdfUrl: '/invoices/INV-2026-029.pdf', tripReferences: ['TRP-042'], createdAt: '2026-04-20T10:00:00Z',
   },
   {
+    id: 'INV-2026-030', invoiceNumber: 'INV-2026-030', invoiceDate: '2026-04-24', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-21', to: '2026-04-24' },
+    paymentDueDate: '2026-05-24', status: 'APPROVED',
+    lineItems: [
+      { tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 54000, expenses: [{ type: 'TOLL', amount: 1800 }], lineTotal: 55800 }
+    ],
+    subtotal: 55800, gstAmount: 10044, grandTotal: 65844, pdfUrl: '/invoices/INV-2026-030.pdf', tripReferences: ['TRP-047'], createdAt: '2026-04-24T15:00:00Z',
+  },
+  {
     id: 'INV-2026-027', invoiceNumber: 'INV-2026-027', invoiceDate: '2026-04-01', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-03-15', to: '2026-03-31' },
     paymentDueDate: '2026-05-01', status: 'REJECTED',
@@ -592,10 +703,15 @@ export const MOCK_INVOICES: Invoice[] = [
 ]
 
 export const MOCK_LEDGER: LedgerEntry[] = [
-  { id: 'led1', date: '2026-04-18', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 115404 },
-  { id: 'led2', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 113096, documentUrl: '/tds/tds-apr-2026.pdf' },
-  { id: 'led3', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 0, documentUrl: '/payments/pa-2026-028.pdf' },
-  { id: 'led4', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: -5000 },
+  { id: 'led1', date: '2026-04-03', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-027 approved', credit: 35400, debit: 0, runningBalance: 35400 },
+  { id: 'led2', date: '2026-04-08', entryType: 'OTHER_DEDUCTION', description: 'Miscellaneous recovery against INV-2026-027', credit: 0, debit: 2400, runningBalance: 33000, documentUrl: '/deductions/od-apr-2026.pdf' },
+  { id: 'led3', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 148404 },
+  { id: 'led4', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 146096, documentUrl: '/tds/tds-apr-2026.pdf' },
+  { id: 'led5', date: '2026-05-02', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-029 approved', credit: 76700, debit: 0, runningBalance: 222796 },
+  { id: 'led6', date: '2026-05-06', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-030 approved', credit: 65844, debit: 0, runningBalance: 288640 },
+  { id: 'led7', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 401736, documentUrl: '/payments/pa-2026-028.pdf' },
+  { id: 'led8', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: 396736, documentUrl: '/penalties/sla-may-2026.pdf' },
+  { id: 'led9', date: '2026-05-18', entryType: 'PAYMENT_RECEIVED', description: 'Partial payment for INV-2026-029', credit: 35000, debit: 0, runningBalance: 431736, documentUrl: '/payments/pa-2026-029.pdf' },
 ]
 
 export const MOCK_COMPANY_INFO: CompanyInfo = {

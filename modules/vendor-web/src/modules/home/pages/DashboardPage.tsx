@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock, Package, CreditCard, Gavel, Truck, AlertTriangle, Home } from 'lucide-react'
+import { Clock, Package, CreditCard, Gavel, Truck, AlertTriangle, Home, Wallet, LifeBuoy, FilePlus } from 'lucide-react'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { PageHero } from '@shared-ui/page-hero'
 import { KpiCard } from '@shared-ui/kpi-card'
+import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 
 export default function DashboardPage() {
@@ -112,6 +113,47 @@ export default function DashboardPage() {
               <StatusBadge status="REJECTED" label={`${invoicePaymentStatus.rejected} Rejected`} />
               <StatusBadge status="PAID" label={`${invoicePaymentStatus.paid} Paid`} />
            </div>
+        </KpiCard>
+
+        <KpiCard
+          title="Finance"
+          value={invoices.length}
+          unit="entries"
+          insight="Ledger, payments, and bill discounting"
+          icon={<Wallet className="h-4 w-4 text-primary" />}
+          onClick={() => navigate('/vendor/ledger')}
+        >
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate('/vendor/ledger') }}>Open Ledger</Button>
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate('/vendor/ledger/payments') }}>Payment Status</Button>
+          </div>
+        </KpiCard>
+
+        <KpiCard
+          title="Resolutions"
+          value={0}
+          insight="Exceptions, disputes, and SLA tracking"
+          icon={<LifeBuoy className="h-4 w-4 text-warning" />}
+          onClick={() => navigate('/vendor/exceptions')}
+        >
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate('/vendor/exceptions') }}>Open Exceptions</Button>
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate('/vendor/report-exception') }}>Report Exception</Button>
+          </div>
+        </KpiCard>
+
+        <KpiCard
+          title="Create Invoice"
+          value={uninvoicedTrips.length}
+          unit="ready"
+          insight="Generate invoices from delivered bookings"
+          icon={<FilePlus className="h-4 w-4 text-primary" />}
+          onClick={() => navigate('/vendor/nbfc')}
+        >
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate('/vendor/nbfc') }}>Open Bill Discounting</Button>
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate('/vendor/invoices/list') }}>Invoice List</Button>
+          </div>
         </KpiCard>
 
         {/* Active Trips */}
