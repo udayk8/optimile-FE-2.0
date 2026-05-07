@@ -1,9 +1,12 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import TmsDriverAppApp from './app/TmsDriverAppApp'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./styles/variables.css";
+import "./styles/global.css";
+import "./i18n/i18n";
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <TmsDriverAppApp standalone />
-  </React.StrictMode>,
-)
+    <App />
+  </React.StrictMode>
+);

@@ -1,21 +1,25 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'node:path'
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react";
+import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@tms-driver-app': path.resolve(__dirname, './src'),
-      '@tms-booking': path.resolve(__dirname, '../tms-booking-web/src'),
-      '@shared-api': path.resolve(__dirname, '../../packages/shared-api/src'),
-      '@shared-auth': path.resolve(__dirname, '../../packages/shared-auth/src'),
-      '@shared-ui': path.resolve(__dirname, '../../packages/shared-ui/src'),
-      '@shared-utils': path.resolve(__dirname, '../../packages/shared-utils/src'),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   server: {
+    host: "127.0.0.1",
     port: 3009,
-    open: false,
   },
-})
+  preview: {
+    host: "127.0.0.1",
+    port: 3009,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+  },
+});
