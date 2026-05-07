@@ -1,0 +1,15 @@
+export const routes = {
+  dashboard: "/",
+  trips: "/trips",
+  tripDetail: (tripId: string) => `/trips/${tripId}`,
+  deliveryDetail: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}`,
+  subDelivery: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}/sub`,
+  uploadPod: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}/pod`,
+  tripDocuments: (tripId: string) => `/trips/${tripId}/documents`,
+  documents: "/documents",
+  poi: "/poi",
+  fuelExpenses: "/fuel-expenses",
+  incidents: "/incidents",
+  profile: "/profile",
+  notifications: "/notifications",
+};
