@@ -28,7 +28,7 @@ export default function DisputeThreadPage() {
           ))}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button onClick={() => navigate('/vendor/exceptions')}>Back to Exceptions</Button>
+          <Button onClick={() => navigate('/vendor/disputes')}>Back to Disputes</Button>
           <Button variant="outline" onClick={() => navigate('/vendor/invoices/list')}>Open Invoices</Button>
         </div>
       </div>

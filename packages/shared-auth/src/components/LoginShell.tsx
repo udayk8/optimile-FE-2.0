@@ -12,7 +12,7 @@ export function LoginShell() {
 
   const { login, loading, error, backendAvailable } = useAuth()
   const navigate = useNavigate()
-  const demoEntries = Object.entries(DEMO_CREDENTIALS).filter(([, info]) => info.role !== 'Driver')
+  const demoEntries = Object.entries(DEMO_CREDENTIALS)
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault()

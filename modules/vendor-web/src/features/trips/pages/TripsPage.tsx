@@ -8,7 +8,7 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
-import { Truck, MapPin, Package, User, CheckCircle, XCircle, Route } from 'lucide-react'
+import { Truck, MapPin, Package, User, CheckCircle, XCircle, Route, Upload } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 
@@ -262,9 +262,19 @@ export default function TripsPage() {
                       <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                       <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.pending} /></td>
                       <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>
-                          View Details
-                        </Button>
+                        <div className="inline-flex items-center gap-2">
+                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-text hover:bg-gray-50">
+                            <Upload className="h-3.5 w-3.5" /> Upload POD
+                            <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) window.alert(`POD document "${file.name}" uploaded for ${trip.id}`)
+                              e.target.value = ''
+                            }} />
+                          </label>
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>
+                            View Details
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

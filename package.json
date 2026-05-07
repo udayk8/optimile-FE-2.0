@@ -25,27 +25,29 @@
   "dependencies": {
     "@optimile/admin-web": "file:modules/admin-web",
     "@optimile/auction-portal-web": "file:modules/auction-web",
+    "@optimile/console-web": "file:modules/console-web",
     "@optimile/fleet-web": "file:modules/fleet-web",
+    "@optimile/platform-admin-web": "file:modules/platform-admin-web",
     "@optimile/shared-auth": "file:packages/shared-auth",
     "@optimile/shared-ui": "file:packages/shared-ui",
-    "@optimile/console-web": "file:modules/console-web",
-    "@optimile/vendor-portal-web": "file:modules/vendor-web",
-    "@optimile/platform-admin-web": "file:modules/platform-admin-web",
     "@optimile/tenant-admin-web": "file:modules/tenant-admin-web",
     "@optimile/tms-booking-web": "file:modules/tms-booking-web",
     "@optimile/tms-driver-app-web": "file:modules/tms-driver-app-web",
+    "@optimile/vendor-portal-web": "file:modules/vendor-web",
     "@vitejs/plugin-react": "^4.3.0",
+    "i18next": "^26.0.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.7",
     "react-router-dom": "^7.1.0",
     "vite": "^6.0.0"
   },
   "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "typescript": "^5.6.0"
   }
 }

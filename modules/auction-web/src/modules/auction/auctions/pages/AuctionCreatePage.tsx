@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import * as ExcelJS from 'exceljs'
 import { toast } from 'sonner'
 import { PageHero } from '@shared-ui/page-hero'
 import { Button } from '@shared-ui/button'
@@ -32,6 +33,8 @@ type AuctionSettingsState = {
   contractStartDate: string
   contractEndDate: string
 }
+
+type LaneImportMode = 'MANUAL' | 'EXCEL'
 
 const VEHICLE_TYPE_OPTIONS = [
   '20 MT Open Body',
@@ -96,6 +99,25 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
   }
 }
 
+function normalizeText(value: unknown) {
+  return String(value ?? '').trim()
+}
+
+function parseLaneMode(value: unknown): DraftLane['allocationMode'] {
+  return normalizeText(value).toUpperCase() === 'SINGLE' ? 'SINGLE' : 'SPLIT'
+}
+
+function parseRateUnit(value: unknown): DraftLane['rateUnit'] {
+  const normalized = normalizeText(value).toUpperCase()
+  if (normalized === 'PER_MT') return 'PER_MT'
+  if (normalized === 'PER_KM') return 'PER_KM'
+  return 'PER_TRIP'
+}
+
+function laneTemplateHeaders() {
+  return ['lane', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'r1', 'r2', 'r3']
+}
+
 export default function AuctionCreatePage() {
   const { type } = useParams()
   const navigate = useNavigate()
@@ -120,6 +142,8 @@ export default function AuctionCreatePage() {
   const [auctionRegion, setAuctionRegion] = useState('North India')
   const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', selectedBooking.lane)])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
+  const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
+  const [importFileName, setImportFileName] = useState('')
 
   const activeBooking = bookings.find((item) => item.id === selectedBookingId) ?? selectedBooking
   const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
@@ -142,11 +166,60 @@ export default function AuctionCreatePage() {
     setAuctionRegion(effectiveType === 'LOT' ? 'North India' : 'South India')
     setLanes([makeDefaultLane(effectiveType, defaultLane)])
     setAuctionSettings(makeAuctionSettings(effectiveType))
+    setLaneImportMode('MANUAL')
+    setImportFileName('')
   }, [effectiveType, bookings, selectedBooking.id, selectedBooking.lane])
 
   const addLane = () => {
     if (!effectiveType || effectiveType === 'SPOT') return
     setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bangalore')])
+  }
+
+  const handleLaneFileImport = async (file: File) => {
+    if (!effectiveType || effectiveType === 'SPOT') return
+
+    try {
+      const workbook = new ExcelJS.Workbook()
+      await workbook.xlsx.load(await file.arrayBuffer())
+      const worksheet = workbook.worksheets[0]
+
+      if (!worksheet) {
+        throw new Error('The workbook does not contain any sheets.')
+      }
+
+      const importedLanes: DraftLane[] = []
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return
+
+        const values = row.values as unknown[]
+        const lane = normalizeText(values[1])
+        if (!lane) return
+
+        importedLanes.push({
+          lane,
+          vehicleType: normalizeText(values[2]) || '20 MT Open Body',
+          capacityMt: normalizeText(values[3]) || '20',
+          rateUnit: parseRateUnit(values[4]),
+          ceilingRate: normalizeText(values[5]) || '0',
+          estimatedTrips: normalizeText(values[6]) || (effectiveType === 'LOT' ? '1' : '300'),
+          allocationMode: parseLaneMode(values[7]),
+          r1: normalizeText(values[8]) || '0',
+          r2: normalizeText(values[9]) || '0',
+          r3: normalizeText(values[10]) || '0',
+        })
+      })
+
+      if (!importedLanes.length) {
+        throw new Error(`Add at least one lane row using the template: ${laneTemplateHeaders().join(', ')}`)
+      }
+
+      setLanes(importedLanes)
+      setImportFileName(file.name)
+      toast.success(`Imported ${importedLanes.length} lanes from Excel.`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not import lanes from the selected file.'
+      toast.error(message)
+    }
   }
 
   const updateLane = (index: number, field: keyof DraftLane, value: string) => {
@@ -288,17 +361,72 @@ export default function AuctionCreatePage() {
                 {effectiveType === 'LOT' && (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                     <Field label="Region" description="Choose the region first, then pick lanes from that region below.">
-                    <Select
-                      value={auctionRegion}
-                      onChange={(event) => setAuctionRegion(event.target.value)}
-                    >
-                      {REGION_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </Select>
+                      <Select
+                        value={auctionRegion}
+                        onChange={(event) => setAuctionRegion(event.target.value)}
+                      >
+                        {REGION_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </Select>
                     </Field>
+                  </div>
+                )}
+
+                {effectiveType !== 'SPOT' && (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-text">Lane Input</h3>
+                        <p className="mt-1 text-xs text-gray-500">Add lanes manually one by one, or upload an Excel sheet with the same columns as the UI.</p>
+                      </div>
+                      <div className="flex rounded-lg border border-gray-200 bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() => setLaneImportMode('MANUAL')}
+                          className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                            laneImportMode === 'MANUAL' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Manual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLaneImportMode('EXCEL')}
+                          className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
+                            laneImportMode === 'EXCEL' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                          }`}
+                        >
+                          Excel
+                        </button>
+                      </div>
+                    </div>
+
+                    {laneImportMode === 'EXCEL' ? (
+                      <div className="space-y-3">
+                        <Input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0]
+                            if (file) void handleLaneFileImport(file)
+                          }}
+                        />
+                        <p className="text-xs text-gray-500">
+                          Required headers: {laneTemplateHeaders().join(', ')}.
+                          {importFileName ? ` Imported file: ${importFileName}` : ' Upload a single-sheet workbook with one lane per row.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <Button type="button" variant="outline" onClick={addLane}>
+                          Add Lane
+                        </Button>
+                        <p className="text-xs text-gray-500">Current lanes are edited below in the form.</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -474,11 +602,6 @@ export default function AuctionCreatePage() {
                   ))}
                 </div>
 
-                {effectiveType !== 'SPOT' && (
-                  <Button type="button" variant="outline" onClick={addLane}>
-                    Add Lane
-                  </Button>
-                )}
               </>
             )}
           </CardContent>

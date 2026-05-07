@@ -208,12 +208,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const restore = async () => {
       const storedSession = getStoredAuthSession()
       if (!storedSession) {
-        const storedDemoEmail = getStoredDemoSessionEmail()?.trim().toLowerCase() ?? ''
-        const storedDemoUser = DEMO_CREDENTIALS[storedDemoEmail]
-        if (storedDemoUser && mounted) {
-          setUser(buildDemoUser(storedDemoEmail, storedDemoUser))
-          setTenant(DEMO_TENANT)
-        }
+        clearDemoSession()
         if (mounted) setLoading(false)
         return
       }

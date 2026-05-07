@@ -50,18 +50,18 @@ export default function LedgerPage() {
   )
 
   const monthlyGraph = useMemo(() => {
-    const buckets = new Map<string, { month: string; earnings: number; payments: number }>()
+    const buckets = new Map<string, { month: string; invoiced: number; payments: number }>()
 
     for (const monthKey of monthOrder) {
       const monthLabel = new Date(`${monthKey}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      buckets.set(monthKey, { month: monthLabel, earnings: 0, payments: 0 })
+      buckets.set(monthKey, { month: monthLabel, invoiced: 0, payments: 0 })
     }
 
     for (const entry of ledgerEntries) {
       const monthKey = entry.date.slice(0, 7)
       const bucket = buckets.get(monthKey)
       if (!bucket) continue
-      if (entry.credit > 0) bucket.earnings += entry.credit
+      if (entry.credit > 0) bucket.invoiced += entry.credit
       if (entry.type === 'Payment Received') bucket.payments += entry.credit
     }
 
@@ -69,7 +69,7 @@ export default function LedgerPage() {
       const bucket = buckets.get(monthKey)
       return {
         month: bucket?.month ?? monthKey,
-        earnings: bucket?.earnings ?? 0,
+        invoiced: bucket?.invoiced ?? 0,
         payments: bucket?.payments ?? 0,
       }
     })
@@ -77,7 +77,8 @@ export default function LedgerPage() {
 
   const summary = useMemo(
     () => ({
-      totalEarned: filteredEntries.reduce((sum, entry) => sum + entry.credit, 0),
+      totalInvoiced: filteredEntries.reduce((sum, entry) => sum + entry.credit, 0),
+      totalInvoicedCount: filteredEntries.filter((entry) => entry.type === 'Invoice Approved').length,
       pendingPayments: filteredEntries.reduce((sum, entry) => sum + (entry.type === 'Payment Received' ? 0 : entry.credit === 0 ? entry.debit : 0), 0),
       tdsDeducted: filteredEntries.reduce((sum, entry) => sum + (entry.type === 'TDS Deduction' ? entry.debit : 0), 0),
     }),
@@ -125,11 +126,16 @@ export default function LedgerPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-3">
+        <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Total Earned</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.totalEarned.toLocaleString('en-IN')}</div>
+            <div className="text-sm font-medium text-gray-500">Total Invoiced</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.totalInvoiced.toLocaleString('en-IN')}</div>
             <div className="mt-2 text-sm text-gray-500">Filtered by the selected date range.</div>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-medium text-gray-500">Total Invoices Invoiced</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.totalInvoicedCount}</div>
+            <div className="mt-2 text-sm text-gray-500">Invoices approved in selected range.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Pending Payments</div>
@@ -147,11 +153,11 @@ export default function LedgerPage() {
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-text">Earnings vs Payments</h3>
+            <h3 className="text-lg font-semibold text-text">Invoiced vs Payments</h3>
             <p className="mt-1 text-sm text-gray-500">Last 6 months, matching the legacy vendor ledger graph.</p>
           </div>
           <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Earnings</span>
+            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Invoiced</span>
             <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-primary" /> Payments</span>
           </div>
         </div>
@@ -167,7 +173,7 @@ export default function LedgerPage() {
                 formatter={(value: number, name: string) => [`₹${value.toLocaleString('en-IN')}`, name]}
               />
               <Legend iconType="circle" wrapperStyle={{ paddingTop: '16px' }} />
-              <Bar dataKey="earnings" name="Earnings" fill="#10b981" radius={[6, 6, 0, 0]} barSize={28} />
+              <Bar dataKey="invoiced" name="Invoiced" fill="#10b981" radius={[6, 6, 0, 0]} barSize={28} />
               <Bar dataKey="payments" name="Payments Received" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={28} />
             </BarChart>
           </ResponsiveContainer>

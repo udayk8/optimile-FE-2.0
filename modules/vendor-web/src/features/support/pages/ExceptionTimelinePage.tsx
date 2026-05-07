@@ -76,6 +76,14 @@ export default function ExceptionTimelinePage() {
     }, 1500)
   }
 
+  const handleDiscardChanges = () => {
+    setNextStatus(exception.status)
+    setReason(REASON_OPTIONS[0])
+    setDescription('')
+    setError('')
+    setSuccess(false)
+  }
+
   return (
     <div className="space-y-6 pb-12">
       <HeroCard
@@ -223,10 +231,10 @@ export default function ExceptionTimelinePage() {
                   </div>
                 ) : (
                   <div className="flex gap-4 pt-4 border-t border-gray-50">
-                    <Button type="submit" className="px-8 py-6 h-auto text-base font-bold shadow-lg shadow-primary/20">
-                      Update Exception Lifecycle
+                    <Button type="submit" className="shadow-lg shadow-primary/20">
+                      Update Status
                     </Button>
-                    <Button type="button" variant="outline" className="h-auto px-8" onClick={() => setDescription('')}>
+                    <Button type="button" variant="outline" onClick={handleDiscardChanges}>
                       Discard Changes
                     </Button>
                   </div>

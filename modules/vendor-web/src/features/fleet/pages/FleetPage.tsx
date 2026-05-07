@@ -12,7 +12,7 @@ import { Ship, Truck, Users, Plus, AlertTriangle, ShieldCheck, ShieldX, Edit3 } 
 type FleetTab = 'vehicles' | 'drivers'
 
 function getFleetTab(pathname: string): FleetTab {
-  return pathname.split('/')[2] === 'drivers' ? 'drivers' : 'vehicles'
+  return pathname.split('/')[3] === 'drivers' ? 'drivers' : 'vehicles'
 }
 
 function ComplianceIcon({ status }: { status: string }) {

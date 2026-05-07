@@ -1,15 +1,17 @@
+const BASE = '/driver-app'
+
 export const routes = {
-  dashboard: "/",
-  trips: "/trips",
-  tripDetail: (tripId: string) => `/trips/${tripId}`,
-  deliveryDetail: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}`,
-  subDelivery: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}/sub`,
-  uploadPod: (tripId: string, deliveryId: string) => `/trips/${tripId}/delivery/${deliveryId}/pod`,
-  tripDocuments: (tripId: string) => `/trips/${tripId}/documents`,
-  documents: "/documents",
-  poi: "/poi",
-  fuelExpenses: "/fuel-expenses",
-  incidents: "/incidents",
-  profile: "/profile",
-  notifications: "/notifications",
-};
+  dashboard: `${BASE}`,
+  trips: `${BASE}/trips`,
+  tripDetail: (tripId: string) => `${BASE}/trips/${tripId}`,
+  deliveryDetail: (tripId: string, deliveryId: string) => `${BASE}/trips/${tripId}/delivery/${deliveryId}`,
+  subDelivery: (tripId: string, deliveryId: string) => `${BASE}/trips/${tripId}/delivery/${deliveryId}/sub`,
+  uploadPod: (tripId: string, deliveryId: string) => `${BASE}/trips/${tripId}/delivery/${deliveryId}/pod`,
+  tripDocuments: (tripId: string) => `${BASE}/trips/${tripId}/documents`,
+  documents: `${BASE}/documents`,
+  poi: `${BASE}/poi`,
+  fuelExpenses: `${BASE}/fuel-expenses`,
+  incidents: `${BASE}/incidents`,
+  profile: `${BASE}/profile`,
+  notifications: `${BASE}/notifications`,
+}

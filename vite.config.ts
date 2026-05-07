@@ -18,6 +18,7 @@ export default defineConfig({
       '@tenant-admin': path.resolve(rootDir, 'modules/tenant-admin-web/src'),
       '@tms-booking': path.resolve(rootDir, 'modules/tms-booking-web/src'),
       '@tms-driver-app': path.resolve(rootDir, 'modules/tms-driver-app-web/src'),
+      '@': path.resolve(rootDir, 'modules/tms-driver-app-web/src'),
       '@shared-api': path.resolve(rootDir, 'packages/shared-api/src'),
       '@shared-auth': path.resolve(rootDir, 'packages/shared-auth/src'),
       '@shared-ui': path.resolve(rootDir, 'packages/shared-ui/src'),
