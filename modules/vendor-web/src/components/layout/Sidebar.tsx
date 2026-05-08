@@ -10,9 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
-  AlertCircle,
   ShieldAlert,
-  MessageSquareWarning,
 } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
@@ -26,7 +24,6 @@ const NAV_ITEMS = [
   { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Create and track bills', icon: CreditCard },
   { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Invoices and payments', icon: Wallet },
   { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
-  { path: '/vendor/disputes', label: 'Disputes', subtitle: 'Rejected invoice disputes', icon: MessageSquareWarning },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
 

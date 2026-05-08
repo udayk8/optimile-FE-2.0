@@ -12,11 +12,13 @@ import {
   MOCK_CAPACITY,
   MOCK_NOTIFICATIONS,
   MOCK_EXCEPTIONS,
+  MOCK_DISPUTES,
 } from '@vendor/lib/mock-data'
-import { 
+import {
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
-  ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType
+  ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
+  Dispute, DisputeStatus
 } from '@vendor/types'
 
 interface AppState {
@@ -33,6 +35,13 @@ interface AppState {
   exceptions: ExceptionRecord[]
   capacity: CapacityDeclaration[]
   notifications: Notification[]
+
+  disputes: Dispute[]
+  raiseDispute: (invoiceId: string, invoiceNumber: string, invoiceAmount: number, reason: string) => void
+  updateDisputeStatus: (disputeId: string, status: DisputeStatus, notes?: string) => void
+  acceptDispute: (disputeId: string) => void
+  cancelDispute: (disputeId: string) => void
+  resubmitInvoice: (invoiceId: string, lineItems: InvoiceLineItem[]) => void
 
   // Actions
   acceptIndent: (indentId: string, vehicleId: string, driverId: string) => void
@@ -139,6 +148,7 @@ export const useAppStore = create<AppState>((set) => ({
   ],
   capacity: [...MOCK_CAPACITY],
   notifications: [...MOCK_NOTIFICATIONS],
+  disputes: [...MOCK_DISPUTES],
 
   acceptIndent: (indentId, vehicleId, driverId) =>
     set((state) => {
@@ -492,6 +502,77 @@ export const useAppStore = create<AppState>((set) => ({
   addNotification: (notification) =>
     set((state) => ({ notifications: [notification, ...state.notifications] })),
 
+  raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) =>
+    set((state) => {
+      if (state.disputes.find((d) => d.invoiceId === invoiceId)) return state
+      const num = state.disputes.length + 1
+      const newDispute: Dispute = {
+        id: `DSP-${new Date().getFullYear()}-${String(num).padStart(3, '0')}`,
+        invoiceId,
+        invoiceNumber,
+        invoiceAmount,
+        reason,
+        status: 'OPEN',
+        raisedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      return { disputes: [newDispute, ...state.disputes] }
+    }),
+
+  updateDisputeStatus: (disputeId, status, notes) =>
+    set((state) => ({
+      disputes: state.disputes.map((d) =>
+        d.id === disputeId ? { ...d, status, notes: notes ?? d.notes, updatedAt: new Date().toISOString() } : d
+      ),
+    })),
+
+  acceptDispute: (disputeId) =>
+    set((state) => {
+      const dispute = state.disputes.find((d) => d.id === disputeId)
+      if (!dispute) return state
+      return {
+        disputes: state.disputes.map((d) =>
+          d.id === disputeId ? { ...d, status: 'ACCEPTED', updatedAt: new Date().toISOString() } : d
+        ),
+        invoices: state.invoices.map((inv) =>
+          inv.id === dispute.invoiceId ? { ...inv, status: 'APPROVED' } : inv
+        ),
+      }
+    }),
+
+  cancelDispute: (disputeId) =>
+    set((state) => {
+      const dispute = state.disputes.find((d) => d.id === disputeId)
+      if (!dispute) return state
+      return {
+        disputes: state.disputes.map((d) =>
+          d.id === disputeId ? { ...d, status: 'CANCELLED', updatedAt: new Date().toISOString() } : d
+        ),
+        invoices: state.invoices.map((inv) =>
+          inv.id === dispute.invoiceId ? { ...inv, status: 'CANCELLED' } : inv
+        ),
+      }
+    }),
+
+  resubmitInvoice: (invoiceId, updatedLineItems) =>
+    set((state) => {
+      const invoice = state.invoices.find((inv) => inv.id === invoiceId)
+      if (!invoice) return state
+      const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
+      const gstRate = invoice.subtotal > 0 ? invoice.gstAmount / invoice.subtotal : 0.12
+      const gstAmount = Math.round(subtotal * gstRate)
+      return {
+        invoices: state.invoices.map((inv) =>
+          inv.id === invoiceId
+            ? { ...inv, status: 'SUBMITTED', lineItems: updatedLineItems, subtotal, gstAmount, grandTotal: subtotal + gstAmount }
+            : inv
+        ),
+        disputes: state.disputes.map((d) =>
+          d.invoiceId === invoiceId ? { ...d, status: 'CLOSED', updatedAt: new Date().toISOString() } : d
+        ),
+      }
+    }),
+
   resetStore: () =>
     set(() => ({
       indents: [...MOCK_INDENTS],
@@ -553,5 +634,6 @@ export const useAppStore = create<AppState>((set) => ({
       ],
       capacity: [...MOCK_CAPACITY],
       notifications: [...MOCK_NOTIFICATIONS],
+      disputes: [...MOCK_DISPUTES],
     }))
 }))

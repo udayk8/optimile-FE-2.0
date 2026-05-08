@@ -403,7 +403,7 @@ export interface CapacityDeclaration {
 }
 
 // ==================== INVOICE TYPES ====================
-export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID'
+export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID' | 'CANCELLED'
 
 export interface Invoice {
   id: string
@@ -432,6 +432,20 @@ export interface InvoiceLineItem {
   freightCharge: number
   expenses: { type: ExpenseType; amount: number }[]
   lineTotal: number
+}
+
+export type DisputeStatus = 'OPEN' | 'IN_REVIEW' | 'ACCEPTED' | 'CANCELLED' | 'CLOSED'
+
+export interface Dispute {
+  id: string
+  invoiceId: string
+  invoiceNumber: string
+  invoiceAmount: number
+  reason: string
+  status: DisputeStatus
+  raisedAt: string
+  updatedAt: string
+  notes?: string
 }
 
 export type LedgerEntryType = 'INVOICE_APPROVED' | 'PAYMENT_RECEIVED' | 'SLA_PENALTY' | 'OTHER_DEDUCTION' | 'TDS_DEDUCTION'

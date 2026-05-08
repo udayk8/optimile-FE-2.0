@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, FileText, Gavel, LayoutDashboard } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, FileSpreadsheet, Gavel, LayoutDashboard } from 'lucide-react'
 import { cn } from '@auction/lib/cn'
 import { useUIStore } from '@auction/stores/ui.store'
 
 const NAV_ITEMS = [
   { path: '/auction/dashboard', label: 'Dashboard', subtitle: 'Operational overview', icon: LayoutDashboard },
   { path: '/auction/sourcing', label: 'Client Hub', subtitle: 'RFI & RFQ Events', icon: FileText },
+  { path: '/auction/rfq-responses', label: 'RFQ Responses', subtitle: 'Lane pricing from vendors', icon: FileSpreadsheet },
   { path: '/auction/auctions', label: 'Auctions', subtitle: 'Create, monitor, award', icon: Gavel },
   { path: '/auction/contracts', label: 'Contracts', subtitle: 'Award outputs and status', icon: FileText },
 ]

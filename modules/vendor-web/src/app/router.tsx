@@ -21,7 +21,6 @@ import DiscountingApplicationPage from '@vendor/features/finance/pages/Discounti
 import SupportHubPage from '@vendor/features/support/pages/SupportHubPage'
 import ReportExceptionPage from '@vendor/features/support/pages/ReportExceptionPage'
 import ExceptionTimelinePage from '@vendor/features/support/pages/ExceptionTimelinePage'
-import DisputesHubPage from '@vendor/features/support/pages/DisputesHubPage'
 import DisputeThreadPage from '@vendor/features/support/pages/DisputeThreadPage'
 import CreateInvoicePage from '@vendor/features/invoices/pages/CreateInvoicePage'
 
@@ -100,7 +99,6 @@ export function VendorRoutes({ standalone = false }: { standalone?: boolean }) {
         { path: 'support/report', element: <ReportExceptionPage /> },
         { path: 'support/exception/:id', element: <ExceptionTimelinePage /> },
         { path: 'support/dispute/:id', element: <DisputeThreadPage /> },
-        { path: 'disputes', element: <DisputesHubPage /> },
         { path: 'disputes/:id', element: <DisputeThreadPage /> },
         { path: '*', element: <Navigate to="/vendor" replace /> },
       ],

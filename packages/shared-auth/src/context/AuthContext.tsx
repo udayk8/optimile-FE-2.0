@@ -8,7 +8,6 @@ import { canUserAccessModule, getPostLoginRouteForUser } from '../moduleRoutes'
 import {
   clearAuthState,
   clearDemoSession,
-  getStoredDemoSessionEmail,
   storeDemoLogin,
   storeDemoSession,
   type Portal,

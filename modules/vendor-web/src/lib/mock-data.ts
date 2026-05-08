@@ -694,11 +694,20 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-027', invoiceNumber: 'INV-2026-027', invoiceDate: '2026-04-01', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-03-15', to: '2026-03-31' },
-    paymentDueDate: '2026-05-01', status: 'REJECTED',
+    paymentDueDate: '2026-05-01', status: 'CANCELLED',
     lineItems: [
-      { tripId: 'TRP-030', tripReference: 'TRP-030', freightCharge: 30000, expenses: [], lineTotal: 30000 }
+      { tripId: 'TRP-030', tripReference: 'TRP-030', freightCharge: 30000, expenses: [{ type: 'TOLL', amount: 1800 }], lineTotal: 31800 }
     ],
-    subtotal: 30000, gstAmount: 5400, grandTotal: 35400, pdfUrl: '/invoices/INV-2026-027.pdf', tripReferences: ['TRP-030'], createdAt: '2026-04-01T09:00:00Z',
+    subtotal: 31800, gstAmount: 5724, grandTotal: 37524, pdfUrl: '/invoices/INV-2026-027.pdf', tripReferences: ['TRP-030'], createdAt: '2026-04-01T09:00:00Z',
+  },
+  {
+    id: 'INV-2026-026', invoiceNumber: 'INV-2026-026', invoiceDate: '2026-03-25', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-03-10', to: '2026-03-25' },
+    paymentDueDate: '2026-04-25', status: 'REJECTED',
+    lineItems: [
+      { tripId: 'TRP-025', tripReference: 'TRP-025', freightCharge: 38000, expenses: [{ type: 'DETENTION', amount: 2500 }], lineTotal: 40500 }
+    ],
+    subtotal: 40500, gstAmount: 7290, grandTotal: 47790, pdfUrl: '/invoices/INV-2026-026.pdf', tripReferences: ['TRP-025'], createdAt: '2026-03-25T11:00:00Z',
   }
 ]
 
@@ -728,3 +737,17 @@ export const MOCK_BANK: BankDetails = {
   accountNumber: '50100123456789', ifscCode: 'HDFC0001234', accountType: 'CURRENT',
   supportingDocumentUrl: '/docs/cancelled-cheque.pdf',
 }
+
+export const MOCK_DISPUTES: import('../types').Dispute[] = [
+  {
+    id: 'DSP-2026-001',
+    invoiceId: 'INV-2026-027',
+    invoiceNumber: 'INV-2026-027',
+    invoiceAmount: 37524,
+    reason: 'Invoice rejected without valid reason. POD was submitted within SLA window.',
+    status: 'CANCELLED',
+    raisedAt: '2026-04-03T10:00:00Z',
+    updatedAt: '2026-04-07T09:30:00Z',
+    notes: 'Dispute cancelled by admin — expense amounts need to be corrected and resubmitted.',
+  },
+]

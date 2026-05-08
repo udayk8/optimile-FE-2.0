@@ -198,3 +198,19 @@ export interface RfqType {
   createdAt: string
   createdBy: string
 }
+
+export interface RfqResponseRow {
+  lane: string
+  vehicleType: string
+  price: number
+}
+
+export interface RfqResponse {
+  id: string
+  fileName: string
+  vendorName?: string
+  rfqId?: string
+  uploadedAt: string
+  uploadedBy: string
+  rows: RfqResponseRow[]
+}

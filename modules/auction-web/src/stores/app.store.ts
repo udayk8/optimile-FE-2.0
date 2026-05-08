@@ -10,6 +10,7 @@ import type {
   VendorOption,
   RfiType,
   RfqType,
+  RfqResponse,
   VendorResponseStatus,
 } from '@auction/types'
 
@@ -51,6 +52,13 @@ interface CreateRfqInput {
   createdBy: string
 }
 
+interface CreateRfqResponseInput {
+  fileName: string
+  vendorName?: string
+  rfqId?: string
+  rows: RfqResponse['rows']
+}
+
 interface AppState {
   auctions: Auction[]
   contracts: Contract[]
@@ -58,9 +66,11 @@ interface AppState {
   vendors: VendorOption[]
   rfis: RfiType[]
   rfqs: RfqType[]
+  rfqResponses: RfqResponse[]
   createAuction: (input: CreateAuctionInput) => string
   createRfi: (input: CreateRfiInput) => string
   createRfq: (input: CreateRfqInput) => string
+  addRfqResponse: (input: CreateRfqResponseInput) => void
   updateSourcingVendorStatus: (type: 'RFI' | 'RFQ', id: string, vendorIdOrEmail: string, status: VendorResponseStatus) => void
   launchAuction: (auctionId: string, actor: string) => void
   cancelAuction: (auctionId: string, actor: string, reason: string) => void
@@ -141,6 +151,48 @@ export const useAppStore = create<AppState>((set) => ({
       createdBy: 'Procurement User',
     }
   ],
+  rfqResponses: [
+    {
+      id: 'RFQR-001',
+      fileName: 'FastLogistics_RFQ2001_Response.xlsx',
+      vendorName: 'Fast Logistics',
+      rfqId: 'RFQ-2001',
+      uploadedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      uploadedBy: 'Procurement User',
+      rows: [
+        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8500 },
+        { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: 12000 },
+        { lane: 'Pune → Nagpur', vehicleType: '32ft SXL', price: 18500 },
+      ],
+    },
+    {
+      id: 'RFQR-002',
+      fileName: 'PrimeTransport_Q3_Rates.xlsx',
+      vendorName: 'Prime Transport Co',
+      rfqId: 'RFQ-2001',
+      uploadedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+      uploadedBy: 'Procurement User',
+      rows: [
+        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8200 },
+        { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: 11800 },
+        { lane: 'Pune → Nagpur', vehicleType: '32ft SXL', price: 17500 },
+        { lane: 'Delhi → Jaipur', vehicleType: '20ft Container', price: 9000 },
+      ],
+    },
+    {
+      id: 'RFQR-003',
+      fileName: 'SunriseCarriers_Response.xlsx',
+      vendorName: 'Sunrise Carriers',
+      rfqId: 'RFQ-2001',
+      uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      uploadedBy: 'Procurement User',
+      rows: [
+        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8800 },
+        { lane: 'Delhi → Jaipur', vehicleType: '20ft Container', price: 9500 },
+        { lane: 'Chennai → Bangalore', vehicleType: '32ft SXL', price: 14200 },
+      ],
+    },
+  ],
 
   createAuction: (input) => {
     const auctionId = `AUC-${input.type}-${Math.floor(100 + Math.random() * 900)}`
@@ -211,6 +263,20 @@ export const useAppStore = create<AppState>((set) => ({
     }
     set((state) => ({ rfqs: [newRfq, ...state.rfqs] }))
     return rfqId
+  },
+
+  addRfqResponse: (input) => {
+    const responseId = `RFQR-${Math.floor(1000 + Math.random() * 9000)}`
+    const newResponse: RfqResponse = {
+      id: responseId,
+      fileName: input.fileName,
+      vendorName: input.vendorName,
+      rfqId: input.rfqId,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: 'Procurement User',
+      rows: input.rows,
+    }
+    set((state) => ({ rfqResponses: [newResponse, ...state.rfqResponses] }))
   },
 
   updateSourcingVendorStatus: (type, id, vendorIdOrEmail, status) => {
@@ -546,5 +612,6 @@ export const useAppStore = create<AppState>((set) => ({
       vendors: [...MOCK_VENDORS],
       rfis: [],
       rfqs: [],
+      rfqResponses: [],
     })),
 }))
