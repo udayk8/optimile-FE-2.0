@@ -71,10 +71,14 @@ export function Sidebar() {
               )}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-primary' : 'text-gray-400')} />
+              <div className="relative shrink-0">
+                <Icon className={cn('h-[18px] w-[18px]', isActive ? 'text-primary' : 'text-gray-400')} />
+              </div>
               {!sidebarCollapsed && (
-                <div className="min-w-0">
-                  <div className="truncate leading-tight">{item.label}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="truncate leading-tight">{item.label}</span>
+                  </div>
                   <div className={cn('mt-0.5 truncate text-[11px] leading-tight', isActive ? 'text-primary/70' : 'text-gray-500')}>
                     {item.subtitle}
                   </div>

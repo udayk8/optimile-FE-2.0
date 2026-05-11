@@ -82,7 +82,9 @@ export function MobileNav() {
                       isActive ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-gray-50 hover:text-primary'
                     )}
                   >
-                    <Icon className="h-6 w-6" />
+                    <div className="relative">
+                      <Icon className="h-6 w-6" />
+                    </div>
                     <span className="text-xs font-semibold">{item.label}</span>
                   </NavLink>
                 )

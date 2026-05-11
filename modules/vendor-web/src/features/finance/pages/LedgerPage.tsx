@@ -7,6 +7,7 @@ import { Input } from '@vendor/components/ui/input'
 
 type LedgerEntry = {
   date: string
+  invoiceId: string
   ref: string
   type: string
   description: string
@@ -15,33 +16,29 @@ type LedgerEntry = {
   balance: number
 }
 
+// Single invoice example — balance starts at ₹2,36,000 and closes to ₹0
+// INV-2606-001: base ₹2,00,000 + IGST 18% ₹36,000 = ₹2,36,000
+// TDS @2% on base = ₹4,000  |  Cash = ₹2,32,000  |  Part + Final + TDS = ₹2,36,000
 const ledgerEntries: LedgerEntry[] = [
-  { date: '2025-12-18', ref: 'INV-2412-014', type: 'Payment Received', description: 'Year-end settlement posted', credit: 86000, debit: 0, balance: 86000 },
-  { date: '2026-01-10', ref: 'INV-2601-021', type: 'Invoice Approved', description: 'January invoice approved', credit: 124000, debit: 0, balance: 210000 },
-  { date: '2026-01-22', ref: 'TDS-2026-01', type: 'TDS Deduction', description: 'January tax deduction posted', credit: 0, debit: 9800, balance: 200200 },
-  { date: '2026-02-07', ref: 'TDS-2026-02', type: 'TDS Deduction', description: 'Monthly TDS deduction posted', credit: 0, debit: 12400, balance: 197600 },
-  { date: '2026-02-11', ref: 'INV-2602-028', type: 'Invoice Approved', description: 'February freight invoice approved', credit: 94000, debit: 0, balance: 291600 },
-  { date: '2026-02-18', ref: 'PAY-2602-016', type: 'Payment Received', description: 'Partial payment received for February cycle', credit: 76000, debit: 0, balance: 367600 },
-  { date: '2026-02-24', ref: 'PEN-2602-004', type: 'Penalty Deduction', description: 'Delay penalty posted', credit: 0, debit: 6400, balance: 361200 },
-  { date: '2026-03-14', ref: 'INV-2603-033', type: 'Payment Received', description: 'March settlement received', credit: 102000, debit: 0, balance: 299600 },
-  { date: '2026-03-20', ref: 'INV-2603-041', type: 'Invoice Approved', description: 'March billing approved', credit: 118000, debit: 0, balance: 417600 },
-  { date: '2026-03-27', ref: 'TDS-2026-03', type: 'TDS Deduction', description: 'March TDS adjustment posted', credit: 0, debit: 11200, balance: 406400 },
-  { date: '2026-04-18', ref: 'ADV-0012', type: 'Advance Adjustment', description: 'Advance recovered against invoice', credit: 0, debit: 25000, balance: 1423500 },
-  { date: '2026-04-22', ref: 'INV-2403-098', type: 'Payment Received', description: 'Invoice settled', credit: 98000, debit: 0, balance: 1521500 },
-  { date: '2026-04-25', ref: 'PEN-4402', type: 'Penalty Deduction', description: 'SLA penalty adjusted', credit: 0, debit: 9500, balance: 1512000 },
-  { date: '2026-04-29', ref: 'INV-2404-107', type: 'Invoice Approved', description: 'Invoice approved', credit: 208000, debit: 0, balance: 1720000 },
-  { date: '2026-05-02', ref: 'TDS-2026-05', type: 'TDS Deduction', description: 'Quarterly tax deduction posted', credit: 0, debit: 18200, balance: 1700000 },
-  { date: '2026-05-04', ref: 'INV-2408-018', type: 'Payment Received', description: 'Invoice settled', credit: 142000, debit: 0, balance: 1840000 },
-  { date: '2026-05-08', ref: 'INV-2605-055', type: 'Invoice Approved', description: 'May load approved', credit: 166000, debit: 0, balance: 2006000 },
-  { date: '2026-05-12', ref: 'PAY-2605-019', type: 'Payment Received', description: 'Mid-month payment posted', credit: 111000, debit: 0, balance: 2117000 },
-  { date: '2026-05-19', ref: 'OTH-2605-003', type: 'Other Deduction', description: 'Operational adjustment deducted', credit: 0, debit: 4600, balance: 2112400 },
+  { date: '2026-06-01', invoiceId: 'INV-2606-001', ref: 'INV-2606-001', type: 'Invoice Raised', description: 'Freight delivery — June 2026 (base ₹2,00,000 + IGST 18% ₹36,000)', credit:      0, debit: 236000, balance: 236000 },
+  { date: '2026-06-10', invoiceId: 'INV-2606-001', ref: 'PAY-2606-001', type: 'Part Payment',   description: 'Part payment against INV-2606-001',                                  credit:  80000, debit:      0, balance: 156000 },
+  { date: '2026-06-25', invoiceId: 'INV-2606-001', ref: 'PAY-2606-002', type: 'Final Payment',  description: 'Final cash settlement for INV-2606-001',                             credit: 152000, debit:      0, balance:   4000 },
+  { date: '2026-06-25', invoiceId: 'INV-2606-001', ref: 'TDS-2606-001', type: 'TDS Deducted',   description: 'TDS u/s 194C @2% on base ₹2,00,000 — INV-2606-001',                 credit:   4000, debit:      0, balance:      0 },
 ]
 
-const monthOrder = ['2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05']
+const monthOrder = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']
+
+const historicalMonthlyData: Record<string, { invoiced: number; payments: number }> = {
+  '2026-01': { invoiced: 420000, payments: 380000 },
+  '2026-02': { invoiced: 510000, payments: 460000 },
+  '2026-03': { invoiced: 385000, payments: 350000 },
+  '2026-04': { invoiced: 620000, payments: 575000 },
+  '2026-05': { invoiced: 490000, payments: 420000 },
+}
 
 export default function LedgerPage() {
-  const [fromDate, setFromDate] = useState('2026-05-01')
-  const [toDate, setToDate] = useState('2026-05-31')
+  const [fromDate, setFromDate] = useState('2026-06-01')
+  const [toDate, setToDate] = useState('2026-06-30')
   const [page, setPage] = useState(1)
 
   const filteredEntries = useMemo(
@@ -50,44 +47,34 @@ export default function LedgerPage() {
   )
 
   const monthlyGraph = useMemo(() => {
-    const buckets = new Map<string, { month: string; invoiced: number; payments: number }>()
-
-    for (const monthKey of monthOrder) {
-      const monthLabel = new Date(`${monthKey}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      buckets.set(monthKey, { month: monthLabel, invoiced: 0, payments: 0 })
-    }
-
+    const liveByMonth: Record<string, { invoiced: number; payments: number }> = {}
     for (const entry of ledgerEntries) {
       const monthKey = entry.date.slice(0, 7)
-      const bucket = buckets.get(monthKey)
-      if (!bucket) continue
-      if (entry.credit > 0) bucket.invoiced += entry.credit
-      if (entry.type === 'Payment Received') bucket.payments += entry.credit
+      liveByMonth[monthKey] ??= { invoiced: 0, payments: 0 }
+      if (entry.type === 'Invoice Raised') liveByMonth[monthKey].invoiced += entry.debit
+      if (entry.type === 'Part Payment' || entry.type === 'Full Payment' || entry.type === 'Final Payment') liveByMonth[monthKey].payments += entry.credit
     }
 
     return monthOrder.map((monthKey) => {
-      const bucket = buckets.get(monthKey)
-      return {
-        month: bucket?.month ?? monthKey,
-        invoiced: bucket?.invoiced ?? 0,
-        payments: bucket?.payments ?? 0,
-      }
+      const monthLabel = new Date(`${monthKey}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      const data = liveByMonth[monthKey] ?? historicalMonthlyData[monthKey] ?? { invoiced: 0, payments: 0 }
+      return { month: monthLabel, invoiced: data.invoiced, payments: data.payments }
     })
   }, [])
 
   const summary = useMemo(
     () => ({
-      totalInvoiced: filteredEntries.reduce((sum, entry) => sum + entry.credit, 0),
-      totalInvoicedCount: filteredEntries.filter((entry) => entry.type === 'Invoice Approved').length,
-      pendingPayments: filteredEntries.reduce((sum, entry) => sum + (entry.type === 'Payment Received' ? 0 : entry.credit === 0 ? entry.debit : 0), 0),
-      tdsDeducted: filteredEntries.reduce((sum, entry) => sum + (entry.type === 'TDS Deduction' ? entry.debit : 0), 0),
+      totalInvoiced:      filteredEntries.reduce((sum, e) => sum + (e.type === 'Invoice Raised' ? e.debit : 0), 0),
+      totalInvoicedCount: filteredEntries.filter((e) => e.type === 'Invoice Raised').length,
+      pendingPayments:    filteredEntries.at(-1)?.balance ?? 0,
+      tdsDeducted:        filteredEntries.reduce((sum, e) => sum + (e.type === 'TDS Deducted' ? e.credit : 0), 0),
     }),
     [filteredEntries],
   )
 
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / 4))
+  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / 10))
   const safePage = Math.min(page, totalPages)
-  const pagedEntries = filteredEntries.slice((safePage - 1) * 4, safePage * 4)
+  const pagedEntries = filteredEntries.slice((safePage - 1) * 10, safePage * 10)
 
   const handleRangeChange = (setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setPage(1)
@@ -133,14 +120,14 @@ export default function LedgerPage() {
             <div className="mt-2 text-sm text-gray-500">Filtered by the selected date range.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Total Invoices Invoiced</div>
+            <div className="text-sm font-medium text-gray-500">Total Invoices Raised</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.totalInvoicedCount}</div>
-            <div className="mt-2 text-sm text-gray-500">Invoices approved in selected range.</div>
+            <div className="mt-2 text-sm text-gray-500">Invoices raised in selected range.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Pending Payments</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.pendingPayments.toLocaleString('en-IN')}</div>
-            <div className="mt-2 text-sm text-gray-500">Open invoices in the filtered period.</div>
+            <div className="mt-2 text-sm text-gray-500">Outstanding at end of filtered period.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">TDS Deducted</div>
@@ -198,6 +185,7 @@ export default function LedgerPage() {
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="p-4">Date</th>
+                <th className="p-4">Invoice ID</th>
                 <th className="p-4">Reference</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Description</th>
@@ -210,6 +198,7 @@ export default function LedgerPage() {
               {pagedEntries.map((row) => (
                 <tr key={`${row.date}-${row.ref}`} className="hover:bg-gray-50">
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.invoiceId}</td>
                   <td className="p-4 font-mono text-xs text-gray-500">{row.ref}</td>
                   <td className="p-4 font-medium text-text">{row.type}</td>
                   <td className="p-4 text-gray-600">{row.description}</td>
@@ -223,7 +212,7 @@ export default function LedgerPage() {
         </div>
         <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 text-sm text-gray-600">
           <span>
-            Showing {filteredEntries.length === 0 ? 0 : (safePage - 1) * 4 + 1}-{Math.min(safePage * 4, filteredEntries.length)} of {filteredEntries.length}
+            Showing {filteredEntries.length === 0 ? 0 : (safePage - 1) * 10 + 1}-{Math.min(safePage * 10, filteredEntries.length)} of {filteredEntries.length}
           </span>
           <div className="flex items-center gap-2">
             <button
