@@ -74,19 +74,19 @@ interface AppState {
   updateSourcingVendorStatus: (type: 'RFI' | 'RFQ', id: string, vendorIdOrEmail: string, status: VendorResponseStatus) => void
   launchAuction: (auctionId: string, actor: string) => void
   cancelAuction: (auctionId: string, actor: string, reason: string) => void
-  awardSpotAuction: (auctionId: string, actor: string, bidRank?: 'R1' | 'R2' | 'R3') => void
+  awardSpotAuction: (auctionId: string, actor: string, bidRank?: 'L1' | 'L2' | 'L3') => void
   awardLaneToAllocationRank: (
     auctionId: string,
     laneId: string,
-    allocationRank: 'R1' | 'R2' | 'R3',
-    bidRank: 'R1' | 'R2' | 'R3',
+    allocationRank: 'L1' | 'L2' | 'L3',
+    bidRank: 'L1' | 'L2' | 'L3',
     actor: string,
     reason?: string
   ) => void
   finalizeLaneAward: (
     auctionId: string,
     laneId: string,
-    selections: { allocationRank: 'R1' | 'R2' | 'R3'; bidRank: 'R1' | 'R2' | 'R3' }[],
+    selections: { allocationRank: 'L1' | 'L2' | 'L3'; bidRank: 'L1' | 'L2' | 'L3' }[],
     actor: string,
     reason?: string
   ) => void
@@ -104,9 +104,9 @@ function makeEvent(id: string, type: AuctionEvent['type'], message: string, acto
   }
 }
 
-function toRankIndex(rank: 'R1' | 'R2' | 'R3') {
-  if (rank === 'R1') return 0
-  if (rank === 'R2') return 1
+function toRankIndex(rank: 'L1' | 'L2' | 'L3') {
+  if (rank === 'L1') return 0
+  if (rank === 'L2') return 1
   return 2
 }
 
@@ -342,7 +342,7 @@ export const useAppStore = create<AppState>((set) => ({
       ),
     })),
 
-  awardSpotAuction: (auctionId, actor, bidRank = 'R1') =>
+  awardSpotAuction: (auctionId, actor, bidRank = 'L1') =>
     set((state) => ({
       auctions: state.auctions.map((auction) => {
         if (auction.id !== auctionId || auction.type !== 'SPOT') return auction
@@ -359,7 +359,7 @@ export const useAppStore = create<AppState>((set) => ({
                   {
                     vendorId: winningBid.vendorId,
                     vendorName: winningBid.vendorName,
-                    allocationRank: 'R1',
+                    allocationRank: 'L1',
                     awardedBidRank: bidRank,
                     awardedAmount: winningBid.amount,
                     allocationPercent: 100,
@@ -388,11 +388,11 @@ export const useAppStore = create<AppState>((set) => ({
 
       const defaultSlots =
         lane.allocationMode === 'SINGLE'
-          ? [{ allocationRank: 'R1' as const, allocationPercent: 100, awardedBidRank: 'R1' as const }]
+          ? [{ allocationRank: 'L1' as const, allocationPercent: 100, awardedBidRank: 'L1' as const }]
           : [
-              { allocationRank: 'R1' as const, allocationPercent: lane.allocation.r1, awardedBidRank: 'R1' as const },
-              { allocationRank: 'R2' as const, allocationPercent: lane.allocation.r2, awardedBidRank: 'R2' as const },
-              { allocationRank: 'R3' as const, allocationPercent: lane.allocation.r3, awardedBidRank: 'R3' as const },
+              { allocationRank: 'L1' as const, allocationPercent: lane.allocation.l1, awardedBidRank: 'L1' as const },
+              { allocationRank: 'L2' as const, allocationPercent: lane.allocation.l2, awardedBidRank: 'L2' as const },
+              { allocationRank: 'L3' as const, allocationPercent: lane.allocation.l3, awardedBidRank: 'L3' as const },
             ].filter((entry) => entry.allocationPercent > 0)
 
       const currentAwardDecision = lane.awardDecision ? [...lane.awardDecision] : defaultSlots
@@ -446,7 +446,7 @@ export const useAppStore = create<AppState>((set) => ({
               endDate: auction.contractEndDate ?? new Date().toISOString().slice(0, 10),
               estimatedTrips: lane.estimatedTrips ?? 0,
               status: 'ACTIVE' as const,
-              r1OverrideReason: decision.overrideReason,
+              l1OverrideReason: decision.overrideReason,
               rateSyncedToTms: true,
               placementFailures: [],
               rateDeviationOpen: false,
@@ -509,9 +509,9 @@ export const useAppStore = create<AppState>((set) => ({
             awardedBidRank: selection.bidRank,
             awardedAmount: bid.amount,
             allocationPercent:
-              selection.allocationRank === 'R1' && lane.allocationMode === 'SINGLE'
+              selection.allocationRank === 'L1' && lane.allocationMode === 'SINGLE'
                 ? 100
-                : lane.allocation[selection.allocationRank.toLowerCase() as 'r1' | 'r2' | 'r3'],
+                : lane.allocation[selection.allocationRank.toLowerCase() as 'l1' | 'l2' | 'l3'],
             overrideReason: selection.bidRank !== selection.allocationRank ? reason : undefined,
           }
         })
@@ -543,7 +543,7 @@ export const useAppStore = create<AppState>((set) => ({
               endDate: auction.contractEndDate ?? new Date().toISOString().slice(0, 10),
               estimatedTrips: lane.estimatedTrips ?? 0,
               status: 'ACTIVE' as const,
-              r1OverrideReason: decision.overrideReason,
+              l1OverrideReason: decision.overrideReason,
               rateSyncedToTms: true,
               placementFailures: [],
               rateDeviationOpen: false,

@@ -27,9 +27,9 @@ export default function AuctionDetailPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('overview')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('Configuration issue found after internal review.')
-  const [awardSelection, setAwardSelection] = useState<Record<string, { R1?: 'R1' | 'R2' | 'R3'; R2?: 'R1' | 'R2' | 'R3'; R3?: 'R1' | 'R2' | 'R3' }>>({})
+  const [awardSelection, setAwardSelection] = useState<Record<string, { L1?: 'L1' | 'L2' | 'L3'; L2?: 'L1' | 'L2' | 'L3'; L3?: 'L1' | 'L2' | 'L3' }>>({})
   const [awardModal, setAwardModal] = useState<AwardModalState | null>(null)
-  const [awardModalBidRank, setAwardModalBidRank] = useState<'R1' | 'R2' | 'R3'>('R1')
+  const [awardModalBidRank, setAwardModalBidRank] = useState<'L1' | 'L2' | 'L3'>('L1')
   const [awardModalReason, setAwardModalReason] = useState('')
 
   const linkedContracts = useMemo(
@@ -43,9 +43,9 @@ export default function AuctionDetailPage() {
 
   const actor = auctionUser?.name ?? 'Demo User'
   const spotLane = auction.lanes[0]
-  const rankOrder = { R1: 0, R2: 1, R3: 2 } as const
+  const rankOrder = { L1: 0, L2: 1, L3: 2 } as const
 
-  const getDefaultSelection = (laneId: string, rank: 'R1' | 'R2' | 'R3') => {
+  const getDefaultSelection = (laneId: string, rank: 'L1' | 'L2' | 'L3') => {
     const selected = awardSelection[laneId]?.[rank]
     if (selected) return selected
     return rank
@@ -56,9 +56,9 @@ export default function AuctionDetailPage() {
     if (!lane) return []
 
     return [
-      { rank: 'R1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.r1 },
-      { rank: 'R2' as const, allocation: lane.allocation.r2 },
-      { rank: 'R3' as const, allocation: lane.allocation.r3 },
+      { rank: 'L1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.l1 },
+      { rank: 'L2' as const, allocation: lane.allocation.l2 },
+      { rank: 'L3' as const, allocation: lane.allocation.l3 },
     ]
       .filter((entry) => entry.allocation > 0)
       .map((entry) => {
@@ -74,7 +74,7 @@ export default function AuctionDetailPage() {
       })
   }
 
-  const openAwardModal = (target: AwardModalState, defaultBidRank: 'R1' | 'R2' | 'R3') => {
+  const openAwardModal = (target: AwardModalState, defaultBidRank: 'L1' | 'L2' | 'L3') => {
     setAwardModal(target)
     setAwardModalBidRank(defaultBidRank)
     setAwardModalReason('')
@@ -85,8 +85,8 @@ export default function AuctionDetailPage() {
 
     if (awardModal.scope === 'SPOT') {
       if (!spotLane) return
-      if (awardModalBidRank !== 'R1' && !awardModalReason.trim()) {
-        toast.error('A reason is required when awarding away from R1.')
+      if (awardModalBidRank !== 'L1' && !awardModalReason.trim()) {
+        toast.error('A reason is required when awarding away from L1.')
         return
       }
       awardSpotAuction(auction.id, actor, awardModalBidRank)
@@ -175,10 +175,10 @@ export default function AuctionDetailPage() {
                 <p className="text-xs uppercase tracking-wide text-[#B45309]">Pending Award</p>
                 <p className="mt-2 text-sm text-[#78350F]">
                   {auction.type === 'SPOT'
-                    ? 'Spot: confirm the selected winning rank in the award modal. R1 is the current top bidder.'
+                    ? 'Spot: confirm the selected winning rank in the award modal. L1 is the current top bidder.'
                     : auction.type === 'BULK'
-                      ? 'Bulk: select the allocation mappings for each lane first, then click Final Award to confirm the lane.'
-                      : 'Lot: select the allocation mappings for each lane first, then click Final Award to confirm the lane.'}
+                      ? 'Bulk: single-lane auction with one winner. Click Final Award to confirm the winning vendor.'
+                      : 'Lot: select the allocation mappings (L1/L2/L3) for each lane first, then click Final Award to confirm the lane.'}
                 </p>
               </div>
             </CardContent>
@@ -260,7 +260,7 @@ export default function AuctionDetailPage() {
                 {lane.ranking.map((bid) => (
                   <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] p-4">
                     <div>
-                      <p className="text-sm font-semibold text-[#0F172A]">R{bid.rank} · {bid.vendorName}</p>
+                      <p className="text-sm font-semibold text-[#0F172A]">L{bid.rank} · {bid.vendorName}</p>
                       <p className="mt-1 text-xs text-[#64748B]">{formatDateTime(bid.timestamp)}</p>
                     </div>
                     <CurrencyDisplay amount={bid.amount} className="text-base" />
@@ -285,7 +285,7 @@ export default function AuctionDetailPage() {
                   disabled={auction.status !== 'COMPLETED' || spotLane?.ranking.length === 0}
                   onClick={() => {
                     if (!spotLane) return
-                    openAwardModal({ scope: 'SPOT', laneId: spotLane.id }, 'R1')
+                    openAwardModal({ scope: 'SPOT', laneId: spotLane.id }, 'L1')
                   }}
                 >
                   Award Spot
@@ -311,7 +311,7 @@ export default function AuctionDetailPage() {
                       {lane.ranking.map((bid) => (
                         <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] p-4">
                           <div>
-                            <p className="text-sm font-semibold text-[#0F172A]">R{bid.rank} · {bid.vendorName}</p>
+                            <p className="text-sm font-semibold text-[#0F172A]">L{bid.rank} · {bid.vendorName}</p>
                             <p className="mt-1 text-xs text-[#64748B]">{formatDateTime(bid.timestamp)}</p>
                           </div>
                           <CurrencyDisplay amount={bid.amount} className="text-base" />
@@ -321,12 +321,12 @@ export default function AuctionDetailPage() {
 
                     <div className="rounded-xl border border-[#E5E7EB] p-4">
                       <p className="text-sm font-semibold text-[#0F172A]">Award Selection</p>
-                      <p className="mt-1 text-xs text-[#64748B]">R1, R2, and R3 are the auction ranks used across auctions, awards, and contracts.</p>
+                      <p className="mt-1 text-xs text-[#64748B]">L1, L2, and L3 are the allocation ranks used across auctions, awards, and contracts.</p>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         {([
-                          { rank: 'R1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.r1 },
-                          { rank: 'R2' as const, allocation: lane.allocation.r2 },
-                          { rank: 'R3' as const, allocation: lane.allocation.r3 },
+                          { rank: 'L1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.l1 },
+                          { rank: 'L2' as const, allocation: lane.allocation.l2 },
+                          { rank: 'L3' as const, allocation: lane.allocation.l3 },
                         ]
                           .filter((entry) => entry.allocation > 0)
                           .map((entry) => (
@@ -336,7 +336,7 @@ export default function AuctionDetailPage() {
                               <select
                                 value={getDefaultSelection(lane.id, entry.rank)}
                                 onChange={(event) => {
-                                  const value = event.target.value as 'R1' | 'R2' | 'R3'
+                                  const value = event.target.value as 'L1' | 'L2' | 'L3'
                                   setAwardSelection((current) => ({
                                     ...current,
                                     [lane.id]: {
@@ -348,8 +348,8 @@ export default function AuctionDetailPage() {
                                 className="mt-3 flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                               >
                                 {lane.ranking.map((bid) => (
-                                  <option key={`${lane.id}-${entry.rank}-${bid.rank}`} value={`R${bid.rank}`}>
-                                    {`R${bid.rank}`} - {bid.vendorName}
+                                  <option key={`${lane.id}-${entry.rank}-${bid.rank}`} value={`L${bid.rank}`}>
+                                    {`L${bid.rank}`} - {bid.vendorName}
                                   </option>
                                 ))}
                               </select>
@@ -361,7 +361,7 @@ export default function AuctionDetailPage() {
                         <p className="text-xs text-[#64748B]">Pick the bidder for each allocation rank, then finalize the lane award.</p>
                         <Button
                           disabled={auction.status !== 'COMPLETED' || lane.awardDecision !== undefined || lane.ranking.length === 0}
-                          onClick={() => openAwardModal({ scope: 'LANE', laneId: lane.id }, 'R1')}
+                          onClick={() => openAwardModal({ scope: 'LANE', laneId: lane.id }, 'L1')}
                         >
                           Final Award
                         </Button>
@@ -420,10 +420,10 @@ export default function AuctionDetailPage() {
                   {awardModal.scope === 'SPOT' ? spotLane?.lane : auction.lanes.find((lane) => lane.id === awardModal.laneId)?.lane}
                 </p>
                 {awardModal.scope === 'SPOT' && spotLane && (
-                  <p className="mt-1 text-xs text-[#64748B]">Spot ranks are shown in bid order. R1 is the current top bidder.</p>
+                  <p className="mt-1 text-xs text-[#64748B]">Spot ranks are shown in bid order. L1 is the current top bidder.</p>
                 )}
                 {awardModal.scope === 'LANE' && (
-                  <p className="mt-1 text-xs text-[#64748B]">R1, R2, and R3 are the auction ranks used across auctions, awards, and contracts.</p>
+                  <p className="mt-1 text-xs text-[#64748B]">L1, L2, and L3 are the allocation ranks used across auctions, awards, and contracts.</p>
                 )}
               </div>
 
@@ -432,22 +432,22 @@ export default function AuctionDetailPage() {
                   <label className="mb-1 block text-sm font-medium text-[#334155]">Award To</label>
                   <select
                     value={awardModalBidRank}
-                    onChange={(event) => setAwardModalBidRank(event.target.value as 'R1' | 'R2' | 'R3')}
+                    onChange={(event) => setAwardModalBidRank(event.target.value as 'L1' | 'L2' | 'L3')}
                     className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                   >
                     {(spotLane?.ranking ?? []).map((bid) => (
-                      <option key={`${awardModal.laneId}-${bid.rank}`} value={`R${bid.rank}`}>
-                        {`R${bid.rank}`} - {bid.vendorName}
+                      <option key={`${awardModal.laneId}-${bid.rank}`} value={`L${bid.rank}`}>
+                        {`L${bid.rank}`} - {bid.vendorName}
                       </option>
                     ))}
                   </select>
-                  {awardModalBidRank !== 'R1' && (
+                  {awardModalBidRank !== 'L1' && (
                     <div className="mt-4">
                       <label className="mb-1 block text-sm font-medium text-[#334155]">Reason</label>
                       <Input
                         value={awardModalReason}
                         onChange={(event) => setAwardModalReason(event.target.value)}
-                        placeholder="Required when awarding away from R1"
+                        placeholder="Required when awarding away from L1"
                       />
                     </div>
                   )}

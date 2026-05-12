@@ -121,10 +121,10 @@ export default function ContractsPage() {
                 <InfoItem label="Allocation">{selectedContract.allocationRank} · {selectedContract.volumeAllocationPercent}%</InfoItem>
               </InfoGrid>
 
-              {selectedContract.r1OverrideReason && (
+              {selectedContract.l1OverrideReason && (
                 <div className="rounded-xl border border-warning/30 bg-warning/10 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-warning">Winner override reason</p>
-                  <p className="mt-2 text-sm text-warning">{selectedContract.r1OverrideReason}</p>
+                  <p className="mt-2 text-sm text-warning">{selectedContract.l1OverrideReason}</p>
                 </div>
               )}
 

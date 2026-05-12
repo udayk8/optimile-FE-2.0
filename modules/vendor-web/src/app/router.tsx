@@ -15,6 +15,7 @@ import InvoiceDetailPage from '@vendor/features/invoices/pages/InvoiceDetailPage
 import ProfilePage from '@vendor/features/profile/pages/ProfilePage'
 import NotificationsPage from '@vendor/features/notifications/pages/NotificationsPage'
 import LedgerPage from '@vendor/features/finance/pages/LedgerPage'
+import PaymentsPage from '@vendor/features/finance/pages/PaymentsPage'
 import BillDiscountingPage from '@vendor/features/finance/pages/BillDiscountingPage'
 import SelectNBFCPage from '@vendor/features/finance/pages/SelectNBFCPage'
 import DiscountingApplicationPage from '@vendor/features/finance/pages/DiscountingApplicationPage'
@@ -81,7 +82,8 @@ export function VendorRoutes({ standalone = false }: { standalone?: boolean }) {
         { path: 'invoices/list', element: <InvoicesPage /> },
         { path: 'invoices/:id', element: <InvoiceDetailPage /> },
         { path: 'ledger', element: <LedgerPage /> },
-        { path: 'ledger/payments', element: <LedgerPage /> },
+        { path: 'ledger/payments', element: <PaymentsPage /> },
+        { path: 'payments', element: <PaymentsPage /> },
         { path: 'exceptions', element: <SupportHubPage /> },
         { path: 'exceptions/:exceptionId', element: <ExceptionTimelinePage /> },
         { path: 'nbfc', element: <BillDiscountingPage /> },

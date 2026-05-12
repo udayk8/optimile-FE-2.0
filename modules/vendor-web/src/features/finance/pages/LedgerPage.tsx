@@ -4,27 +4,8 @@ import { CalendarDays, Download, FileSpreadsheet } from 'lucide-react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
-
-type LedgerEntry = {
-  date: string
-  invoiceId: string
-  ref: string
-  type: string
-  description: string
-  credit: number
-  debit: number
-  balance: number
-}
-
-// Single invoice example — balance starts at ₹2,36,000 and closes to ₹0
-// INV-2606-001: base ₹2,00,000 + IGST 18% ₹36,000 = ₹2,36,000
-// TDS @2% on base = ₹4,000  |  Cash = ₹2,32,000  |  Part + Final + TDS = ₹2,36,000
-const ledgerEntries: LedgerEntry[] = [
-  { date: '2026-06-01', invoiceId: 'INV-2606-001', ref: 'INV-2606-001', type: 'Invoice Raised', description: 'Freight delivery — June 2026 (base ₹2,00,000 + IGST 18% ₹36,000)', credit:      0, debit: 236000, balance: 236000 },
-  { date: '2026-06-10', invoiceId: 'INV-2606-001', ref: 'PAY-2606-001', type: 'Part Payment',   description: 'Part payment against INV-2606-001',                                  credit:  80000, debit:      0, balance: 156000 },
-  { date: '2026-06-25', invoiceId: 'INV-2606-001', ref: 'PAY-2606-002', type: 'Final Payment',  description: 'Final cash settlement for INV-2606-001',                             credit: 152000, debit:      0, balance:   4000 },
-  { date: '2026-06-25', invoiceId: 'INV-2606-001', ref: 'TDS-2606-001', type: 'TDS Deducted',   description: 'TDS u/s 194C @2% on base ₹2,00,000 — INV-2606-001',                 credit:   4000, debit:      0, balance:      0 },
-]
+import { useAppStore } from '@vendor/stores/app.store'
+import type { LedgerEntry } from '@vendor/types'
 
 const monthOrder = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']
 
@@ -40,19 +21,20 @@ export default function LedgerPage() {
   const [fromDate, setFromDate] = useState('2026-06-01')
   const [toDate, setToDate] = useState('2026-06-30')
   const [page, setPage] = useState(1)
+  const { ledger } = useAppStore()
 
   const filteredEntries = useMemo(
-    () => ledgerEntries.filter((entry) => entry.date >= fromDate && entry.date <= toDate),
-    [fromDate, toDate],
+    () => ledger.filter((entry) => entry.date >= fromDate && entry.date <= toDate),
+    [fromDate, toDate, ledger],
   )
 
   const monthlyGraph = useMemo(() => {
     const liveByMonth: Record<string, { invoiced: number; payments: number }> = {}
-    for (const entry of ledgerEntries) {
+    for (const entry of ledger) {
       const monthKey = entry.date.slice(0, 7)
       liveByMonth[monthKey] ??= { invoiced: 0, payments: 0 }
-      if (entry.type === 'Invoice Raised') liveByMonth[monthKey].invoiced += entry.debit
-      if (entry.type === 'Part Payment' || entry.type === 'Full Payment' || entry.type === 'Final Payment') liveByMonth[monthKey].payments += entry.credit
+      if (entry.entryType === 'INVOICE_APPROVED') liveByMonth[monthKey].invoiced += entry.credit
+      if (entry.entryType === 'PAYMENT_RECEIVED') liveByMonth[monthKey].payments += entry.credit
     }
 
     return monthOrder.map((monthKey) => {
@@ -64,10 +46,10 @@ export default function LedgerPage() {
 
   const summary = useMemo(
     () => ({
-      totalInvoiced:      filteredEntries.reduce((sum, e) => sum + (e.type === 'Invoice Raised' ? e.debit : 0), 0),
-      totalInvoicedCount: filteredEntries.filter((e) => e.type === 'Invoice Raised').length,
-      pendingPayments:    filteredEntries.at(-1)?.balance ?? 0,
-      tdsDeducted:        filteredEntries.reduce((sum, e) => sum + (e.type === 'TDS Deducted' ? e.credit : 0), 0),
+      totalInvoiced: filteredEntries.reduce((sum, e) => sum + (e.entryType === 'INVOICE_APPROVED' ? e.credit : 0), 0),
+      totalInvoicedCount: filteredEntries.filter((e) => e.entryType === 'INVOICE_APPROVED').length,
+      pendingPayments: filteredEntries.at(-1)?.runningBalance ?? 0,
+      tdsDeducted: filteredEntries.reduce((sum, e) => sum + (e.entryType === 'TDS_DEDUCTION' ? e.debit : 0), 0),
     }),
     [filteredEntries],
   )
@@ -141,7 +123,7 @@ export default function LedgerPage() {
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-text">Invoiced vs Payments</h3>
-            <p className="mt-1 text-sm text-gray-500">Last 6 months, matching the legacy vendor ledger graph.</p>
+            <p className="mt-1 text-sm text-gray-500">Last 6 months, backed by the same ledger records used by invoice payments.</p>
           </div>
           <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
             <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Invoiced</span>
@@ -196,15 +178,15 @@ export default function LedgerPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pagedEntries.map((row) => (
-                <tr key={`${row.date}-${row.ref}`} className="hover:bg-gray-50">
+                <tr key={`${row.date}-${row.id}`} className="hover:bg-gray-50">
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.invoiceId}</td>
-                  <td className="p-4 font-mono text-xs text-gray-500">{row.ref}</td>
-                  <td className="p-4 font-medium text-text">{row.type}</td>
+                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.entryType === 'INVOICE_APPROVED' || row.entryType === 'PAYMENT_RECEIVED' ? row.description.match(/INV-\d{4}-\d{3}/)?.[0] ?? '-' : '-'}</td>
+                  <td className="p-4 font-mono text-xs text-gray-500">{row.id}</td>
+                  <td className="p-4 font-medium text-text">{row.entryType.replace('_', ' ')}</td>
                   <td className="p-4 text-gray-600">{row.description}</td>
                   <td className="p-4 text-right font-medium text-emerald-600">{row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
                   <td className="p-4 text-right font-medium text-rose-600">{row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
-                  <td className="p-4 text-right font-mono">₹{row.balance.toLocaleString('en-IN')}</td>
+                  <td className="p-4 text-right font-mono">₹{row.runningBalance.toLocaleString('en-IN')}</td>
                 </tr>
               ))}
             </tbody>

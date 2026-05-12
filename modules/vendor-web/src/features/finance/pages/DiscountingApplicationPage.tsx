@@ -103,7 +103,7 @@ export default function DiscountingApplicationPage() {
     { label: 'Approved', done: ['APPROVED', 'DISBURSED'].includes(mode), detail: application?.approvedAt ?? 'Waiting for approval' },
     { label: 'Disbursed', done: mode === 'DISBURSED', detail: application?.disbursedAt ?? 'Waiting for disbursement' },
   ]
-  const primaryActionLabel = mode === 'SUBMITTED' ? 'Mark Approved' : mode === 'APPROVED' ? 'Mark Disbursed' : mode === 'DISBURSED' ? 'Disbursed' : 'Submit Application'
+  const primaryActionLabel = mode === 'SUBMITTED' ? 'Mark Approved' : mode === 'APPROVED' ? 'Mark Disbursed' : mode === 'DISBURSED' ? 'Disbursed' : 'Submit'
 
   const handleSubmitApplication = () => {
     submitNbfcApplication({
@@ -359,7 +359,7 @@ export default function DiscountingApplicationPage() {
         </Button>
         {mode === 'ELIGIBLE' && !isViewMode ? (
           <Button disabled={!agreed} onClick={handleSubmitApplication}>
-            Submit Application
+            Submit
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         ) : mode === 'SUBMITTED' || mode === 'APPROVED' ? (

@@ -115,7 +115,7 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
     extensionTriggerMinutes: '5',
     extensionDurationMinutes: '5',
     maxExtensions: '3',
-    biddingWindowMinutes: type === 'SPOT' ? '20' : String(24 * 60),
+    biddingWindowMinutes: type === 'SPOT' ? '20' : type === 'BULK' ? '60' : String(24 * 60),
     contractStartDate: defaultStartDate,
     contractEndDate: defaultEndDate,
   }
@@ -130,10 +130,10 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
     rateUnit: 'PER_TRIP',
     ceilingRate: type === 'SPOT' ? '52000' : '10000',
     estimatedTrips: type === 'SPOT' ? '1' : '300',
-    allocationMode: type === 'SPOT' ? 'SINGLE' : 'SPLIT',
-    r1: type === 'SPOT' ? '100' : '60',
-    r2: type === 'SPOT' ? '0' : '30',
-    r3: type === 'SPOT' ? '0' : '10',
+    allocationMode: type === 'LOT' ? 'SPLIT' : 'SINGLE',
+    r1: type === 'LOT' ? '60' : '100',
+    r2: type === 'LOT' ? '30' : '0',
+    r3: type === 'LOT' ? '10' : '0',
   }
 }
 
@@ -652,12 +652,12 @@ export default function AuctionCreatePage() {
   }, [effectiveType, bookings, selectedBooking.id, selectedBooking.lane])
 
   const addLane = () => {
-    if (!effectiveType || effectiveType === 'SPOT') return
+    if (!effectiveType || effectiveType === 'SPOT' || effectiveType === 'BULK') return
     setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bangalore')])
   }
 
   const handleLaneFileImport = async (file: File) => {
-    if (!effectiveType || effectiveType === 'SPOT') return
+    if (!effectiveType || effectiveType === 'SPOT' || effectiveType === 'BULK') return
 
     try {
       const workbook = new ExcelJS.Workbook()
@@ -897,7 +897,7 @@ export default function AuctionCreatePage() {
                     </div>
                   )}
 
-                  {effectiveType !== 'SPOT' && (
+                  {effectiveType === 'LOT' && (
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <div>
@@ -1081,7 +1081,7 @@ export default function AuctionCreatePage() {
                   {/* -------------------------------------------------------- */}
                   {/* Lane form cards OR imported-lanes preview table           */}
                   {/* -------------------------------------------------------- */}
-                  {laneImportMode === 'EXCEL' && lanes.length > 0 && effectiveType !== 'SPOT' ? (
+                  {laneImportMode === 'EXCEL' && lanes.length > 0 && effectiveType === 'LOT' ? (
                     <ImportedLanesPreviewTable
                       lanes={lanes}
                       importFileName={importFileName}
@@ -1175,7 +1175,7 @@ export default function AuctionCreatePage() {
                                 onChange={(event) => updateLane(index, 'ceilingRate', event.target.value)}
                               />
                             </Field>
-                            {effectiveType === 'LOT' && (
+                            {effectiveType !== 'SPOT' && (
                               <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                                   Estimated Trips
@@ -1186,7 +1186,7 @@ export default function AuctionCreatePage() {
                                 />
                               </div>
                             )}
-                            {effectiveType !== 'SPOT' && (
+                            {effectiveType === 'LOT' && (
                               <>
                                 <Field
                                   label="Rank Split"

@@ -18,7 +18,7 @@ import {
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
-  Dispute, DisputeStatus
+  Dispute, DisputeStatus, PaymentRecord, PaymentKind
 } from '@vendor/types'
 
 interface AppState {
@@ -31,6 +31,7 @@ interface AppState {
   contracts: Contract[]
   invoices: Invoice[]
   ledger: LedgerEntry[]
+  payments: PaymentRecord[]
   nbfcApplications: NBFCApplication[]
   exceptions: ExceptionRecord[]
   capacity: CapacityDeclaration[]
@@ -42,6 +43,15 @@ interface AppState {
   acceptDispute: (disputeId: string) => void
   cancelDispute: (disputeId: string) => void
   resubmitInvoice: (invoiceId: string, lineItems: InvoiceLineItem[]) => void
+  recordInvoicePayment: (payload: {
+    invoiceId: string
+    paymentKind: PaymentKind
+    paymentDate: string
+    cashAmount: number
+    tdsAmount: number
+    referenceNumber?: string
+    note?: string
+  }) => void
 
   // Actions
   acceptIndent: (indentId: string, vehicleId: string, driverId: string) => void
@@ -98,6 +108,27 @@ export const useAppStore = create<AppState>((set) => ({
   contracts: [...MOCK_CONTRACTS],
   invoices: [...MOCK_INVOICES],
   ledger: [...MOCK_LEDGER],
+  payments: MOCK_LEDGER
+    .filter((entry) => entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'TDS_DEDUCTION')
+    .map((entry, index) => {
+      const invoiceMatch = entry.description.match(/INV-\d{4}-\d{3}/)
+      const invoiceId = invoiceMatch?.[0] ?? 'INV-UNKNOWN'
+      return {
+        id: `pay-seed-${index + 1}`,
+        invoiceId,
+        invoiceNumber: invoiceId,
+        customerName: invoiceId,
+        paymentKind: entry.entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION' : entry.description.includes('Partial') ? 'PARTIAL_PAYMENT' : 'FINAL_PAYMENT',
+        paymentDate: entry.date,
+        cashAmount: entry.entryType === 'TDS_DEDUCTION' ? 0 : entry.credit,
+        tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.debit : 0,
+        referenceNumber: entry.id.toUpperCase(),
+        note: entry.description,
+        status: 'POSTED',
+        createdAt: `${entry.date}T00:00:00Z`,
+        ledgerEntryIds: [entry.id],
+      } as PaymentRecord
+    }),
   exceptions: [...MOCK_EXCEPTIONS],
   nbfcApplications: [
     {
@@ -355,6 +386,93 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 
+  recordInvoicePayment: ({ invoiceId, paymentKind, paymentDate, cashAmount, tdsAmount, referenceNumber, note }) =>
+    set((state) => {
+      const invoice = state.invoices.find((item) => item.id === invoiceId)
+      if (!invoice) return state
+
+      const invoicePaidFromRecords = state.payments
+        .filter((payment) => payment.invoiceId === invoiceId && payment.status === 'POSTED')
+        .reduce((sum, payment) => sum + payment.cashAmount + payment.tdsAmount, 0)
+      const remainingBefore = Math.max(0, invoice.grandTotal - invoicePaidFromRecords)
+      const totalPosted = Math.max(0, cashAmount) + Math.max(0, tdsAmount)
+      if (totalPosted <= 0) return state
+      if (totalPosted > remainingBefore) return state
+
+      const timestamp = new Date().toISOString()
+      const paymentId = `pay-${Math.floor(1000 + Math.random() * 9000)}`
+      const ledgerEntryIds: string[] = []
+      const nextBalanceAfterCash = remainingBefore - Math.max(0, cashAmount)
+      const nextBalanceAfterTds = nextBalanceAfterCash - Math.max(0, tdsAmount)
+
+      const nextLedger: LedgerEntry[] = []
+
+      if (cashAmount > 0) {
+        const cashEntry: LedgerEntry = {
+          id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: paymentDate,
+          entryType: 'PAYMENT_RECEIVED',
+          description: `${paymentKind === 'PARTIAL_PAYMENT' ? 'Partial payment' : 'Final payment'} for ${invoice.invoiceNumber}`,
+          credit: cashAmount,
+          debit: 0,
+          runningBalance: nextBalanceAfterCash,
+          documentUrl: referenceNumber ? `/payments/${referenceNumber}.pdf` : undefined,
+        }
+        ledgerEntryIds.push(cashEntry.id)
+        nextLedger.push(cashEntry)
+      }
+
+      if (tdsAmount > 0) {
+        const tdsEntry: LedgerEntry = {
+          id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: paymentDate,
+          entryType: 'TDS_DEDUCTION',
+          description: `TDS deduction against ${invoice.invoiceNumber}`,
+          credit: 0,
+          debit: tdsAmount,
+          runningBalance: nextBalanceAfterTds,
+          documentUrl: referenceNumber ? `/tds/${referenceNumber}.pdf` : undefined,
+        }
+        ledgerEntryIds.push(tdsEntry.id)
+        nextLedger.push(tdsEntry)
+      }
+
+      const totalAfterPayment = state.payments
+        .filter((payment) => payment.invoiceId === invoiceId && payment.status === 'POSTED')
+        .reduce((sum, payment) => sum + payment.cashAmount + payment.tdsAmount, 0) + totalPosted
+      const invoiceSettled = totalAfterPayment >= invoice.grandTotal
+
+      const paymentRecord: PaymentRecord = {
+        id: paymentId,
+        invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        customerName: (invoice as any).clientName ?? invoice.invoiceNumber,
+        paymentKind,
+        paymentDate,
+        cashAmount: Math.max(0, cashAmount),
+        tdsAmount: Math.max(0, tdsAmount),
+        referenceNumber,
+        note,
+        status: 'POSTED',
+        createdAt: timestamp,
+        ledgerEntryIds,
+      }
+
+      return {
+        payments: [paymentRecord, ...state.payments],
+        ledger: [...nextLedger, ...state.ledger],
+        invoices: state.invoices.map((item) =>
+          item.id === invoiceId
+            ? {
+                ...item,
+                status: invoiceSettled ? 'PAID' : item.status,
+                paymentDate: invoiceSettled ? paymentDate : item.paymentDate,
+              }
+            : item
+        ),
+      }
+    }),
+
   submitNbfcApplication: ({ invoiceId, invoiceNumber, customerName, partnerId, partnerName, advanceAmount, charges, netDisbursement }) =>
     set((state) => {
       const application: NBFCApplication = {
@@ -584,6 +702,27 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       invoices: [...MOCK_INVOICES],
       ledger: [...MOCK_LEDGER],
+      payments: MOCK_LEDGER
+        .filter((entry) => entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'TDS_DEDUCTION')
+        .map((entry, index) => {
+          const invoiceMatch = entry.description.match(/INV-\d{4}-\d{3}/)
+          const invoiceId = invoiceMatch?.[0] ?? 'INV-UNKNOWN'
+          return {
+            id: `pay-seed-${index + 1}`,
+            invoiceId,
+            invoiceNumber: invoiceId,
+            customerName: invoiceId,
+            paymentKind: entry.entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION' : entry.description.includes('Partial') ? 'PARTIAL_PAYMENT' : 'FINAL_PAYMENT',
+            paymentDate: entry.date,
+            cashAmount: entry.entryType === 'TDS_DEDUCTION' ? 0 : entry.credit,
+            tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.debit : 0,
+            referenceNumber: entry.id.toUpperCase(),
+            note: entry.description,
+            status: 'POSTED',
+            createdAt: `${entry.date}T00:00:00Z`,
+            ledgerEntryIds: [entry.id],
+          } as PaymentRecord
+        }),
       exceptions: [...MOCK_EXCEPTIONS],
       nbfcApplications: [
         {

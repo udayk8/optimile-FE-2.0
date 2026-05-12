@@ -461,6 +461,25 @@ export interface LedgerEntry {
   documentUrl?: string
 }
 
+export type PaymentKind = 'PARTIAL_PAYMENT' | 'FINAL_PAYMENT' | 'TDS_DEDUCTION'
+export type PaymentState = 'POSTED' | 'PENDING'
+
+export interface PaymentRecord {
+  id: string
+  invoiceId: string
+  invoiceNumber: string
+  customerName: string
+  paymentKind: PaymentKind
+  paymentDate: string
+  cashAmount: number
+  tdsAmount: number
+  referenceNumber?: string
+  note?: string
+  status: PaymentState
+  createdAt: string
+  ledgerEntryIds: string[]
+}
+
 export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED'
 
 export interface NBFCApplication {

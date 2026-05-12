@@ -60,9 +60,9 @@ export interface AuctionLane {
   basePriceSource: 'MANUAL'
   allocationMode: 'SINGLE' | 'SPLIT'
   allocation: {
-    r1: number
-    r2: number
-    r3: number
+    l1: number
+    l2: number
+    l3: number
   }
   eligibleVendorIds: string[]
   timerEndsAt: string
@@ -72,8 +72,8 @@ export interface AuctionLane {
   awardDecision?: {
     vendorId: string
     vendorName: string
-    allocationRank: 'R1' | 'R2' | 'R3'
-    awardedBidRank: 'R1' | 'R2' | 'R3'
+    allocationRank: 'L1' | 'L2' | 'L3'
+    awardedBidRank: 'L1' | 'L2' | 'L3'
     awardedAmount: number
     overrideReason?: string
     allocationPercent: number
@@ -132,12 +132,12 @@ export interface Contract {
   contractedRate: number
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
-  allocationRank: 'R1' | 'R2' | 'R3'
+  allocationRank: 'L1' | 'L2' | 'L3'
   startDate: string
   endDate: string
   estimatedTrips: number
   status: ContractStatus
-  r1OverrideReason?: string
+  l1OverrideReason?: string
   rateSyncedToTms: boolean
   placementFailures: PlacementFailure[]
   rateDeviationOpen: boolean
