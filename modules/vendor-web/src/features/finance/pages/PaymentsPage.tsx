@@ -6,115 +6,84 @@ import { Input } from '@shared-ui/input'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import type { Invoice, PaymentKind, PaymentRecord } from '@vendor/types'
+import type { Invoice, PaymentRecord } from '@vendor/types'
 
 const PAGE_SIZE = 8
-
-const PAYMENT_KIND_LABEL: Record<PaymentKind, string> = {
-  PARTIAL_PAYMENT: 'Partial payment',
-  FINAL_PAYMENT: 'Final payment',
-  TDS_DEDUCTION: 'TDS deduction',
-}
 
 function getInvoicePendingAmount(invoice: Invoice | undefined, payments: PaymentRecord[]) {
   if (!invoice) return 0
   const paid = payments
-    .filter((payment) => payment.invoiceId === invoice.id && payment.status === 'POSTED')
-    .reduce((sum, payment) => sum + payment.cashAmount + payment.tdsAmount, 0)
+    .filter((p) => p.invoiceId === invoice.id && p.status === 'POSTED')
+    .reduce((sum, p) => sum + p.cashAmount + p.tdsAmount, 0)
   return Math.max(0, invoice.grandTotal - paid)
 }
 
 export default function PaymentsPage() {
   const { invoices, payments, recordInvoicePayment } = useAppStore()
   const [page, setPage] = useState(1)
-  const [recordModalOpen, setRecordModalOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
-  const [form, setForm] = useState({
-    paymentDate: new Date().toISOString().slice(0, 10),
-    amount: '',
-    paymentKind: 'PARTIAL_PAYMENT' as PaymentKind,
-    referenceNumber: '',
-    note: '',
-  })
-  const [formError, setFormError] = useState('')
+  const [amount, setAmount] = useState('')
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
+  const [reference, setReference] = useState('')
+  const [error, setError] = useState('')
 
-  const invoiceById = useMemo(() => new Map(invoices.map((invoice) => [invoice.id, invoice])), [invoices])
+  const invoiceById = useMemo(() => new Map(invoices.map((inv) => [inv.id, inv])), [invoices])
 
-  const rows = useMemo(() => {
-    return payments
-      .map((payment) => {
-        const invoice = invoiceById.get(payment.invoiceId)
-        return {
-          payment,
-          invoice,
-          pendingAmount: getInvoicePendingAmount(invoice, payments),
-        }
-      })
-      .sort((left, right) => right.payment.paymentDate.localeCompare(left.payment.paymentDate))
-  }, [payments, invoiceById])
+  const rows = useMemo(() =>
+    payments
+      .map((p) => ({ payment: p, invoice: invoiceById.get(p.invoiceId) }))
+      .sort((a, b) => b.payment.paymentDate.localeCompare(a.payment.paymentDate)),
+    [payments, invoiceById]
+  )
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pagedRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const selectedInvoice = invoiceById.get(selectedInvoiceId)
-  const selectedPendingAmount = getInvoicePendingAmount(selectedInvoice, payments)
-  const enteredAmount = Number(form.amount) || 0
+  const pendingAmount = getInvoicePendingAmount(selectedInvoice, payments)
+  const enteredAmount = Number(amount) || 0
 
-  const openRecordModal = (invoiceId?: string) => {
-    setSelectedInvoiceId(invoiceId ?? '')
-    setForm({
-      paymentDate: new Date().toISOString().slice(0, 10),
-      amount: '',
-      paymentKind: 'PARTIAL_PAYMENT',
-      referenceNumber: '',
-      note: '',
-    })
-    setFormError('')
-    setRecordModalOpen(true)
+  const openModal = () => {
+    setSelectedInvoiceId('')
+    setAmount('')
+    setPaymentDate(new Date().toISOString().slice(0, 10))
+    setReference('')
+    setError('')
+    setOpen(true)
   }
 
   const handleSubmit = () => {
-    if (!selectedInvoiceId) {
-      setFormError('Select an invoice.')
-      return
-    }
-    if (enteredAmount <= 0) {
-      setFormError('Enter an amount.')
-      return
-    }
-    if (enteredAmount > selectedPendingAmount) {
-      setFormError('Amount exceeds pending invoice balance.')
-      return
-    }
+    if (!selectedInvoiceId) { setError('Select an invoice.'); return }
+    if (enteredAmount <= 0) { setError('Enter a valid amount.'); return }
+    if (enteredAmount > pendingAmount) { setError('Amount exceeds pending balance.'); return }
 
     recordInvoicePayment({
       invoiceId: selectedInvoiceId,
-      paymentKind: form.paymentKind,
-      paymentDate: form.paymentDate,
-      cashAmount: form.paymentKind === 'TDS_DEDUCTION' ? 0 : enteredAmount,
-      tdsAmount: form.paymentKind === 'TDS_DEDUCTION' ? enteredAmount : 0,
-      referenceNumber: form.referenceNumber.trim() || undefined,
-      note: form.note.trim() || undefined,
+      paymentKind: 'PARTIAL_PAYMENT',
+      paymentDate,
+      cashAmount: enteredAmount,
+      tdsAmount: 0,
+      referenceNumber: reference.trim() || undefined,
     })
-
-    setRecordModalOpen(false)
+    setOpen(false)
   }
 
   const columns: DataTableColumn<(typeof pagedRows)[number]>[] = [
     {
-      key: 'paymentId',
+      key: 'id',
       header: 'Payment ID',
       render: (row) => (
         <div>
           <div className="font-mono text-sm font-semibold text-text">{row.payment.id}</div>
-          <div className="text-xs text-gray-500">{row.payment.referenceNumber ?? 'No reference'}</div>
+          <div className="text-xs text-gray-500">{row.payment.referenceNumber ?? '—'}</div>
         </div>
       ),
     },
     {
-      key: 'invoiceId',
-      header: 'Invoice ID',
+      key: 'invoice',
+      header: 'Invoice',
       render: (row) => <span className="font-mono text-sm text-gray-700">{row.payment.invoiceId}</span>,
     },
     {
@@ -123,21 +92,10 @@ export default function PaymentsPage() {
       render: (row) => new Date(row.payment.paymentDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
     },
     {
-      key: 'type',
-      header: 'Type',
-      render: (row) => PAYMENT_KIND_LABEL[row.payment.paymentKind],
-    },
-    {
       key: 'amount',
       header: 'Amount',
       align: 'right',
-      render: (row) => `₹${row.payment.paymentKind === 'TDS_DEDUCTION' ? row.payment.tdsAmount.toLocaleString('en-IN') : row.payment.cashAmount.toLocaleString('en-IN')}`,
-    },
-    {
-      key: 'pending',
-      header: 'Pending After',
-      align: 'right',
-      render: (row) => `₹${row.pendingAmount.toLocaleString('en-IN')}`,
+      render: (row) => `₹${row.payment.cashAmount.toLocaleString('en-IN')}`,
     },
   ]
 
@@ -146,17 +104,15 @@ export default function PaymentsPage() {
       <PageHero
         eyebrow="FINANCE"
         title="Payments"
-        subtitle="Record payments received outside the system. Each entry is linked to an invoice and reduces the pending amount immediately."
+        subtitle="Record payments received against invoices."
         icon={<Banknote className="h-6 w-6 text-primary" />}
-        action={<Button variant="outline" onClick={() => openRecordModal()}><Plus className="h-4 w-4" />Record Payment</Button>}
+        action={<Button variant="outline" onClick={openModal}><Plus className="h-4 w-4" />Record Payment</Button>}
       />
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <div>
-            <h3 className="text-lg font-semibold text-text">Recorded payments</h3>
-            <p className="mt-1 text-sm text-gray-500">Simple log of payment entries.</p>
-          </div>
+        <div className="border-b border-gray-100 px-6 py-4">
+          <h3 className="text-lg font-semibold text-text">Payment history</h3>
+          <p className="mt-1 text-sm text-gray-500">{rows.length} payment{rows.length !== 1 ? 's' : ''} recorded</p>
         </div>
 
         <DataTable
@@ -170,102 +126,70 @@ export default function PaymentsPage() {
         />
       </div>
 
-      <Dialog open={recordModalOpen} onOpenChange={setRecordModalOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>
-              Enter the amount received outside the system and link it to an invoice id.
-            </DialogDescription>
+            <DialogDescription>Link a payment to an invoice. The balance is reduced immediately.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <label className="block text-sm font-medium text-text">
-              Invoice ID
+              Invoice
               <select
                 value={selectedInvoiceId}
-                onChange={(event) => {
-                  setFormError('')
-                  setSelectedInvoiceId(event.target.value)
-                }}
+                onChange={(e) => { setError(''); setSelectedInvoiceId(e.target.value) }}
                 className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
               >
                 <option value="">Select invoice</option>
                 {invoices
-                  .filter((invoice) => invoice.status !== 'CANCELLED')
-                  .map((invoice) => (
-                    <option key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceNumber}
-                    </option>
+                  .filter((inv) => inv.status !== 'CANCELLED')
+                  .map((inv) => (
+                    <option key={inv.id} value={inv.id}>{inv.invoiceNumber}</option>
                   ))}
               </select>
             </label>
 
             {selectedInvoice && (
-              <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
-                <div className="flex items-center justify-between">
-                  <span>Pending amount</span>
-                  <span className="font-semibold text-text">₹{selectedPendingAmount.toLocaleString('en-IN')}</span>
-                </div>
-                <div className="mt-1 text-xs text-gray-500">Linked invoice: {selectedInvoice.invoiceNumber}</div>
+              <div className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2.5 text-sm">
+                <span className="text-gray-500">Pending</span>
+                <span className="font-semibold text-text">₹{pendingAmount.toLocaleString('en-IN')}</span>
               </div>
             )}
 
             <label className="block text-sm font-medium text-text">
-              Payment Type
-              <select
-                value={form.paymentKind}
-                onChange={(event) => setForm((current) => ({ ...current, paymentKind: event.target.value as PaymentKind }))}
-                className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
-              >
-                <option value="PARTIAL_PAYMENT">Partial payment</option>
-                <option value="FINAL_PAYMENT">Final payment</option>
-                <option value="TDS_DEDUCTION">TDS deduction</option>
-              </select>
-            </label>
-
-            <label className="block text-sm font-medium text-text">
-              Amount
-              <Input type="number" min="0" value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} className="mt-1" />
+              Amount (₹)
+              <Input
+                type="number"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="mt-1"
+                placeholder="Enter amount"
+              />
             </label>
 
             <label className="block text-sm font-medium text-text">
               Payment Date
-              <Input type="date" value={form.paymentDate} onChange={(event) => setForm((current) => ({ ...current, paymentDate: event.target.value }))} className="mt-1" />
+              <Input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} className="mt-1" />
             </label>
 
             <label className="block text-sm font-medium text-text">
-              Reference
-              <Input value={form.referenceNumber} onChange={(event) => setForm((current) => ({ ...current, referenceNumber: event.target.value }))} className="mt-1" placeholder="UTR / voucher / cheque no." />
-            </label>
-
-            <label className="block text-sm font-medium text-text">
-              Note
-              <textarea
-                value={form.note}
-                onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
-                className="mt-1 min-h-[88px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                placeholder="Optional note"
+              Reference <span className="font-normal text-gray-400">(UTR / voucher no.)</span>
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                className="mt-1"
+                placeholder="Optional"
               />
             </label>
 
-            <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
-              <div className="flex items-center justify-between">
-                <span>Amount entered</span>
-                <span className="font-semibold text-text">₹{enteredAmount.toLocaleString('en-IN')}</span>
-              </div>
-            </div>
-
-            {formError && <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{formError}</div>}
+            {error && <p className="rounded-lg bg-rose-50 px-4 py-2.5 text-sm text-rose-700">{error}</p>}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRecordModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit}>
-              Save Payment
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

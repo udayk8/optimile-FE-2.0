@@ -127,11 +127,14 @@ export default function SourcingPage() {
               className="w-full lg:w-[320px]"
             />
           </div>
-          <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+          <div className="flex w-fit gap-1 overflow-x-auto border-b border-gray-200">
             <Button
               type="button"
-              variant={activeTab === 'RFI' ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
+                activeTab === 'RFI' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
+              }`}
               onClick={() => {
                 setSearchParams({ tab: 'RFI' })
                 setPage(1)
@@ -142,8 +145,11 @@ export default function SourcingPage() {
             </Button>
             <Button
               type="button"
-              variant={activeTab === 'RFQ' ? 'default' : 'outline'}
+              variant="ghost"
               size="sm"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
+                activeTab === 'RFQ' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
+              }`}
               onClick={() => {
                 setSearchParams({ tab: 'RFQ' })
                 setPage(1)

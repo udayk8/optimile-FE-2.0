@@ -19,6 +19,7 @@ type DraftLane = {
   lane: string
   vehicleType: string
   capacityMt: string
+  commodity: string
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   ceilingRate: string
   estimatedTrips: string
@@ -55,6 +56,17 @@ const VEHICLE_CAPACITY: Record<(typeof VEHICLE_TYPE_OPTIONS)[number], string> = 
   '20 FT Container': '20',
   LCV: '8',
 }
+
+const COMMODITY_OPTIONS = [
+  'FMCG',
+  'Electronics',
+  'Automotive',
+  'Textiles',
+  'Chemicals',
+  'Industrial',
+  'Pharma',
+  'Agriculture',
+] as const
 
 const LANE_OPTIONS = [
   'Mumbai → Delhi',
@@ -93,6 +105,7 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
     lane,
     vehicleType: '20 MT Open Body',
     capacityMt: '20',
+    commodity: 'FMCG',
     rateUnit: 'PER_TRIP',
     ceilingRate: type === 'SPOT' ? '52000' : '10000',
     estimatedTrips: type === 'SPOT' ? '1' : '300',
@@ -551,6 +564,20 @@ export default function AuctionCreatePage() {
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Capacity (MT)</label>
                               <Input value={lane.capacityMt} onChange={(event) => updateLane(index, 'capacityMt', event.target.value)} />
                             </div>
+                            {effectiveType === 'BULK' && (
+                              <div>
+                                <label className="mb-1 block text-sm font-medium text-[#334155]">Commodity Type</label>
+                                <select
+                                  value={lane.commodity}
+                                  onChange={(event) => updateLane(index, 'commodity', event.target.value)}
+                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                >
+                                  {COMMODITY_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                             {effectiveType === 'LOT' && (
                               <div>
                                 <label className="mb-1 block text-sm font-medium text-[#334155]">Region</label>
