@@ -13,6 +13,7 @@ import RfiDetailPage from '@auction/features/sourcing/pages/RfiDetailPage'
 import RfqCreatePage from '@auction/features/sourcing/pages/RfqCreatePage'
 import RfqDetailPage from '@auction/features/sourcing/pages/RfqDetailPage'
 import RfqResponsesPage from '@auction/features/sourcing/pages/RfqResponsesPage'
+import NotificationsPage from '@auction/features/notifications/pages/NotificationsPage'
 
 export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) {
   const protectedChildren = [
@@ -30,6 +31,7 @@ export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) 
     { path: 'sourcing/rfq/new', element: <RfqCreatePage /> },
     { path: 'sourcing/rfq/:id', element: <RfqDetailPage /> },
     { path: 'rfq-responses', element: <RfqResponsesPage /> },
+    { path: 'notifications', element: <NotificationsPage /> },
     { path: '*', element: <Navigate to="dashboard" replace /> },
   ]
 

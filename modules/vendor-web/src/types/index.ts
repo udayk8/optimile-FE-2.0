@@ -423,7 +423,7 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
-  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED'
+  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'DISBURSED' | 'CANCELLED'
 }
 
 export interface InvoiceLineItem {
@@ -480,7 +480,7 @@ export interface PaymentRecord {
   ledgerEntryIds: string[]
 }
 
-export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED'
+export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'DISBURSED' | 'CANCELLED'
 
 export interface NBFCApplication {
   id: string

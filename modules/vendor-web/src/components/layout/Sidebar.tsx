@@ -13,11 +13,9 @@ import {
   Banknote,
   ReceiptText,
   ShieldAlert,
-  Bell,
 } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
-import { useAppStore } from '@vendor/stores/app.store'
 
 const NAV_ITEMS = [
   { path: '/vendor', label: 'Home', subtitle: 'Executive overview', icon: Home },
@@ -30,14 +28,12 @@ const NAV_ITEMS = [
   { path: '/vendor/ledger/payments', label: 'Payments', subtitle: 'Record invoice settlements', icon: ReceiptText },
   { path: '/vendor/nbfc', label: 'Bill Discounting', subtitle: 'Finance and partner applications', icon: Banknote },
   { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
-  { path: '/vendor/notifications', label: 'Notifications', subtitle: 'Alerts and activity', icon: Bell },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
 
 export function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
   const location = useLocation()
-  const unreadCount = useAppStore((state) => state.notifications.filter((n) => !n.isRead).length)
 
   return (
     <aside
@@ -66,7 +62,6 @@ export function Sidebar() {
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname.startsWith(item.path)
-          const isNotifications = item.path === '/vendor/notifications'
 
           return (
             <NavLink
@@ -82,21 +77,11 @@ export function Sidebar() {
             >
               <div className="relative shrink-0">
                 <Icon className={cn('h-[18px] w-[18px]', isActive ? 'text-primary' : 'text-gray-400')} />
-                {isNotifications && unreadCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </div>
               {!sidebarCollapsed && (
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1">
                     <span className="truncate leading-tight">{item.label}</span>
-                    {isNotifications && unreadCount > 0 && (
-                      <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
-                        {unreadCount}
-                      </span>
-                    )}
                   </div>
                   <div className={cn('mt-0.5 truncate text-[11px] leading-tight', isActive ? 'text-primary/70' : 'text-gray-500')}>
                     {item.subtitle}

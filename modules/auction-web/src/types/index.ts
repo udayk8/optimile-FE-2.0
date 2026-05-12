@@ -81,6 +81,18 @@ export interface AuctionLane {
   rejectionReason?: string
 }
 
+export type AuctionNotificationCategory = 'AUCTIONS' | 'AWARDS' | 'CONTRACTS' | 'SOURCING' | 'SYSTEM'
+
+export interface AuctionNotification {
+  id: string
+  type: AuctionNotificationCategory
+  title: string
+  message: string
+  isRead: boolean
+  deepLink: string
+  createdAt: string
+}
+
 export type AuctionType = 'SPOT' | 'BULK' | 'LOT'
 export type AuctionStatus = 'DRAFT' | 'LIVE' | 'COMPLETED' | 'AWARDED' | 'NO_BIDS' | 'CANCELLED'
 

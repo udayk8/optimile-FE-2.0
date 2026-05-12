@@ -4,6 +4,7 @@ import type {
   Auction,
   AuctionEvent,
   AuctionLane,
+  AuctionNotification,
   AuctionType,
   BookingReference,
   Contract,
@@ -13,6 +14,17 @@ import type {
   RfqResponse,
   VendorResponseStatus,
 } from '@auction/types'
+
+const MOCK_NOTIFICATIONS: AuctionNotification[] = [
+  { id: 'an-1', type: 'AWARDS', title: 'Award deadline approaching', message: 'Auction AUC-2026-001 award window closes in 2 hours.', isRead: false, deepLink: '/auction/auctions', createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString() },
+  { id: 'an-2', type: 'AUCTIONS', title: 'Auction completed', message: 'Lot | North India Regional Procurement has ended with 3 valid bids.', isRead: false, deepLink: '/auction/auctions', createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-3', type: 'CONTRACTS', title: 'Contract expiring soon', message: 'Contract CTR-2026-003 with FastLogistics expires in 14 days.', isRead: false, deepLink: '/auction/contracts', createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-4', type: 'SOURCING', title: 'New RFQ response uploaded', message: 'PrimeTransport submitted a response to RFQ-2026-005.', isRead: true, deepLink: '/auction/rfq-responses', createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-5', type: 'AUCTIONS', title: 'Auction launched', message: 'Bulk | South Corridor Contract Rates is now live.', isRead: true, deepLink: '/auction/auctions', createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-6', type: 'AWARDS', title: 'Lane awarded', message: 'Mumbai → Delhi lane awarded to SunriseCarriers at ₹9,400/trip.', isRead: true, deepLink: '/auction/auctions', createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-7', type: 'CONTRACTS', title: 'Contract created', message: 'New contract CTR-2026-008 created from Lot auction.', isRead: true, deepLink: '/auction/contracts', createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString() },
+  { id: 'an-8', type: 'SYSTEM', title: 'Demo data reset', message: 'Store has been reset to default mock state.', isRead: true, deepLink: '/auction/dashboard', createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() },
+]
 
 interface CreateAuctionInput {
   type: AuctionType
@@ -67,6 +79,9 @@ interface AppState {
   rfis: RfiType[]
   rfqs: RfqType[]
   rfqResponses: RfqResponse[]
+  notifications: AuctionNotification[]
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
   createAuction: (input: CreateAuctionInput) => string
   createRfi: (input: CreateRfiInput) => string
   createRfq: (input: CreateRfqInput) => string
@@ -193,6 +208,17 @@ export const useAppStore = create<AppState>((set) => ({
       ],
     },
   ],
+  notifications: [...MOCK_NOTIFICATIONS],
+
+  markNotificationRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => n.id === id ? { ...n, isRead: true } : n),
+    })),
+
+  markAllNotificationsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({ ...n, isRead: true })),
+    })),
 
   createAuction: (input) => {
     const auctionId = `AUC-${input.type}-${Math.floor(100 + Math.random() * 900)}`
@@ -613,5 +639,6 @@ export const useAppStore = create<AppState>((set) => ({
       rfis: [],
       rfqs: [],
       rfqResponses: [],
+      notifications: [...MOCK_NOTIFICATIONS],
     })),
 }))

@@ -508,7 +508,6 @@ export const useAppStore = create<AppState>((set) => ({
           ? {
               ...application,
               status,
-              approvedAt: status === 'APPROVED' && !application.approvedAt ? new Date().toISOString() : application.approvedAt,
               disbursedAt: status === 'DISBURSED' ? new Date().toISOString() : application.disbursedAt,
             }
           : application
@@ -520,7 +519,7 @@ export const useAppStore = create<AppState>((set) => ({
           invoice.id === invoiceId
             ? {
                 ...invoice,
-                nbfcDiscountingStatus: status === 'SUBMITTED' ? 'SUBMITTED' : status === 'APPROVED' ? 'APPROVED' : 'DISBURSED',
+                nbfcDiscountingStatus: status === 'SUBMITTED' ? 'SUBMITTED' : status === 'DISBURSED' ? 'DISBURSED' : 'CANCELLED',
               }
             : invoice
         ),

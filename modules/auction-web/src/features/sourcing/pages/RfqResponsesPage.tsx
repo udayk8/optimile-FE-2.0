@@ -19,17 +19,15 @@ type FlatRow = {
   price: number
   avgPrice: number
   vendorName: string
-  rfqId: string
   uploadedAt: string
 }
 
 export default function RfqResponsesPage() {
-  const { rfqResponses, rfqs, addRfqResponse } = useAppStore()
+  const { rfqResponses, addRfqResponse } = useAppStore()
 
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
   const [vendorName, setVendorName] = useState('')
-  const [selectedRfqId, setSelectedRfqId] = useState('')
   const [uploading, setUploading] = useState(false)
 
   const [search, setSearch] = useState('')
@@ -48,7 +46,6 @@ export default function RfqResponsesPage() {
           price: row.price,
           avgPrice: 0,
           vendorName: response.vendorName || '—',
-          rfqId: response.rfqId || '—',
           uploadedAt: response.uploadedAt,
         })
       })
@@ -112,11 +109,6 @@ export default function RfqResponsesPage() {
         render: (row) => <span className="text-sm text-[#0F172A]">{row.vendorName}</span>,
       },
       {
-        key: 'rfqId',
-        header: 'RFQ',
-        render: (row) => <span className="text-sm text-[#64748B]">{row.rfqId}</span>,
-      },
-      {
         key: 'uploadedAt',
         header: 'Uploaded',
         render: (row) => <span className="text-sm text-[#64748B]">{formatDate(row.uploadedAt)}</span>,
@@ -143,7 +135,6 @@ export default function RfqResponsesPage() {
       addRfqResponse({
         fileName,
         vendorName: vendorName.trim() || undefined,
-        rfqId: selectedRfqId || undefined,
         rows: [
           { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: Math.round(8000 + Math.random() * 2000) },
           { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: Math.round(11000 + Math.random() * 2000) },
@@ -152,7 +143,6 @@ export default function RfqResponsesPage() {
       })
       setFileName('')
       setVendorName('')
-      setSelectedRfqId('')
       if (fileRef.current) fileRef.current.value = ''
       setUploading(false)
       setPage(1)
@@ -205,22 +195,6 @@ export default function RfqResponsesPage() {
                 onChange={(e) => setVendorName(e.target.value)}
                 placeholder="e.g. Fast Logistics"
               />
-            </div>
-
-            <div className="space-y-1.5 lg:w-56">
-              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">RFQ Reference (optional)</label>
-              <select
-                value={selectedRfqId}
-                onChange={(e) => setSelectedRfqId(e.target.value)}
-                className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none focus:border-primary"
-              >
-                <option value="">— None —</option>
-                {rfqs.map((rfq) => (
-                  <option key={rfq.id} value={rfq.id}>
-                    {rfq.id} – {rfq.title}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <Button disabled={!fileName || uploading} onClick={handleUpload} className="shrink-0">

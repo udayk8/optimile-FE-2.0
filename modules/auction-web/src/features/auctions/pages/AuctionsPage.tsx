@@ -13,6 +13,17 @@ import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 const AUCTION_TABS = ['ALL', 'DRAFT', 'UPCOMING', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
 const PAGE_SIZE = 6
 
+const TAB_LABELS: Record<(typeof AUCTION_TABS)[number], string> = {
+  ALL: 'All',
+  DRAFT: 'Draft',
+  UPCOMING: 'Upcoming',
+  LIVE: 'Live',
+  COMPLETED: 'Completed',
+  AWARDED: 'Awarded',
+  NO_BIDS: 'No Bids',
+  CANCELLED: 'Cancelled',
+}
+
 function normalizeTab(tab: string | null) {
   const normalizedTab = tab?.toUpperCase() ?? null
   return AUCTION_TABS.includes(normalizedTab as (typeof AUCTION_TABS)[number]) ? (normalizedTab as (typeof AUCTION_TABS)[number]) : 'ALL'
@@ -100,20 +111,22 @@ export default function AuctionsPage() {
               className="w-full lg:w-[320px]"
             />
           </div>
-          <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+          <div className="flex w-fit gap-1 overflow-x-auto border-b border-gray-200">
             {AUCTION_TABS.map((tab) => (
               <Button
                 key={tab}
                 type="button"
-                variant={activeTab === tab ? 'default' : 'outline'}
+                variant="ghost"
                 size="sm"
-                className="shrink-0 whitespace-nowrap"
+                className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
+                  activeTab === tab ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
+                }`}
                 onClick={() => {
                   setSearchParams({ tab })
                   setPage(1)
                 }}
               >
-                {tab === 'ALL' ? 'All' : tab === 'COMPLETED' ? 'PENDING_AWARD' : tab.replace('_', ' ')}
+                {TAB_LABELS[tab]}
               </Button>
             ))}
           </div>

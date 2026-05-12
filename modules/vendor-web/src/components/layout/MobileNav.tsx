@@ -1,8 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Truck, Ship, MoreHorizontal, Search, FileText, User, X, Wallet, ShieldAlert, Banknote, ReceiptText, Bell } from 'lucide-react'
+import { Home, Truck, Ship, MoreHorizontal, Search, FileText, User, X, Wallet, ShieldAlert, Banknote, ReceiptText } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
-import { useAppStore } from '@vendor/stores/app.store'
 
 const BOTTOM_NAV = [
   { path: '/vendor', label: 'Home', icon: Home },
@@ -18,14 +17,12 @@ const MORE_NAV = [
   { path: '/vendor/ledger/payments', label: 'Payments', icon: ReceiptText },
   { path: '/vendor/nbfc', label: 'Bill Discounting', icon: Banknote },
   { path: '/vendor/exceptions', label: 'Exceptions', icon: ShieldAlert },
-  { path: '/vendor/notifications', label: 'Alerts', icon: Bell },
   { path: '/vendor/profile', label: 'Profile', icon: User },
 ]
 
 export function MobileNav() {
   const { mobileNavOpen, setMobileNavOpen } = useUIStore()
   const location = useLocation()
-  const unreadCount = useAppStore((state) => state.notifications.filter((n) => !n.isRead).length)
 
   const isMoreActive = MORE_NAV.some((item) => location.pathname.startsWith(item.path))
 
@@ -53,18 +50,11 @@ export function MobileNav() {
         <button
           onClick={() => setMobileNavOpen(true)}
           className={cn(
-            'relative flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-lg text-xs transition-colors',
+            'flex flex-col items-center justify-center gap-0.5 py-1 px-3 rounded-lg text-xs transition-colors',
             isMoreActive ? 'bg-primary/10 font-semibold text-primary' : 'text-gray-500'
           )}
         >
-          <div className="relative">
-            <MoreHorizontal className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </div>
+          <MoreHorizontal className="h-5 w-5" />
           <span>More</span>
         </button>
       </nav>
@@ -84,7 +74,6 @@ export function MobileNav() {
               {MORE_NAV.map((item) => {
                 const Icon = item.icon
                 const isActive = location.pathname.startsWith(item.path)
-                const isNotifications = item.path === '/vendor/notifications'
                 return (
                   <NavLink
                     key={item.path}
@@ -97,11 +86,6 @@ export function MobileNav() {
                   >
                     <div className="relative">
                       <Icon className="h-6 w-6" />
-                      {isNotifications && unreadCount > 0 && (
-                        <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
                     </div>
                     <span className="text-xs font-semibold">{item.label}</span>
                   </NavLink>
