@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
 import { useAppStore } from '@vendor/stores/app.store'
-import type { ComplianceDocument, Vehicle, VehicleAdditionalDocument, VehicleTrackingSelection } from '@vendor/types'
+import { FileCheck, Upload, X, AlertTriangle } from 'lucide-react'
+import type { ComplianceDocument, ComplianceStatus, Vehicle } from '@vendor/types'
 
 interface AddVehicleModalProps {
   isOpen: boolean
@@ -11,472 +12,369 @@ interface AddVehicleModalProps {
   initialVehicle?: Vehicle | null
 }
 
+type DocEntry = { fileName: string; referenceNo: string; expiryDate: string }
+type VehicleDocs = Record<'RC' | 'Insurance' | 'PUC' | 'FC' | 'NationalPermit', DocEntry>
+
+const DOC_CONFIG: Array<{ key: keyof VehicleDocs; label: string; refPlaceholder: string }> = [
+  { key: 'RC', label: 'Registration Certificate (RC)', refPlaceholder: 'RC Number' },
+  { key: 'Insurance', label: 'Insurance', refPlaceholder: 'Policy Number' },
+  { key: 'PUC', label: 'Pollution Under Control (PUC)', refPlaceholder: 'PUC Number' },
+  { key: 'FC', label: 'Fitness Certificate (FC)', refPlaceholder: 'FC Number' },
+  { key: 'NationalPermit', label: 'National Permit', refPlaceholder: 'Permit Number' },
+]
+
+const EMPTY_DOC: DocEntry = { fileName: '', referenceNo: '', expiryDate: '' }
+const DEFAULT_DOCS: VehicleDocs = { RC: { ...EMPTY_DOC }, Insurance: { ...EMPTY_DOC }, PUC: { ...EMPTY_DOC }, FC: { ...EMPTY_DOC }, NationalPermit: { ...EMPTY_DOC } }
+
+const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'EV']
+const VEHICLE_TYPES = ['20ft Container', '40ft Container', 'Open Truck', 'Trailer', 'Mini Truck', 'Tanker']
+const OPERATIONAL_STATUSES: Array<{ value: Vehicle['operationalStatus']; label: string }> = [
+  { value: 'ACTIVE', label: 'Active' },
+  { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },
+  { value: 'INACTIVE', label: 'Inactive' },
+]
+
+function computeDocStatus(expiryDate: string): ComplianceDocument['status'] {
+  if (!expiryDate) return 'VALID'
+  const daysLeft = (new Date(expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  if (daysLeft < 0) return 'EXPIRED'
+  if (daysLeft <= 30) return 'EXPIRING_SOON'
+  return 'VALID'
+}
+
+function computeComplianceStatus(docs: VehicleDocs): ComplianceStatus {
+  const entries = Object.values(docs)
+  if (entries.some((d) => !d.fileName)) return 'PENDING_DOCS'
+  if (entries.some((d) => computeDocStatus(d.expiryDate) === 'EXPIRED')) return 'EXPIRED'
+  if (entries.some((d) => computeDocStatus(d.expiryDate) === 'EXPIRING_SOON')) return 'EXPIRING_SOON'
+  return 'COMPLIANT'
+}
+
+function docsToComplianceDocuments(docs: VehicleDocs): ComplianceDocument[] {
+  return (Object.keys(docs) as Array<keyof VehicleDocs>)
+    .filter((key) => docs[key].fileName)
+    .map((key) => {
+      const doc = docs[key]
+      return {
+        id: `${key}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        type: key,
+        referenceNo: doc.referenceNo,
+        fileName: doc.fileName,
+        fileUrl: `/docs/${doc.fileName}`,
+        expiryDate: doc.expiryDate,
+        status: computeDocStatus(doc.expiryDate),
+        uploadedAt: new Date().toISOString(),
+      }
+    })
+}
+
+function complianceDocsToDocs(complianceDocs: ComplianceDocument[]): Partial<VehicleDocs> {
+  const result: Partial<VehicleDocs> = {}
+  for (const doc of complianceDocs) {
+    const key = doc.type as keyof VehicleDocs
+    if (DOC_CONFIG.some((c) => c.key === key)) {
+      result[key] = { fileName: doc.fileName ?? '', referenceNo: doc.referenceNo ?? '', expiryDate: doc.expiryDate ?? '' }
+    }
+  }
+  return result
+}
+
 type VehicleFormState = {
   registrationNumber: string
+  vehicleType: string
+  manufacturer: string
   model: string
+  year: string
+  fuelType: string
   engineNumber: string
   chassisNumber: string
-  odometerReading: string
-  manufacturer: string
-  manufactureDate: string
-  registrationDate: string
-  vehicleType: string
-  permitType: string
   capacityKg: string
-  capacityCubicMeter: string
-  capacityLiters: string
-  length: string
-  width: string
-  height: string
-  rcStartDate: string
-  rcEndDate: string
-  rcFileName: string
   baseLocation: string
   operationalStatus: Vehicle['operationalStatus']
-  complianceStatus: Vehicle['complianceStatus']
-  gpsDeviceId: string
 }
 
 const DEFAULT_FORM: VehicleFormState = {
   registrationNumber: '',
+  vehicleType: '20ft Container',
+  manufacturer: '',
   model: '',
+  year: '',
+  fuelType: 'Diesel',
   engineNumber: '',
   chassisNumber: '',
-  odometerReading: '',
-  manufacturer: '',
-  manufactureDate: '',
-  registrationDate: '',
-  vehicleType: '20ft Container',
-  permitType: 'National Permit',
   capacityKg: '',
-  capacityCubicMeter: '',
-  capacityLiters: '',
-  length: '',
-  width: '',
-  height: '',
-  rcStartDate: '',
-  rcEndDate: '',
-  rcFileName: '',
-  baseLocation: 'Mumbai',
+  baseLocation: '',
   operationalStatus: 'ACTIVE',
-  complianceStatus: 'COMPLIANT',
-  gpsDeviceId: '',
 }
 
-function createComplianceStatus(expiryDate?: string): ComplianceDocument['status'] {
-  if (!expiryDate) return 'VALID'
-  const expiry = new Date(expiryDate).getTime()
-  const now = Date.now()
-  const diffDays = (expiry - now) / (1000 * 60 * 60 * 24)
-  if (diffDays < 0) return 'EXPIRED'
-  if (diffDays < 45) return 'EXPIRING_SOON'
-  return 'VALID'
+const STATUS_STYLES: Record<ComplianceStatus, string> = {
+  COMPLIANT: 'bg-success/10 text-success',
+  EXPIRING_SOON: 'bg-warning/10 text-warning',
+  EXPIRED: 'bg-danger/10 text-danger',
+  PENDING_DOCS: 'bg-gray-100 text-gray-500',
 }
 
-function buildVehicleDocuments(
-  rcFileName: string,
-  rcStartDate: string,
-  rcEndDate: string,
-  additionalDocuments: VehicleAdditionalDocument[]
-): ComplianceDocument[] {
-  const documents: ComplianceDocument[] = []
-
-  if (rcFileName) {
-    documents.push({
-      id: `rc-${Date.now()}`,
-      type: 'RC',
-      fileName: rcFileName,
-      fileUrl: `/docs/${rcFileName}`,
-      expiryDate: rcEndDate || rcStartDate || new Date().toISOString().slice(0, 10),
-      status: createComplianceStatus(rcEndDate),
-      uploadedAt: rcStartDate || new Date().toISOString(),
-    })
-  }
-
-  additionalDocuments.forEach((doc, index) => {
-    documents.push({
-      id: `doc-${index}-${Date.now()}`,
-      type: doc.type,
-      fileName: doc.fileName,
-      fileUrl: `/docs/${doc.fileName}`,
-      expiryDate: doc.endDate || rcEndDate || new Date().toISOString().slice(0, 10),
-      status: createComplianceStatus(doc.endDate || rcEndDate),
-      uploadedAt: doc.startDate || new Date().toISOString(),
-    })
-  })
-
-  return documents
+const STATUS_LABELS: Record<ComplianceStatus, string> = {
+  COMPLIANT: 'All Documents Uploaded',
+  EXPIRING_SOON: 'Documents Expiring Soon',
+  EXPIRED: 'Documents Expired',
+  PENDING_DOCS: 'Documents Pending',
 }
 
 export function AddVehicleModal({ isOpen, onClose, initialVehicle }: AddVehicleModalProps) {
   const { addVehicle, updateVehicle } = useAppStore()
   const isEditMode = !!initialVehicle
   const [form, setForm] = useState<VehicleFormState>(DEFAULT_FORM)
-  const [trackingSelections, setTrackingSelections] = useState<VehicleTrackingSelection[]>([
-    { type: 'GPS Tracking', checked: true, primarySet: true, gpsOption: '', gpsDeviceID: '' },
-    { type: 'Manual Tracking', checked: false, primarySet: false, gpsOption: '', gpsDeviceID: '' },
-  ])
-  const [additionalDocuments, setAdditionalDocuments] = useState<VehicleAdditionalDocument[]>([])
+  const [docs, setDocs] = useState<VehicleDocs>(DEFAULT_DOCS)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [pendingUploadKey, setPendingUploadKey] = useState<keyof VehicleDocs | null>(null)
 
   useEffect(() => {
     if (!isOpen) return
     if (initialVehicle) {
       setForm({
         registrationNumber: initialVehicle.registrationNumber ?? '',
+        vehicleType: initialVehicle.vehicleType ?? '20ft Container',
+        manufacturer: initialVehicle.manufacturer ?? '',
         model: initialVehicle.model ?? '',
+        year: initialVehicle.year ?? initialVehicle.manufactureDate?.slice(0, 4) ?? '',
+        fuelType: initialVehicle.fuelType ?? 'Diesel',
         engineNumber: initialVehicle.engineNumber ?? '',
         chassisNumber: initialVehicle.chassisNumber ?? '',
-        odometerReading: initialVehicle.odometerReading ?? '',
-        manufacturer: initialVehicle.manufacturer ?? '',
-        manufactureDate: initialVehicle.manufactureDate ?? '',
-        registrationDate: initialVehicle.registrationDate ?? '',
-        vehicleType: initialVehicle.vehicleType ?? '20ft Container',
-        permitType: initialVehicle.permitType ?? 'National Permit',
         capacityKg: initialVehicle.capacityKg ?? '',
-        capacityCubicMeter: initialVehicle.capacityCubicMeter ?? '',
-        capacityLiters: initialVehicle.capacityLiters ?? '',
-        length: initialVehicle.length ?? '',
-        width: initialVehicle.width ?? '',
-        height: initialVehicle.height ?? '',
-        rcStartDate: initialVehicle.rcStartDate ?? '',
-        rcEndDate: initialVehicle.rcEndDate ?? '',
-        rcFileName: initialVehicle.rcFileName ?? '',
-        baseLocation: initialVehicle.baseLocation ?? 'Mumbai',
+        baseLocation: initialVehicle.baseLocation ?? '',
         operationalStatus: initialVehicle.operationalStatus,
-        complianceStatus: initialVehicle.complianceStatus,
-        gpsDeviceId: initialVehicle.gpsDeviceId ?? '',
       })
-      setTrackingSelections(
-        initialVehicle.trackingSelections ?? [
-          { type: 'GPS Tracking', checked: true, primarySet: true, gpsOption: '', gpsDeviceID: initialVehicle.gpsDeviceId ?? '' },
-          { type: 'Manual Tracking', checked: false, primarySet: false, gpsOption: '', gpsDeviceID: '' },
-        ]
-      )
-      setAdditionalDocuments(initialVehicle.additionalDocuments ?? [])
+      const existing = complianceDocsToDocs(initialVehicle.complianceDocuments ?? [])
+      setDocs({
+        RC: existing.RC ?? (initialVehicle.rcFileName ? { fileName: initialVehicle.rcFileName, referenceNo: '', expiryDate: initialVehicle.rcEndDate ?? '' } : { ...EMPTY_DOC }),
+        Insurance: existing.Insurance ?? { ...EMPTY_DOC },
+        PUC: existing.PUC ?? { ...EMPTY_DOC },
+        FC: existing.FC ?? { ...EMPTY_DOC },
+        NationalPermit: existing.NationalPermit ?? { ...EMPTY_DOC },
+      })
     } else {
       setForm(DEFAULT_FORM)
-      setTrackingSelections([
-        { type: 'GPS Tracking', checked: true, primarySet: true, gpsOption: '', gpsDeviceID: '' },
-        { type: 'Manual Tracking', checked: false, primarySet: false, gpsOption: '', gpsDeviceID: '' },
-      ])
-      setAdditionalDocuments([])
+      setDocs({ RC: { ...EMPTY_DOC }, Insurance: { ...EMPTY_DOC }, PUC: { ...EMPTY_DOC }, FC: { ...EMPTY_DOC }, NationalPermit: { ...EMPTY_DOC } })
     }
   }, [initialVehicle, isOpen])
 
-  const complianceDocuments = useMemo(
-    () => buildVehicleDocuments(form.rcFileName, form.rcStartDate, form.rcEndDate, additionalDocuments),
-    [additionalDocuments, form.rcEndDate, form.rcFileName, form.rcStartDate]
-  )
-
-  const setField = <K extends keyof VehicleFormState>(key: K, value: VehicleFormState[K]) => {
+  const setField = <K extends keyof VehicleFormState>(key: K, value: VehicleFormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
+
+  const setDoc = (key: keyof VehicleDocs, patch: Partial<DocEntry>) =>
+    setDocs((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }))
+
+  const handleUploadClick = (key: keyof VehicleDocs) => {
+    setPendingUploadKey(key)
+    if (fileRef.current) { fileRef.current.value = ''; fileRef.current.click() }
   }
 
-  const updateTrackingSelection = (index: number, patch: Partial<VehicleTrackingSelection>) => {
-    setTrackingSelections((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !pendingUploadKey) return
+    const oneYearFromNow = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)
+    setDoc(pendingUploadKey, { fileName: file.name, expiryDate: oneYearFromNow })
+    setPendingUploadKey(null)
   }
 
-  const updateDocument = (index: number, patch: Partial<VehicleAdditionalDocument>) => {
-    setAdditionalDocuments((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
-  }
-
-  const addDocumentRow = () => {
-    setAdditionalDocuments((prev) => [...prev, { id: `doc-${Date.now()}`, type: 'Insurance', fileName: '' }])
-  }
-
-  const removeDocumentRow = (index: number) => {
-    setAdditionalDocuments((prev) => prev.filter((_, idx) => idx !== index))
-  }
-
-  const handleClose = () => {
-    onClose()
-  }
+  const removeDoc = (key: keyof VehicleDocs) => setDoc(key, { ...EMPTY_DOC })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const complianceDocuments = docsToComplianceDocuments(docs)
+    const complianceStatus = computeComplianceStatus(docs)
 
     const nextVehicle: Vehicle = {
       id: initialVehicle?.id ?? `VH-${Math.floor(1000 + Math.random() * 9000)}`,
       registrationNumber: form.registrationNumber.toUpperCase(),
+      vehicleType: form.vehicleType,
+      manufacturer: form.manufacturer,
       model: form.model,
+      year: form.year,
+      fuelType: form.fuelType,
       engineNumber: form.engineNumber,
       chassisNumber: form.chassisNumber,
-      odometerReading: form.odometerReading,
-      manufacturer: form.manufacturer,
-      manufactureDate: form.manufactureDate,
-      registrationDate: form.registrationDate,
-      vehicleType: form.vehicleType,
-      permitType: form.permitType,
       capacityKg: form.capacityKg,
-      capacityCubicMeter: form.capacityCubicMeter,
-      capacityLiters: form.capacityLiters,
-      length: form.length,
-      width: form.width,
-      height: form.height,
-      rcStartDate: form.rcStartDate,
-      rcEndDate: form.rcEndDate,
-      rcFileName: form.rcFileName,
-      trackingSelections,
-      additionalDocuments,
       baseLocation: form.baseLocation,
       operationalStatus: form.operationalStatus,
-      complianceStatus: form.complianceStatus,
-      gpsDeviceId: form.gpsDeviceId,
+      complianceStatus,
       complianceDocuments,
       blackoutDates: initialVehicle?.blackoutDates ?? [],
     }
 
     if (isEditMode) {
       updateVehicle(nextVehicle)
-      window.alert(`Mock vehicle updated: ${nextVehicle.registrationNumber}`)
+      window.alert(`Vehicle updated: ${nextVehicle.registrationNumber}`)
     } else {
       addVehicle(nextVehicle)
-      window.alert(`Mock vehicle added: ${nextVehicle.registrationNumber}`)
+      window.alert(`Vehicle added: ${nextVehicle.registrationNumber}`)
     }
-
-    handleClose()
+    onClose()
   }
 
+  const complianceStatus = computeComplianceStatus(docs)
+  const uploadedCount = Object.values(docs).filter((d) => d.fileName).length
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
+          <DialogTitle>{isEditMode ? 'Edit Vehicle' : 'Add Vehicle'}</DialogTitle>
           <DialogDescription>
-            Mirror the mobile add-vehicle form with RC, tracking, capacity, and compliance data.
+            You can upload compliance documents now or after onboarding. The vehicle will be active for dispatch only when all documents are uploaded and valid.
           </DialogDescription>
         </DialogHeader>
 
+        {/* hidden file input shared across all doc upload buttons */}
+        <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFileChange} />
+
         <form onSubmit={handleSubmit} className="space-y-6 py-2">
+          {/* Vehicle Details */}
           <section className="space-y-4 rounded-xl border p-4">
-            <h3 className="font-semibold">Vehicle details</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Vehicle Details</h3>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Registration Number *</label>
-                <Input value={form.registrationNumber} onChange={(e) => setField('registrationNumber', e.target.value)} placeholder="MH-04-AB-1234" className="mt-1" />
+                <Input required value={form.registrationNumber} onChange={(e) => setField('registrationNumber', e.target.value)} placeholder="MH-04-AB-1234" className="mt-1" />
               </div>
               <div>
                 <label className="text-sm font-medium">Vehicle Type *</label>
-                <Input value={form.vehicleType} onChange={(e) => setField('vehicleType', e.target.value)} placeholder="20ft Container" className="mt-1" />
+                <select required className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.vehicleType} onChange={(e) => setField('vehicleType', e.target.value)}>
+                  {VEHICLE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
               </div>
               <div>
-                <label className="text-sm font-medium">Manufacturer</label>
-                <Input value={form.manufacturer} onChange={(e) => setField('manufacturer', e.target.value)} className="mt-1" />
+                <label className="text-sm font-medium">Make (Manufacturer)</label>
+                <Input value={form.manufacturer} onChange={(e) => setField('manufacturer', e.target.value)} placeholder="Tata, Mahindra…" className="mt-1" />
               </div>
               <div>
                 <label className="text-sm font-medium">Model</label>
-                <Input value={form.model} onChange={(e) => setField('model', e.target.value)} className="mt-1" />
+                <Input value={form.model} onChange={(e) => setField('model', e.target.value)} placeholder="Prima 4928.S" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Year of Manufacture</label>
+                <Input value={form.year} onChange={(e) => setField('year', e.target.value)} placeholder="2021" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Fuel Type *</label>
+                <select required className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.fuelType} onChange={(e) => setField('fuelType', e.target.value)}>
+                  {FUEL_TYPES.map((t) => <option key={t}>{t}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-sm font-medium">Engine Number</label>
                 <Input value={form.engineNumber} onChange={(e) => setField('engineNumber', e.target.value)} className="mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Chassis Number</label>
+                <label className="text-sm font-medium">Chassis / VIN</label>
                 <Input value={form.chassisNumber} onChange={(e) => setField('chassisNumber', e.target.value)} className="mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Odometer Reading</label>
-                <Input value={form.odometerReading} onChange={(e) => setField('odometerReading', e.target.value)} className="mt-1" />
+                <label className="text-sm font-medium">Capacity (kg)</label>
+                <Input value={form.capacityKg} onChange={(e) => setField('capacityKg', e.target.value)} placeholder="15000" className="mt-1" />
               </div>
               <div>
                 <label className="text-sm font-medium">Base Location *</label>
-                <Input value={form.baseLocation} onChange={(e) => setField('baseLocation', e.target.value)} className="mt-1" />
+                <Input required value={form.baseLocation} onChange={(e) => setField('baseLocation', e.target.value)} placeholder="Mumbai" className="mt-1" />
               </div>
             </div>
           </section>
 
+          {/* Compliance Documents */}
           <section className="space-y-4 rounded-xl border p-4">
-            <h3 className="font-semibold">Dates, permit, and dimensions</h3>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium">Manufacture Date</label>
-                <Input value={form.manufactureDate} onChange={(e) => setField('manufactureDate', e.target.value)} placeholder="YYYY-MM-DD" className="mt-1" />
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Compliance Documents</h3>
+                <p className="mt-0.5 text-xs text-gray-400">{uploadedCount} of {DOC_CONFIG.length} uploaded</p>
               </div>
-              <div>
-                <label className="text-sm font-medium">Registration Date</label>
-                <Input value={form.registrationDate} onChange={(e) => setField('registrationDate', e.target.value)} placeholder="YYYY-MM-DD" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Permit Type</label>
-                <Input value={form.permitType} onChange={(e) => setField('permitType', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">RC Start Date</label>
-                <Input value={form.rcStartDate} onChange={(e) => setField('rcStartDate', e.target.value)} placeholder="YYYY-MM-DD" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">RC End Date</label>
-                <Input value={form.rcEndDate} onChange={(e) => setField('rcEndDate', e.target.value)} placeholder="YYYY-MM-DD" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">RC File Name</label>
-                <Input value={form.rcFileName} onChange={(e) => setField('rcFileName', e.target.value)} placeholder="rc.pdf" className="mt-1" />
-              </div>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[complianceStatus]}`}>
+                {STATUS_LABELS[complianceStatus]}
+              </span>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <div>
-                <label className="text-sm font-medium">Capacity Kg</label>
-                <Input value={form.capacityKg} onChange={(e) => setField('capacityKg', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Capacity CBM</label>
-                <Input value={form.capacityCubicMeter} onChange={(e) => setField('capacityCubicMeter', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Capacity Liters</label>
-                <Input value={form.capacityLiters} onChange={(e) => setField('capacityLiters', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Length</label>
-                <Input value={form.length} onChange={(e) => setField('length', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Width</label>
-                <Input value={form.width} onChange={(e) => setField('width', e.target.value)} className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Height</label>
-                <Input value={form.height} onChange={(e) => setField('height', e.target.value)} className="mt-1" />
-              </div>
-            </div>
-          </section>
+            <div className="space-y-3">
+              {DOC_CONFIG.map(({ key, label, refPlaceholder }) => {
+                const doc = docs[key]
+                const isUploaded = !!doc.fileName
+                const docStatus = isUploaded && doc.expiryDate ? computeDocStatus(doc.expiryDate) : null
 
-          <section className="space-y-4 rounded-xl border p-4">
-            <h3 className="font-semibold">Tracking setup</h3>
-            <div className="space-y-4">
-              {trackingSelections.map((selection, index) => (
-                <div key={`${index}-${selection.type}`} className="rounded-lg border bg-muted/20 p-3">
-                  <div className="grid gap-3 md:grid-cols-5">
-                    <div>
-                      <label className="text-xs font-medium uppercase text-muted-foreground">Type</label>
-                      <Input
-                        value={selection.type}
-                        onChange={(e) => updateTrackingSelection(index, { type: e.target.value })}
-                        className="mt-1"
-                        placeholder="GPS Tracking"
-                      />
+                return (
+                  <div key={key} className={`rounded-lg border p-3 transition-colors ${
+                    docStatus === 'EXPIRED' ? 'border-danger/40 bg-danger/5'
+                    : docStatus === 'EXPIRING_SOON' ? 'border-warning/40 bg-warning/5'
+                    : isUploaded ? 'border-success/40 bg-success/5'
+                    : 'border-dashed border-gray-300 bg-gray-50'
+                  }`}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">{label}</span>
+                      {docStatus === 'EXPIRED' && <span className="text-xs font-semibold text-danger">Expired — blocks dispatch</span>}
+                      {docStatus === 'EXPIRING_SOON' && <span className="text-xs font-semibold text-warning">Expiring soon</span>}
+                      {!isUploaded && <span className="text-xs text-gray-400">Required</span>}
                     </div>
-                    <div>
-                      <label className="text-xs font-medium uppercase text-muted-foreground">GPS Option</label>
-                      <Input
-                        value={selection.gpsOption ?? ''}
-                        onChange={(e) => updateTrackingSelection(index, { gpsOption: e.target.value })}
-                        className="mt-1"
-                        placeholder="gps-vamosys"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium uppercase text-muted-foreground">GPS Device ID</label>
-                      <Input
-                        value={selection.gpsDeviceID ?? ''}
-                        onChange={(e) => updateTrackingSelection(index, { gpsDeviceID: e.target.value })}
-                        className="mt-1"
-                        placeholder="GPS-001"
-                      />
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selection.checked}
-                          onChange={(e) => updateTrackingSelection(index, { checked: e.target.checked })}
-                        />
-                        Enabled
-                      </label>
-                    </div>
-                    <div className="flex items-end gap-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selection.primarySet}
-                          onChange={(e) => updateTrackingSelection(index, { primarySet: e.target.checked })}
-                        />
-                        Primary
-                      </label>
-                    </div>
+
+                    {!isUploaded ? (
+                      <button
+                        type="button"
+                        onClick={() => handleUploadClick(key)}
+                        className="flex w-full items-center gap-3 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-3 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                      >
+                        <Upload className="h-5 w-5 shrink-0 text-gray-400" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-600">Click to upload {label}</div>
+                          <div className="text-xs text-gray-400">PDF, JPG, PNG</div>
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <FileCheck className="h-4 w-4 shrink-0 text-success" />
+                            <span className="max-w-[260px] truncate text-sm font-medium text-gray-700">{doc.fileName}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => handleUploadClick(key)} className="text-xs text-primary hover:underline">Replace</button>
+                            <button type="button" onClick={() => removeDoc(key)} className="text-gray-400 hover:text-danger">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-2">
+                          <div>
+                            <label className="text-xs text-gray-500">Reference No. (from document)</label>
+                            <Input value={doc.referenceNo} onChange={(e) => setDoc(key, { referenceNo: e.target.value })} placeholder={refPlaceholder} className="mt-1 h-8 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-500">Expiry date (confirm from document)</label>
+                            <Input type="date" value={doc.expiryDate} onChange={(e) => setDoc(key, { expiryDate: e.target.value })} className="mt-1 h-8 text-sm" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
-          </section>
-
-          <section className="space-y-4 rounded-xl border p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-semibold">Additional documents</h3>
-              <Button type="button" variant="outline" onClick={addDocumentRow}>
-                Add document
-              </Button>
-            </div>
-            {additionalDocuments.length === 0 ? (
-              <div className="text-sm text-muted-foreground">Add insurance, tax, emission, FC, or permit documents.</div>
-            ) : (
-              <div className="space-y-3">
-                {additionalDocuments.map((doc, index) => (
-                  <div key={doc.id} className="rounded-lg border bg-muted/20 p-3">
-                    <div className="grid gap-3 md:grid-cols-4">
-                      <div>
-                        <label className="text-xs font-medium uppercase text-muted-foreground">Type</label>
-                        <Input value={doc.type} onChange={(e) => updateDocument(index, { type: e.target.value })} className="mt-1" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium uppercase text-muted-foreground">File name</label>
-                        <Input value={doc.fileName} onChange={(e) => updateDocument(index, { fileName: e.target.value })} className="mt-1" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium uppercase text-muted-foreground">Start date</label>
-                        <Input value={doc.startDate ?? ''} onChange={(e) => updateDocument(index, { startDate: e.target.value })} className="mt-1" placeholder="YYYY-MM-DD" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium uppercase text-muted-foreground">End date</label>
-                        <Input value={doc.endDate ?? ''} onChange={(e) => updateDocument(index, { endDate: e.target.value })} className="mt-1" placeholder="YYYY-MM-DD" />
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-end">
-                      <Button type="button" variant="ghost" onClick={() => removeDocumentRow(index)}>
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+            {uploadedCount < DOC_CONFIG.length && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>Vehicle will be saved but will not be eligible for dispatch until all {DOC_CONFIG.length} documents are uploaded.</span>
               </div>
             )}
           </section>
 
+          {/* Operational Status */}
           <section className="space-y-4 rounded-xl border p-4">
-            <h3 className="font-semibold">Status</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium">Operational Status</label>
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={form.operationalStatus}
-                  onChange={(e) => setField('operationalStatus', e.target.value as Vehicle['operationalStatus'])}
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="INACTIVE">INACTIVE</option>
-                  <option value="UNDER_MAINTENANCE">UNDER_MAINTENANCE</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Compliance Status</label>
-                <select
-                  className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={form.complianceStatus}
-                  onChange={(e) => setField('complianceStatus', e.target.value as Vehicle['complianceStatus'])}
-                >
-                  <option value="COMPLIANT">COMPLIANT</option>
-                  <option value="EXPIRING_SOON">EXPIRING_SOON</option>
-                  <option value="EXPIRED">EXPIRED</option>
-                </select>
-              </div>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Operational Status</h3>
+            <div>
+              <label className="text-sm font-medium">Status</label>
+              <select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.operationalStatus} onChange={(e) => setField('operationalStatus', e.target.value as Vehicle['operationalStatus'])}>
+                {OPERATIONAL_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
             </div>
           </section>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit">{isEditMode ? 'Save Vehicle' : 'Add Vehicle'}</Button>
           </DialogFooter>
         </form>

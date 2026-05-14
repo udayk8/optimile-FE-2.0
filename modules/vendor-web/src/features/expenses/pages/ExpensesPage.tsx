@@ -20,6 +20,15 @@ const STATUS_FILTERS: { value: ExpenseStatus | 'ALL'; label: string }[] = [
   { value: 'REJECTED', label: 'Rejected' },
 ]
 
+const COLUMN_OPTIONS = [
+  { key: 'expense', label: 'Expense' },
+  { key: 'booking', label: 'Booking' },
+  { key: 'status', label: 'Status' },
+  { key: 'lineItems', label: 'Line Items' },
+  { key: 'submitted', label: 'Submitted' },
+  { key: 'amount', label: 'Amount' },
+]
+
 export default function ExpensesPage() {
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'ALL'>('ALL')
   const { expenses } = useAppStore()

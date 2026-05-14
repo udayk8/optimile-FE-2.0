@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, ChevronLeft, Clock, FileText, ShieldCheck, Star } from 'lucide-react'
+import { ArrowRight, ChevronLeft, Clock, Mail, Paperclip, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import type { Invoice, NBFCDiscountingStatus } from '@vendor/types'
@@ -9,6 +10,9 @@ const PARTNERS = [
   { id: 'nbfc-1', name: 'FinEdge Capital', advancePercentage: 85, interestRate: 12.5, processingTime: '24 hours', rating: 4.9 },
   { id: 'nbfc-2', name: 'Prime Credit', advancePercentage: 82, interestRate: 13.2, processingTime: '36 hours', rating: 4.8 },
   { id: 'nbfc-3', name: 'Axis Finance', advancePercentage: 80, interestRate: 11.9, processingTime: '48 hours', rating: 4.7 },
+  { id: 'nbfc-4', name: 'Tata Capital', advancePercentage: 83, interestRate: 12.1, processingTime: '30 hours', rating: 4.6 },
+  { id: 'nbfc-5', name: 'Aditya Birla Finance', advancePercentage: 81, interestRate: 12.8, processingTime: '42 hours', rating: 4.5 },
+  { id: 'nbfc-6', name: 'SMFG India', advancePercentage: 79, interestRate: 13.0, processingTime: '48 hours', rating: 4.4 },
 ]
 
 const FALLBACK_INVOICES: Record<string, Invoice> = {
@@ -65,11 +69,22 @@ const FALLBACK_INVOICES: Record<string, Invoice> = {
   },
 }
 
+function inputClass(hasError: boolean) {
+  return `w-full rounded-xl border ${hasError ? 'border-red-400 bg-red-50' : 'border-gray-200 bg-gray-50'} px-4 py-2.5 text-sm text-text outline-none transition focus:border-primary focus:bg-white`
+}
+
 export default function DiscountingApplicationPage() {
   const navigate = useNavigate()
   const { invoiceId, nbfcId } = useParams()
   const { invoices, nbfcApplications, markNbfcApplicationStatus, submitNbfcApplication } = useAppStore()
+
+  // email form state
+  const [emailTitle, setEmailTitle] = useState('')
+  const [recipientEmail, setRecipientEmail] = useState('')
+  const [description, setDescription] = useState('')
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [agreed, setAgreed] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const invoice = useMemo(() => {
     return invoices.find((item) => item.id === invoiceId) ?? (invoiceId ? FALLBACK_INVOICES[invoiceId as keyof typeof FALLBACK_INVOICES] : undefined)
@@ -97,15 +112,21 @@ export default function DiscountingApplicationPage() {
     return <div className="p-6 text-sm text-gray-500">Loading application details...</div>
   }
 
-  const timeline = [
-    { label: 'Eligible', done: true, detail: 'Invoice approved and ready for discounting' },
-    { label: 'Submitted', done: ['SUBMITTED', 'APPROVED', 'DISBURSED'].includes(mode), detail: application?.appliedAt ?? 'Waiting for submission' },
-    { label: 'Approved', done: ['APPROVED', 'DISBURSED'].includes(mode), detail: application?.approvedAt ?? 'Waiting for approval' },
-    { label: 'Disbursed', done: mode === 'DISBURSED', detail: application?.disbursedAt ?? 'Waiting for disbursement' },
-  ]
-  const primaryActionLabel = mode === 'SUBMITTED' ? 'Mark Approved' : mode === 'APPROVED' ? 'Mark Disbursed' : mode === 'DISBURSED' ? 'Disbursed' : 'Submit'
+  const isEligibleMode = mode === 'ELIGIBLE' && !isViewMode
+
+  // validation
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)
+  const canSubmit = agreed && emailTitle.trim().length > 0 && emailValid && description.trim().length > 0 && uploadedFile !== null
+
+  const showTitleError = submitted && emailTitle.trim().length === 0
+  const showEmailError = submitted && !emailValid
+  const showDescError = submitted && description.trim().length === 0
+  const showFileError = submitted && uploadedFile === null
 
   const handleSubmitApplication = () => {
+    setSubmitted(true)
+    if (!canSubmit) return
+
     submitNbfcApplication({
       invoiceId: invoice.id,
       invoiceNumber: invoice.invoiceNumber ?? invoice.id,
@@ -115,20 +136,29 @@ export default function DiscountingApplicationPage() {
       advanceAmount,
       charges,
       netDisbursement,
+      emailTitle,
+      recipientEmail,
+      emailDescription: description,
+      invoiceFileName: uploadedFile?.name,
     })
+
+    toast.success(`Application submitted — email sent to ${recipientEmail}`, {
+      description: `"${emailTitle}" has been delivered to ${partner.name}.`,
+    })
+
     navigate('/vendor/nbfc')
   }
 
   const handleAdvanceStatus = () => {
     if (mode === 'SUBMITTED') {
-      markNbfcApplicationStatus(invoice.id, 'APPROVED')
-    } else if (mode === 'APPROVED') {
       markNbfcApplicationStatus(invoice.id, 'DISBURSED')
+      toast.success('Status updated to Disbursed')
     }
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-center gap-3">
@@ -138,239 +168,242 @@ export default function DiscountingApplicationPage() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-gray-400">Bill Discounting</div>
               <h1 className="text-2xl font-semibold text-text">
-                {mode === 'ELIGIBLE' ? 'Apply for Discounting' : 'Application Details'}
+                {isEligibleMode ? 'Apply for Discounting' : 'Application Details'}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                Invoice {invoice.id} with {partner.name}
+                Invoice {invoice.id} · {partner.name}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {mode === 'SUBMITTED' || mode === 'APPROVED' ? (
-              <Button onClick={handleAdvanceStatus}>
-                {primaryActionLabel}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            ) : mode === 'DISBURSED' ? (
-              <Button variant="outline" disabled>
-                {primaryActionLabel}
-              </Button>
-            ) : null}
-          </div>
+          {mode === 'SUBMITTED' && (
+            <Button onClick={handleAdvanceStatus}>
+              Mark Disbursed
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
+          {mode === 'DISBURSED' && (
+            <Button variant="outline" disabled>Disbursed</Button>
+          )}
         </div>
       </div>
 
+      {/* KPI row */}
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="text-sm font-medium text-gray-500">Invoice amount</div>
+          <div className="mt-2 text-2xl font-semibold text-text">₹{amount.toLocaleString('en-IN')}</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">Advance amount</div>
-          <div className="mt-2 text-2xl font-semibold text-text">₹{advanceAmount.toLocaleString('en-IN')}</div>
+          <div className="mt-2 text-2xl font-semibold text-emerald-600">₹{advanceAmount.toLocaleString('en-IN')}</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">Charges</div>
-          <div className="mt-2 text-2xl font-semibold text-text">₹{charges.toLocaleString('en-IN')}</div>
+          <div className="mt-2 text-2xl font-semibold text-red-500">₹{charges.toLocaleString('en-IN')}</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">Net disbursement</div>
-          <div className="mt-2 text-2xl font-semibold text-text">₹{netDisbursement.toLocaleString('en-IN')}</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Processing</div>
-          <div className="mt-2 flex items-center gap-2 text-2xl font-semibold text-text">
-            <Clock className="h-5 w-5 text-primary" />
-            {partner.processingTime}
+          <div className="mt-2 flex items-center gap-2 text-2xl font-semibold text-blue-600">
+            ₹{netDisbursement.toLocaleString('en-IN')}
           </div>
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-text">Invoice summary</h3>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600">IRN Verified</span>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-400">Client</div>
-            <div className="mt-1 font-semibold text-text">{(invoice as any).clientName ?? 'Vendor Invoice'}</div>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-4">
-            <div className="text-xs uppercase tracking-wide text-gray-400">Invoice Amount</div>
-            <div className="mt-1 font-semibold text-text">₹{amount.toLocaleString('en-IN')}</div>
-          </div>
-          <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-            This is the vendor-side application screen. No NBFC portal is required.
-          </div>
-        </div>
-
-        <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-900 p-6 text-white shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
-              <ShieldCheck className="h-5 w-5" />
+      {/* Email application form (ELIGIBLE mode only) */}
+      {isEligibleMode && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              <Mail className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">Status preview</h3>
-              <p className="text-sm text-gray-300">Used to update the lifecycle inside vendor-web.</p>
+              <h3 className="text-lg font-semibold text-text">Submit application</h3>
+              <p className="text-sm text-gray-500">
+                Fill in the details below. An email will be sent to {partner.name} on your behalf.
+              </p>
             </div>
           </div>
 
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-400">Partner</span>
-              <span className="font-semibold">{partner.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Advance rate</span>
-              <span className="font-semibold text-emerald-400">{partner.advancePercentage}%</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Interest</span>
-              <span className="font-semibold">{partner.interestRate}% p.a.</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Reference</span>
-              <span className="font-semibold">{application?.referenceNumber ?? '—'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Status</span>
-              <span className="font-semibold uppercase">{mode}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Net disbursement</span>
-              <span className="font-semibold">₹{netDisbursement.toLocaleString('en-IN')}</span>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-white/5 p-4 text-xs text-gray-300">
-            Funds will be credited to the registered bank account ending in ****4421.
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-text">Bill Discounting Details</h3>
-          <div className="mt-4 space-y-4">
-            {timeline.map((item) => (
-              <div key={item.label} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3">
-                <div className={`mt-1 flex h-8 w-8 items-center justify-center rounded-full ${item.done ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-500'}`}>
-                  <CheckCircle2 className="h-4 w-4" />
+          <div className="space-y-5">
+            {/* Prefilled summary */}
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">Application summary (auto-filled)</p>
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <span className="text-gray-500">Invoice</span>
+                  <p className="mt-0.5 font-mono font-semibold text-text">{invoice.id}</p>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-text">{item.label}</div>
-                  <div className="text-xs text-gray-500">{item.detail}</div>
+                  <span className="text-gray-500">Invoice amount</span>
+                  <p className="mt-0.5 font-semibold text-text">₹{amount.toLocaleString('en-IN')}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Advance ({partner.advancePercentage}%)</span>
+                  <p className="mt-0.5 font-semibold text-emerald-600">₹{advanceAmount.toLocaleString('en-IN')}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Charges ({partner.interestRate}% p.a.)</span>
+                  <p className="mt-0.5 font-semibold text-red-500">₹{charges.toLocaleString('en-IN')}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Net disbursement</span>
+                  <p className="mt-0.5 font-semibold text-blue-600">₹{netDisbursement.toLocaleString('en-IN')}</p>
+                </div>
+                <div>
+                  <span className="text-gray-500">Partner</span>
+                  <p className="mt-0.5 font-semibold text-text">{partner.name}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-text">Required documents</h3>
-          <div className="mt-4 space-y-3">
-            {[
-              'PAN Card',
-              'E-Invoice / IRN',
-              'Signed Invoice Copy',
-              'POD (Proof of Delivery)',
-            ].map((doc) => (
-              <div key={doc} className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-3">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-semibold text-text">{doc}</span>
+            {/* Email title */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-text">
+                Email title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={emailTitle}
+                onChange={(e) => setEmailTitle(e.target.value)}
+                placeholder={`Bill Discounting Request – Invoice ${invoice.id}`}
+                className={inputClass(showTitleError)}
+              />
+              {showTitleError && <p className="text-xs text-red-500">Email title is required.</p>}
+            </div>
+
+            {/* Recipient email */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-text">
+                Recipient email <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                placeholder="partner@nbfc.com"
+                className={inputClass(showEmailError)}
+              />
+              {showEmailError && <p className="text-xs text-red-500">Enter a valid email address.</p>}
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-text">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                placeholder={`We are submitting invoice ${invoice.id} for bill discounting. Please review the attached documents and proceed with the advance disbursement at your earliest convenience.`}
+                className={`${inputClass(showDescError)} resize-none`}
+              />
+              {showDescError && <p className="text-xs text-red-500">Description is required.</p>}
+            </div>
+
+            {/* Invoice upload */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-text">
+                Attach invoice <span className="text-red-500">*</span>
+              </label>
+              {uploadedFile ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Paperclip className="h-4 w-4 shrink-0 text-emerald-600" />
+                    <span className="font-semibold text-emerald-700 truncate max-w-xs">{uploadedFile.name}</span>
+                    <span className="text-xs text-emerald-500">({(uploadedFile.size / 1024).toFixed(1)} KB)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUploadedFile(null)}
+                    className="ml-2 rounded-full p-1 text-emerald-600 hover:bg-emerald-100"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                  AUTO-ATTACHED
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+              ) : (
+                <label className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition hover:bg-gray-50 ${showFileError ? 'border-red-400 bg-red-50' : 'border-gray-200'}`}>
+                  <Paperclip className={`h-6 w-6 ${showFileError ? 'text-red-400' : 'text-gray-400'}`} />
+                  <div className="text-sm text-gray-600">
+                    <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+                  </div>
+                  <p className="text-xs text-gray-400">PDF, PNG, JPG up to 10 MB</p>
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null
+                      setUploadedFile(file)
+                    }}
+                  />
+                </label>
+              )}
+              {showFileError && <p className="text-xs text-red-500">Please attach the invoice before submitting.</p>}
+            </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-text">Partner details</h3>
-            <div className="flex items-center gap-1 text-amber-500">
-              <Star className="h-4 w-4 fill-current" />
-              <span className="text-sm font-semibold text-text">{partner.rating}</span>
-            </div>
-          </div>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl bg-gray-50 p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-400">Advance</div>
-              <div className="mt-1 font-semibold text-text">Up to {partner.advancePercentage}%</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-400">Processing</div>
-              <div className="mt-1 font-semibold text-text">{partner.processingTime}</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-400">Rating</div>
-              <div className="mt-1 font-semibold text-text">{partner.rating}</div>
-            </div>
+            {/* Agreement */}
+            <label className="flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 cursor-pointer hover:bg-gray-100">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary"
+              />
+              <span>
+                I agree to the terms of bill discounting and authorise <strong>{partner.name}</strong> to recover the invoice amount from the client upon disbursement.
+              </span>
+            </label>
           </div>
         </div>
+      )}
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
-            {mode === 'ELIGIBLE' && !isViewMode
-              ? 'Submit now to move the invoice to Submitted status. You can later simulate approval and disbursal from this page.'
-              : mode === 'SUBMITTED'
-                ? 'This application is submitted. Use the mock action to mark it Approved.'
-                : mode === 'APPROVED'
-                  ? 'This application is approved. Use the mock action to mark it Disbursed.'
-                  : 'This application has completed the lifecycle and is read-only.'}
-          </div>
-        </div>
-      </div>
-
-      {mode === 'ELIGIBLE' && !isViewMode ? (
-        <div className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <input
-            type="checkbox"
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-gray-300"
-          />
-          <span className="text-sm text-gray-600">
-            I agree to the terms of bill discounting and authorize {partner.name} to recover the invoice amount from the client.
-          </span>
-        </div>
-      ) : (
+      {/* Submitted / Disbursed info */}
+      {!isEligibleMode && (
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-text">Vendor-side control</h3>
+              <h3 className="text-lg font-semibold text-text">
+                {mode === 'SUBMITTED' ? 'Application submitted' : 'Application disbursed'}
+              </h3>
               <p className="text-sm text-gray-500">
-                There is no external NBFC portal in this setup, so status changes happen here.
+                {mode === 'SUBMITTED'
+                  ? 'Your application is under review. Use the button above to mark it disbursed once confirmed.'
+                  : 'This application has completed the lifecycle and is read-only.'}
               </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Footer actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="outline" onClick={() => navigate(mode === 'ELIGIBLE' && !isViewMode ? `/vendor/nbfc/apply/${invoiceId}/select-partner` : '/vendor/nbfc')}>
-          Back
+        <Button
+          variant="outline"
+          onClick={() => navigate(isEligibleMode ? `/vendor/nbfc/apply/${invoiceId}/select-partner` : '/vendor/nbfc')}
+        >
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          {isEligibleMode ? 'Back to partners' : 'Back to hub'}
         </Button>
-        {mode === 'ELIGIBLE' && !isViewMode ? (
-          <Button disabled={!agreed} onClick={handleSubmitApplication}>
-            Submit
+
+        {isEligibleMode && (
+          <Button onClick={handleSubmitApplication}>
+            Submit & send email
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-        ) : mode === 'SUBMITTED' || mode === 'APPROVED' ? (
+        )}
+        {mode === 'SUBMITTED' && (
           <Button onClick={handleAdvanceStatus}>
-            {mode === 'SUBMITTED' ? 'Mark Approved' : 'Mark Disbursed'}
+            Mark Disbursed
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
-        ) : (
-          <Button variant="outline" disabled>
-            Disbursed
-          </Button>
+        )}
+        {mode === 'DISBURSED' && (
+          <Button variant="outline" disabled>Disbursed</Button>
         )}
       </div>
     </div>

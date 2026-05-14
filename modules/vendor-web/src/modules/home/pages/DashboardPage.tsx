@@ -148,10 +148,9 @@ export default function DashboardPage() {
           unit="ready"
           insight="Generate invoices from delivered bookings"
           icon={<FilePlus className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/vendor/nbfc')}
+          onClick={() => navigate('/vendor/invoices/create')}
         >
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate('/vendor/nbfc') }}>Open Bill Discounting</Button>
             <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); navigate('/vendor/invoices/list') }}>Invoice List</Button>
           </div>
         </KpiCard>

@@ -3,7 +3,7 @@ import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Clock3, Filter, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 const PAGE_SIZE = 6
@@ -28,7 +28,6 @@ const statusLabel = (value: ExceptionStatus) => value.replace('_', ' ')
 export default function SupportHubPage() {
   const navigate = useNavigate()
   const exceptions = useAppStore((state) => state.exceptions)
-  const updateExceptionStatus = useAppStore((state) => state.updateExceptionStatus)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | ExceptionStatus>('ALL')
   const [page, setPage] = useState(1)
@@ -113,31 +112,29 @@ export default function SupportHubPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-gray-100 px-6 py-4">
-          <div className="mr-2 inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            <Filter className="h-4 w-4" />
-            State
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
+          <div className="flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+            {STATE_FILTERS.map((item) => (
+              <button
+                key={item}
+                onClick={() => {
+                  setStatusFilter(item)
+                  setPage(1)
+                }}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${
+                  statusFilter === item ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'
+                }`}
+              >
+                {item === 'ALL' ? 'All' : statusLabel(item)}
+              </button>
+            ))}
           </div>
-          {STATE_FILTERS.map((item) => (
-            <button
-              key={item}
-              onClick={() => {
-                setStatusFilter(item)
-                setPage(1)
-              }}
-              className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
-                statusFilter === item ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              {item === 'ALL' ? 'All' : statusLabel(item)}
-            </button>
-          ))}
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1280px] text-left">
-            <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
                 <th className="px-5 py-3 font-bold">Exception</th>
                 <th className="px-5 py-3 font-bold">Booking</th>
                 <th className="px-5 py-3 font-bold">Route</th>
@@ -167,17 +164,9 @@ export default function SupportHubPage() {
                   <td className="px-5 py-4 text-sm text-text">{new Date(item.slaDueAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td className="px-5 py-4 text-sm text-text">{new Date(item.createdAt).toLocaleDateString('en-IN')}</td>
                   <td className="px-5 py-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/support/exception/${item.id}`)}>
-                        Details
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        onClick={() => navigate(`/vendor/support/exception/${item.id}`, { state: { tab: 'actions' } })}
-                      >
-                        Update Status
-                      </Button>
-                    </div>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/support/exception/${item.id}`)}>
+                      View
+                    </Button>
                   </td>
                 </tr>
               ))}

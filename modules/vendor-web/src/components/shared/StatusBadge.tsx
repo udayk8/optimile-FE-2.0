@@ -48,6 +48,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   DECLINED: { variant: 'destructive', label: 'Declined' },
   NOT_AVAILABLE: { variant: 'destructive', label: 'Not Available' },
   EXCEPTION: { variant: 'destructive', label: 'Exception' },
+  PENDING_DOCS: { variant: 'muted', label: 'Pending Docs' },
   // Gray statuses
   DRAFT: { variant: 'muted', label: 'Draft' },
   CANCELLED: { variant: 'muted', label: 'Cancelled' },

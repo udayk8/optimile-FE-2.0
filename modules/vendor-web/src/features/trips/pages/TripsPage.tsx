@@ -16,6 +16,52 @@ type BookingsTab = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' |
 
 const BOOKING_TABS: BookingsTab[] = ['new', 'accepted', 'active', 'pending-pod', 'completed', 'cancelled', 'disrupted']
 
+const TAB_COLUMN_OPTIONS: Record<BookingsTab, { key: string; label: string }[]> = {
+  new: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'load', label: 'Load' },
+    { key: 'sla', label: 'SLA' },
+  ],
+  accepted: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'vehicle', label: 'Vehicle' },
+    { key: 'driver', label: 'Driver' },
+  ],
+  active: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'vehicle', label: 'Vehicle' },
+    { key: 'driver', label: 'Driver' },
+    { key: 'status', label: 'Status' },
+  ],
+  'pending-pod': [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'delivered', label: 'Delivered' },
+    { key: 'expenses', label: 'Expenses' },
+  ],
+  completed: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'delivered', label: 'Delivered' },
+    { key: 'freight', label: 'Freight' },
+    { key: 'approvedExpenses', label: 'Approved Expenses' },
+    { key: 'invoice', label: 'Invoice' },
+  ],
+  cancelled: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'reason', label: 'Reason' },
+  ],
+  disrupted: [
+    { key: 'booking', label: 'Booking' },
+    { key: 'route', label: 'Route' },
+    { key: 'issue', label: 'Issue' },
+  ],
+}
+
 function getBookingsTab(pathname: string, search: string): BookingsTab {
   const pathTab = pathname.split('/')[2]
   if (BOOKING_TABS.includes(pathTab as BookingsTab)) return pathTab as BookingsTab
@@ -75,16 +121,18 @@ export default function TripsPage() {
         icon={<Truck className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mt-6 mb-6 flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
-        {tabs.map((tab) => (
-          <BookingCard
-            key={tab.key}
-            title={tab.label}
-            count={tab.count}
-            active={activeTab === tab.key}
-            onClick={() => navigate(`/vendor/bookings?tab=${tab.key}`)}
-          />
-        ))}
+      <div className="mt-6 mb-6 flex items-center justify-between gap-4">
+        <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+          {tabs.map((tab) => (
+            <BookingCard
+              key={tab.key}
+              title={tab.label}
+              count={tab.count}
+              active={activeTab === tab.key}
+              onClick={() => navigate(`/vendor/bookings?tab=${tab.key}`)}
+            />
+          ))}
+        </div>
       </div>
 
       {activeTab === 'new' && (

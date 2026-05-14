@@ -26,7 +26,7 @@ export function AppShell() {
     <div className="optimile-vendor-root flex min-h-screen bg-background text-text">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden">
         {/* Suspended / Blacklisted banners */}
         {vendor?.status === 'SUSPENDED' && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-center text-sm text-amber-700">

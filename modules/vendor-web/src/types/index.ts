@@ -307,23 +307,31 @@ export interface Expense {
 }
 
 // ==================== FLEET TYPES ====================
-export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED'
-export type OperationalStatus = 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE'
+export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED' | 'PENDING_DOCS'
+export type OperationalStatus = 'ACTIVE' | 'INACTIVE'
 export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
 
 export interface Vehicle {
   id: string
   registrationNumber: string
+  vehicleType: string
+  manufacturer?: string
   model?: string
+  year?: string
+  fuelType?: string
   engineNumber?: string
   chassisNumber?: string
+  capacityKg?: string
+  baseLocation: string
+  operationalStatus: OperationalStatus
+  complianceStatus: ComplianceStatus
+  complianceDocuments: ComplianceDocument[]
+  blackoutDates: { from: string; to: string }[]
+  // legacy fields kept for existing mock data
   odometerReading?: string
-  manufacturer?: string
   manufactureDate?: string
   registrationDate?: string
-  vehicleType: string
   permitType?: string
-  capacityKg?: string
   capacityCubicMeter?: string
   capacityLiters?: string
   length?: string
@@ -334,32 +342,30 @@ export interface Vehicle {
   rcFileName?: string
   trackingSelections?: VehicleTrackingSelection[]
   additionalDocuments?: VehicleAdditionalDocument[]
-  baseLocation: string
-  operationalStatus: OperationalStatus
-  complianceStatus: ComplianceStatus
   gpsDeviceId?: string
-  complianceDocuments: ComplianceDocument[]
-  blackoutDates: { from: string; to: string }[]
 }
 
 export interface Driver {
   id: string
   name: string
-  dateOfBirth?: string
-  dlName?: string
-  dlVerified?: boolean
   mobile: string
   licenseNumber: string
-  dlValidTillDate?: string
-  gender?: 'Male' | 'Female' | 'Other'
-  email?: string
-  dlCopyFileName?: string
-  trackingSelections?: DriverTrackingSelection[]
   licenseExpiry: string
   licenseClass: string[]
   complianceStatus: ComplianceStatus
   currentStatus: DriverStatus
   complianceDocuments: ComplianceDocument[]
+  dateOfBirth?: string
+  gender?: 'Male' | 'Female' | 'Other'
+  email?: string
+  baseLocation?: string
+  aadhaarMasked?: string
+  // legacy fields
+  dlName?: string
+  dlVerified?: boolean
+  dlValidTillDate?: string
+  dlCopyFileName?: string
+  trackingSelections?: DriverTrackingSelection[]
 }
 
 export interface VehicleTrackingSelection {
@@ -387,6 +393,7 @@ export interface DriverTrackingSelection {
 export interface ComplianceDocument {
   id: string
   type: string
+  referenceNo?: string
   fileName: string
   fileUrl: string
   expiryDate: string
@@ -497,6 +504,10 @@ export interface NBFCApplication {
   advanceAmount: number
   charges: number
   netDisbursement: number
+  emailTitle?: string
+  recipientEmail?: string
+  emailDescription?: string
+  invoiceFileName?: string
 }
 
 export type ExceptionSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'

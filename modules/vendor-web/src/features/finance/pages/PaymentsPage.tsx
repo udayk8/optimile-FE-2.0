@@ -9,6 +9,15 @@ import type { Invoice, PaymentKind, PaymentRecord } from '@vendor/types'
 
 const PAGE_SIZE = 8
 
+const COLUMN_OPTIONS = [
+  { key: 'paymentId', label: 'Payment ID' },
+  { key: 'invoice', label: 'Invoice' },
+  { key: 'date', label: 'Date' },
+  { key: 'type', label: 'Type' },
+  { key: 'amount', label: 'Amount' },
+  { key: 'reference', label: 'Reference' },
+]
+
 const KIND_LABEL: Record<PaymentKind, string> = {
   PARTIAL_PAYMENT: 'Partial',
   FINAL_PAYMENT: 'Final',
@@ -97,8 +106,12 @@ export default function PaymentsPage() {
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
-          <h3 className="text-base font-semibold text-text">Payment history</h3>
-          <p className="mt-0.5 text-sm text-gray-500">{rows.length} payment{rows.length !== 1 ? 's' : ''} recorded</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-text">Payment history</h3>
+              <p className="mt-0.5 text-sm text-gray-500">{rows.length} payment{rows.length !== 1 ? 's' : ''} recorded</p>
+            </div>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -115,7 +128,7 @@ export default function PaymentsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pagedRows.length === 0 && (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-gray-500">No payments recorded yet.</td></tr>
+                <tr><td colSpan={COLUMN_OPTIONS.length} className="px-5 py-8 text-center text-sm text-gray-500">No payments recorded yet.</td></tr>
               )}
               {pagedRows.map(({ payment }) => (
                 <tr key={payment.id} className="hover:bg-gray-50">

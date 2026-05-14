@@ -14,6 +14,15 @@ const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
   { value: 'EXPIRED', label: 'Expired' },
 ]
 
+const COLUMN_OPTIONS = [
+  { key: 'contract', label: 'Contract' },
+  { key: 'customer', label: 'Customer' },
+  { key: 'route', label: 'Route' },
+  { key: 'status', label: 'Status' },
+  { key: 'validity', label: 'Validity' },
+  { key: 'rate', label: 'Rate' },
+]
+
 export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
@@ -51,8 +60,10 @@ export default function ContractsPage() {
             </button>
           ))}
         </div>
-        <input type="text" placeholder="Search by ID or customer..." value={search} onChange={(e) => setSearch(e.target.value)}
-          className="h-10 w-60 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
+        <div className="flex items-center gap-2">
+          <input type="text" placeholder="Search by ID or customer..." value={search} onChange={(e) => setSearch(e.target.value)}
+            className="h-10 w-60 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -76,28 +87,28 @@ export default function ContractsPage() {
               <tbody className="divide-y divide-gray-200">
                 {pagedContracts.map((contract) => (
                   <tr
-                    key={contract.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => navigate(`/vendor/contracts/${contract.id}`)}
-                  >
-                    <td className="px-5 py-4 font-mono text-sm font-semibold text-text">{contract.id}</td>
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-text">{contract.customerName}</div>
-                      <div className="mt-1 text-xs text-gray-500">{contract.customerGSTIN}</div>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-sm text-text">
-                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                        {contract.laneDetails.origin.city} → {contract.laneDetails.destination.city}
-                      </div>
-                    </td>
-                    <td className="px-5 py-4"><StatusBadge status={contract.status} /></td>
-                    <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityFrom)} — {formatDate(contract.validityTo)}</td>
-                    <td className="px-5 py-4 text-sm text-text">
-                      <span className="font-mono">
-                        ₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}/{contract.rateCard[0]?.rateType === 'PER_TRIP' ? 'trip' : 'km'}
-                      </span>
-                    </td>
+                  key={contract.id}
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => navigate(`/vendor/contracts/${contract.id}`)}
+                >
+                  <td className="px-5 py-4 font-mono text-sm font-semibold text-text">{contract.id}</td>
+                  <td className="px-5 py-4">
+                    <div className="font-semibold text-text">{contract.customerName}</div>
+                    <div className="mt-1 text-xs text-gray-500">{contract.customerGSTIN}</div>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-2 text-sm text-text">
+                      <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                      {contract.laneDetails.origin.city} → {contract.laneDetails.destination.city}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4"><StatusBadge status={contract.status} /></td>
+                  <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityFrom)} — {formatDate(contract.validityTo)}</td>
+                  <td className="px-5 py-4 text-sm text-text">
+                    <span className="font-mono">
+                      ₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}/{contract.rateCard[0]?.rateType === 'PER_TRIP' ? 'trip' : 'km'}
+                    </span>
+                  </td>
                   </tr>
                 ))}
               </tbody>

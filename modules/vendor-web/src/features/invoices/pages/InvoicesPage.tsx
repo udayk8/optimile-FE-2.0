@@ -195,13 +195,15 @@ export default function InvoicesPage() {
       {/* My Invoices */}
       {activeTab === 'list' && (
         <div>
-          <div className="mb-4 flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
-            {STATUS_FILTERS.map((f) => (
-              <button key={f.value} onClick={() => setStatusFilter(f.value)}
-                className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
-                {f.label}
-              </button>
-            ))}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+              {STATUS_FILTERS.map((f) => (
+                <button key={f.value} onClick={() => setStatusFilter(f.value)}
+                  className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             {filteredInvoices.length === 0 ? (
@@ -266,9 +268,11 @@ export default function InvoicesPage() {
                                 Edit &amp; Resubmit
                               </Button>
                             )}
-                            <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}>
-                              <Download className="h-4 w-4" />
-                            </Button>
+                            {(inv.status === 'APPROVED' || inv.status === 'PAID') && (
+                              <Button size="sm" variant="ghost" title="Download invoice PDF" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}>
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

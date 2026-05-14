@@ -10,9 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Wallet,
-  Banknote,
   ReceiptText,
   ShieldAlert,
+  Banknote,
 } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Create and track bills', icon: CreditCard },
   { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Invoices and payments', icon: Wallet },
   { path: '/vendor/ledger/payments', label: 'Payments', subtitle: 'Record invoice settlements', icon: ReceiptText },
-  { path: '/vendor/nbfc', label: 'Bill Discounting', subtitle: 'Finance and partner applications', icon: Banknote },
+  // { path: '/vendor/nbfc', label: 'Bill Discounting', subtitle: 'Early payment financing', icon: Banknote },
   { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]

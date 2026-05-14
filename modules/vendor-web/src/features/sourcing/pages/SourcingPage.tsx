@@ -91,117 +91,119 @@ export default function SourcingPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-bold">Auction</th>
-                  <th className="px-4 py-3 font-bold">Customer</th>
-                  <th className="px-4 py-3 font-bold">Route</th>
-                  <th className="px-4 py-3 font-bold">State</th>
-                  <th className="px-4 py-3 font-bold">Outcome</th>
-                  <th className="px-4 py-3 font-bold">Timing</th>
-                  <th className="px-4 py-3 font-bold text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {pagedAuctions.map((auction) => {
-                  const outcomeLabel = ENDING_STATES.includes(auction.state)
-                    ? auction.state === 'PENDING_AWARD'
-                      ? 'Pending Award'
-                      : auction.state === 'AWARDED'
-                        ? 'Awarded'
-                        : auction.state === 'NOT_AWARDED'
-                          ? 'Not Awarded'
-                          : 'Not Participated'
-                    : auction.state === 'LIVE'
-                      ? 'In Progress'
-                      : auction.state === 'UPCOMING'
-                        ? 'Scheduled'
-                        : 'Cancelled'
-                  const outcomeStatus = auction.state === 'CANCELLED'
-                    ? 'CANCELLED'
-                    : outcomeLabel.toUpperCase().replace(/ /g, '_')
-                  const timingLabel = auction.state === 'UPCOMING'
-                    ? 'Starts'
-                    : auction.state === 'LIVE'
-                      ? 'Ends'
-                      : auction.state === 'CANCELLED'
-                        ? 'Closed'
-                        : 'Finished'
-                  const timingValue = auction.state === 'UPCOMING' ? auction.startTime : auction.endTime
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-left">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3 font-bold">Auction</th>
+                    <th className="px-4 py-3 font-bold">Customer</th>
+                    <th className="px-4 py-3 font-bold">Route</th>
+                    <th className="px-4 py-3 font-bold">State</th>
+                    <th className="px-4 py-3 font-bold">Outcome</th>
+                    <th className="px-4 py-3 font-bold">Timing</th>
+                    <th className="px-4 py-3 font-bold text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {pagedAuctions.map((auction) => {
+                    const outcomeLabel = ENDING_STATES.includes(auction.state)
+                      ? auction.state === 'PENDING_AWARD'
+                        ? 'Pending Award'
+                        : auction.state === 'AWARDED'
+                          ? 'Awarded'
+                          : auction.state === 'NOT_AWARDED'
+                            ? 'Not Awarded'
+                            : 'Not Participated'
+                      : auction.state === 'LIVE'
+                        ? 'In Progress'
+                        : auction.state === 'UPCOMING'
+                          ? 'Scheduled'
+                          : 'Cancelled'
+                    const outcomeStatus = auction.state === 'CANCELLED'
+                      ? 'CANCELLED'
+                      : outcomeLabel.toUpperCase().replace(/ /g, '_')
+                    const timingLabel = auction.state === 'UPCOMING'
+                      ? 'Starts'
+                      : auction.state === 'LIVE'
+                        ? 'Ends'
+                        : auction.state === 'CANCELLED'
+                          ? 'Closed'
+                          : 'Finished'
+                    const timingValue = auction.state === 'UPCOMING' ? auction.startTime : auction.endTime
 
-                  return (
-                    <tr key={auction.id} className="align-top transition-colors hover:bg-gray-50">
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold text-text">{auction.id}</div>
-                        <div className="mt-1 text-xs text-gray-500">{auction.type}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-semibold text-text">{auction.customerName}</div>
-                        <div className="mt-1 text-xs text-gray-500">{auction.vehicleTypeRequired}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-start gap-2">
-                          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-                          <div>
-                            <div className="text-sm font-medium text-text">
-                              {auction.lanes.length === 1 && auction.lanes[0]
-                                ? `${auction.lanes[0].laneDetails.origin.city} → ${auction.lanes[0].laneDetails.destination.city}`
-                                : `${auction.lanes.length} lanes`}
+                    return (
+                      <tr key={auction.id} className="align-top transition-colors hover:bg-gray-50">
+                        <td className="px-5 py-4">
+                          <div className="font-mono text-sm font-semibold text-text">{auction.id}</div>
+                          <div className="mt-1 text-xs text-gray-500">{auction.type}</div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="font-semibold text-text">{auction.customerName}</div>
+                          <div className="mt-1 text-xs text-gray-500">{auction.vehicleTypeRequired}</div>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                            <div>
+                              <div className="text-sm font-medium text-text">
+                                {auction.lanes.length === 1 && auction.lanes[0]
+                                  ? `${auction.lanes[0].laneDetails.origin.city} → ${auction.lanes[0].laneDetails.destination.city}`
+                                  : `${auction.lanes.length} lanes`}
+                              </div>
+                              <div className="mt-1 text-xs text-gray-500">{auction.lanes.length === 1 ? 'Single lane' : 'Multi-lane auction'}</div>
                             </div>
-                            <div className="mt-1 text-xs text-gray-500">{auction.lanes.length === 1 ? 'Single lane' : 'Multi-lane auction'}</div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        {ENDING_STATES.includes(auction.state)
-                          ? <StatusBadge status="CANCELLED" label="Ended" />
-                          : <StatusBadge status={auction.state} />}
-                      </td>
-                      <td className="px-5 py-4">
-                        {activeTab === 'ENDED' ? (
-                          <StatusBadge status={outcomeStatus} label={outcomeLabel} />
-                        ) : (
-                          <span className="text-sm text-gray-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="text-sm font-medium text-text">{timingLabel}</div>
-                        <div className="mt-1 text-xs text-gray-500">{formatDateTime(timingValue)}</div>
-                        {auction.state === 'LIVE' && (
-                          <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
-                            <Clock className="h-3.5 w-3.5 text-gray-400" />
-                            <SLACountdown deadline={auction.endTime} showLabel={false} />
-                          </div>
-                        )}
-                        {auction.state === 'PENDING_AWARD' && (
-                          <div className="mt-2 text-xs text-gray-600">Awaiting award decision</div>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        {auction.state === 'CANCELLED' ? (
-                          <span className="text-sm text-gray-500">No Action</span>
-                        ) : auction.state === 'LIVE' ? (
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
-                            <Gavel className="mr-2 h-4 w-4" /> Enter
-                          </Button>
-                        ) : auction.state === 'UPCOMING' ? (
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
-                            <Gavel className="mr-2 h-4 w-4" /> View
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
-                            Details
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-5 py-4">
+                          {ENDING_STATES.includes(auction.state)
+                            ? <StatusBadge status="CANCELLED" label="Ended" />
+                            : <StatusBadge status={auction.state} />}
+                        </td>
+                        <td className="px-5 py-4">
+                          {activeTab === 'ENDED' ? (
+                            <StatusBadge status={outcomeStatus} label={outcomeLabel} />
+                          ) : (
+                            <span className="text-sm text-gray-500">-</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="text-sm font-medium text-text">{timingLabel}</div>
+                          <div className="mt-1 text-xs text-gray-500">{formatDateTime(timingValue)}</div>
+                          {auction.state === 'LIVE' && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                              <Clock className="h-3.5 w-3.5 text-gray-400" />
+                              <SLACountdown deadline={auction.endTime} showLabel={false} />
+                            </div>
+                          )}
+                          {auction.state === 'PENDING_AWARD' && (
+                            <div className="mt-2 text-xs text-gray-600">Awaiting award decision</div>
+                          )}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {auction.state === 'CANCELLED' ? (
+                            <span className="text-sm text-gray-500">No Action</span>
+                          ) : auction.state === 'LIVE' ? (
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
+                              <Gavel className="mr-2 h-4 w-4" /> Enter
+                            </Button>
+                          ) : auction.state === 'UPCOMING' ? (
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
+                              <Gavel className="mr-2 h-4 w-4" /> View
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
+                              Details
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
       {displayedAuctions.length > 0 && (

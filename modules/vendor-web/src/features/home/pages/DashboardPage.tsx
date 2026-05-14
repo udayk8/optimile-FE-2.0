@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Clock, Package, Gavel, Truck, AlertTriangle, Home, CalendarClock } from 'lucide-react'
+import { Clock, Package, Gavel, Truck, AlertTriangle, Home, CalendarClock, Banknote } from 'lucide-react'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const trips = useAppStore(state => state.trips)
   const vehicles = useAppStore(state => state.vehicles)
   const drivers = useAppStore(state => state.drivers)
+  const invoices = useAppStore(state => state.invoices)
 
   const pendingIndents = indents.filter(i => i.status === 'PENDING')
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
@@ -127,6 +128,28 @@ export default function DashboardPage() {
               <span className="text-gray-600">Total billable</span>
               <CurrencyDisplay amount={totalBillableAmount} className="font-semibold text-text" />
            </div>
+        </KPICard>
+
+        {/* Bill Discounting */}
+        <KPICard
+          title="Bill Discounting"
+          value={invoices.filter((invoice) => ['APPROVED', 'PAID', 'SUBMITTED'].includes(invoice.status) || invoice.nbfcDiscountingStatus).length}
+          insight="Early payment options"
+          icon={<Banknote className="h-4 w-4 text-primary" />}
+          onClick={() => navigate('/vendor/nbfc')}
+        >
+          <div className="mt-3 space-y-2 px-1">
+            <div className="text-xs text-gray-600">
+              <div className="flex items-center justify-between gap-4">
+                <span className="min-w-0 flex-1 truncate font-medium text-text">Approved invoices ready for funding</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">Open</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
+                <span className="truncate">View NBFC partners and applications</span>
+                <span className="truncate">Bills</span>
+              </div>
+            </div>
+          </div>
         </KPICard>
 
         {/* Active Bookings */}

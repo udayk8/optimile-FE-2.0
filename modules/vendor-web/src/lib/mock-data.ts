@@ -628,7 +628,7 @@ export const MOCK_VEHICLES: Vehicle[] = [
     rcFileName: 'rc-mh-12-pz-1010.pdf',
     trackingSelections: [{ type: 'Manual Tracking', checked: true, primarySet: true }],
     additionalDocuments: [],
-    baseLocation: 'Pune', operationalStatus: 'UNDER_MAINTENANCE', complianceStatus: 'COMPLIANT',
+    baseLocation: 'Pune', operationalStatus: 'INACTIVE', complianceStatus: 'COMPLIANT',
     complianceDocuments: [
       { id: 'doc6', type: 'Insurance', fileName: 'ins3.pdf', fileUrl: '/docs/ins3.pdf', expiryDate: '2027-01-01', status: 'VALID', uploadedAt: '2026-01-01' }
     ],
@@ -719,16 +719,25 @@ export const MOCK_INVOICES: Invoice[] = [
   }
 ]
 
+// Ledger rules: INVOICE_APPROVED → debit field. PAYMENT_RECEIVED + TDS_DEDUCTION → credit field.
+// Each fully-settled invoice: sum(credit entries) = debit → net = 0.
 export const MOCK_LEDGER: LedgerEntry[] = [
-  { id: 'led1', date: '2026-04-03', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-027 approved', credit: 35400, debit: 0, runningBalance: 35400 },
-  { id: 'led2', date: '2026-04-08', entryType: 'OTHER_DEDUCTION', description: 'Miscellaneous recovery against INV-2026-027', credit: 0, debit: 2400, runningBalance: 33000, documentUrl: '/deductions/od-apr-2026.pdf' },
-  { id: 'led3', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 148404 },
-  { id: 'led4', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 146096, documentUrl: '/tds/tds-apr-2026.pdf' },
-  { id: 'led5', date: '2026-05-02', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-029 approved', credit: 76700, debit: 0, runningBalance: 222796 },
-  { id: 'led6', date: '2026-05-06', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-030 approved', credit: 65844, debit: 0, runningBalance: 288640 },
-  { id: 'led7', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 401736, documentUrl: '/payments/pa-2026-028.pdf' },
-  { id: 'led8', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: 396736, documentUrl: '/penalties/sla-may-2026.pdf' },
-  { id: 'led9', date: '2026-05-18', entryType: 'PAYMENT_RECEIVED', description: 'Partial payment for INV-2026-029', credit: 35000, debit: 0, runningBalance: 431736, documentUrl: '/payments/pa-2026-029.pdf' },
+  // INV-2026-027 — fully settled (35,400 debit = 708 TDS + 34,692 payment)
+  { id: 'led1', date: '2026-04-03', entryType: 'INVOICE_APPROVED',  description: 'Invoice INV-2026-027 approved',            debit: 35400,  credit: 0,      runningBalance: 35400 },
+  { id: 'led2', date: '2026-04-10', entryType: 'TDS_DEDUCTION',     description: 'TDS @ 2% on INV-2026-027',                 debit: 0,      credit: 708,    runningBalance: 34692, documentUrl: '/tds/tds-inv-027.pdf' },
+  { id: 'led3', date: '2026-04-18', entryType: 'PAYMENT_RECEIVED',  description: 'Final payment for INV-2026-027',            debit: 0,      credit: 34692,  runningBalance: 0,     documentUrl: '/payments/pay-inv-027.pdf' },
+
+  // INV-2026-028 — fully settled (115,404 debit = 2,308 TDS + 113,096 payment)
+  { id: 'led4', date: '2026-04-15', entryType: 'INVOICE_APPROVED',  description: 'Invoice INV-2026-028 approved',            debit: 115404, credit: 0,      runningBalance: 115404 },
+  { id: 'led5', date: '2026-04-20', entryType: 'TDS_DEDUCTION',     description: 'TDS @ 2% on INV-2026-028',                 debit: 0,      credit: 2308,   runningBalance: 113096, documentUrl: '/tds/tds-inv-028.pdf' },
+  { id: 'led6', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED',  description: 'Final payment for INV-2026-028',            debit: 0,      credit: 113096, runningBalance: 0,      documentUrl: '/payments/pay-inv-028.pdf' },
+
+  // INV-2026-029 — partially settled (76,700 debit, 35,000 partial payment received, 41,700 outstanding)
+  { id: 'led7', date: '2026-05-02', entryType: 'INVOICE_APPROVED',  description: 'Invoice INV-2026-029 approved',            debit: 76700,  credit: 0,      runningBalance: 76700 },
+  { id: 'led8', date: '2026-05-18', entryType: 'PAYMENT_RECEIVED',  description: 'Partial payment for INV-2026-029',         debit: 0,      credit: 35000,  runningBalance: 41700,  documentUrl: '/payments/pay-inv-029-partial.pdf' },
+
+  // INV-2026-030 — pending (65,844 debit, no payments yet)
+  { id: 'led9', date: '2026-05-06', entryType: 'INVOICE_APPROVED',  description: 'Invoice INV-2026-030 approved',            debit: 65844,  credit: 0,      runningBalance: 107544 },
 ]
 
 export const MOCK_COMPANY_INFO: CompanyInfo = {

@@ -17,23 +17,48 @@ const historicalMonthlyData: Record<string, { invoiced: number; payments: number
   '2026-05': { invoiced: 490000, payments: 420000 },
 }
 
+const COLUMN_OPTIONS = [
+  { key: 'date', label: 'Date' },
+  { key: 'invoiceId', label: 'Invoice ID' },
+  { key: 'reference', label: 'Reference' },
+  { key: 'type', label: 'Type' },
+  { key: 'description', label: 'Description' },
+  { key: 'credit', label: 'Credit' },
+  { key: 'debit', label: 'Debit' },
+  { key: 'balance', label: 'Balance' },
+]
+
 export default function LedgerPage() {
-  const [fromDate, setFromDate] = useState('2026-06-01')
-  const [toDate, setToDate] = useState('2026-06-30')
+  const [fromDate, setFromDate] = useState('2026-04-01')
+  const [toDate, setToDate] = useState('2026-05-31')
   const [page, setPage] = useState(1)
   const { ledger } = useAppStore()
 
-  const filteredEntries = useMemo(
-    () => ledger.filter((entry) => entry.date >= fromDate && entry.date <= toDate),
-    [fromDate, toDate, ledger],
-  )
+  const ALLOWED_TYPES = ['INVOICE_APPROVED', 'PAYMENT_RECEIVED', 'TDS_DEDUCTION']
+
+  const filteredEntries = useMemo(() => {
+    const allowed = ledger
+      .filter((entry) =>
+        entry.date >= fromDate && entry.date <= toDate &&
+        ALLOWED_TYPES.includes(entry.entryType)
+      )
+      .sort((a, b) => a.date.localeCompare(b.date))
+
+    let balance = 0
+    return allowed.map((entry) => {
+      if (entry.entryType === 'INVOICE_APPROVED') balance += entry.debit
+      else if (entry.entryType === 'PAYMENT_RECEIVED') balance -= entry.credit
+      else if (entry.entryType === 'TDS_DEDUCTION') balance -= entry.credit
+      return { ...entry, runningBalance: balance }
+    })
+  }, [fromDate, toDate, ledger])
 
   const monthlyGraph = useMemo(() => {
     const liveByMonth: Record<string, { invoiced: number; payments: number }> = {}
     for (const entry of ledger) {
       const monthKey = entry.date.slice(0, 7)
       liveByMonth[monthKey] ??= { invoiced: 0, payments: 0 }
-      if (entry.entryType === 'INVOICE_APPROVED') liveByMonth[monthKey].invoiced += entry.credit
+      if (entry.entryType === 'INVOICE_APPROVED') liveByMonth[monthKey].invoiced += entry.debit
       if (entry.entryType === 'PAYMENT_RECEIVED') liveByMonth[monthKey].payments += entry.credit
     }
 
@@ -44,15 +69,17 @@ export default function LedgerPage() {
     })
   }, [])
 
-  const summary = useMemo(
-    () => ({
-      totalInvoiced: filteredEntries.reduce((sum, e) => sum + (e.entryType === 'INVOICE_APPROVED' ? e.credit : 0), 0),
+  const summary = useMemo(() => {
+    const totalInvoiced = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'INVOICE_APPROVED' ? e.debit : 0), 0)
+    const totalReceived = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'PAYMENT_RECEIVED' ? e.credit : 0), 0)
+    const tdsDeducted = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'TDS_DEDUCTION' ? e.credit : 0), 0)
+    return {
+      totalInvoiced,
       totalInvoicedCount: filteredEntries.filter((e) => e.entryType === 'INVOICE_APPROVED').length,
-      pendingPayments: filteredEntries.at(-1)?.runningBalance ?? 0,
-      tdsDeducted: filteredEntries.reduce((sum, e) => sum + (e.entryType === 'TDS_DEDUCTION' ? e.debit : 0), 0),
-    }),
-    [filteredEntries],
-  )
+      pendingPayments: Math.max(0, totalInvoiced - totalReceived - tdsDeducted),
+      tdsDeducted,
+    }
+  }, [filteredEntries])
 
   const totalPages = Math.max(1, Math.ceil(filteredEntries.length / 10))
   const safePage = Math.min(page, totalPages)
@@ -156,10 +183,12 @@ export default function LedgerPage() {
             <p className="mt-1 text-sm text-gray-500">Chronological financial history with running balance.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button>
-              Export Statement
-              <Download className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button>
+                Export Statement
+                <Download className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -171,8 +200,8 @@ export default function LedgerPage() {
                 <th className="p-4">Reference</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Description</th>
-                <th className="p-4 text-right">Credit</th>
                 <th className="p-4 text-right">Debit</th>
+                <th className="p-4 text-right">Credit</th>
                 <th className="p-4 text-right">Balance</th>
               </tr>
             </thead>
@@ -182,10 +211,20 @@ export default function LedgerPage() {
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                   <td className="p-4 font-mono text-xs font-semibold text-text">{row.entryType === 'INVOICE_APPROVED' || row.entryType === 'PAYMENT_RECEIVED' ? row.description.match(/INV-\d{4}-\d{3}/)?.[0] ?? '-' : '-'}</td>
                   <td className="p-4 font-mono text-xs text-gray-500">{row.id}</td>
-                  <td className="p-4 font-medium text-text">{row.entryType.replace('_', ' ')}</td>
+                  <td className="p-4 font-medium text-text">
+                    {row.entryType === 'INVOICE_APPROVED' ? 'Invoice Approved'
+                      : row.entryType === 'PAYMENT_RECEIVED' ? (row.description.toLowerCase().includes('partial') ? 'Partial Payment' : 'Final Payment')
+                      : row.entryType === 'TDS_DEDUCTION' ? 'TDS Deduction'
+                      : row.entryType}
+                  </td>
                   <td className="p-4 text-gray-600">{row.description}</td>
-                  <td className="p-4 text-right font-medium text-emerald-600">{row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
-                  <td className="p-4 text-right font-medium text-rose-600">{row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
+                  <td className="p-4 text-right font-medium text-rose-600">
+                    {row.entryType === 'INVOICE_APPROVED' ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}
+                  </td>
+                  <td className="p-4 text-right font-medium text-emerald-600">
+                    {row.entryType === 'PAYMENT_RECEIVED' || row.entryType === 'TDS_DEDUCTION'
+                      ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}
+                  </td>
                   <td className="p-4 text-right font-mono">₹{row.runningBalance.toLocaleString('en-IN')}</td>
                 </tr>
               ))}

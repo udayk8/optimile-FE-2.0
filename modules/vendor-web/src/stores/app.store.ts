@@ -78,6 +78,10 @@ interface AppState {
     advanceAmount: number
     charges: number
     netDisbursement: number
+    emailTitle?: string
+    recipientEmail?: string
+    emailDescription?: string
+    invoiceFileName?: string
   }) => void
   markNbfcApplicationStatus: (invoiceId: string, status: Exclude<NBFCDiscountingStatus, 'ELIGIBLE'>) => void
   createException: (payload: {
@@ -121,7 +125,7 @@ export const useAppStore = create<AppState>((set) => ({
         paymentKind: entry.entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION' : entry.description.includes('Partial') ? 'PARTIAL_PAYMENT' : 'FINAL_PAYMENT',
         paymentDate: entry.date,
         cashAmount: entry.entryType === 'TDS_DEDUCTION' ? 0 : entry.credit,
-        tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.debit : 0,
+        tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.credit : 0,
         referenceNumber: entry.id.toUpperCase(),
         note: entry.description,
         status: 'POSTED',
@@ -152,7 +156,7 @@ export const useAppStore = create<AppState>((set) => ({
       customerName: 'Mahindra CIE',
       partnerId: 'nbfc-2',
       partnerName: 'Prime Credit',
-      status: 'APPROVED',
+      status: 'SUBMITTED',
       appliedAt: '2026-05-03T09:00:00Z',
       approvedAt: '2026-05-04T14:00:00Z',
       referenceNumber: 'NBFC-884212',
@@ -428,8 +432,8 @@ export const useAppStore = create<AppState>((set) => ({
           date: paymentDate,
           entryType: 'TDS_DEDUCTION',
           description: `TDS deduction against ${invoice.invoiceNumber}`,
-          credit: 0,
-          debit: tdsAmount,
+          credit: tdsAmount,
+          debit: 0,
           runningBalance: nextBalanceAfterTds,
           documentUrl: referenceNumber ? `/tds/${referenceNumber}.pdf` : undefined,
         }
@@ -473,7 +477,7 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 
-  submitNbfcApplication: ({ invoiceId, invoiceNumber, customerName, partnerId, partnerName, advanceAmount, charges, netDisbursement }) =>
+  submitNbfcApplication: ({ invoiceId, invoiceNumber, customerName, partnerId, partnerName, advanceAmount, charges, netDisbursement, emailTitle, recipientEmail, emailDescription, invoiceFileName }) =>
     set((state) => {
       const application: NBFCApplication = {
         id: `nbfc-app-${Math.floor(100 + Math.random() * 900)}`,
@@ -488,6 +492,10 @@ export const useAppStore = create<AppState>((set) => ({
         advanceAmount,
         charges,
         netDisbursement,
+        emailTitle,
+        recipientEmail,
+        emailDescription,
+        invoiceFileName,
       }
 
       return {
