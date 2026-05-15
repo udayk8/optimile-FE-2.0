@@ -117,9 +117,9 @@ export default function DashboardPage() {
 
         <KpiCard
           title="Finance"
-          value={invoices.length}
+          value={invoices.filter((invoice) => ['APPROVED', 'PAID', 'SUBMITTED'].includes(invoice.status)).length}
           unit="entries"
-          insight="Ledger, payments, and bill discounting"
+          insight="Ledger and payments"
           icon={<Wallet className="h-4 w-4 text-primary" />}
           onClick={() => navigate('/vendor/ledger')}
         >
