@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
@@ -8,12 +8,18 @@ import { useAppStore } from '@auction/stores/app.store'
 import { Badge } from '@auction/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDateTime } from '@auction/lib/date-utils'
+import { fetchRfqs } from '@auction/services/sourcing.service'
+import type { RfqType } from '@auction/types'
 
 const PAGE_SIZE = 10
 
 export default function RfqPage() {
   const navigate = useNavigate()
-  const { rfqs } = useAppStore()
+  const storeRfqs = useAppStore((s) => s.rfqs)
+  const [rfqs, setRfqs] = useState<RfqType[]>(storeRfqs)
+  useEffect(() => {
+    fetchRfqs().then(setRfqs).catch(() => undefined)
+  }, [])
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)

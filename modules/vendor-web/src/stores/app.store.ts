@@ -1,5 +1,10 @@
 import { create } from 'zustand'
 import apiClient, { auctionClient } from '@vendor/lib/api-client'
+import * as Bookings from '@vendor/services/bookings.service'
+import { NotificationService } from '@vendor/services/notifications.service'
+import { ExceptionService } from '@vendor/services/exceptions.service'
+import { ExpenseService, InvoiceService, DisputeService } from '@vendor/services/finance.service'
+import { SourcingService } from '@vendor/services/sourcing.service'
 import {
   MOCK_INDENTS,
   MOCK_TRIPS,
@@ -187,7 +192,8 @@ export const useAppStore = create<AppState>((set) => ({
   notifications: [...MOCK_NOTIFICATIONS],
   disputes: [...MOCK_DISPUTES],
 
-  acceptIndent: (indentId, vehicleId, driverId) =>
+  acceptIndent: (indentId, vehicleId, driverId) => {
+    Bookings.acceptBooking(indentId, vehicleId, driverId).catch(() => undefined)
     set((state) => {
       const indentIndex = state.indents.findIndex((i) => i.id === indentId)
       if (indentIndex === -1) return state
@@ -209,7 +215,7 @@ export const useAppStore = create<AppState>((set) => ({
         assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
         assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
         status: 'DISPATCHED',
-        freightRate: 0, // Should come from contract, simplify for now
+        freightRate: 0,
         expenseSummary: { total: 0, approved: 0, pending: 0 },
         isInvoiced: false,
         createdAt: new Date().toISOString(),
@@ -219,19 +225,27 @@ export const useAppStore = create<AppState>((set) => ({
         indents: updatedIndents,
         trips: [newTrip, ...state.trips],
       }
-    }),
+    })
+  },
 
-  declineIndent: (indentId) =>
+  declineIndent: (indentId) => {
+    Bookings.declineBooking(indentId).catch(() => undefined)
     set((state) => {
       const indentIndex = state.indents.findIndex((i) => i.id === indentId)
       if (indentIndex === -1) return state
-      
+
       const updatedIndents = [...state.indents]
       updatedIndents[indentIndex] = { ...state.indents[indentIndex], status: 'DECLINED' } as Indent
       return { indents: updatedIndents }
-    }),
+    })
+  },
 
-  submitBid: (auctionId, laneId, amount) =>
+  submitBid: (auctionId, laneId, amount) => {
+    SourcingService.placeBid(auctionId, laneId, {
+      vendorId: 'a1000000-0000-0000-0000-000000000001',
+      vendorName: 'Vendor',
+      amount,
+    }).catch(() => undefined)
     set((state) => {
       const auctionIndex = state.auctions.findIndex((a) => a.id === auctionId)
       if (auctionIndex === -1) return state
@@ -270,25 +284,35 @@ export const useAppStore = create<AppState>((set) => ({
       updatedAuctions[auctionIndex] = updatedAuction
 
       return { auctions: updatedAuctions }
-    }),
+    })
+  },
 
-  addVehicle: (vehicle) =>
-    set((state) => ({ vehicles: [vehicle, ...state.vehicles] })),
+  addVehicle: (vehicle) => {
+    apiClient.post('/fleet/vehicles', vehicle).catch(() => undefined)
+    set((state) => ({ vehicles: [vehicle, ...state.vehicles] }))
+  },
 
-  updateVehicle: (vehicle) =>
+  updateVehicle: (vehicle) => {
+    apiClient.put(`/fleet/vehicles/${vehicle.id}`, vehicle).catch(() => undefined)
     set((state) => ({
       vehicles: state.vehicles.map((item) => (item.id === vehicle.id ? vehicle : item)),
-    })),
+    }))
+  },
 
-  addDriver: (driver) =>
-    set((state) => ({ drivers: [driver, ...state.drivers] })),
+  addDriver: (driver) => {
+    apiClient.post('/fleet/drivers', driver).catch(() => undefined)
+    set((state) => ({ drivers: [driver, ...state.drivers] }))
+  },
 
-  updateDriver: (driver) =>
+  updateDriver: (driver) => {
+    apiClient.put(`/fleet/drivers/${driver.id}`, driver).catch(() => undefined)
     set((state) => ({
       drivers: state.drivers.map((item) => (item.id === driver.id ? driver : item)),
-    })),
+    }))
+  },
 
-  addExpense: (expense) =>
+  addExpense: (expense) => {
+    ExpenseService.create(expense).catch(() => undefined)
     set((state) => {
       const tripIndex = state.trips.findIndex((t) => t.id === expense.tripId)
       const existingExpense = state.expenses.find((item) => item.tripId === expense.tripId)
@@ -320,9 +344,11 @@ export const useAppStore = create<AppState>((set) => ({
         expenses: updatedExpenses,
         trips: updatedTrips,
       }
-    }),
+    })
+  },
 
-  generateInvoice: (payload) =>
+  generateInvoice: (payload) => {
+    InvoiceService.create({ bookingIds: payload.tripIds, lineItems: [] }).catch(() => undefined)
     set((state) => {
       const { tripIds, invoiceDate = new Date().toISOString(), dueDate, gstRate = 12, invoiceNumber } = payload
       if (tripIds.length === 0) return state
@@ -390,7 +416,8 @@ export const useAppStore = create<AppState>((set) => ({
         invoices: [newInvoice, ...state.invoices],
         trips: updatedTrips
       }
-    }),
+    })
+  },
 
   recordInvoicePayment: ({ invoiceId, paymentKind, paymentDate, cashAmount, tdsAmount, referenceNumber, note }) =>
     set((state) => {
@@ -536,7 +563,8 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 
-  createException: ({ bookingId, route, vehicle, driver, issueType, severity, description, evidence = [] }) =>
+  createException: ({ bookingId, route, vehicle, driver, issueType, severity, description, evidence = [] }) => {
+    ExceptionService.create({ bookingId, route, vehicle, driver, issueType, severity, description, evidence }).catch(() => undefined)
     set((state) => {
       const timestamp = new Date().toISOString()
       const exception: ExceptionRecord = {
@@ -567,9 +595,11 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         exceptions: [exception, ...state.exceptions],
       }
-    }),
+    })
+  },
 
-  updateExceptionStatus: (exceptionId, status, notes) =>
+  updateExceptionStatus: (exceptionId, status, notes) => {
+    ExceptionService.patchStatus(exceptionId, status, notes).catch(() => undefined)
     set((state) => ({
       exceptions: state.exceptions.map((exception) => {
         if (exception.id !== exceptionId) return exception
@@ -609,31 +639,36 @@ export const useAppStore = create<AppState>((set) => ({
           ],
         }
       }),
-    })),
+    }))
+  },
 
   addCapacityDeclaration: (declaration) =>
     set((state) => ({ capacity: [declaration, ...state.capacity] })),
 
-  markNotificationRead: (notificationId) =>
+  markNotificationRead: (notificationId) => {
+    NotificationService.markRead(notificationId).catch(() => undefined)
     set((state) => ({
       notifications: state.notifications.map((notification) =>
         notification.id === notificationId ? { ...notification, isRead: true } : notification
       ),
-    })),
+    }))
+  },
 
-  markAllNotificationsRead: () =>
+  markAllNotificationsRead: () => {
+    NotificationService.markAllRead().catch(() => undefined)
     set((state) => ({
       notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
-    })),
+    }))
+  },
 
   addNotification: (notification) =>
     set((state) => ({ notifications: [notification, ...state.notifications] })),
 
   loadBackendData: async () => {
     const vendorId = 'a1000000-0000-0000-0000-000000000001'
+    const PENDING_STATUSES = new Set(['PENDING', 'ACCEPTED', 'DECLINED', 'EXPIRED'])
     const [
-      indents,
-      trips,
+      bookings,
       vehicles,
       drivers,
       expenses,
@@ -646,8 +681,7 @@ export const useAppStore = create<AppState>((set) => ({
       contracts,
       disputes,
     ] = await Promise.all([
-      apiClient.get('/indents').then((r) => r.data),
-      apiClient.get('/trips').then((r) => r.data),
+      apiClient.get('/bookings').then((r) => r.data),
       apiClient.get('/fleet/vehicles').then((r) => r.data),
       apiClient.get('/fleet/drivers').then((r) => r.data),
       apiClient.get('/expenses').then((r) => r.data),
@@ -661,9 +695,10 @@ export const useAppStore = create<AppState>((set) => ({
       apiClient.get('/disputes').then((r) => r.data),
     ])
 
+    const allBookings = bookings as any[]
     set({
-      indents: indents as Indent[],
-      trips: trips as Trip[],
+      indents: allBookings.filter((b) => PENDING_STATUSES.has(b.status)) as Indent[],
+      trips: allBookings.filter((b) => !PENDING_STATUSES.has(b.status)) as Trip[],
       vehicles: vehicles as Vehicle[],
       drivers: drivers as Driver[],
       expenses: expenses as Expense[],
@@ -678,7 +713,8 @@ export const useAppStore = create<AppState>((set) => ({
     })
   },
 
-  raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) =>
+  raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) => {
+    InvoiceService.dispute(invoiceId, reason).catch(() => undefined)
     set((state) => {
       if (state.disputes.find((d) => d.invoiceId === invoiceId)) return state
       const num = state.disputes.length + 1
@@ -693,7 +729,8 @@ export const useAppStore = create<AppState>((set) => ({
         updatedAt: new Date().toISOString(),
       }
       return { disputes: [newDispute, ...state.disputes] }
-    }),
+    })
+  },
 
   updateDisputeStatus: (disputeId, status, notes) =>
     set((state) => ({

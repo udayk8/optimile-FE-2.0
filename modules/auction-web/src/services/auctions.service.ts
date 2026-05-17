@@ -64,9 +64,7 @@ export async function rejectAuction(auctionId: string, reason?: string) {
 
 // Lookups
 export async function fetchVendors(search?: string): Promise<VendorOption[]> {
-  const res = search
-    ? await apiClient.get('/vendors/lookup', { params: { search } })
-    : await apiClient.get('/vendors')
+  const res = await apiClient.get('/vendors', { params: search ? { search } : undefined })
   return res.data
 }
 

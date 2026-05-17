@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
@@ -8,12 +8,18 @@ import { useAppStore } from '@auction/stores/app.store'
 import { Badge } from '@auction/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDateTime } from '@auction/lib/date-utils'
+import { fetchRfis } from '@auction/services/sourcing.service'
+import type { RfiType } from '@auction/types'
 
 const PAGE_SIZE = 10
 
 export default function RfiPage() {
   const navigate = useNavigate()
-  const { rfis } = useAppStore()
+  const storeRfis = useAppStore((s) => s.rfis)
+  const [rfis, setRfis] = useState<RfiType[]>(storeRfis)
+  useEffect(() => {
+    fetchRfis().then(setRfis).catch(() => undefined)
+  }, [])
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
