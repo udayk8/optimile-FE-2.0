@@ -1,38 +1,55 @@
-import { useState, useMemo } from 'react'
+﻿import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
-import { useAppStore } from '@auction/stores/app.store'
 import { Badge } from '@auction/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDateTime } from '@auction/lib/date-utils'
 import { Users } from 'lucide-react'
+import type { RfiType, RfqType } from '@auction/types'
+import { fetchRfis, fetchRfqs } from '@auction/services/sourcing.service'
 
 const PAGE_SIZE = 10
 
 export default function SourcingPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { rfis, rfqs } = useAppStore()
 
   const activeTab = searchParams.get('tab') === 'RFQ' ? 'RFQ' : 'RFI'
-  
+
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  // --- RFI LOGIC ---
+  const [rfis, setRfis] = useState<RfiType[]>([])
+  const [rfqs, setRfqs] = useState<RfqType[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    Promise.all([
+      fetchRfis({ search: search || undefined }),
+      fetchRfqs({ search: search || undefined }),
+    ])
+      .then(([rfiData, rfqData]) => {
+        setRfis(rfiData)
+        setRfqs(rfqData)
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [search])
+
   const filteredRfis = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return rfis.filter((rfi) => {
-      return (
-        query.length === 0 ||
-        rfi.id.toLowerCase().includes(query) ||
-        rfi.title.toLowerCase().includes(query) ||
-        rfi.createdBy.toLowerCase().includes(query)
-      )
-    })
+    return rfis.filter((rfi) => (
+      query.length === 0 ||
+      rfi.id.toLowerCase().includes(query) ||
+      rfi.title.toLowerCase().includes(query) ||
+      rfi.createdBy.toLowerCase().includes(query)
+    ))
   }, [rfis, search])
 
   const rfiColumns = useMemo<DataTableColumn<(typeof filteredRfis)[number]>[]>(
@@ -60,17 +77,14 @@ export default function SourcingPage() {
     [navigate]
   )
 
-  // --- RFQ LOGIC ---
   const filteredRfqs = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return rfqs.filter((rfq) => {
-      return (
-        query.length === 0 ||
-        rfq.id.toLowerCase().includes(query) ||
-        rfq.title.toLowerCase().includes(query) ||
-        rfq.createdBy.toLowerCase().includes(query)
-      )
-    })
+    return rfqs.filter((rfq) => (
+      query.length === 0 ||
+      rfq.id.toLowerCase().includes(query) ||
+      rfq.title.toLowerCase().includes(query) ||
+      rfq.createdBy.toLowerCase().includes(query)
+    ))
   }, [rfqs, search])
 
   const rfqColumns = useMemo<DataTableColumn<(typeof filteredRfqs)[number]>[]>(
@@ -119,10 +133,7 @@ export default function SourcingPage() {
             <CardTitle>{activeTab === 'RFI' ? 'RFI Campaigns' : 'RFQ Events'}</CardTitle>
             <Input
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
+              onChange={(event) => { setSearch(event.target.value); setPage(1) }}
               placeholder="Search by ID, title, or creator"
               className="w-full lg:w-[320px]"
             />
@@ -132,14 +143,8 @@ export default function SourcingPage() {
               type="button"
               variant="ghost"
               size="sm"
-              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
-                activeTab === 'RFI' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
-              }`}
-              onClick={() => {
-                setSearchParams({ tab: 'RFI' })
-                setPage(1)
-                setSearch('')
-              }}
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${activeTab === 'RFI' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'}`}
+              onClick={() => { setSearchParams({ tab: 'RFI' }); setPage(1); setSearch('') }}
             >
               RFI Campaigns
             </Button>
@@ -147,20 +152,19 @@ export default function SourcingPage() {
               type="button"
               variant="ghost"
               size="sm"
-              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
-                activeTab === 'RFQ' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
-              }`}
-              onClick={() => {
-                setSearchParams({ tab: 'RFQ' })
-                setPage(1)
-                setSearch('')
-              }}
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${activeTab === 'RFQ' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'}`}
+              onClick={() => { setSearchParams({ tab: 'RFQ' }); setPage(1); setSearch('') }}
             >
               Request for Quotations (RFQs)
             </Button>
           </div>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              Failed to load data: {error}
+            </div>
+          )}
           {activeTab === 'RFI' ? (
             <DataTable
               rows={filteredRfis}
@@ -169,7 +173,7 @@ export default function SourcingPage() {
               page={page}
               onPageChange={setPage}
               pageSize={PAGE_SIZE}
-              emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No RFI campaigns found.</div>}
+              emptyState={loading ? <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">Loading...</div> : <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No RFI campaigns found.</div>}
             />
           ) : (
             <DataTable
@@ -179,7 +183,7 @@ export default function SourcingPage() {
               page={page}
               onPageChange={setPage}
               pageSize={PAGE_SIZE}
-              emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No RFQs found.</div>}
+              emptyState={loading ? <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">Loading...</div> : <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No RFQs found.</div>}
             />
           )}
         </CardContent>

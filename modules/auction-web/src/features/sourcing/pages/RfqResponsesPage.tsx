@@ -1,14 +1,15 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
-import { useAppStore } from '@auction/stores/app.store'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDate } from '@auction/lib/date-utils'
 import { formatCurrency } from '@auction/lib/currency-utils'
 import { FileSpreadsheet, Upload, X } from 'lucide-react'
-import type { RfqResponse } from '@auction/types'
+import type { RfqResponse, RfqResponseRow, RfqType } from '@auction/types'
+import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/services/rfq-responses.service'
+import { fetchRfqs } from '@auction/services/sourcing.service'
 
 const PAGE_SIZE = 15
 
@@ -23,17 +24,49 @@ type FlatRow = {
 }
 
 export default function RfqResponsesPage() {
-  const { rfqResponses, addRfqResponse } = useAppStore()
-
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [vendorName, setVendorName] = useState('')
+  const [quoteRows, setQuoteRows] = useState('')
+  const [rfqs, setRfqs] = useState<RfqType[]>([])
+  const [selectedRfqId, setSelectedRfqId] = useState('')
   const [uploading, setUploading] = useState(false)
 
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
+
+  const [rfqResponses, setRfqResponses] = useState<RfqResponse[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadResponses = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    fetchAllRfqResponses({
+      search: search || undefined,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
+    })
+      .then(setRfqResponses)
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [dateFrom, dateTo, search])
+
+  useEffect(() => {
+    loadResponses()
+  }, [loadResponses])
+
+  useEffect(() => {
+    fetchRfqs()
+      .then((data) => {
+        setRfqs(data)
+        setSelectedRfqId((current) => current || data[0]?.id || '')
+      })
+      .catch(() => setRfqs([]))
+  }, [])
 
   const allRows = useMemo<FlatRow[]>(() => {
     const rows: FlatRow[] = []
@@ -119,34 +152,63 @@ export default function RfqResponsesPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) setFileName(file.name)
+    if (file) {
+      setFileName(file.name)
+      setSelectedFile(file)
+    }
   }
 
   const clearFile = (e: React.MouseEvent) => {
     e.stopPropagation()
     setFileName('')
+    setSelectedFile(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const handleUpload = () => {
-    if (!fileName) return
-    setUploading(true)
-    setTimeout(() => {
-      addRfqResponse({
-        fileName,
-        vendorName: vendorName.trim() || undefined,
-        rows: [
-          { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: Math.round(8000 + Math.random() * 2000) },
-          { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: Math.round(11000 + Math.random() * 2000) },
-          { lane: 'Delhi → Jaipur', vehicleType: '20ft Container', price: Math.round(8500 + Math.random() * 2000) },
-        ],
+  const parseRows = async (): Promise<RfqResponseRow[]> => {
+    const raw = quoteRows.trim() || (selectedFile?.name.toLowerCase().endsWith('.csv') ? await selectedFile.text() : '')
+    if (!raw) throw new Error('Add quote rows manually or upload a CSV file.')
+
+    return raw
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line, index) => {
+        const [lane, vehicleType, priceText] = line.split(',').map((part) => part.trim())
+        const price = Number(priceText)
+        if (!lane || !vehicleType || !Number.isFinite(price)) {
+          throw new Error(`Invalid quote row ${index + 1}. Use: lane, vehicle type, price`)
+        }
+        return { lane, vehicleType, price }
       })
+  }
+
+  const handleUpload = async () => {
+    if (!selectedRfqId) {
+      setError('Select an RFQ before uploading a response.')
+      return
+    }
+    if (!fileName && !quoteRows.trim()) return
+    setUploading(true)
+    try {
+      const rows = await parseRows()
+      const uploaded = await uploadRfqResponse(selectedRfqId, {
+        fileName: fileName || 'manual-response.csv',
+        vendorName: vendorName || undefined,
+        rows,
+      })
+      setRfqResponses((current) => [uploaded, ...current])
       setFileName('')
+      setSelectedFile(null)
       setVendorName('')
+      setQuoteRows('')
       if (fileRef.current) fileRef.current.value = ''
-      setUploading(false)
       setPage(1)
-    }, 700)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to upload RFQ response.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const hasFilters = search || dateFrom || dateTo
@@ -169,8 +231,22 @@ export default function RfqResponsesPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="space-y-1.5 lg:w-64">
+              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">RFQ *</label>
+              <select
+                value={selectedRfqId}
+                onChange={(event) => setSelectedRfqId(event.target.value)}
+                className="flex h-10 w-full rounded-md border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none focus:border-primary"
+              >
+                {rfqs.length === 0 && <option value="">No RFQs available</option>}
+                {rfqs.map((rfq) => (
+                  <option key={rfq.id} value={rfq.id}>{rfq.title}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="flex-1 space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Excel / CSV File *</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Excel / CSV File</label>
               <div
                 className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-[#CBD5E1] bg-[#F8FAFC] px-4 py-3 transition-colors hover:border-primary"
                 onClick={() => fileRef.current?.click()}
@@ -197,10 +273,19 @@ export default function RfqResponsesPage() {
               />
             </div>
 
-            <Button disabled={!fileName || uploading} onClick={handleUpload} className="shrink-0">
+            <Button disabled={(!fileName && !quoteRows.trim()) || uploading || !selectedRfqId} onClick={handleUpload} className="shrink-0">
               <Upload className="mr-2 h-4 w-4" />
-              {uploading ? 'Uploading…' : 'Upload'}
+              {uploading ? 'Uploading...' : 'Upload'}
             </Button>
+          </div>
+          <div className="mt-4 space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Quote rows</label>
+            <textarea
+              value={quoteRows}
+              onChange={(event) => setQuoteRows(event.target.value)}
+              placeholder="Mumbai to Pune, 20ft Container, 8500"
+              className="min-h-24 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none focus:border-primary"
+            />
           </div>
         </CardContent>
       </Card>
@@ -247,6 +332,11 @@ export default function RfqResponsesPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              Failed to load responses: {error}
+            </div>
+          )}
           <DataTable
             rows={filteredRows}
             columns={columns}
@@ -256,7 +346,7 @@ export default function RfqResponsesPage() {
             pageSize={PAGE_SIZE}
             emptyState={
               <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">
-                No responses found. Upload an RFQ response Excel to get started.
+                {loading ? 'Loading...' : 'No responses found. Upload an RFQ response Excel to get started.'}
               </div>
             }
           />

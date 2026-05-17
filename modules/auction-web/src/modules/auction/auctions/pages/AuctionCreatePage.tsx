@@ -752,9 +752,9 @@ export default function AuctionCreatePage() {
         basePriceSource: 'MANUAL' as const,
         allocationMode: lane.allocationMode,
         allocation: {
-          r1: Number(lane.r1),
-          r2: Number(lane.r2),
-          r3: Number(lane.r3),
+          l1: Number(lane.r1),
+          l2: Number(lane.r2),
+          l3: Number(lane.r3),
         },
         eligibleVendorIds: vendors.map((item) => item.id),
       })),

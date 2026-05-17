@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import apiClient, { auctionClient } from '@vendor/lib/api-client'
 import {
   MOCK_INDENTS,
   MOCK_TRIPS,
@@ -99,6 +100,7 @@ interface AppState {
   markNotificationRead: (notificationId: string) => void
   markAllNotificationsRead: () => void
   addNotification: (notification: Notification) => void
+  loadBackendData: () => Promise<void>
   resetStore: () => void
 }
 
@@ -626,6 +628,55 @@ export const useAppStore = create<AppState>((set) => ({
 
   addNotification: (notification) =>
     set((state) => ({ notifications: [notification, ...state.notifications] })),
+
+  loadBackendData: async () => {
+    const vendorId = 'a1000000-0000-0000-0000-000000000001'
+    const [
+      indents,
+      trips,
+      vehicles,
+      drivers,
+      expenses,
+      invoices,
+      ledger,
+      payments,
+      exceptions,
+      notifications,
+      auctions,
+      contracts,
+      disputes,
+    ] = await Promise.all([
+      apiClient.get('/indents').then((r) => r.data),
+      apiClient.get('/trips').then((r) => r.data),
+      apiClient.get('/fleet/vehicles').then((r) => r.data),
+      apiClient.get('/fleet/drivers').then((r) => r.data),
+      apiClient.get('/expenses').then((r) => r.data),
+      apiClient.get('/invoices').then((r) => r.data),
+      apiClient.get('/ledger').then((r) => r.data),
+      apiClient.get('/payments').then((r) => r.data),
+      apiClient.get('/exceptions').then((r) => r.data),
+      apiClient.get('/notifications').then((r) => r.data),
+      auctionClient.get(`/auctions?invitedVendorId=${vendorId}`).then((r) => r.data),
+      auctionClient.get(`/contracts?vendorId=${vendorId}`).then((r) => r.data),
+      apiClient.get('/disputes').then((r) => r.data),
+    ])
+
+    set({
+      indents: indents as Indent[],
+      trips: trips as Trip[],
+      vehicles: vehicles as Vehicle[],
+      drivers: drivers as Driver[],
+      expenses: expenses as Expense[],
+      invoices: invoices as Invoice[],
+      ledger: ledger as LedgerEntry[],
+      payments: payments as PaymentRecord[],
+      exceptions: exceptions as ExceptionRecord[],
+      notifications: notifications as Notification[],
+      auctions: auctions as Auction[],
+      contracts: contracts as Contract[],
+      disputes: disputes as Dispute[],
+    })
+  },
 
   raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) =>
     set((state) => {

@@ -38,7 +38,7 @@ export default function RfqPage() {
       { key: 'createdBy', header: 'Created By', render: (rfq) => <span className="text-sm text-[#0F172A]">{rfq.createdBy}</span> },
       { key: 'createdAt', header: 'Created At', render: (rfq) => <span className="text-sm text-[#0F172A]">{formatDateTime(rfq.createdAt)}</span> },
       { key: 'deadline', header: 'Deadline', render: (rfq) => <span className="text-sm text-[#0F172A]">{formatDateTime(rfq.deadline)}</span> },
-      { key: 'onboarded', header: 'Onboarded', align: 'right', render: (rfq) => <span className="text-sm text-[#0F172A]">{rfq.invitedVendorIds.length}</span> },
+      { key: 'onboarded', header: 'Onboarded', align: 'right', render: (rfq) => <span className="text-sm text-[#0F172A]">{((rfq as any).invitedVendorIds ?? []).length}</span> },
       { key: 'external', header: 'External', align: 'right', render: (rfq) => <span className="text-sm text-[#0F172A]">{rfq.targetEmails?.length || 0}</span> },
       {
         key: 'action',

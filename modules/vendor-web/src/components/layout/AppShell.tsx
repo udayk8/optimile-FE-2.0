@@ -3,11 +3,13 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
+import { useAppStore } from '@vendor/stores/app.store'
 
 export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, loading, vendor } = useVendorAuth()
+  const loadBackendData = useAppStore((state) => state.loadBackendData)
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -19,6 +21,12 @@ export function AppShell() {
       navigate('/vendor/onboarding', { replace: true })
     }
   }, [isAuthenticated, loading, navigate, vendor?.status, location.pathname])
+
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      loadBackendData().catch(() => undefined)
+    }
+  }, [isAuthenticated, loading, loadBackendData])
 
   if (loading || !isAuthenticated) return null
 

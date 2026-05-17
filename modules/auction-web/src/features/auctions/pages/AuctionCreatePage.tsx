@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
-import { CheckCircle2, FileSpreadsheet, Upload } from 'lucide-react'
+import { CheckCircle2, Upload } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
-import { useAppStore } from '@auction/stores/app.store'
-import type { AuctionType } from '@auction/types'
+import { createAuction, fetchBookings, fetchVendors } from '@auction/services/auctions.service'
+import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
 // BULK  — single lane (manually chosen), single winner, no L1/L2/L3
@@ -133,24 +133,38 @@ function parseLaneMode(value: unknown): DraftLane['allocationMode'] {
   return normalizeText(value).toUpperCase() === 'SINGLE' ? 'SINGLE' : 'SPLIT'
 }
 
+const FALLBACK_BOOKING: BookingReference = {
+  id: 'BK-DEMO-0001',
+  lane: 'Mumbai → Delhi',
+  vehicleType: '20 MT Open Body',
+  commodity: 'FMCG',
+  quantity: 18,
+  uom: 'Metric Tonnes',
+  loadingDate: new Date().toISOString().slice(0, 10),
+  status: 'PENDING_AUCTION',
+}
+
 export default function AuctionCreatePage() {
   const { type } = useParams()
   const navigate = useNavigate()
   const auctionType = ((type?.toUpperCase() ?? '') || '') as AuctionType
   const effectiveType: AuctionType | '' = ['SPOT', 'BULK', 'LOT'].includes(auctionType) ? auctionType : ''
-  const { createAuction, bookings, vendors } = useAppStore()
   const { auctionUser } = useAuctionAuth()
 
-  const selectedBooking = bookings[0] ?? {
-    id: 'BK-DEMO-0001',
-    lane: 'Mumbai → Delhi',
-    vehicleType: '20 MT Open Body',
-    commodity: 'FMCG',
-    quantity: 18,
-    uom: 'Metric Tonnes',
-    loadingDate: new Date().toISOString().slice(0, 10),
-    status: 'PENDING_AUCTION' as const,
-  }
+  const [bookings, setBookings] = useState<BookingReference[]>([])
+  const [vendors, setVendors] = useState<VendorOption[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchBookings()
+      .then(setBookings)
+      .catch(() => setBookings([]))
+    fetchVendors()
+      .then(setVendors)
+      .catch(() => setVendors([]))
+  }, [])
+
+  const selectedBooking = bookings[0] ?? FALLBACK_BOOKING
 
   const [selectedBookingId, setSelectedBookingId] = useState(selectedBooking.id)
   const [title, setTitle] = useState(`Spot | ${selectedBooking.id} | ${selectedBooking.lane}`)
@@ -170,7 +184,7 @@ export default function AuctionCreatePage() {
 
   useEffect(() => {
     if (!effectiveType) return
-    const defaultBooking = bookings[0] ?? selectedBooking
+    const defaultBooking = bookings[0] ?? FALLBACK_BOOKING
     const defaultLane = effectiveType === 'SPOT' ? defaultBooking.lane : 'Mumbai → Bangalore'
     setTitle(
       effectiveType === 'SPOT'
@@ -183,7 +197,7 @@ export default function AuctionCreatePage() {
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
-  }, [effectiveType, bookings, selectedBooking.id, selectedBooking.lane])
+  }, [effectiveType, bookings])
 
   const addLane = () => {
     if (effectiveType !== 'LOT') return
@@ -221,6 +235,7 @@ export default function AuctionCreatePage() {
           lane,
           vehicleType: normalizeText(values[2]) || '20 MT Open Body',
           capacityMt: normalizeText(values[3]) || '20',
+          commodity: 'FMCG',
           rateUnit: parseRateUnit(values[4]),
           ceilingRate: normalizeText(values[5]) || '0',
           estimatedTrips: normalizeText(values[6]) || '300',
@@ -239,49 +254,55 @@ export default function AuctionCreatePage() {
     }
   }
 
-  const handleCreate = (launchNow: boolean) => {
+  const handleCreate = async (launchNow: boolean) => {
     if (!effectiveType) {
       toast.error('Select an auction type first.')
       return
     }
 
-    const newAuctionId = createAuction({
-      type: effectiveType,
-      title,
-      bookingId: effectiveType === 'SPOT' ? activeBooking.id : undefined,
-      region: effectiveType === 'LOT' ? auctionRegion : undefined,
-      minBidDecrement: Number(auctionSettings.minBidDecrement),
-      extensionTriggerMinutes: Number(auctionSettings.extensionTriggerMinutes),
-      extensionDurationMinutes: Number(auctionSettings.extensionDurationMinutes),
-      maxExtensions: Number(auctionSettings.maxExtensions),
-      biddingWindowMinutes: Number(auctionSettings.biddingWindowMinutes),
-      contractStartDate: effectiveType === 'SPOT' ? undefined : auctionSettings.contractStartDate || undefined,
-      contractEndDate: effectiveType === 'SPOT' ? undefined : auctionSettings.contractEndDate || undefined,
-      invitedVendorIds: vendors.map((item) => item.id),
-      createdBy: auctionUser?.name ?? 'Demo User',
-      createdByRole: auctionUser?.role ?? 'OPS',
-      launchNow,
-      lanes: lanes.map((lane) => ({
-        lane: lane.lane,
+    setSaving(true)
+    try {
+      const payload = {
+        type: effectiveType,
+        title,
+        bookingId: effectiveType === 'SPOT' ? activeBooking.id : undefined,
         region: effectiveType === 'LOT' ? auctionRegion : undefined,
-        vehicleType: lane.vehicleType,
-        capacityMt: Number(lane.capacityMt),
-        rateUnit: lane.rateUnit,
-        ceilingRate: Number(lane.ceilingRate),
-        estimatedTrips: effectiveType === 'LOT' ? Number(lane.estimatedTrips) : undefined,
-        basePriceSource: 'MANUAL' as const,
-        allocationMode: effectiveType === 'LOT' ? lane.allocationMode : 'SINGLE',
-        allocation: {
-          l1: effectiveType === 'LOT' ? Number(lane.l1) : 100,
-          l2: effectiveType === 'LOT' ? Number(lane.l2) : 0,
-          l3: effectiveType === 'LOT' ? Number(lane.l3) : 0,
-        },
-        eligibleVendorIds: vendors.map((item) => item.id),
-      })),
-    })
+        minBidDecrement: Number(auctionSettings.minBidDecrement),
+        extensionTriggerMinutes: Number(auctionSettings.extensionTriggerMinutes),
+        extensionDurationMinutes: Number(auctionSettings.extensionDurationMinutes),
+        maxExtensions: Number(auctionSettings.maxExtensions),
+        biddingWindowMinutes: Number(auctionSettings.biddingWindowMinutes),
+        contractStartDate: effectiveType === 'SPOT' ? undefined : auctionSettings.contractStartDate || undefined,
+        contractEndDate: effectiveType === 'SPOT' ? undefined : auctionSettings.contractEndDate || undefined,
+        invitedVendorIds: vendors.map((item) => item.id),
+        createdBy: auctionUser?.name ?? 'Demo User',
+        createdByRole: auctionUser?.role ?? 'OPS',
+        launchNow,
+        lanes: lanes.map((lane) => ({
+          lane: lane.lane,
+          region: effectiveType === 'LOT' ? auctionRegion : undefined,
+          vehicleType: lane.vehicleType,
+          capacityMt: Number(lane.capacityMt),
+          rateUnit: lane.rateUnit,
+          ceilingRate: Number(lane.ceilingRate),
+          estimatedTrips: effectiveType === 'LOT' ? Number(lane.estimatedTrips) : undefined,
+          basePriceSource: 'MANUAL' as const,
+          allocationMode: effectiveType === 'LOT' ? lane.allocationMode : 'SINGLE',
+          l1AllocationPct: effectiveType === 'LOT' ? Number(lane.l1) : 100,
+          l2AllocationPct: effectiveType === 'LOT' ? Number(lane.l2) : 0,
+          l3AllocationPct: effectiveType === 'LOT' ? Number(lane.l3) : 0,
+          eligibleVendorIds: vendors.map((item) => item.id),
+        })),
+      }
 
-    toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
-    navigate(`/auction/auctions/${newAuctionId}`)
+      const created = await createAuction(payload)
+      toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
+      navigate(`/auction/auctions/${created.id}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create auction.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -660,8 +681,12 @@ export default function AuctionCreatePage() {
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" disabled={!effectiveType} onClick={() => handleCreate(false)}>Save Draft</Button>
-                <Button disabled={!effectiveType} onClick={() => handleCreate(true)}>Create and Launch</Button>
+                <Button variant="outline" disabled={!effectiveType || saving} onClick={() => handleCreate(false)}>
+                  {saving ? 'Saving…' : 'Save Draft'}
+                </Button>
+                <Button disabled={!effectiveType || saving} onClick={() => handleCreate(true)}>
+                  {saving ? 'Creating…' : 'Create and Launch'}
+                </Button>
               </div>
             </CardContent>
           </Card>

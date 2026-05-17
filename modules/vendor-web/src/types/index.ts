@@ -308,7 +308,7 @@ export interface Expense {
 
 // ==================== FLEET TYPES ====================
 export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED' | 'PENDING_DOCS'
-export type OperationalStatus = 'ACTIVE' | 'INACTIVE'
+export type OperationalStatus = 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE'
 export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
 
 export interface Vehicle {
@@ -487,7 +487,7 @@ export interface PaymentRecord {
   ledgerEntryIds: string[]
 }
 
-export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'DISBURSED' | 'CANCELLED'
+export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'CANCELLED'
 
 export interface NBFCApplication {
   id: string

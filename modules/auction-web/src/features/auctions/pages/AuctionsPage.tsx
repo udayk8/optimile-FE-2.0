@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Gavel, PlusCircle } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui
 import { Input } from '@auction/components/ui/input'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { formatDateTime } from '@auction/lib/date-utils'
-import { useAppStore } from '@auction/stores/app.store'
+import { fetchAuctions } from '@auction/services/auctions.service'
+import type { Auction } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 
 const AUCTION_TABS = ['ALL', 'DRAFT', 'UPCOMING', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
@@ -32,15 +33,27 @@ function normalizeTab(tab: string | null) {
 export default function AuctionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { auctions } = useAppStore()
+  const [auctions, setAuctions] = useState<Auction[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const activeTab = normalizeTab(searchParams.get('tab'))
 
+  useEffect(() => {
+    setLoading(true)
+    fetchAuctions({
+      status: activeTab === 'ALL' ? undefined : activeTab === 'UPCOMING' ? 'DRAFT' : activeTab,
+      search: search || undefined,
+    })
+      .then(setAuctions)
+      .catch(() => setAuctions([]))
+      .finally(() => setLoading(false))
+  }, [activeTab, search])
+
   const filteredAuctions = useMemo(() => {
     const query = search.trim().toLowerCase()
     return auctions.filter((auction) => {
-      const matchesTab = activeTab === 'ALL' || auction.status === activeTab
+      const matchesTab = activeTab === 'ALL' || auction.status === activeTab || (activeTab === 'UPCOMING' && auction.status === 'DRAFT')
       const matchesSearch =
         query.length === 0 ||
         auction.id.toLowerCase().includes(query) ||
@@ -132,15 +145,19 @@ export default function AuctionsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <DataTable
-            rows={filteredAuctions}
-            columns={columns}
-            getRowKey={(auction) => auction.id}
-            page={page}
-            onPageChange={setPage}
-            pageSize={PAGE_SIZE}
-            emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No auctions match the current filters.</div>}
-          />
+          {loading ? (
+            <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">Loading auctions…</div>
+          ) : (
+            <DataTable
+              rows={filteredAuctions}
+              columns={columns}
+              getRowKey={(auction) => auction.id}
+              page={page}
+              onPageChange={setPage}
+              pageSize={PAGE_SIZE}
+              emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No auctions match the current filters.</div>}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
