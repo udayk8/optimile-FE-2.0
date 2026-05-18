@@ -3,13 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
-import { Input } from '@auction/components/ui/input'
 import { Badge } from '@auction/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDateTime } from '@auction/lib/date-utils'
 import { Users } from 'lucide-react'
 import type { RfiType, RfqType } from '@auction/types'
-import { fetchRfis, fetchRfqs } from '@auction/services/sourcing.service'
+import { fetchRfis, fetchRfqs } from '@auction/lib/mock-services'
 
 const PAGE_SIZE = 10
 
@@ -19,7 +18,6 @@ export default function SourcingPage() {
 
   const activeTab = searchParams.get('tab') === 'RFQ' ? 'RFQ' : 'RFI'
 
-  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
   const [rfis, setRfis] = useState<RfiType[]>([])
@@ -31,8 +29,8 @@ export default function SourcingPage() {
     setLoading(true)
     setError(null)
     Promise.all([
-      fetchRfis({ search: search || undefined }),
-      fetchRfqs({ search: search || undefined }),
+      fetchRfis(),
+      fetchRfqs(),
     ])
       .then(([rfiData, rfqData]) => {
         setRfis(rfiData)
@@ -40,17 +38,9 @@ export default function SourcingPage() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
-  }, [search])
+  }, [])
 
-  const filteredRfis = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return rfis.filter((rfi) => (
-      query.length === 0 ||
-      rfi.id.toLowerCase().includes(query) ||
-      rfi.title.toLowerCase().includes(query) ||
-      rfi.createdBy.toLowerCase().includes(query)
-    ))
-  }, [rfis, search])
+  const filteredRfis = useMemo(() => rfis, [rfis])
 
   const rfiColumns = useMemo<DataTableColumn<(typeof filteredRfis)[number]>[]>(
     () => [
@@ -77,15 +67,7 @@ export default function SourcingPage() {
     [navigate]
   )
 
-  const filteredRfqs = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return rfqs.filter((rfq) => (
-      query.length === 0 ||
-      rfq.id.toLowerCase().includes(query) ||
-      rfq.title.toLowerCase().includes(query) ||
-      rfq.createdBy.toLowerCase().includes(query)
-    ))
-  }, [rfqs, search])
+  const filteredRfqs = useMemo(() => rfqs, [rfqs])
 
   const rfqColumns = useMemo<DataTableColumn<(typeof filteredRfqs)[number]>[]>(
     () => [
@@ -131,12 +113,6 @@ export default function SourcingPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>{activeTab === 'RFI' ? 'RFI Campaigns' : 'RFQ Events'}</CardTitle>
-            <Input
-              value={search}
-              onChange={(event) => { setSearch(event.target.value); setPage(1) }}
-              placeholder="Search by ID, title, or creator"
-              className="w-full lg:w-[320px]"
-            />
           </div>
           <div className="flex w-fit gap-1 overflow-x-auto border-b border-gray-200">
             <Button
@@ -144,7 +120,7 @@ export default function SourcingPage() {
               variant="ghost"
               size="sm"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${activeTab === 'RFI' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'}`}
-              onClick={() => { setSearchParams({ tab: 'RFI' }); setPage(1); setSearch('') }}
+              onClick={() => { setSearchParams({ tab: 'RFI' }); setPage(1) }}
             >
               RFI Campaigns
             </Button>
@@ -153,7 +129,7 @@ export default function SourcingPage() {
               variant="ghost"
               size="sm"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${activeTab === 'RFQ' ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'}`}
-              onClick={() => { setSearchParams({ tab: 'RFQ' }); setPage(1); setSearch('') }}
+              onClick={() => { setSearchParams({ tab: 'RFQ' }); setPage(1) }}
             >
               Request for Quotations (RFQs)
             </Button>

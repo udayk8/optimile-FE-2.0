@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
-import { Input } from '@auction/components/ui/input'
 import { useAppStore } from '@auction/stores/app.store'
 import { Badge } from '@auction/components/ui/badge'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDateTime } from '@auction/lib/date-utils'
-import { fetchRfqs } from '@auction/services/sourcing.service'
+import { fetchRfqs } from '@auction/lib/mock-services'
 import type { RfqType } from '@auction/types'
 
 const PAGE_SIZE = 10
@@ -21,20 +20,9 @@ export default function RfqPage() {
     fetchRfqs().then(setRfqs).catch(() => undefined)
   }, [])
 
-  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
-  const filteredRfqs = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return rfqs.filter((rfq) => {
-      return (
-        query.length === 0 ||
-        rfq.id.toLowerCase().includes(query) ||
-        rfq.title.toLowerCase().includes(query) ||
-        rfq.createdBy.toLowerCase().includes(query)
-      )
-    })
-  }, [rfqs, search])
+  const filteredRfqs = useMemo(() => rfqs, [rfqs])
 
   const columns = useMemo<DataTableColumn<(typeof filteredRfqs)[number]>[]>(
     () => [
@@ -75,15 +63,6 @@ export default function RfqPage() {
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle>RFQ Queue</CardTitle>
-            <Input
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder="Search by ID, title, or creator"
-              className="w-full lg:w-[320px]"
-            />
           </div>
         </CardHeader>
         <CardContent>

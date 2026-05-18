@@ -14,8 +14,8 @@ import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { PageHero } from '@shared-ui/page-hero'
 import { ArrowLeft, Download, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
 
-type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'disrupted'
-type DetailTab = 'freight' | 'track' | 'recent' | 'documents' | 'expenses'
+type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'exception'
+type DetailTab = 'freight' | 'documents' | 'expenses'
 
 function getBookingMode(pathname: string) {
   const rawMode = pathname.split('/')[3]
@@ -46,13 +46,12 @@ export default function TripDetailPage() {
       ? (mode === 'accepted' || mode === 'cancelled' ? mode : indent.status === 'DECLINED' ? 'cancelled' : 'new')
       : (trip?.status === 'DELIVERED'
         ? (trip.podStatus === 'CONFIRMED' ? 'completed' : 'pending-pod')
-        : trip?.status === 'DISPATCHED' || trip?.status === 'IN_TRANSIT' || trip?.status === 'AT_DELIVERY'
-          ? 'active'
-          : trip?.status === 'EXCEPTION' || trip?.status === 'DISRUPTED'
-            ? 'disrupted'
+        : trip?.status === 'IN_TRANSIT' || trip?.status === 'IN_TRANSIT_ON_TIME' || trip?.status === 'IN_TRANSIT_DELAYED' || trip?.status === 'AT_DELIVERY'
+          ? (trip?.disruption && !trip.disruption.resolvedAt ? 'exception' : 'active')
+          : trip?.status === 'EXCEPTION'
+            ? 'exception'
             : mode)
   const docs = booking && 'documents' in booking ? trip?.documents ?? [] : []
-  const timeline = trip && 'timeline' in trip ? trip.timeline ?? [] : []
 
   if (!indent && !trip) {
     return <EmptyState title="Booking not found" description="The selected booking no longer exists in mock data." />
@@ -76,7 +75,7 @@ export default function TripDetailPage() {
         subtitle={
           resolvedMode === 'new'
             ? 'Review the request, assign fleet, or cancel the booking.'
-            : 'Review freight details, tracking, recent activity, and booking documents.'
+            : 'Review freight details and booking documents.'
         }
         icon={<Route className="h-5 w-5 text-primary" />}
         action={
@@ -85,7 +84,6 @@ export default function TripDetailPage() {
             <StatusBadge status={booking?.status ?? 'PENDING'} />
             {trip?.podStatus === 'CONFIRMED' && <StatusBadge status="CONFIRMED" label="POD confirmed" />}
             {trip?.status === 'DELIVERED' && trip?.podStatus === 'PENDING' && <StatusBadge status="PENDING" label="Pending POD" />}
-            {trip?.isInvoiced && <StatusBadge status="INVOICED" />}
             {(resolvedMode === 'new' || resolvedMode === 'accepted') && (
               <>
                 <Button onClick={() => setSelectedIndentId(indent!.id)}>
@@ -101,7 +99,7 @@ export default function TripDetailPage() {
       />
 
       <div className="flex flex-wrap gap-2">
-        {(['freight', 'track', 'recent', 'documents', 'expenses'] as DetailTab[]).map((tab) => (
+        {(['freight', 'documents', 'expenses'] as DetailTab[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -111,8 +109,6 @@ export default function TripDetailPage() {
             }`}
           >
             {tab === 'freight' && 'Freight details'}
-            {tab === 'track' && 'Track'}
-            {tab === 'recent' && 'Recent action'}
             {tab === 'documents' && 'Documents'}
             {tab === 'expenses' && 'Expenses'}
           </button>
@@ -153,56 +149,6 @@ export default function TripDetailPage() {
                     {indent ? <SLACountdown deadline={indent.slaDeadline} /> : trip?.podStatus === 'CONFIRMED' ? 'POD confirmed' : 'Pending POD'}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {detailTab === 'track' && trip && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-primary" /> Track
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
-                  Vehicle {trip.assignedVehicle.registrationNumber} is moving under {trip.status} state.
-                </div>
-                {timeline.length === 0 ? (
-                  <EmptyState title="No tracking events" />
-                ) : (
-                  timeline.map((event) => (
-                    <div key={event.id} className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-bold text-text">{event.title}</span>
-                          {event.status && <StatusBadge status={event.status} />}
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600">{event.description}</p>
-                        <p className="mt-2 text-xs text-gray-500">{formatDateTime(event.timestamp)}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {detailTab === 'recent' && trip && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock3 className="h-5 w-5 text-primary" /> Recent action
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div><span className="text-gray-500">Status: </span><StatusBadge status={trip.status} /></div>
-                <div><span className="text-gray-500">Vehicle: </span>{trip.assignedVehicle.registrationNumber}</div>
-                <div><span className="text-gray-500">Driver: </span>{trip.assignedDriver.name}</div>
-                <div><span className="text-gray-500">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
-                <div><span className="text-gray-500">Expenses approved: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
-                <div><span className="text-gray-500">Invoiced: </span>{trip.isInvoiced ? 'Yes' : 'No'}</div>
               </CardContent>
             </Card>
           )}
@@ -354,7 +300,6 @@ export default function TripDetailPage() {
                 <div><span className="text-gray-500">Driver: </span>{trip.assignedDriver?.name ?? '—'}</div>
                 <div><span className="text-gray-500">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
                 <div><span className="text-gray-500">Approved expenses: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
-                <div><span className="text-gray-500">Invoice status: </span>{trip.isInvoiced ? 'Invoiced' : 'Pending'}</div>
               </CardContent>
             </Card>
           )}

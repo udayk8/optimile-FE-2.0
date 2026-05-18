@@ -21,8 +21,12 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   // Blue statuses
   SUBMITTED: { variant: 'info', label: 'Submitted' },
   QUOTE_SUBMITTED: { variant: 'info', label: 'Quote Submitted' },
-  DISPATCHED: { variant: 'info', label: 'Dispatched' },
   IN_TRANSIT: { variant: 'info', label: 'In Transit' },
+  IN_TRANSIT_ON_TIME: { variant: 'success', label: 'In Transit · On Time' },
+  IN_TRANSIT_DELAYED: { variant: 'warning', label: 'In Transit · Delayed' },
+  VEHICLE_BREAKDOWN: { variant: 'destructive', label: 'Vehicle Breakdown' },
+  DRIVER_BREAKDOWN: { variant: 'destructive', label: 'Driver Breakdown' },
+  VEHICLE_OR_DRIVER_BREAKDOWN: { variant: 'destructive', label: 'Vehicle / Driver Breakdown' },
   QUOTE_REVISED: { variant: 'info', label: 'Quote Revised' },
   AT_DELIVERY: { variant: 'info', label: 'At Delivery' },
   LIVE: { variant: 'info', label: 'Live' },

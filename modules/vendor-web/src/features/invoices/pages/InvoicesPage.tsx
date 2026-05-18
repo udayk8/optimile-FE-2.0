@@ -35,7 +35,6 @@ const STATUS_FILTERS: { value: InvoiceStatus | 'ALL'; label: string }[] = [
   { value: 'APPROVED', label: 'Approved' },
   { value: 'REJECTED', label: 'Rejected' },
   { value: 'CANCELLED', label: 'Cancelled' },
-  { value: 'PAID', label: 'Paid' },
 ]
 
 export default function InvoicesPage() {
@@ -268,7 +267,7 @@ export default function InvoicesPage() {
                                 Edit &amp; Resubmit
                               </Button>
                             )}
-                            {(inv.status === 'APPROVED' || inv.status === 'PAID') && (
+                            {inv.status === 'APPROVED' && (
                               <Button size="sm" variant="ghost" title="Download invoice PDF" onClick={(e) => { e.stopPropagation(); window.alert('Downloading Invoice PDF...') }}>
                                 <Download className="h-4 w-4" />
                               </Button>

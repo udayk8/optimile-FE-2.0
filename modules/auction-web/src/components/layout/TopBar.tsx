@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { LogOut, Search } from 'lucide-react'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
-import { searchAuctionService, type SearchResponse, type SearchResultItem } from '@auction/services/search.service'
+import { searchAuctionService, type SearchResponse, type SearchResultItem } from '@auction/lib/mock-services'
 
 const PAGE_TITLES: Record<string, string> = {
   '/auction/dashboard': 'Dashboard',

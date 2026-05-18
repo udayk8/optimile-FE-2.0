@@ -8,8 +8,8 @@ import { formatDate } from '@auction/lib/date-utils'
 import { formatCurrency } from '@auction/lib/currency-utils'
 import { FileSpreadsheet, Upload, X } from 'lucide-react'
 import type { RfqResponse, RfqResponseRow, RfqType } from '@auction/types'
-import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/services/rfq-responses.service'
-import { fetchRfqs } from '@auction/services/sourcing.service'
+import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/lib/mock-services'
+import { fetchRfqs } from '@auction/lib/mock-services'
 
 const PAGE_SIZE = 15
 

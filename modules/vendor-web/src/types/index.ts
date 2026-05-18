@@ -235,13 +235,22 @@ export interface Indent {
 }
 
 export type TripStatus =
-  | 'DISPATCHED'
   | 'IN_TRANSIT'
+  | 'IN_TRANSIT_ON_TIME'
+  | 'IN_TRANSIT_DELAYED'
   | 'AT_DELIVERY'
   | 'EXCEPTION'
   | 'DELIVERED'
   | 'CANCELLED'
-  | 'DISRUPTED'
+
+export type DisruptionReason = 'VEHICLE_BREAKDOWN' | 'DRIVER_BREAKDOWN' | 'VEHICLE_OR_DRIVER_BREAKDOWN'
+
+export interface TripDisruption {
+  reason: DisruptionReason
+  reportedAt: string
+  notes?: string
+  resolvedAt?: string
+}
 
 export interface Trip {
   id: string
@@ -251,6 +260,7 @@ export interface Trip {
   assignedVehicle: { id: string; registrationNumber: string; type: string }
   assignedDriver: { id: string; name: string; mobile: string }
   status: TripStatus
+  disruption?: TripDisruption
   deliveredDate?: string
   podStatus?: 'PENDING' | 'CONFIRMED'
   podReference?: string
@@ -285,7 +295,7 @@ export interface TripTimelineEvent {
 
 // ==================== EXPENSE TYPES ====================
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type ExpenseType = 'TOLL' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
+export type ExpenseType = 'EXPENSE' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
 
 export interface ExpenseLineItem {
   id: string
@@ -410,7 +420,7 @@ export interface CapacityDeclaration {
 }
 
 // ==================== INVOICE TYPES ====================
-export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID' | 'CANCELLED'
+export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
 
 export interface Invoice {
   id: string
@@ -430,7 +440,7 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
-  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'DISBURSED' | 'CANCELLED'
+  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
 }
 
 export interface InvoiceLineItem {
@@ -455,7 +465,15 @@ export interface Dispute {
   notes?: string
 }
 
-export type LedgerEntryType = 'INVOICE_APPROVED' | 'PAYMENT_RECEIVED' | 'SLA_PENALTY' | 'OTHER_DEDUCTION' | 'TDS_DEDUCTION'
+export type LedgerEntryType =
+  | 'INVOICE_APPROVED'
+  | 'PAYMENT_RECEIVED'
+  | 'NBFC_FINANCING_RECEIVED'
+  | 'NBFC_CHARGES'
+  | 'RESIDUAL_PAYMENT_RECEIVED'
+  | 'SLA_PENALTY'
+  | 'OTHER_DEDUCTION'
+  | 'TDS_DEDUCTION'
 
 export interface LedgerEntry {
   id: string
@@ -468,7 +486,13 @@ export interface LedgerEntry {
   documentUrl?: string
 }
 
-export type PaymentKind = 'PARTIAL_PAYMENT' | 'FINAL_PAYMENT' | 'TDS_DEDUCTION'
+export type PaymentKind =
+  | 'PARTIAL_PAYMENT'
+  | 'FINAL_PAYMENT'
+  | 'NBFC_FINANCING_RECEIVED'
+  | 'NBFC_CHARGES'
+  | 'RESIDUAL_PAYMENT_RECEIVED'
+  | 'TDS_DEDUCTION'
 export type PaymentState = 'POSTED' | 'PENDING'
 
 export interface PaymentRecord {
@@ -482,12 +506,14 @@ export interface PaymentRecord {
   tdsAmount: number
   referenceNumber?: string
   note?: string
+  recordedBy?: string
+  recordedAt?: string
   status: PaymentState
   createdAt: string
   ledgerEntryIds: string[]
 }
 
-export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'CANCELLED'
+export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
 
 export interface NBFCApplication {
   id: string
@@ -499,11 +525,12 @@ export interface NBFCApplication {
   status: NBFCDiscountingStatus
   appliedAt?: string
   approvedAt?: string
-  disbursedAt?: string
   referenceNumber?: string
-  advanceAmount: number
+  requestedAmount: number
+  approvedAmount?: number
   charges: number
-  netDisbursement: number
+  netAmount: number
+  remarks?: string
   emailTitle?: string
   recipientEmail?: string
   emailDescription?: string

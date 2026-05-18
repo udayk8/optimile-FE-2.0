@@ -6,7 +6,7 @@ import { Badge } from '@auction/components/ui/badge'
 import { Mail, ArrowLeft, FileText, Calendar, Users } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { RfiType } from '@auction/types'
-import { fetchRfi, patchRfiStatus } from '@auction/services/sourcing.service'
+import { fetchRfi, patchRfiStatus } from '@auction/lib/mock-services'
 
 export default function RfiDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -76,15 +76,6 @@ export default function RfiDetailPage() {
               onClick={() => handleStatusChange('PUBLISHED')}
             >
               Publish
-            </Button>
-          )}
-          {rfi.status === 'PUBLISHED' && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleStatusChange('CLOSED')}
-            >
-              Close
             </Button>
           )}
           <Button

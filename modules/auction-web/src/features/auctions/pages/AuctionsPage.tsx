@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui
 import { Input } from '@auction/components/ui/input'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { formatDateTime } from '@auction/lib/date-utils'
-import { fetchAuctions } from '@auction/services/auctions.service'
+import { fetchAuctions } from '@auction/lib/mock-services'
 import type { Auction } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 

@@ -8,7 +8,7 @@ import { Input } from '@auction/components/ui/input'
 import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { formatDate } from '@auction/lib/date-utils'
-import { fetchContract, fetchContracts, terminateContract } from '@auction/services/contracts.service'
+import { fetchContract, fetchContracts, terminateContract } from '@auction/lib/mock-services'
 import type { Contract } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 

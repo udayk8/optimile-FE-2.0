@@ -19,8 +19,8 @@ import {
   awardAuction,
   finalizeAuction,
   rejectAuction,
-} from '@auction/services/auctions.service'
-import { fetchContracts } from '@auction/services/contracts.service'
+} from '@auction/lib/mock-services'
+import { fetchContracts } from '@auction/lib/mock-services'
 import type { Auction, BookingReference, Contract } from '@auction/types'
 
 const TABS = ['overview', 'lanes', 'ranking', 'award'] as const

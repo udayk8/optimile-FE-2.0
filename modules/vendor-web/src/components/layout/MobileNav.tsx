@@ -13,9 +13,9 @@ const MORE_NAV = [
   { path: '/vendor/sourcing', label: 'Sourcing', icon: Search },
   { path: '/vendor/contracts', label: 'Contracts', icon: FileText },
   { path: '/vendor/invoices', label: 'Invoices', icon: FileText },
+  { path: '/vendor/receivables', label: 'Bill Discounting', icon: Banknote },
+  { path: '/vendor/record-payments', label: 'Record Payments', icon: ReceiptText },
   { path: '/vendor/ledger', label: 'Ledger', icon: Wallet },
-  { path: '/vendor/ledger/payments', label: 'Payments', icon: ReceiptText },
-  // { path: '/vendor/nbfc', label: 'Bill Discounting', icon: Banknote },
   { path: '/vendor/exceptions', label: 'Exceptions', icon: ShieldAlert },
   { path: '/vendor/profile', label: 'Profile', icon: User },
 ]

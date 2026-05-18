@@ -34,7 +34,7 @@ export default function LedgerPage() {
   const [page, setPage] = useState(1)
   const { ledger } = useAppStore()
 
-  const ALLOWED_TYPES = ['INVOICE_APPROVED', 'PAYMENT_RECEIVED', 'TDS_DEDUCTION']
+  const ALLOWED_TYPES = ['INVOICE_APPROVED', 'PAYMENT_RECEIVED', 'NBFC_FINANCING_RECEIVED', 'NBFC_CHARGES', 'RESIDUAL_PAYMENT_RECEIVED', 'TDS_DEDUCTION']
 
   const filteredEntries = useMemo(() => {
     const allowed = ledger
@@ -47,7 +47,7 @@ export default function LedgerPage() {
     let balance = 0
     return allowed.map((entry) => {
       if (entry.entryType === 'INVOICE_APPROVED') balance += entry.debit
-      else if (entry.entryType === 'PAYMENT_RECEIVED') balance -= entry.credit
+      else if (entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'NBFC_FINANCING_RECEIVED' || entry.entryType === 'NBFC_CHARGES' || entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED') balance -= entry.credit
       else if (entry.entryType === 'TDS_DEDUCTION') balance -= entry.credit
       return { ...entry, runningBalance: balance }
     })
@@ -59,7 +59,7 @@ export default function LedgerPage() {
       const monthKey = entry.date.slice(0, 7)
       liveByMonth[monthKey] ??= { invoiced: 0, payments: 0 }
       if (entry.entryType === 'INVOICE_APPROVED') liveByMonth[monthKey].invoiced += entry.debit
-      if (entry.entryType === 'PAYMENT_RECEIVED') liveByMonth[monthKey].payments += entry.credit
+      if (entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'NBFC_FINANCING_RECEIVED' || entry.entryType === 'NBFC_CHARGES' || entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED') liveByMonth[monthKey].payments += entry.credit
     }
 
     return monthOrder.map((monthKey) => {
@@ -71,7 +71,7 @@ export default function LedgerPage() {
 
   const summary = useMemo(() => {
     const totalInvoiced = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'INVOICE_APPROVED' ? e.debit : 0), 0)
-    const totalReceived = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'PAYMENT_RECEIVED' ? e.credit : 0), 0)
+    const totalReceived = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'PAYMENT_RECEIVED' || e.entryType === 'NBFC_FINANCING_RECEIVED' || e.entryType === 'NBFC_CHARGES' || e.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? e.credit : 0), 0)
     const tdsDeducted = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'TDS_DEDUCTION' ? e.credit : 0), 0)
     return {
       totalInvoiced,
@@ -209,10 +209,13 @@ export default function LedgerPage() {
               {pagedEntries.map((row) => (
                 <tr key={`${row.date}-${row.id}`} className="hover:bg-gray-50">
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.entryType === 'INVOICE_APPROVED' || row.entryType === 'PAYMENT_RECEIVED' ? row.description.match(/INV-\d{4}-\d{3}/)?.[0] ?? '-' : '-'}</td>
+                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.description.match(/INV-\d{4}-\d{3}/)?.[0] ?? '-'}</td>
                   <td className="p-4 font-mono text-xs text-gray-500">{row.id}</td>
                   <td className="p-4 font-medium text-text">
                     {row.entryType === 'INVOICE_APPROVED' ? 'Invoice Approved'
+                      : row.entryType === 'NBFC_FINANCING_RECEIVED' ? 'NBFC Financing Received'
+                      : row.entryType === 'NBFC_CHARGES' ? 'NBFC Charges'
+                      : row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? 'Residual Payment Received'
                       : row.entryType === 'PAYMENT_RECEIVED' ? (row.description.toLowerCase().includes('partial') ? 'Partial Payment' : 'Final Payment')
                       : row.entryType === 'TDS_DEDUCTION' ? 'TDS Deduction'
                       : row.entryType}
@@ -222,7 +225,7 @@ export default function LedgerPage() {
                     {row.entryType === 'INVOICE_APPROVED' ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}
                   </td>
                   <td className="p-4 text-right font-medium text-emerald-600">
-                    {row.entryType === 'PAYMENT_RECEIVED' || row.entryType === 'TDS_DEDUCTION'
+                    {row.entryType === 'PAYMENT_RECEIVED' || row.entryType === 'NBFC_FINANCING_RECEIVED' || row.entryType === 'NBFC_CHARGES' || row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' || row.entryType === 'TDS_DEDUCTION'
                       ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}
                   </td>
                   <td className="p-4 text-right font-mono">₹{row.runningBalance.toLocaleString('en-IN')}</td>

@@ -91,7 +91,7 @@ export default function SelectNBFCPage() {
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:bg-white sm:w-[280px]"
               />
             </div>
-            <Button variant="outline" onClick={() => navigate('/vendor/nbfc')}>
+            <Button variant="outline" onClick={() => navigate('/vendor/receivables')}>
               <ChevronLeft className="mr-1 h-4 w-4" />
               Back to hub
             </Button>

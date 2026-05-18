@@ -6,8 +6,8 @@ import { Badge } from '@auction/components/ui/badge'
 import { Mail, ArrowLeft, FileText, Calendar, Users } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { RfqResponse, RfqType } from '@auction/types'
-import { fetchRfq, patchRfqStatus } from '@auction/services/sourcing.service'
-import { fetchRfqResponses } from '@auction/services/rfq-responses.service'
+import { fetchRfq, patchRfqStatus } from '@auction/lib/mock-services'
+import { fetchRfqResponses } from '@auction/lib/mock-services'
 
 export default function RfqDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -77,16 +77,6 @@ export default function RfqDetailPage() {
           {rfq.status === 'DRAFT' && (
             <Button variant="outline" size="sm" onClick={() => handleStatusChange('PUBLISHED')}>
               Publish
-            </Button>
-          )}
-          {rfq.status === 'PUBLISHED' && (
-            <Button variant="outline" size="sm" onClick={() => handleStatusChange('EVALUATING')}>
-              Mark Evaluating
-            </Button>
-          )}
-          {rfq.status === 'EVALUATING' && (
-            <Button variant="outline" size="sm" onClick={() => handleStatusChange('AWARDED')}>
-              Mark Awarded
             </Button>
           )}
           <Button
@@ -177,7 +167,7 @@ export default function RfqDetailPage() {
                           <p className="text-sm font-semibold text-[#0F172A]">{response.vendorName || 'Vendor'}</p>
                           <p className="mt-1 text-xs text-[#64748B]">{response.fileName || 'Manual upload'}</p>
                         </div>
-                        <Badge variant="secondary">{response.rows.length} rows</Badge>
+                        <Badge variant="secondary">Received</Badge>
                       </div>
                     </div>
                   ))}

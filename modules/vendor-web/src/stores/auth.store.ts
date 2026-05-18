@@ -28,7 +28,10 @@ export const useAuthStore = create<AuthStore>()(
       hydrateVendor: (vendor) => set((state) => ({
         vendor: state.vendor ?? vendor,
       })),
-      setAuth: (vendor, token) => set({ vendor, token, isAuthenticated: true }),
+      setAuth: (vendor, token) => {
+        useAppStore.getState().resetStore()
+        set({ vendor, token, isAuthenticated: true })
+      },
       setOnboardingDraft: (draft) => set({ onboardingDraft: draft }),
       updateOnboardingDraft: (draft) => set((state) => ({
         onboardingDraft: state.onboardingDraft ? { ...state.onboardingDraft, ...draft } : { ...draft } as VendorSetupDraft,

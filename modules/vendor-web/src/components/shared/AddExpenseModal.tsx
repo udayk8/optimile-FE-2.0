@@ -19,7 +19,7 @@ interface ExpenseLineDraft {
 }
 
 const EXPENSE_TYPE_OPTIONS: { value: ExpenseType; label: string }[] = [
-  { value: 'TOLL', label: 'Toll' },
+  { value: 'EXPENSE', label: 'Expense' },
   { value: 'DETENTION', label: 'Detention' },
   { value: 'LOADING_UNLOADING', label: 'Loading / Unloading' },
   { value: 'WEIGHBRIDGE', label: 'Weighbridge' },
@@ -29,7 +29,7 @@ const EXPENSE_TYPE_OPTIONS: { value: ExpenseType; label: string }[] = [
 function createEmptyLine(): ExpenseLineDraft {
   return {
     id: `line-${Math.floor(1000 + Math.random() * 9000)}`,
-    expenseType: 'TOLL',
+    expenseType: 'EXPENSE',
     amount: '',
     description: '',
   }

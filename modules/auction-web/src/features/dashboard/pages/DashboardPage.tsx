@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FileClock, Gavel, ScrollText } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
@@ -6,20 +6,24 @@ import { KPICard } from '@auction/components/cards/KPICard'
 import { Button } from '@auction/components/ui/button'
 import { LoadingSkeleton } from '@auction/components/shared/LoadingSkeleton'
 import { ErrorState } from '@auction/components/shared/ErrorState'
-import { fetchDashboard, type DashboardResponse } from '@auction/services/dashboard.service'
-import { formatDateTime } from '@auction/lib/date-utils'
+import { fetchAuctions, fetchContracts } from '@auction/lib/mock-services'
+import type { Auction, Contract } from '@auction/types'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const [data, setData] = useState<DashboardResponse | null>(null)
+  const [auctions, setAuctions] = useState<Auction[]>([])
+  const [contracts, setContracts] = useState<Contract[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  function load() {
+  const load = () => {
     setLoading(true)
     setError(null)
-    fetchDashboard()
-      .then(setData)
+    Promise.all([fetchAuctions(), fetchContracts()])
+      .then(([auctionData, contractData]) => {
+        setAuctions(auctionData)
+        setContracts(contractData)
+      })
       .catch((e) => setError(e.message ?? 'Failed to load dashboard'))
       .finally(() => setLoading(false))
   }
@@ -27,6 +31,10 @@ export default function DashboardPage() {
   useEffect(() => {
     load()
   }, [])
+
+  const liveAuctions = useMemo(() => auctions.filter((item) => item.status === 'LIVE'), [auctions])
+  const pendingAwards = useMemo(() => auctions.filter((item) => item.status === 'COMPLETED'), [auctions])
+  const expiringContracts = useMemo(() => contracts.filter((item) => item.status === 'EXPIRING_SOON'), [contracts])
 
   if (loading) {
     return (
@@ -41,20 +49,15 @@ export default function DashboardPage() {
     )
   }
 
-  if (error || !data) {
-    return (
-      <ErrorState
-        message={error ?? 'Failed to load dashboard'}
-        onRetry={load}
-      />
-    )
+  if (error) {
+    return <ErrorState message={error} onRetry={load} />
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <HeroCard
         eyebrow="Auction Control Tower"
-        title="Customer Procurement Dashboard"
+        title="Procurement Control Dashboard"
         subtitle="Monitor live auctions, award deadlines, and contract outcomes from a single operational view."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
@@ -64,79 +67,30 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <KPICard
           title="Live Auctions"
-          value={data.liveAuctions.value}
-          insight={data.liveAuctions.insight}
+          value={liveAuctions.length}
+          insight="Auctions currently accepting bids."
           icon={<Gavel className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/auction/auctions?tab=live')}
+          onClick={() => navigate('/auction/auctions?tab=LIVE')}
         />
         <KPICard
           title="Pending Awards"
-          value={data.pendingAwards.value}
-          insight={data.pendingAwards.insight}
+          value={pendingAwards.length}
+          insight="Completed auctions waiting for award decision."
           icon={<FileClock className="h-4 w-4 text-warning" />}
-          onClick={() => navigate('/auction/auctions?tab=completed')}
+          onClick={() => navigate('/auction/auctions?tab=COMPLETED')}
         />
         <KPICard
           title="Expiring Contracts"
-          value={data.expiringContracts.value}
-          insight={data.expiringContracts.insight}
+          value={expiringContracts.length}
+          insight="Contracts entering expiry warning window."
           icon={<ScrollText className="h-4 w-4 text-primary" />}
           onClick={() => navigate('/auction/contracts?tab=expiring_soon')}
         />
       </div>
 
-      {data.priorityAuctions.length > 0 && (
-        <div className="mb-6">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#94A3B8]">Priority Auctions</h2>
-          <div className="space-y-3">
-            {data.priorityAuctions.map((auction) => (
-              <div
-                key={auction.id}
-                className="flex cursor-pointer items-center justify-between rounded-xl border border-[#E5E7EB] bg-white p-4 transition-shadow hover:shadow-sm"
-                onClick={() => navigate(`/auction/auctions/${auction.id}`)}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-[#0F172A]">{auction.title}</p>
-                  <p className="mt-0.5 text-xs text-[#64748B]">
-                    {auction.type} &middot; <span className="capitalize">{auction.status.toLowerCase()}</span>
-                  </p>
-                </div>
-                <div className="ml-4 shrink-0 text-right">
-                  <p className="text-xs text-[#94A3B8]">Award deadline</p>
-                  <p className="text-xs font-medium text-[#0F172A]">{formatDateTime(auction.awardDeadline)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {data.expiringContractsList.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[#94A3B8]">Expiring Contracts</h2>
-          <div className="space-y-3">
-            {data.expiringContractsList.map((contract) => (
-              <div
-                key={contract.id}
-                className="flex cursor-pointer items-center justify-between rounded-xl border border-[#E5E7EB] bg-white p-4 transition-shadow hover:shadow-sm"
-                onClick={() => navigate(`/auction/contracts/${contract.id}`)}
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-[#0F172A]">{contract.vendorName}</p>
-                  <p className="mt-0.5 text-xs text-[#64748B]">{contract.lane}</p>
-                </div>
-                <div className="ml-4 shrink-0 text-right">
-                  <p className="text-xs text-[#94A3B8]">Expires</p>
-                  <p className="text-xs font-medium text-[#0F172A]">{formatDateTime(contract.endDate)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

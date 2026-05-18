@@ -35,8 +35,9 @@ export const ROUTES = {
   INVOICES_NEW: '/invoices/new',
   INVOICES_LIST: '/invoices/list',
   INVOICE_DETAIL: '/invoices/:id',
+  RECEIVABLES: '/receivables',
+  RECORD_PAYMENTS: '/record-payments',
   LEDGER: '/ledger',
-  LEDGER_PAYMENTS: '/ledger/payments',
   EXCEPTIONS: '/exceptions',
   EXCEPTION_DETAIL: '/exceptions/:exceptionId',
   DISPUTES: '/disputes',
@@ -50,7 +51,7 @@ export const ROUTES = {
 } as const
 
 export const EXPENSE_TYPES = [
-  { value: 'TOLL', label: 'Toll' },
+  { value: 'EXPENSE', label: 'Expense' },
   { value: 'DETENTION', label: 'Detention' },
   { value: 'LOADING_UNLOADING', label: 'Loading / Unloading' },
   { value: 'WEIGHBRIDGE', label: 'Weighbridge' },

@@ -8,7 +8,7 @@ import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
-import { createAuction, fetchBookings, fetchVendors } from '@auction/services/auctions.service'
+import { createAuction, fetchBookings, fetchVendors } from '@auction/lib/mock-services'
 import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner

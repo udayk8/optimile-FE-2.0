@@ -14,6 +14,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/vendor/bookings': 'Bookings',
   '/vendor/trips': 'Bookings',
   '/vendor/fleet': 'Fleet',
+  '/vendor/receivables': 'Bill Discounting',
+  '/vendor/record-payments': 'Record Payments',
+  '/vendor/ledger': 'Ledger',
   '/vendor/profile': 'Profile',
 }
 

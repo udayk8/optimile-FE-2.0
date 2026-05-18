@@ -5,7 +5,7 @@ import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
-import { createRfq } from '@auction/services/sourcing.service'
+import { createRfq } from '@auction/lib/mock-services'
 import { Upload } from 'lucide-react'
 
 export default function RfqCreatePage() {

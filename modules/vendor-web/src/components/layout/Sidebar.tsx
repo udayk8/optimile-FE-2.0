@@ -24,9 +24,9 @@ const NAV_ITEMS = [
   { path: '/vendor/bookings', label: 'Bookings', subtitle: 'Indents and deliveries', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
   { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Create and track bills', icon: CreditCard },
-  { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Invoices and payments', icon: Wallet },
-  { path: '/vendor/ledger/payments', label: 'Payments', subtitle: 'Record invoice settlements', icon: ReceiptText },
-  // { path: '/vendor/nbfc', label: 'Bill Discounting', subtitle: 'Early payment financing', icon: Banknote },
+  { path: '/vendor/receivables', label: 'Bill Discounting', subtitle: 'Invoice and NBFC tracking', icon: Banknote },
+  { path: '/vendor/record-payments', label: 'Record Payments', subtitle: 'Post settlements and TDS', icon: ReceiptText },
+  { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Read-only reconciliation trail', icon: Wallet },
   { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
