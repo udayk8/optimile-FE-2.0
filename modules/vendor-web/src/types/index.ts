@@ -234,14 +234,22 @@ export interface Indent {
   createdAt: string
 }
 
-export type TripStatus =
+export type BookingState =
+  | 'ACCEPTED'
+  | 'ASSIGNED'
+  | 'OUT_FOR_PICKUP'
+  | 'PICKUP_REACHED'
+  | 'LOADING_STARTED'
+  | 'LOADING_COMPLETED'
   | 'IN_TRANSIT'
-  | 'IN_TRANSIT_ON_TIME'
-  | 'IN_TRANSIT_DELAYED'
-  | 'AT_DELIVERY'
-  | 'EXCEPTION'
-  | 'DELIVERED'
+  | 'DESTINATION_REACHED'
+  | 'POD_PENDING'
+  | 'COMPLETED'
   | 'CANCELLED'
+
+export type TripStatus = BookingState
+
+export type BookingSlaFlag = 'ON_TIME' | 'DELAYED'
 
 export type DisruptionReason = 'VEHICLE_BREAKDOWN' | 'DRIVER_BREAKDOWN' | 'VEHICLE_OR_DRIVER_BREAKDOWN'
 
@@ -259,7 +267,9 @@ export interface Trip {
   laneDetails: LaneDetails
   assignedVehicle: { id: string; registrationNumber: string; type: string }
   assignedDriver: { id: string; name: string; mobile: string }
-  status: TripStatus
+  status: BookingState
+  slaFlag?: BookingSlaFlag
+  exceptionFlag?: boolean
   disruption?: TripDisruption
   deliveredDate?: string
   podStatus?: 'PENDING' | 'CONFIRMED'
@@ -272,7 +282,7 @@ export interface Trip {
   createdAt: string
 }
 
-export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
+export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'LR_COPY' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
 
 export interface TripDocument {
   id: string
@@ -440,7 +450,7 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
-  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
 }
 
 export interface InvoiceLineItem {
@@ -513,7 +523,7 @@ export interface PaymentRecord {
   ledgerEntryIds: string[]
 }
 
-export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
 
 export interface NBFCApplication {
   id: string
@@ -529,6 +539,7 @@ export interface NBFCApplication {
   requestedAmount: number
   approvedAmount?: number
   charges: number
+  approvedCharges?: number
   netAmount: number
   remarks?: string
   emailTitle?: string

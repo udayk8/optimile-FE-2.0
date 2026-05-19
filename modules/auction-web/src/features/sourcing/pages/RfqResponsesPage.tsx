@@ -28,7 +28,6 @@ export default function RfqResponsesPage() {
   const [fileName, setFileName] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [vendorName, setVendorName] = useState('')
-  const [quoteRows, setQuoteRows] = useState('')
   const [rfqs, setRfqs] = useState<RfqType[]>([])
   const [selectedRfqId, setSelectedRfqId] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -166,8 +165,8 @@ export default function RfqResponsesPage() {
   }
 
   const parseRows = async (): Promise<RfqResponseRow[]> => {
-    const raw = quoteRows.trim() || (selectedFile?.name.toLowerCase().endsWith('.csv') ? await selectedFile.text() : '')
-    if (!raw) throw new Error('Add quote rows manually or upload a CSV file.')
+    const raw = selectedFile?.name.toLowerCase().endsWith('.csv') ? await selectedFile.text() : ''
+    if (!raw) throw new Error('Upload a CSV file with quote rows.')
 
     return raw
       .split(/\r?\n/)
@@ -188,12 +187,12 @@ export default function RfqResponsesPage() {
       setError('Select an RFQ before uploading a response.')
       return
     }
-    if (!fileName && !quoteRows.trim()) return
+    if (!fileName) return
     setUploading(true)
     try {
       const rows = await parseRows()
       const uploaded = await uploadRfqResponse(selectedRfqId, {
-        fileName: fileName || 'manual-response.csv',
+        fileName,
         vendorName: vendorName || undefined,
         rows,
       })
@@ -201,7 +200,6 @@ export default function RfqResponsesPage() {
       setFileName('')
       setSelectedFile(null)
       setVendorName('')
-      setQuoteRows('')
       if (fileRef.current) fileRef.current.value = ''
       setPage(1)
     } catch (e) {
@@ -273,19 +271,10 @@ export default function RfqResponsesPage() {
               />
             </div>
 
-            <Button disabled={(!fileName && !quoteRows.trim()) || uploading || !selectedRfqId} onClick={handleUpload} className="shrink-0">
+            <Button disabled={!fileName || uploading || !selectedRfqId} onClick={handleUpload} className="shrink-0">
               <Upload className="mr-2 h-4 w-4" />
               {uploading ? 'Uploading...' : 'Upload'}
             </Button>
-          </div>
-          <div className="mt-4 space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Quote rows</label>
-            <textarea
-              value={quoteRows}
-              onChange={(event) => setQuoteRows(event.target.value)}
-              placeholder="Mumbai to Pune, 20ft Container, 8500"
-              className="min-h-24 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none focus:border-primary"
-            />
           </div>
         </CardContent>
       </Card>

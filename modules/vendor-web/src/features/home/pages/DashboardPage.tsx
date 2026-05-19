@@ -20,10 +20,10 @@ export default function DashboardPage() {
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
-  const uninvoicedBookings = trips.filter(t => t.podStatus === 'CONFIRMED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
+  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
   const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0) + (booking.expenseSummary.approved || 0), 0)
 
-  const activeBookings = trips.filter(t => ['IN_TRANSIT', 'IN_TRANSIT_ON_TIME', 'IN_TRANSIT_DELAYED', 'AT_DELIVERY', 'EXCEPTION'].includes(t.status))
+  const activeBookings = trips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
   
   const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
   const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')

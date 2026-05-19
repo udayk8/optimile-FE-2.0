@@ -23,7 +23,7 @@ export default function CreateInvoicePage() {
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
 
   const eligibleTrips = useMemo(
-    () => trips.filter((trip) => trip.status === 'DELIVERED' && trip.podStatus === 'CONFIRMED' && !trip.isInvoiced && (trip.freightRate > 0 || trip.expenseSummary.approved > 0)),
+    () => trips.filter((trip) => trip.status === 'COMPLETED' && !trip.isInvoiced && (trip.freightRate > 0 || trip.expenseSummary.approved > 0)),
     [trips],
   )
 

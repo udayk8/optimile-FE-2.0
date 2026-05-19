@@ -54,7 +54,8 @@ interface AppState {
   }) => void
 
   // Actions
-  acceptIndent: (indentId: string, vehicleId: string, driverId: string) => void
+  acceptIndent: (indentId: string) => void
+  assignVehicleToTrip: (tripId: string, vehicleId: string, driverId: string) => void
   declineIndent: (indentId: string) => void
   submitBid: (auctionId: string, laneId: string, amount: number) => void
   addVehicle: (vehicle: Vehicle) => void
@@ -86,7 +87,7 @@ interface AppState {
   updateNbfcApplicationFinancials: (payload: {
     invoiceId: string
     approvedAmount: number
-    charges: number
+    approvedCharges: number
     netAmount: number
     referenceNumber?: string
     remarks?: string
@@ -118,19 +119,95 @@ interface AppState {
   resetStore: () => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
-  indents: [...MOCK_INDENTS],
-  trips: [...MOCK_TRIPS],
-  auctions: [...MOCK_AUCTIONS],
-  vehicles: [...MOCK_VEHICLES],
-  drivers: [...MOCK_DRIVERS],
-  expenses: [...MOCK_EXPENSES],
-  contracts: [...MOCK_CONTRACTS],
-  invoices: [...MOCK_INVOICES],
-  ledger: [...MOCK_LEDGER],
-  payments: MOCK_LEDGER
+const INITIAL_NBFC_APPLICATIONS: NBFCApplication[] = [
+  {
+    id: 'nbfc-app-001',
+    invoiceId: 'INV-2026-001',
+    invoiceNumber: 'INV-2026-001',
+    customerName: 'HUL',
+    partnerId: 'nbfc-1',
+    partnerName: 'FinEdge Capital',
+    status: 'SUBMITTED',
+    appliedAt: '2026-05-10T10:00:00Z',
+    requestedAmount: 90000,
+    charges: 1500,
+    netAmount: 88500,
+    referenceNumber: 'NBFC-REF-001',
+    remarks: 'Awaiting final approval',
+    emailTitle: 'Bill Discounting Request - INV-2026-001',
+    recipientEmail: 'finedge@nbfc.com',
+    emailDescription: 'Please process the request for INV-2026-001.',
+    invoiceFileName: 'inv-2026-001.pdf',
+  },
+  {
+    id: 'nbfc-app-002',
+    invoiceId: 'INV-2026-002',
+    invoiceNumber: 'INV-2026-002',
+    customerName: 'HUL',
+    partnerId: 'nbfc-2',
+    partnerName: 'Prime Credit',
+    status: 'DISBURSED',
+    appliedAt: '2026-05-11T09:30:00Z',
+    approvedAt: '2026-05-12T15:30:00Z',
+    requestedAmount: 92000,
+    approvedAmount: 90000,
+    charges: 1800,
+    approvedCharges: 2000,
+    netAmount: 88000,
+    referenceNumber: 'NBFC-REF-002',
+    remarks: 'Disbursed — NBFC financing and charges posted to ledger',
+    emailTitle: 'Bill Discounting Request - INV-2026-002',
+    recipientEmail: 'prime@nbfc.com',
+    emailDescription: 'Please process the request for INV-2026-002.',
+    invoiceFileName: 'inv-2026-002.pdf',
+  },
+  {
+    id: 'nbfc-app-003',
+    invoiceId: 'INV-2026-003',
+    invoiceNumber: 'INV-2026-003',
+    customerName: 'HUL',
+    partnerId: 'nbfc-3',
+    partnerName: 'Axis Finance',
+    status: 'REJECTED',
+    appliedAt: '2026-05-12T11:00:00Z',
+    requestedAmount: 76000,
+    charges: 1400,
+    netAmount: 74600,
+    referenceNumber: 'NBFC-REF-003',
+    remarks: 'Rejected due to credit policy mismatch',
+    emailTitle: 'Bill Discounting Request - INV-2026-003',
+    recipientEmail: 'axis@nbfc.com',
+    emailDescription: 'Please process the request for INV-2026-003.',
+    invoiceFileName: 'inv-2026-003.pdf',
+  },
+  {
+    id: 'nbfc-app-004',
+    invoiceId: 'INV-2026-004',
+    invoiceNumber: 'INV-2026-004',
+    customerName: 'HUL',
+    partnerId: 'nbfc-4',
+    partnerName: 'Tata Capital',
+    status: 'APPROVED',
+    appliedAt: '2026-05-15T09:00:00Z',
+    approvedAt: '2026-05-17T11:00:00Z',
+    requestedAmount: 76000,
+    approvedAmount: 75000,
+    charges: 1500,
+    approvedCharges: 1600,
+    netAmount: 73400,
+    referenceNumber: 'NBFC-REF-004',
+    remarks: 'Approved — awaiting disbursal',
+    emailTitle: 'Bill Discounting Request - INV-2026-004',
+    recipientEmail: 'tata@nbfc.com',
+    emailDescription: 'Please process the request for INV-2026-004.',
+    invoiceFileName: 'inv-2026-004.pdf',
+  },
+]
+
+const buildInitialPayments = (): PaymentRecord[] =>
+  MOCK_LEDGER
     .filter((entry) =>
-      ['PAYMENT_RECEIVED', 'TDS_DEDUCTION', 'NBFC_FINANCING_RECEIVED', 'NBFC_CHARGES', 'RESIDUAL_PAYMENT_RECEIVED'].includes(entry.entryType)
+      ['PAYMENT_RECEIVED', 'TDS_DEDUCTION', 'RESIDUAL_PAYMENT_RECEIVED'].includes(entry.entryType)
     )
     .map((entry, index) => {
       const invoiceMatch = entry.description.match(/INV-\d{4}-\d{3}/)
@@ -142,13 +219,9 @@ export const useAppStore = create<AppState>((set) => ({
         customerName: invoiceId,
         paymentKind: entry.entryType === 'TDS_DEDUCTION'
           ? 'TDS_DEDUCTION'
-          : entry.entryType === 'NBFC_FINANCING_RECEIVED'
-            ? 'NBFC_FINANCING_RECEIVED'
-            : entry.entryType === 'NBFC_CHARGES'
-              ? 'NBFC_CHARGES'
             : entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED'
               ? 'RESIDUAL_PAYMENT_RECEIVED'
-              : entry.description.includes('Partial')
+              : entry.description.toLowerCase().includes('partial')
                 ? 'PARTIAL_PAYMENT'
                 : 'FINAL_PAYMENT',
         paymentDate: entry.date,
@@ -160,84 +233,31 @@ export const useAppStore = create<AppState>((set) => ({
         createdAt: `${entry.date}T00:00:00Z`,
         ledgerEntryIds: [entry.id],
       } as PaymentRecord
-    }),
+    })
+
+export const useAppStore = create<AppState>((set) => ({
+  indents: [...MOCK_INDENTS],
+  trips: [...MOCK_TRIPS],
+  auctions: [...MOCK_AUCTIONS],
+  vehicles: [...MOCK_VEHICLES],
+  drivers: [...MOCK_DRIVERS],
+  expenses: [...MOCK_EXPENSES],
+  contracts: [...MOCK_CONTRACTS],
+  invoices: [...MOCK_INVOICES],
+  ledger: [...MOCK_LEDGER],
+  payments: buildInitialPayments(),
   exceptions: [...MOCK_EXCEPTIONS],
-  nbfcApplications: [
-    {
-      id: 'nbfc-app-001',
-      invoiceId: 'INV-2026-001',
-      invoiceNumber: 'INV-2026-001',
-      customerName: 'HUL',
-      partnerId: 'nbfc-1',
-      partnerName: 'FinEdge Capital',
-      status: 'SUBMITTED',
-      appliedAt: '2026-05-10T10:00:00Z',
-      requestedAmount: 90000,
-      approvedAmount: 90000,
-      charges: 1500,
-      netAmount: 88500,
-      referenceNumber: 'NBFC-REF-001',
-      remarks: 'Awaiting final approval',
-      emailTitle: 'Bill Discounting Request - INV-2026-001',
-      recipientEmail: 'finedge@nbfc.com',
-      emailDescription: 'Please process the request for INV-2026-001.',
-      invoiceFileName: 'inv-2026-001.pdf',
-    },
-    {
-      id: 'nbfc-app-002',
-      invoiceId: 'INV-2026-002',
-      invoiceNumber: 'INV-2026-002',
-      customerName: 'HUL',
-      partnerId: 'nbfc-2',
-      partnerName: 'Prime Credit',
-      status: 'APPROVED',
-      appliedAt: '2026-05-11T09:30:00Z',
-      approvedAt: '2026-05-12T15:30:00Z',
-      requestedAmount: 92000,
-      approvedAmount: 90000,
-      charges: 1800,
-      netAmount: 88200,
-      referenceNumber: 'NBFC-REF-002',
-      remarks: 'Approved and ready for payment posting',
-      emailTitle: 'Bill Discounting Request - INV-2026-002',
-      recipientEmail: 'prime@nbfc.com',
-      emailDescription: 'Please process the request for INV-2026-002.',
-      invoiceFileName: 'inv-2026-002.pdf',
-    },
-    {
-      id: 'nbfc-app-003',
-      invoiceId: 'INV-2026-003',
-      invoiceNumber: 'INV-2026-003',
-      customerName: 'HUL',
-      partnerId: 'nbfc-3',
-      partnerName: 'Axis Finance',
-      status: 'REJECTED',
-      appliedAt: '2026-05-12T11:00:00Z',
-      requestedAmount: 76000,
-      charges: 1400,
-      netAmount: 74600,
-      referenceNumber: 'NBFC-REF-003',
-      remarks: 'Rejected due to credit policy mismatch',
-      emailTitle: 'Bill Discounting Request - INV-2026-003',
-      recipientEmail: 'axis@nbfc.com',
-      emailDescription: 'Please process the request for INV-2026-003.',
-      invoiceFileName: 'inv-2026-003.pdf',
-    },
-  ],
+  nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
   capacity: [...MOCK_CAPACITY],
   notifications: [...MOCK_NOTIFICATIONS],
   disputes: [...MOCK_DISPUTES],
 
-  acceptIndent: (indentId, vehicleId, driverId) => {
+  acceptIndent: (indentId) => {
     set((state) => {
       const indentIndex = state.indents.findIndex((i) => i.id === indentId)
       if (indentIndex === -1) return state
 
       const indent = state.indents[indentIndex] as Indent
-      const vehicle = state.vehicles.find((v) => v.id === vehicleId)
-      const driver = state.drivers.find((d) => d.id === driverId)
-
-      if (!vehicle || !driver) return state
 
       const updatedIndents = [...state.indents]
       updatedIndents[indentIndex] = { ...indent, status: 'ACCEPTED' }
@@ -247,9 +267,10 @@ export const useAppStore = create<AppState>((set) => ({
         contractId: indent.contractId,
         indentId: indent.id,
         laneDetails: indent.laneDetails,
-        assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
-        assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
-        status: 'IN_TRANSIT_ON_TIME',
+        assignedVehicle: { id: '', registrationNumber: '—', type: '—' },
+        assignedDriver: { id: '', name: '—', mobile: '—' },
+        status: 'ACCEPTED',
+        slaFlag: 'ON_TIME',
         freightRate: 0,
         expenseSummary: { total: 0, approved: 0, pending: 0 },
         isInvoiced: false,
@@ -260,6 +281,30 @@ export const useAppStore = create<AppState>((set) => ({
         indents: updatedIndents,
         trips: [newTrip, ...state.trips],
       }
+    })
+  },
+
+  assignVehicleToTrip: (tripId, vehicleId, driverId) => {
+    set((state) => {
+      const tripIndex = state.trips.findIndex((t) => t.id === tripId)
+      if (tripIndex === -1) return state
+
+      const trip = state.trips[tripIndex] as Trip
+      if (trip.status !== 'ACCEPTED') return state
+
+      const vehicle = state.vehicles.find((v) => v.id === vehicleId)
+      const driver = state.drivers.find((d) => d.id === driverId)
+      if (!vehicle || !driver) return state
+
+      const updatedTrips = [...state.trips]
+      updatedTrips[tripIndex] = {
+        ...trip,
+        assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
+        assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
+        status: 'ASSIGNED',
+      }
+
+      return { trips: updatedTrips }
     })
   },
 
@@ -465,21 +510,13 @@ export const useAppStore = create<AppState>((set) => ({
 
       if (cashAmount > 0) {
         const cashEntryType =
-          paymentKind === 'NBFC_FINANCING_RECEIVED'
-            ? 'NBFC_FINANCING_RECEIVED'
-            : paymentKind === 'NBFC_CHARGES'
-              ? 'NBFC_CHARGES'
-            : paymentKind === 'RESIDUAL_PAYMENT_RECEIVED'
-              ? 'RESIDUAL_PAYMENT_RECEIVED'
-              : 'PAYMENT_RECEIVED'
+          paymentKind === 'RESIDUAL_PAYMENT_RECEIVED'
+            ? 'RESIDUAL_PAYMENT_RECEIVED'
+            : 'PAYMENT_RECEIVED'
         const defaultCashDescription =
-          paymentKind === 'NBFC_FINANCING_RECEIVED'
-            ? `NBFC financing received for ${invoice.invoiceNumber}`
-            : paymentKind === 'NBFC_CHARGES'
-              ? `NBFC charges adjusted for ${invoice.invoiceNumber}`
-            : paymentKind === 'RESIDUAL_PAYMENT_RECEIVED'
-              ? `Residual payment received from escrow account for ${invoice.invoiceNumber}`
-              : `${paymentKind === 'PARTIAL_PAYMENT' ? 'Partial payment' : 'Final payment'} for ${invoice.invoiceNumber}`
+          paymentKind === 'RESIDUAL_PAYMENT_RECEIVED'
+            ? `Residual payment from escrow for ${invoice.invoiceNumber}`
+            : `${paymentKind === 'PARTIAL_PAYMENT' ? 'Partial payment from customer' : 'Final payment from customer'} for ${invoice.invoiceNumber}`
         const cashDescription = note?.trim() ? `${note.trim()} (${invoice.invoiceNumber})` : defaultCashDescription
         const cashEntry: LedgerEntry = {
           id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -576,14 +613,14 @@ export const useAppStore = create<AppState>((set) => ({
       }
     }),
 
-  updateNbfcApplicationFinancials: ({ invoiceId, approvedAmount, charges, netAmount, referenceNumber, remarks }) =>
+  updateNbfcApplicationFinancials: ({ invoiceId, approvedAmount, approvedCharges, netAmount, referenceNumber, remarks }) =>
     set((state) => ({
       nbfcApplications: state.nbfcApplications.map((application) =>
         application.invoiceId === invoiceId
           ? {
               ...application,
               approvedAmount,
-              charges,
+              approvedCharges,
               netAmount,
               referenceNumber: referenceNumber ?? application.referenceNumber,
               remarks: remarks ?? application.remarks,
@@ -594,26 +631,95 @@ export const useAppStore = create<AppState>((set) => ({
 
   markNbfcApplicationStatus: (invoiceId, status) =>
     set((state) => {
+      const nowIso = new Date().toISOString()
+      const todayDate = nowIso.slice(0, 10)
+
       const updatedApplications = state.nbfcApplications.map((application) =>
         application.invoiceId === invoiceId
           ? {
               ...application,
               status,
-              approvedAt: status === 'APPROVED' ? new Date().toISOString() : application.approvedAt,
+              approvedAt: status === 'APPROVED' && !application.approvedAt ? nowIso : application.approvedAt,
             }
           : application
       )
 
+      const nbfcDiscountingStatus: Invoice['nbfcDiscountingStatus'] =
+        status === 'SUBMITTED' ? 'SUBMITTED'
+        : status === 'APPROVED' ? 'APPROVED'
+        : status === 'DISBURSED' ? 'DISBURSED'
+        : 'REJECTED'
+
+      const invoices = state.invoices.map((invoice) =>
+        invoice.id === invoiceId ? { ...invoice, nbfcDiscountingStatus } : invoice
+      )
+
+      if (status !== 'DISBURSED') {
+        return { nbfcApplications: updatedApplications, invoices }
+      }
+
+      const alreadyDisbursed = state.ledger.some(
+        (entry) =>
+          entry.entryType === 'NBFC_FINANCING_RECEIVED' &&
+          entry.description.includes(invoiceId)
+      )
+      if (alreadyDisbursed) {
+        return { nbfcApplications: updatedApplications, invoices }
+      }
+
+      const application = updatedApplications.find((item) => item.invoiceId === invoiceId)
+      const invoice = invoices.find((item) => item.id === invoiceId)
+      if (!application || !invoice) {
+        return { nbfcApplications: updatedApplications, invoices }
+      }
+
+      const financingAmount = Math.max(0, application.approvedAmount ?? application.requestedAmount ?? 0)
+      const chargesAmount = Math.max(0, application.approvedCharges ?? application.charges ?? 0)
+      if (financingAmount <= 0 && chargesAmount <= 0) {
+        return { nbfcApplications: updatedApplications, invoices }
+      }
+
+      const invoicePaidBefore = state.payments
+        .filter((payment) => payment.invoiceId === invoiceId && payment.status === 'POSTED')
+        .reduce((sum, payment) => sum + payment.cashAmount + payment.tdsAmount, 0)
+      const baselineBalance = Math.max(0, invoice.grandTotal - invoicePaidBefore)
+
+      const nextLedger: LedgerEntry[] = []
+      const referenceNumber = application.referenceNumber
+
+      if (financingAmount > 0) {
+        const financingEntry: LedgerEntry = {
+          id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: todayDate,
+          entryType: 'NBFC_FINANCING_RECEIVED',
+          description: `NBFC financing received for ${invoice.invoiceNumber}`,
+          credit: financingAmount,
+          debit: 0,
+          runningBalance: Math.max(0, baselineBalance - financingAmount),
+          documentUrl: referenceNumber ? `/payments/${referenceNumber}.pdf` : undefined,
+        }
+        nextLedger.push(financingEntry)
+      }
+
+      if (chargesAmount > 0) {
+        const chargesBalanceBefore = nextLedger.length > 0 ? nextLedger[nextLedger.length - 1].runningBalance : baselineBalance
+        const chargesEntry: LedgerEntry = {
+          id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: todayDate,
+          entryType: 'NBFC_CHARGES',
+          description: `NBFC charges adjusted for ${invoice.invoiceNumber}`,
+          credit: chargesAmount,
+          debit: 0,
+          runningBalance: Math.max(0, chargesBalanceBefore - chargesAmount),
+          documentUrl: referenceNumber ? `/payments/${referenceNumber}.pdf` : undefined,
+        }
+        nextLedger.push(chargesEntry)
+      }
+
       return {
         nbfcApplications: updatedApplications,
-        invoices: state.invoices.map((invoice) =>
-          invoice.id === invoiceId
-            ? {
-                ...invoice,
-                nbfcDiscountingStatus: status === 'SUBMITTED' ? 'SUBMITTED' : status === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-              }
-            : invoice
-        ),
+        invoices,
+        ledger: [...nextLedger, ...state.ledger],
       }
     }),
 
@@ -722,15 +828,15 @@ export const useAppStore = create<AppState>((set) => ({
 
       if (resolve) {
         updatedTrip.disruption = trip.disruption ? { ...trip.disruption, resolvedAt: now } : undefined
-        if (trip.status === 'EXCEPTION') {
-          updatedTrip.status = 'IN_TRANSIT_ON_TIME'
-        }
+        updatedTrip.exceptionFlag = false
+        updatedTrip.slaFlag = 'ON_TIME'
       } else if (issueReason) {
         updatedTrip.disruption = {
           reason: issueReason,
           reportedAt: trip.disruption?.reportedAt ?? now,
           notes: notes ?? trip.disruption?.notes,
         }
+        updatedTrip.exceptionFlag = true
       } else if (notes && trip.disruption) {
         updatedTrip.disruption = { ...trip.disruption, notes }
       }
@@ -844,102 +950,9 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       invoices: [...MOCK_INVOICES],
       ledger: [...MOCK_LEDGER],
-      payments: MOCK_LEDGER
-        .filter((entry) =>
-          ['PAYMENT_RECEIVED', 'TDS_DEDUCTION', 'NBFC_FINANCING_RECEIVED', 'NBFC_CHARGES', 'RESIDUAL_PAYMENT_RECEIVED'].includes(entry.entryType)
-        )
-        .map((entry, index) => {
-          const invoiceMatch = entry.description.match(/INV-\d{4}-\d{3}/)
-          const invoiceId = invoiceMatch?.[0] ?? 'INV-UNKNOWN'
-          return {
-            id: `pay-seed-${index + 1}`,
-            invoiceId,
-            invoiceNumber: invoiceId,
-            customerName: invoiceId,
-            paymentKind: entry.entryType === 'TDS_DEDUCTION'
-              ? 'TDS_DEDUCTION'
-              : entry.entryType === 'NBFC_FINANCING_RECEIVED'
-                ? 'NBFC_FINANCING_RECEIVED'
-                : entry.entryType === 'NBFC_CHARGES'
-                  ? 'NBFC_CHARGES'
-                : entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED'
-                  ? 'RESIDUAL_PAYMENT_RECEIVED'
-                  : entry.description.includes('Partial')
-                    ? 'PARTIAL_PAYMENT'
-                    : 'FINAL_PAYMENT',
-            paymentDate: entry.date,
-            cashAmount: entry.entryType === 'TDS_DEDUCTION' ? 0 : entry.credit,
-            tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.credit : 0,
-            referenceNumber: entry.id.toUpperCase(),
-            note: entry.description,
-            status: 'POSTED',
-            createdAt: `${entry.date}T00:00:00Z`,
-            ledgerEntryIds: [entry.id],
-          } as PaymentRecord
-        }),
+      payments: buildInitialPayments(),
       exceptions: [...MOCK_EXCEPTIONS],
-      nbfcApplications: [
-        {
-          id: 'nbfc-app-001',
-          invoiceId: 'INV-2026-001',
-          invoiceNumber: 'INV-2026-001',
-          customerName: 'HUL',
-          partnerId: 'nbfc-1',
-          partnerName: 'FinEdge Capital',
-          status: 'SUBMITTED',
-          appliedAt: '2026-05-10T10:00:00Z',
-          requestedAmount: 90000,
-          approvedAmount: 90000,
-          charges: 1500,
-          netAmount: 88500,
-          referenceNumber: 'NBFC-REF-001',
-          remarks: 'Awaiting final approval',
-          emailTitle: 'Bill Discounting Request - INV-2026-001',
-          recipientEmail: 'finedge@nbfc.com',
-          emailDescription: 'Please process the request for INV-2026-001.',
-          invoiceFileName: 'inv-2026-001.pdf',
-        },
-        {
-          id: 'nbfc-app-002',
-          invoiceId: 'INV-2026-002',
-          invoiceNumber: 'INV-2026-002',
-          customerName: 'HUL',
-          partnerId: 'nbfc-2',
-          partnerName: 'Prime Credit',
-          status: 'APPROVED',
-          appliedAt: '2026-05-11T09:30:00Z',
-          approvedAt: '2026-05-12T15:30:00Z',
-          requestedAmount: 92000,
-          approvedAmount: 90000,
-          charges: 1800,
-          netAmount: 88200,
-          referenceNumber: 'NBFC-REF-002',
-          remarks: 'Approved and ready for payment posting',
-          emailTitle: 'Bill Discounting Request - INV-2026-002',
-          recipientEmail: 'prime@nbfc.com',
-          emailDescription: 'Please process the request for INV-2026-002.',
-          invoiceFileName: 'inv-2026-002.pdf',
-        },
-        {
-          id: 'nbfc-app-003',
-          invoiceId: 'INV-2026-003',
-          invoiceNumber: 'INV-2026-003',
-          customerName: 'HUL',
-          partnerId: 'nbfc-3',
-          partnerName: 'Axis Finance',
-          status: 'REJECTED',
-          appliedAt: '2026-05-12T11:00:00Z',
-          requestedAmount: 76000,
-          charges: 1400,
-          netAmount: 74600,
-          referenceNumber: 'NBFC-REF-003',
-          remarks: 'Rejected due to credit policy mismatch',
-          emailTitle: 'Bill Discounting Request - INV-2026-003',
-          recipientEmail: 'axis@nbfc.com',
-          emailDescription: 'Please process the request for INV-2026-003.',
-          invoiceFileName: 'inv-2026-003.pdf',
-        },
-      ],
+      nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
       capacity: [...MOCK_CAPACITY],
       notifications: [...MOCK_NOTIFICATIONS],
       disputes: [...MOCK_DISPUTES],

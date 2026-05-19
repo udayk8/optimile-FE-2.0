@@ -12,9 +12,10 @@ import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal
 import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { PageHero } from '@shared-ui/page-hero'
-import { ArrowLeft, Download, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Download, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
+import type { Trip, TripDocument } from '@vendor/types'
 
-type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'exception'
+type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
 type DetailTab = 'freight' | 'documents' | 'expenses'
 
 function getBookingMode(pathname: string) {
@@ -31,7 +32,8 @@ export default function TripDetailPage() {
   const [expenseFilter, setExpenseFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL')
 
   const { indents, trips, declineIndent } = useAppStore()
-  const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null)
+  const [assignTripId, setAssignTripId] = useState<string | null>(null)
+  const acceptIndent = useAppStore((s) => s.acceptIndent)
   const [selectedTripForExpense, setSelectedTripForExpense] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
 
@@ -41,17 +43,33 @@ export default function TripDetailPage() {
   const expenses = useMemo(() => allExpenses.filter((expense) => expense.tripId === id), [allExpenses, id])
   const mode = getBookingMode(location.pathname)
   const booking = indent ?? trip
+  const ASSIGNMENT_STATES: Trip['status'][] = ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED']
+  const IN_TRANSIT_STATES: Trip['status'][] = ['IN_TRANSIT', 'DESTINATION_REACHED']
   const resolvedMode: BookingMode =
     indent
-      ? (mode === 'accepted' || mode === 'cancelled' ? mode : indent.status === 'DECLINED' ? 'cancelled' : 'new')
-      : (trip?.status === 'DELIVERED'
-        ? (trip.podStatus === 'CONFIRMED' ? 'completed' : 'pending-pod')
-        : trip?.status === 'IN_TRANSIT' || trip?.status === 'IN_TRANSIT_ON_TIME' || trip?.status === 'IN_TRANSIT_DELAYED' || trip?.status === 'AT_DELIVERY'
-          ? (trip?.disruption && !trip.disruption.resolvedAt ? 'exception' : 'active')
-          : trip?.status === 'EXCEPTION'
-            ? 'exception'
-            : mode)
-  const docs = booking && 'documents' in booking ? trip?.documents ?? [] : []
+      ? (mode === 'accepted' || mode === 'cancelled' || mode === 'rejected' ? mode : indent.status === 'DECLINED' ? 'rejected' : 'new')
+      : trip?.status === 'COMPLETED'
+        ? 'completed'
+        : trip?.status === 'POD_PENDING'
+          ? 'pending-pod'
+          : trip?.status === 'CANCELLED'
+            ? 'cancelled'
+            : trip && (ASSIGNMENT_STATES.includes(trip.status) || IN_TRANSIT_STATES.includes(trip.status))
+              ? (trip.exceptionFlag ? 'exception' : 'active')
+              : mode
+  const POST_ACCEPT_STATUSES: Trip['status'][] = ['ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED']
+  const tripDocs = booking && 'documents' in booking ? trip?.documents ?? [] : []
+  const docs = (() => {
+    if (!trip || !POST_ACCEPT_STATUSES.includes(trip.status)) return tripDocs
+    const haveType = new Set(tripDocs.map((d) => d.type))
+    const defaults: TripDocument[] = []
+    if (!haveType.has('LR_COPY')) defaults.push({ id: `${trip.id}-lr`, type: 'LR_COPY', title: 'LR copy', fileName: `lr-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/lr-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
+    if (!haveType.has('EWAY_BILL')) defaults.push({ id: `${trip.id}-eway`, type: 'EWAY_BILL', title: 'E-way bill copy', fileName: `ewaybill-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/ewaybill-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
+    if (!haveType.has('INVOICE_COPY')) defaults.push({ id: `${trip.id}-inv`, type: 'INVOICE_COPY', title: 'Invoice copy', fileName: `invoice-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/invoice-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
+    return [...defaults, ...tripDocs]
+  })()
+  const visibleTabs: DetailTab[] = resolvedMode === 'completed' ? ['freight', 'documents', 'expenses'] : ['freight', 'documents']
+  const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   if (!indent && !trip) {
     return <EmptyState title="Booking not found" description="The selected booking no longer exists in mock data." />
@@ -82,30 +100,35 @@ export default function TripDetailPage() {
           <div className="flex flex-wrap gap-2">
             <span className="font-mono text-sm font-semibold text-text">{bookingId}</span>
             <StatusBadge status={booking?.status ?? 'PENDING'} />
-            {trip?.podStatus === 'CONFIRMED' && <StatusBadge status="CONFIRMED" label="POD confirmed" />}
-            {trip?.status === 'DELIVERED' && trip?.podStatus === 'PENDING' && <StatusBadge status="PENDING" label="Pending POD" />}
-            {(resolvedMode === 'new' || resolvedMode === 'accepted') && (
+            {trip?.slaFlag && <StatusBadge status={trip.slaFlag} />}
+            {trip?.exceptionFlag && <StatusBadge status="EXCEPTION" />}
+            {indent && (resolvedMode === 'new' || resolvedMode === 'accepted') && (
               <>
-                <Button onClick={() => setSelectedIndentId(indent!.id)}>
-                  <Truck className="mr-2 h-4 w-4" /> Accept & Assign
+                <Button onClick={() => { acceptIndent(indent.id); navigate('/vendor/bookings?tab=assignment') }}>
+                  <CheckCircle className="mr-2 h-4 w-4" /> Accept
                 </Button>
-                <Button variant="outline" onClick={() => setDeclineConfirmId(indent!.id)}>
+                <Button variant="outline" onClick={() => setDeclineConfirmId(indent.id)}>
                   Decline
                 </Button>
               </>
+            )}
+            {trip?.status === 'ACCEPTED' && (
+              <Button onClick={() => setAssignTripId(trip.id)}>
+                <Truck className="mr-2 h-4 w-4" /> Assign Vehicle & Driver
+              </Button>
             )}
           </div>
         }
       />
 
       <div className="flex flex-wrap gap-2">
-        {(['freight', 'documents', 'expenses'] as DetailTab[]).map((tab) => (
+        {visibleTabs.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setDetailTab(tab)}
             className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-              detailTab === tab ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:text-primary'
+              effectiveDetailTab === tab ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:text-primary'
             }`}
           >
             {tab === 'freight' && 'Freight details'}
@@ -117,7 +140,7 @@ export default function TripDetailPage() {
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <div className="space-y-6">
-          {detailTab === 'freight' && (
+          {effectiveDetailTab === 'freight' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -153,7 +176,7 @@ export default function TripDetailPage() {
             </Card>
           )}
 
-          {detailTab === 'documents' && (
+          {effectiveDetailTab === 'documents' && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -183,7 +206,7 @@ export default function TripDetailPage() {
             </Card>
           )}
 
-          {detailTab === 'expenses' && trip && (
+          {effectiveDetailTab === 'expenses' && trip && (
             <Card>
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -204,7 +227,7 @@ export default function TripDetailPage() {
                         </button>
                       ))}
                     </div>
-                    {trip?.status === 'DELIVERED' && !trip.isInvoiced && (
+                    {trip?.status === 'COMPLETED' && !trip.isInvoiced && (
                       <Button size="sm" onClick={() => setSelectedTripForExpense(trip.id)}>
                         Add Expense
                       </Button>
@@ -321,8 +344,8 @@ export default function TripDetailPage() {
         </div>
       </div>
 
-      {indent && (mode === 'new' || mode === 'accepted') && (
-        <AssignVehicleModal isOpen={!!selectedIndentId} onClose={() => setSelectedIndentId(null)} indentId={indent.id} />
+      {assignTripId && (
+        <AssignVehicleModal isOpen={!!assignTripId} onClose={() => setAssignTripId(null)} tripId={assignTripId} />
       )}
 
       {selectedTripForExpense && trip && (
@@ -339,7 +362,7 @@ export default function TripDetailPage() {
         onConfirm={() => {
           if (declineConfirmId) declineIndent(declineConfirmId)
           setDeclineConfirmId(null)
-          navigate('/vendor/bookings?tab=cancelled')
+          navigate('/vendor/bookings?tab=rejected')
         }}
         title="Decline booking?"
         description="This will mark the booking as cancelled in the mock data."

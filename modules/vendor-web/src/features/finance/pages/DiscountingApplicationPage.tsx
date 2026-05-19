@@ -51,7 +51,7 @@ export default function DiscountingApplicationPage() {
   const computedNet = computedRequested - computedCharges
 
   const [approvedAmount, setApprovedAmount] = useState(0)
-  const [charges, setCharges] = useState(0)
+  const [approvedCharges, setApprovedCharges] = useState(0)
   const [netAmount, setNetAmount] = useState(0)
   const [referenceNumber, setReferenceNumber] = useState('')
   const [remarks, setRemarks] = useState('')
@@ -61,9 +61,11 @@ export default function DiscountingApplicationPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
+  const expectedCharges = application?.charges ?? computedCharges
+
   useEffect(() => {
     setApprovedAmount(application?.approvedAmount ?? application?.requestedAmount ?? computedRequested)
-    setCharges(application?.charges ?? computedCharges)
+    setApprovedCharges(application?.approvedCharges ?? application?.charges ?? computedCharges)
     setNetAmount(application?.netAmount ?? computedNet)
     setReferenceNumber(application?.referenceNumber ?? '')
     setRemarks(application?.remarks ?? '')
@@ -113,7 +115,7 @@ export default function DiscountingApplicationPage() {
     updateNbfcApplicationFinancials({
       invoiceId: invoice.id,
       approvedAmount,
-      charges,
+      approvedCharges,
       netAmount,
       referenceNumber,
       remarks,
@@ -130,6 +132,11 @@ export default function DiscountingApplicationPage() {
   const markRejected = () => {
     markNbfcApplicationStatus(invoice.id, 'REJECTED')
     toast.success('Application marked rejected')
+  }
+
+  const markDisbursed = () => {
+    markNbfcApplicationStatus(invoice.id, 'DISBURSED')
+    toast.success('Marked disbursed — NBFC financing and charges posted to ledger')
   }
 
   return (
@@ -150,10 +157,11 @@ export default function DiscountingApplicationPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Stat label="Invoice amount" value={amount} />
         <Stat label="Requested amount" value={application?.requestedAmount ?? computedRequested} />
-        <Stat label="Charges" value={application?.charges ?? computedCharges} />
+        <Stat label="Expected charges" value={expectedCharges} />
+        <Stat label="Approved charges" value={mode === 'APPROVED' || mode === 'DISBURSED' ? (application?.approvedCharges ?? 0) : 0} muted={mode !== 'APPROVED' && mode !== 'DISBURSED'} />
         <Stat label="Net amount" value={application?.netAmount ?? computedNet} />
       </div>
 
@@ -233,8 +241,11 @@ export default function DiscountingApplicationPage() {
             <label className="text-sm font-medium text-text">Approved amount
               <Input type="number" min="0" value={approvedAmount} disabled={!editable} onChange={(e) => setApprovedAmount(Number(e.target.value))} className="mt-1" />
             </label>
-            <label className="text-sm font-medium text-text">Charges
-              <Input type="number" min="0" value={charges} disabled={!editable} onChange={(e) => setCharges(Number(e.target.value))} className="mt-1" />
+            <label className="text-sm font-medium text-text">Expected charges
+              <Input type="number" min="0" value={expectedCharges} disabled className="mt-1" />
+            </label>
+            <label className="text-sm font-medium text-text">Approved charges
+              <Input type="number" min="0" value={approvedCharges} disabled={!editable} onChange={(e) => setApprovedCharges(Number(e.target.value))} className="mt-1" />
             </label>
             <label className="text-sm font-medium text-text">Net amount
               <Input type="number" min="0" value={netAmount} disabled={!editable} onChange={(e) => setNetAmount(Number(e.target.value))} className="mt-1" />
@@ -261,6 +272,19 @@ export default function DiscountingApplicationPage() {
             </div>
           )}
 
+          {mode === 'APPROVED' && (
+            <div className="flex items-center gap-3">
+              <Button onClick={markDisbursed}>Mark Disbursed</Button>
+              <p className="text-xs text-gray-500">Posts NBFC financing (₹{approvedAmount.toLocaleString('en-IN')}) and approved charges (₹{approvedCharges.toLocaleString('en-IN')}) to the ledger.</p>
+            </div>
+          )}
+
+          {mode === 'DISBURSED' && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              Disbursed. NBFC financing and charges have been posted to the ledger and payment history.
+            </div>
+          )}
+
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
             <p><span className="font-semibold text-gray-700">Email:</span> {application?.recipientEmail ?? '—'}</p>
             <p><span className="font-semibold text-gray-700">Subject:</span> {application?.emailTitle ?? '—'}</p>
@@ -273,11 +297,13 @@ export default function DiscountingApplicationPage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, muted = false }: { label: string; value: number; muted?: boolean }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="text-sm font-medium text-gray-500">{label}</div>
-      <div className="mt-2 text-2xl font-semibold text-text">₹{value.toLocaleString('en-IN')}</div>
+      <div className={`mt-2 text-2xl font-semibold ${muted ? 'text-gray-400' : 'text-text'}`}>
+        {muted ? '—' : `₹${value.toLocaleString('en-IN')}`}
+      </div>
     </div>
   )
 }

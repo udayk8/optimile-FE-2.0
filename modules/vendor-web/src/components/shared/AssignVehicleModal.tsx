@@ -6,11 +6,11 @@ import { useAppStore } from '@vendor/stores/app.store'
 interface AssignVehicleModalProps {
   isOpen: boolean
   onClose: () => void
-  indentId: string
+  tripId: string
 }
 
-export function AssignVehicleModal({ isOpen, onClose, indentId }: AssignVehicleModalProps) {
-  const { vehicles, drivers, acceptIndent } = useAppStore()
+export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleModalProps) {
+  const { vehicles, drivers, assignVehicleToTrip } = useAppStore()
   const [selectedVehicle, setSelectedVehicle] = useState<string>('')
   const [selectedDriver, setSelectedDriver] = useState<string>('')
 
@@ -20,7 +20,7 @@ export function AssignVehicleModal({ isOpen, onClose, indentId }: AssignVehicleM
 
   const handleAssign = () => {
     if (!selectedVehicle || !selectedDriver) return
-    acceptIndent(indentId, selectedVehicle, selectedDriver)
+    assignVehicleToTrip(tripId, selectedVehicle, selectedDriver)
     onClose()
   }
 
@@ -30,7 +30,7 @@ export function AssignVehicleModal({ isOpen, onClose, indentId }: AssignVehicleM
         <DialogHeader>
           <DialogTitle>Assign Vehicle & Driver</DialogTitle>
           <DialogDescription>
-            Select a vehicle and driver from your active fleet to accept this indent.
+            Select a vehicle and driver from your active fleet for this booking.
           </DialogDescription>
         </DialogHeader>
         
@@ -71,7 +71,7 @@ export function AssignVehicleModal({ isOpen, onClose, indentId }: AssignVehicleM
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleAssign} disabled={!selectedVehicle || !selectedDriver}>
-            Accept & Assign
+            Assign
           </Button>
         </DialogFooter>
       </DialogContent>

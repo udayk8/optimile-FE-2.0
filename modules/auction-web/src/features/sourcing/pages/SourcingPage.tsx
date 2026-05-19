@@ -40,7 +40,7 @@ export default function SourcingPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filteredRfis = useMemo(() => rfis, [rfis])
+  const filteredRfis = useMemo(() => rfis.filter((rfi) => rfi.status === 'PUBLISHED'), [rfis])
 
   const rfiColumns = useMemo<DataTableColumn<(typeof filteredRfis)[number]>[]>(
     () => [
@@ -67,7 +67,7 @@ export default function SourcingPage() {
     [navigate]
   )
 
-  const filteredRfqs = useMemo(() => rfqs, [rfqs])
+  const filteredRfqs = useMemo(() => rfqs.filter((rfq) => rfq.status === 'PUBLISHED'), [rfqs])
 
   const rfqColumns = useMemo<DataTableColumn<(typeof filteredRfqs)[number]>[]>(
     () => [

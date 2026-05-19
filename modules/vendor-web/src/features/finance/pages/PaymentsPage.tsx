@@ -10,11 +10,11 @@ import type { Invoice, PaymentKind, PaymentRecord } from '@vendor/types'
 const PAGE_SIZE = 8
 
 const KIND_LABEL: Record<PaymentKind, string> = {
-  PARTIAL_PAYMENT: 'Partial Payment',
-  FINAL_PAYMENT: 'Final Payment',
+  PARTIAL_PAYMENT: 'Partial Payment from Customer',
+  FINAL_PAYMENT: 'Final Payment from Customer',
   NBFC_FINANCING_RECEIVED: 'NBFC Financing',
   NBFC_CHARGES: 'NBFC Charges',
-  RESIDUAL_PAYMENT_RECEIVED: 'Residual Payment',
+  RESIDUAL_PAYMENT_RECEIVED: 'Residual Payment from Escrow',
   TDS_DEDUCTION: 'TDS Deduction',
 }
 
@@ -36,7 +36,7 @@ function getPendingAmount(invoice: Invoice | undefined, payments: PaymentRecord[
 }
 
 export default function PaymentsPage() {
-  const { invoices, payments, nbfcApplications, recordInvoicePayment } = useAppStore()
+  const { invoices, payments, recordInvoicePayment } = useAppStore()
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -74,13 +74,6 @@ export default function PaymentsPage() {
     setOpen(true)
   }
 
-  const maybePrefillNbfc = (invoiceId: string) => {
-    const app = nbfcApplications.find((item) => item.invoiceId === invoiceId)
-    if (paymentKind === 'NBFC_FINANCING_RECEIVED' && app?.approvedAmount) {
-      setAmount(String(app.approvedAmount))
-    }
-  }
-
   const handleSubmit = () => {
     if (!selectedInvoiceId) { setError('Select an invoice.'); return }
     if (enteredAmount <= 0) { setError('Enter a valid amount.'); return }
@@ -89,13 +82,8 @@ export default function PaymentsPage() {
       return
     }
 
-    const app = nbfcApplications.find((item) => item.invoiceId === selectedInvoiceId)
     if (!description.trim()) {
       setError('Description is required.')
-      return
-    }
-    if (paymentKind === 'NBFC_FINANCING_RECEIVED' && app?.approvedAmount && enteredAmount !== app.approvedAmount && !description.trim()) {
-      setError('Add a description when posted amount differs from approved amount.')
       return
     }
 
@@ -181,7 +169,7 @@ export default function PaymentsPage() {
               Invoice
               <select
                 value={selectedInvoiceId}
-                onChange={(e) => { setError(''); setSelectedInvoiceId(e.target.value); maybePrefillNbfc(e.target.value) }}
+                onChange={(e) => { setError(''); setSelectedInvoiceId(e.target.value) }}
                 className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
               >
                 <option value="">Select invoice</option>
@@ -196,11 +184,9 @@ export default function PaymentsPage() {
                 onChange={(e) => setPaymentKind(e.target.value as PaymentKind)}
                 className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
               >
-                <option value="PARTIAL_PAYMENT">Partial Payment</option>
-                <option value="FINAL_PAYMENT">Final Payment</option>
-                <option value="NBFC_FINANCING_RECEIVED">NBFC Financing Received</option>
-                <option value="NBFC_CHARGES">NBFC Charges</option>
-                <option value="RESIDUAL_PAYMENT_RECEIVED">Residual Payment Received</option>
+                <option value="PARTIAL_PAYMENT">Partial Payment from Customer</option>
+                <option value="FINAL_PAYMENT">Final Payment from Customer</option>
+                <option value="RESIDUAL_PAYMENT_RECEIVED">Residual Payment from Escrow</option>
                 <option value="TDS_DEDUCTION">TDS Deduction</option>
               </select>
             </label>

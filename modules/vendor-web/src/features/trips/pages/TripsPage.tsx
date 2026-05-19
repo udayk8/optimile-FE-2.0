@@ -14,11 +14,37 @@ import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
 import type { Trip } from '@vendor/types'
 
-type BookingsTab = 'pending-allocation' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'exception'
+type BookingsTab =
+  | 'pending-allocation'
+  | 'assignment'
+  | 'in-transit'
+  | 'pending-pod'
+  | 'completed'
+  | 'exception'
+  | 'cancelled'
+  | 'rejected'
 
-const BOOKING_TABS: BookingsTab[] = ['pending-allocation', 'active', 'pending-pod', 'completed', 'cancelled', 'exception']
+const BOOKING_TABS: BookingsTab[] = [
+  'pending-allocation',
+  'assignment',
+  'in-transit',
+  'pending-pod',
+  'completed',
+  'exception',
+  'cancelled',
+  'rejected',
+]
 
-const ACTIVE_STATUSES = new Set<Trip['status']>(['IN_TRANSIT', 'IN_TRANSIT_ON_TIME', 'IN_TRANSIT_DELAYED', 'AT_DELIVERY'])
+const ASSIGNMENT_STATES = new Set<Trip['status']>([
+  'ACCEPTED',
+  'ASSIGNED',
+  'OUT_FOR_PICKUP',
+  'PICKUP_REACHED',
+  'LOADING_STARTED',
+  'LOADING_COMPLETED',
+])
+
+const IN_TRANSIT_STATES = new Set<Trip['status']>(['IN_TRANSIT', 'DESTINATION_REACHED'])
 
 const REASON_LABEL: Record<string, string> = {
   VEHICLE_BREAKDOWN: 'Vehicle Breakdown',
@@ -54,45 +80,52 @@ export default function TripsPage() {
   const navigate = useNavigate()
   const activeTab = getBookingsTab(location.pathname, location.search)
 
-  const { indents, trips, declineIndent } = useAppStore()
-  const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null)
+  const { indents, trips, declineIndent, acceptIndent } = useAppStore()
+  const [assignTripId, setAssignTripId] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
   const [reassignTripId, setReassignTripId] = useState<string | null>(null)
 
   const pendingAllocation = indents.filter((indent) => indent.status === 'PENDING')
 
-  const exceptionBookings = trips.filter((trip) => trip.disruption && !trip.disruption.resolvedAt)
+  const exceptionBookings = trips.filter((trip) => trip.exceptionFlag === true)
   const exceptionTripIds = new Set(exceptionBookings.map((t) => t.id))
 
-  const activeBookings = trips.filter((trip) =>
-    ACTIVE_STATUSES.has(trip.status) && !exceptionTripIds.has(trip.id)
+  const assignmentBookings = trips.filter((trip) =>
+    ASSIGNMENT_STATES.has(trip.status) && !exceptionTripIds.has(trip.id)
   )
-  const pendingPodBookings = trips.filter((trip) => trip.status === 'DELIVERED' && trip.podStatus === 'PENDING')
-  const completedBookings = trips.filter((trip) => trip.status === 'DELIVERED' && trip.podStatus === 'CONFIRMED')
-  const cancelledIndentBookings = indents.filter((indent) => indent.status === 'DECLINED')
+  const inTransitBookings = trips.filter((trip) =>
+    IN_TRANSIT_STATES.has(trip.status) && !exceptionTripIds.has(trip.id)
+  )
+  const pendingPodBookings = trips.filter((trip) => trip.status === 'POD_PENDING')
+  const completedBookings = trips.filter((trip) => trip.status === 'COMPLETED')
   const cancelledTripBookings = trips.filter((trip) => trip.status === 'CANCELLED')
-  const cancelledBookings = [
-    ...cancelledIndentBookings.map((indent) => ({
-      id: indent.id,
-      route: `${indent.laneDetails.origin.city} → ${indent.laneDetails.destination.city}`,
-      reason: indent.rejectionReason ?? 'Cancelled before dispatch',
-      detailsPath: `/vendor/bookings/cancelled/${indent.id}`,
-    })),
-    ...cancelledTripBookings.map((trip) => ({
-      id: trip.id,
-      route: `${trip.laneDetails.origin.city} → ${trip.laneDetails.destination.city}`,
-      reason: trip.podStatus === 'PENDING' ? 'Rejected by user while POD was pending' : 'Cancelled after dispatch',
-      detailsPath: `/vendor/bookings/cancelled/${trip.id}`,
-    })),
-  ]
+  const cancelledBookings = cancelledTripBookings.map((trip) => ({
+    id: trip.id,
+    route: `${trip.laneDetails.origin.city} → ${trip.laneDetails.destination.city}`,
+    stage: 'Post Dispatch',
+    cancelledBy: 'Vendor',
+    reason: 'Booking cancelled',
+    detailsPath: `/vendor/bookings/cancelled/${trip.id}`,
+  }))
+  const rejectedIndentBookings = indents.filter((indent) => indent.status === 'DECLINED')
+  const rejectedBookings = rejectedIndentBookings.map((indent) => ({
+    id: indent.id,
+    route: `${indent.laneDetails.origin.city} → ${indent.laneDetails.destination.city}`,
+    stage: 'Pending Transport Allocation',
+    rejectedBy: 'Vendor',
+    reason: indent.rejectionReason ?? 'Declined before allocation',
+    detailsPath: `/vendor/bookings/rejected/${indent.id}`,
+  }))
 
   const tabs: { key: BookingsTab; label: string; count: number }[] = [
-    { key: 'pending-allocation', label: 'Pending Transport Allocation', count: pendingAllocation.length },
-    { key: 'active', label: 'Active Bookings', count: activeBookings.length },
+    { key: 'pending-allocation', label: 'Pending Allocation', count: pendingAllocation.length },
+    { key: 'assignment', label: 'Assignment', count: assignmentBookings.length },
+    { key: 'in-transit', label: 'In Transit', count: inTransitBookings.length },
     { key: 'pending-pod', label: 'Pending POD', count: pendingPodBookings.length },
     { key: 'completed', label: 'Completed', count: completedBookings.length },
-    { key: 'cancelled', label: 'Cancelled', count: cancelledBookings.length },
     { key: 'exception', label: 'Exception', count: exceptionBookings.length },
+    { key: 'cancelled', label: 'Cancelled', count: cancelledBookings.length },
+    { key: 'rejected', label: 'Rejected', count: rejectedBookings.length },
   ]
 
   return (
@@ -153,8 +186,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4"><SLACountdown deadline={indent.slaDeadline} /></td>
                       <td className="px-5 py-4 text-right">
                         <div className="inline-flex items-center gap-2">
-                          <Button size="sm" variant="success" onClick={() => setSelectedIndentId(indent.id)}>
-                            <CheckCircle className="mr-1 h-3.5 w-3.5" /> Allocate
+                          <Button size="sm" variant="success" onClick={() => { acceptIndent(indent.id); navigate('/vendor/bookings?tab=assignment') }}>
+                            <CheckCircle className="mr-1 h-3.5 w-3.5" /> Accept
                           </Button>
                           <Button size="sm" variant="outline" onClick={() => setDeclineConfirmId(indent.id)}>
                             <XCircle className="mr-1 h-3.5 w-3.5" /> Decline
@@ -173,10 +206,10 @@ export default function TripsPage() {
         </div>
       )}
 
-      {activeTab === 'active' && (
+      {activeTab === 'assignment' && (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {activeBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Truck className="h-12 w-12" />} title="No active bookings" /></div>
+          {assignmentBookings.length === 0 ? (
+            <div className="p-8"><EmptyState icon={<Truck className="h-12 w-12" />} title="No bookings in assignment" /></div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px] text-left">
@@ -191,10 +224,66 @@ export default function TripsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {activeBookings.map((trip) => (
+                  {assignmentBookings.map((trip) => (
+                    <tr key={trip.id} className="hover:bg-gray-50">
+                      <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
+                      <td className="px-5 py-4">
+                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
+                      <td className="px-5 py-4 text-right">
+                        <div className="inline-flex items-center gap-2">
+                          {trip.status === 'ACCEPTED' && (
+                            <Button size="sm" variant="success" onClick={() => setAssignTripId(trip.id)}>
+                              <Truck className="mr-1 h-3.5 w-3.5" /> Assign Vehicle & Driver
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/assignment/${trip.id}`)}>
+                            View Details
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'in-transit' && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {inTransitBookings.length === 0 ? (
+            <div className="p-8"><EmptyState icon={<Truck className="h-12 w-12" />} title="No bookings in transit" /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px] text-left">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-5 py-3 font-bold">Status</th>
+                    <th className="px-5 py-3 font-bold">Booking</th>
+                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Vehicle</th>
+                    <th className="px-5 py-3 font-bold">Driver</th>
+                    <th className="px-5 py-3 text-right font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {inTransitBookings.map((trip) => (
                     <tr key={trip.id} className="hover:bg-gray-50">
                       <td className="px-5 py-4">
-                        {trip.podStatus === 'CONFIRMED' ? <StatusBadge status="CONFIRMED" label="POD ✓" /> : <StatusBadge status={trip.status} />}
+                        <div className="flex flex-wrap gap-1.5">
+                          <StatusBadge status={trip.status} />
+                          {trip.slaFlag && <StatusBadge status={trip.slaFlag} />}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -208,7 +297,7 @@ export default function TripsPage() {
                       <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
                       <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/active/${trip.id}`)}>
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/in-transit/${trip.id}`)}>
                           View Details
                         </Button>
                       </td>
@@ -241,7 +330,7 @@ export default function TripsPage() {
                 <tbody className="divide-y divide-gray-200">
                   {pendingPodBookings.map((trip) => (
                     <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status="PENDING" label="Pending POD" /></td>
+                      <td className="px-5 py-4"><StatusBadge status="POD_PENDING" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
                       </td>
@@ -294,10 +383,7 @@ export default function TripsPage() {
                   {completedBookings.map((trip) => (
                     <tr key={trip.id} className="hover:bg-gray-50">
                       <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          <StatusBadge status="DELIVERED" />
-                          <StatusBadge status="CONFIRMED" label="POD ✓" />
-                        </div>
+                        <StatusBadge status="COMPLETED" />
                       </td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -326,12 +412,14 @@ export default function TripsPage() {
             <div className="p-8"><EmptyState icon={<XCircle className="h-12 w-12" />} title="No cancelled bookings" /></div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left">
+              <table className="w-full min-w-[1100px] text-left">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
                     <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Stage</th>
+                    <th className="px-5 py-3 font-bold">Cancelled By</th>
                     <th className="px-5 py-3 font-bold">Reason</th>
                     <th className="px-5 py-3 font-bold text-right">Actions</th>
                   </tr>
@@ -344,6 +432,51 @@ export default function TripsPage() {
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
                       </td>
                       <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.cancelledBy}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
+                      <td className="px-5 py-4 text-right">
+                        <Button size="sm" variant="outline" onClick={() => navigate(booking.detailsPath)}>
+                          View Details
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'rejected' && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {rejectedBookings.length === 0 ? (
+            <div className="p-8"><EmptyState icon={<XCircle className="h-12 w-12" />} title="No rejected bookings" /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] text-left">
+                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-5 py-3 font-bold">Status</th>
+                    <th className="px-5 py-3 font-bold">Booking</th>
+                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Stage</th>
+                    <th className="px-5 py-3 font-bold">Rejected By</th>
+                    <th className="px-5 py-3 font-bold">Reason</th>
+                    <th className="px-5 py-3 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {rejectedBookings.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-gray-50">
+                      <td className="px-5 py-4"><StatusBadge status="REJECTED" /></td>
+                      <td className="px-5 py-4">
+                        <div className="font-mono text-sm font-semibold">{booking.id}</div>
+                      </td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.rejectedBy}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
                       <td className="px-5 py-4 text-right">
                         <Button size="sm" variant="outline" onClick={() => navigate(booking.detailsPath)}>
@@ -383,6 +516,7 @@ export default function TripsPage() {
                         <div className="flex flex-wrap gap-1.5">
                           <StatusBadge status={trip.status} />
                           <StatusBadge status="EXCEPTION" />
+                          {trip.slaFlag && <StatusBadge status={trip.slaFlag} />}
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -422,11 +556,11 @@ export default function TripsPage() {
         </div>
       )}
 
-      {selectedIndentId && (
+      {assignTripId && (
         <AssignVehicleModal
-          isOpen={!!selectedIndentId}
-          onClose={() => setSelectedIndentId(null)}
-          indentId={selectedIndentId}
+          isOpen={!!assignTripId}
+          onClose={() => setAssignTripId(null)}
+          tripId={assignTripId}
         />
       )}
 
@@ -442,10 +576,10 @@ export default function TripsPage() {
         onConfirm={() => {
           if (declineConfirmId) declineIndent(declineConfirmId)
           setDeclineConfirmId(null)
-          navigate('/vendor/bookings?tab=cancelled')
+          navigate('/vendor/bookings?tab=rejected')
         }}
         title="Decline booking?"
-        description="This will mark the booking as cancelled in the mock data."
+        description="This will mark the booking as rejected in the mock data."
         confirmLabel="Decline Booking"
         variant="destructive"
       />

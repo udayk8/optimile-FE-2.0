@@ -215,8 +215,8 @@ export default function LedgerPage() {
                     {row.entryType === 'INVOICE_APPROVED' ? 'Invoice Approved'
                       : row.entryType === 'NBFC_FINANCING_RECEIVED' ? 'NBFC Financing Received'
                       : row.entryType === 'NBFC_CHARGES' ? 'NBFC Charges'
-                      : row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? 'Residual Payment Received'
-                      : row.entryType === 'PAYMENT_RECEIVED' ? (row.description.toLowerCase().includes('partial') ? 'Partial Payment' : 'Final Payment')
+                      : row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? 'Residual Payment from Escrow'
+                      : row.entryType === 'PAYMENT_RECEIVED' ? (row.description.toLowerCase().includes('partial') ? 'Partial Payment from Customer' : 'Final Payment from Customer')
                       : row.entryType === 'TDS_DEDUCTION' ? 'TDS Deduction'
                       : row.entryType}
                   </td>

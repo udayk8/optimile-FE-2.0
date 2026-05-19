@@ -8,7 +8,7 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
-import { CreditCard, Plus, Download, FileText, MessageSquareWarning, Lock, X, ArrowRight, Edit2, Eye } from 'lucide-react'
+import { CreditCard, Plus, Download, FileText, MessageSquareWarning, X, ArrowRight, Edit2, Eye } from 'lucide-react'
 import type { InvoiceStatus, DisputeStatus, InvoiceLineItem, Dispute } from '@vendor/types'
 
 const DISPUTE_CHIP: Record<DisputeStatus, string> = {
@@ -65,8 +65,18 @@ export default function InvoicesPage() {
     return map
   }, [disputes])
 
-  const uninvoicedBookings = trips.filter((t) => t.status === 'DELIVERED' && t.podStatus === 'CONFIRMED' && !t.isInvoiced)
+  const uninvoicedBookings = trips.filter((t) => t.status === 'COMPLETED' && !t.isInvoiced)
   const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
+
+  const invoiceSummary = useMemo(() => {
+    const totalCount = invoices.length
+    const approved = invoices.filter((inv) => inv.status === 'APPROVED')
+    const approvedAmount = approved.reduce((sum, inv) => sum + inv.grandTotal, 0)
+    const approvedSubtotal = approved.reduce((sum, inv) => sum + inv.subtotal, 0)
+    const totalGst = approved.reduce((sum, inv) => sum + inv.gstAmount, 0)
+    const gstPercent = approvedSubtotal > 0 ? Math.round((totalGst / approvedSubtotal) * 1000) / 10 : 0
+    return { totalCount, approvedAmount, totalGst, gstPercent }
+  }, [invoices])
   const invoicePageSize = 5
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize))
   const safePage = Math.min(invoicePage, invoiceTotalPages)
@@ -126,6 +136,16 @@ export default function InvoicesPage() {
     )
   }
 
+  const handleFreightChange = (lineIdx: number, value: number) => {
+    setEditedItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== lineIdx) return item
+        const freightCharge = Math.max(0, value)
+        return { ...item, freightCharge, lineTotal: freightCharge + item.expenses.reduce((s, e) => s + e.amount, 0) }
+      })
+    )
+  }
+
   const handleResubmit = () => {
     if (!editModalInvoiceId) return
     resubmitInvoice(editModalInvoiceId, editedItems)
@@ -145,6 +165,21 @@ export default function InvoicesPage() {
         subtitle="Manage your billing, track payments, and create new invoices"
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="text-sm font-medium text-gray-500">Invoices Created</div>
+          <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{invoiceSummary.totalCount}</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="text-sm font-medium text-gray-500">Approved Invoiced Amount</div>
+          <div className="mt-2 text-3xl font-semibold tracking-tight text-emerald-700">₹{invoiceSummary.approvedAmount.toLocaleString('en-IN')}</div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="text-sm font-medium text-gray-500">Total GST ({invoiceSummary.gstPercent}%)</div>
+          <div className="mt-2 text-3xl font-semibold tracking-tight text-amber-700">₹{invoiceSummary.totalGst.toLocaleString('en-IN')}</div>
+        </div>
+      </div>
 
       <div className="mb-4 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
@@ -171,7 +206,7 @@ export default function InvoicesPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-sm font-semibold">{booking.id}</span>
-                          <StatusBadge status="DELIVERED" />
+                          <StatusBadge status="COMPLETED" />
                         </div>
                         <p className="text-sm text-gray-500">{booking.laneDetails.origin.city} → {booking.laneDetails.destination.city} · {booking.deliveredDate ? formatDate(booking.deliveredDate) : ''}</p>
                       </div>
@@ -378,7 +413,7 @@ export default function InvoicesPage() {
               </button>
             </div>
 
-            <p className="mt-3 text-xs font-semibold text-gray-500">Freight is locked. Update expense amounts only.</p>
+            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight and expense amounts before resubmitting.</p>
 
             <div className="mt-4 space-y-3">
               {editedItems.map((item, lineIdx) => (
@@ -387,10 +422,19 @@ export default function InvoicesPage() {
                     <span className="font-mono text-sm font-bold text-text">{item.tripReference}</span>
                     <span className="text-xs text-gray-500">Line: <CurrencyDisplay amount={item.lineTotal} className="font-semibold text-text" /></span>
                   </div>
-                  {/* Freight locked */}
-                  <div className="flex items-center justify-between rounded-lg bg-gray-100 px-3 py-2 text-sm">
-                    <span className="flex items-center gap-1.5 text-gray-500"><Lock className="h-3 w-3" /> Freight</span>
-                    <CurrencyDisplay amount={item.freightCharge} className="font-semibold text-text" />
+                  {/* Freight editable */}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-gray-600">Freight</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.freightCharge}
+                        onChange={(e) => handleFreightChange(lineIdx, Number(e.target.value))}
+                        className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-right text-sm font-semibold text-text outline-none focus:border-primary focus:bg-white"
+                      />
+                    </div>
                   </div>
                   {/* Expenses editable */}
                   {item.expenses.map((exp, expIdx) => (
