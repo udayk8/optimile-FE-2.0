@@ -163,10 +163,7 @@ export function ChangeAssignmentModal({ isOpen, onClose, tripId }: ChangeAssignm
                 onChange={(e) => setResolve(e.target.checked)}
                 className="mt-0.5 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
               />
-              <span>
-                <span className="font-semibold">Mark disruption resolved</span>
-                <span className="ml-1">— moves booking back to Active.</span>
-              </span>
+              <span className="font-semibold">Mark disruption resolved</span>
             </label>
           )}
 

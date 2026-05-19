@@ -68,15 +68,6 @@ export default function InvoicesPage() {
   const uninvoicedBookings = trips.filter((t) => t.status === 'COMPLETED' && !t.isInvoiced)
   const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
 
-  const invoiceSummary = useMemo(() => {
-    const totalCount = invoices.length
-    const approved = invoices.filter((inv) => inv.status === 'APPROVED')
-    const approvedAmount = approved.reduce((sum, inv) => sum + inv.grandTotal, 0)
-    const approvedSubtotal = approved.reduce((sum, inv) => sum + inv.subtotal, 0)
-    const totalGst = approved.reduce((sum, inv) => sum + inv.gstAmount, 0)
-    const gstPercent = approvedSubtotal > 0 ? Math.round((totalGst / approvedSubtotal) * 1000) / 10 : 0
-    return { totalCount, approvedAmount, totalGst, gstPercent }
-  }, [invoices])
   const invoicePageSize = 5
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize))
   const safePage = Math.min(invoicePage, invoiceTotalPages)
@@ -166,21 +157,6 @@ export default function InvoicesPage() {
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Invoices Created</div>
-          <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{invoiceSummary.totalCount}</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Approved Invoiced Amount</div>
-          <div className="mt-2 text-3xl font-semibold tracking-tight text-emerald-700">₹{invoiceSummary.approvedAmount.toLocaleString('en-IN')}</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Total GST ({invoiceSummary.gstPercent}%)</div>
-          <div className="mt-2 text-3xl font-semibold tracking-tight text-amber-700">₹{invoiceSummary.totalGst.toLocaleString('en-IN')}</div>
-        </div>
-      </div>
-
       <div className="mb-4 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button key={tab.key} onClick={() => navigate(`/vendor/invoices/${tab.key}`)}
@@ -243,7 +219,7 @@ export default function InvoicesPage() {
             {filteredInvoices.length === 0 ? (
               <div className="p-8"><EmptyState icon={<FileText className="h-12 w-12" />} title="No invoices found" /></div>
             ) : (
-              <table className="w-full min-w-[960px] text-left text-sm">
+              <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className="border-b bg-gray-50">
                   <tr>
                     <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
@@ -251,8 +227,9 @@ export default function InvoicesPage() {
                     <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                     <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                     <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Paid Date</th>
-                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Amount</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Freight Amount</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
+                    <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
                     <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                   </tr>
                 </thead>
@@ -277,7 +254,8 @@ export default function InvoicesPage() {
                           )}
                         </td>
                         <td className="p-4">{inv.lineItems?.length || 0}</td>
-                        <td className="p-4">{inv.paymentDate ? formatDate(inv.paymentDate) : '—'}</td>
+                        <td className="p-4 text-right"><CurrencyDisplay amount={inv.subtotal} className="font-medium text-text" /></td>
+                        <td className="p-4 text-right"><CurrencyDisplay amount={inv.gstAmount} className="font-medium text-amber-700" /></td>
                         <td className="p-4 text-right"><CurrencyDisplay amount={inv.grandTotal} className="font-semibold" /></td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
