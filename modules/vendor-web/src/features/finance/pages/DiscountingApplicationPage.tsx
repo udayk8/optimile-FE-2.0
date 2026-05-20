@@ -134,11 +134,6 @@ export default function DiscountingApplicationPage() {
     toast.success('Application marked rejected')
   }
 
-  const markDisbursed = () => {
-    markNbfcApplicationStatus(invoice.id, 'DISBURSED')
-    toast.success('Marked disbursed — NBFC financing and charges posted to ledger')
-  }
-
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -272,16 +267,9 @@ export default function DiscountingApplicationPage() {
             </div>
           )}
 
-          {mode === 'APPROVED' && (
-            <div className="flex items-center gap-3">
-              <Button onClick={markDisbursed}>Mark Disbursed</Button>
-              <p className="text-xs text-gray-500">Posts NBFC financing (₹{approvedAmount.toLocaleString('en-IN')}) and approved charges (₹{approvedCharges.toLocaleString('en-IN')}) to the ledger.</p>
-            </div>
-          )}
-
-          {mode === 'DISBURSED' && (
+          {(mode === 'APPROVED' || mode === 'DISBURSED') && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              Disbursed. NBFC financing and charges have been posted to the ledger and payment history.
+              Approved. Record actual NBFC advances/repayments in Record Payments.
             </div>
           )}
 

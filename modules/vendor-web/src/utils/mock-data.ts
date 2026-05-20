@@ -440,7 +440,7 @@ export const MOCK_INVOICES: Invoice[] = [
       { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
       { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
     ],
-    subtotal: 100000, gstAmount: 0, grandTotal: 100000, pdfUrl: '/invoices/INV-2026-001.pdf', createdAt: '2026-04-15T12:00:00Z',
+    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', createdAt: '2026-04-15T12:00:00Z',
   },
   {
     id: 'INV-2026-002', invoiceNumber: 'INV-2026-002', invoiceDate: '2026-05-13', vendorGstin: '29AABCF1234M1ZP',
@@ -449,28 +449,28 @@ export const MOCK_INVOICES: Invoice[] = [
     lineItems: [
       { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
     ],
-    subtotal: 100000, gstAmount: 0, grandTotal: 100000, pdfUrl: '/invoices/INV-2026-002.pdf', createdAt: '2026-05-13T10:00:00Z',
+    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', createdAt: '2026-05-13T10:00:00Z',
   },
   {
     id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'APPROVED',
     lineItems: [{ tripId: 'TRP-046', tripReference: 'TRP-046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
-    subtotal: 85000, gstAmount: 0, grandTotal: 85000, pdfUrl: '/invoices/INV-2026-003.pdf', createdAt: '2026-05-17T10:00:00Z',
+    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', createdAt: '2026-05-17T10:00:00Z',
   },
   {
     id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'APPROVED',
     lineItems: [{ tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
-    subtotal: 92000, gstAmount: 0, grandTotal: 92000, pdfUrl: '/invoices/INV-2026-004.pdf', createdAt: '2026-05-18T10:00:00Z',
+    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', createdAt: '2026-05-18T10:00:00Z',
   },
   {
     id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'APPROVED',
     lineItems: [{ tripId: 'TRP-048', tripReference: 'TRP-048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
-    subtotal: 68000, gstAmount: 0, grandTotal: 68000, pdfUrl: '/invoices/INV-2026-005.pdf', createdAt: '2026-05-19T10:00:00Z',
+    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', createdAt: '2026-05-19T10:00:00Z',
   },
   {
     id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
@@ -481,7 +481,7 @@ export const MOCK_INVOICES: Invoice[] = [
       expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
       lineTotal: 74800,
     }],
-    subtotal: 74800, gstAmount: 0, grandTotal: 74800, pdfUrl: '/invoices/INV-2026-006.pdf', createdAt: '2026-05-19T11:00:00Z',
+    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', createdAt: '2026-05-19T11:00:00Z',
   },
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
@@ -495,27 +495,29 @@ export const MOCK_INVOICES: Invoice[] = [
       ],
       lineTotal: 62500,
     }],
-    subtotal: 62500, gstAmount: 0, grandTotal: 62500, pdfUrl: '/invoices/INV-2026-007.pdf', notes: 'POD missing for TRP-050 and expense amounts need correction', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', notes: 'POD missing for TRP-050 and expense amounts need correction', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'CANCELLED',
     lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
-    subtotal: 47000, gstAmount: 0, grandTotal: 47000, pdfUrl: '/invoices/INV-2026-008.pdf', notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
+    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
   }
 ]
 
 export const MOCK_LEDGER: LedgerEntry[] = [
-  { id: 'led-001', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-001 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
-  { id: 'led-002', date: '2026-04-20', entryType: 'PAYMENT_RECEIVED', description: 'Partial payment from customer for INV-2026-001', debit: 0, credit: 40000, runningBalance: 60000 },
-  { id: 'led-003', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Final payment from customer for INV-2026-001', debit: 0, credit: 58000, runningBalance: 2000 },
-  { id: 'led-004', date: '2026-05-12', entryType: 'TDS_DEDUCTION', description: 'TDS deduction against INV-2026-001', debit: 0, credit: 2000, runningBalance: 0 },
-  { id: 'led-005', date: '2026-05-13', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-002 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
-  { id: 'led-006', date: '2026-05-14', entryType: 'NBFC_FINANCING_RECEIVED', description: 'NBFC financing received for INV-2026-002', debit: 0, credit: 90000, runningBalance: 10000 },
-  { id: 'led-006a', date: '2026-05-15', entryType: 'NBFC_CHARGES', description: 'NBFC charges adjusted for INV-2026-002', debit: 0, credit: 2000, runningBalance: 8000 },
-  { id: 'led-007', date: '2026-05-15', entryType: 'RESIDUAL_PAYMENT_RECEIVED', description: 'Residual payment from escrow for INV-2026-002', debit: 0, credit: 6000, runningBalance: 2000 },
-  { id: 'led-008', date: '2026-05-16', entryType: 'TDS_DEDUCTION', description: 'TDS deduction against INV-2026-002', debit: 0, credit: 2000, runningBalance: 0 },
+  { id: 'led-001', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-001 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
+  { id: 'led-002', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-04-20', entryType: 'CUSTOMER_PAYMENT', description: 'Partial payment from customer for INV-2026-001', debit: 0, credit: 40000, runningBalance: 60000 },
+  { id: 'led-003', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-05-10', entryType: 'CUSTOMER_PAYMENT', description: 'Final payment from customer for INV-2026-001', debit: 0, credit: 58000, runningBalance: 2000 },
+  { id: 'led-004', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-05-12', entryType: 'TDS_DEDUCTION', description: 'TDS deduction against INV-2026-001', debit: 0, credit: 2000, runningBalance: 0 },
+  { id: 'led-005', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-13', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-002 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
+  { id: 'led-006', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-14', entryType: 'NBFC_DISBURSEMENT', description: 'NBFC advance received for INV-2026-002', debit: 0, credit: 90000, runningBalance: 90000 },
+  { id: 'led-006a', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-20', entryType: 'NBFC_REPAYMENT', description: 'Repaid to NBFC for INV-2026-002', debit: 40000, credit: 0, runningBalance: 50000 },
+  { id: 'led-006b', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-28', entryType: 'NBFC_REPAYMENT', description: 'Repaid to NBFC for INV-2026-002', debit: 50000, credit: 0, runningBalance: 0 },
+  { id: 'led-007', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-20', entryType: 'CUSTOMER_PAYMENT', description: 'Customer payment for INV-2026-002', debit: 0, credit: 40000, runningBalance: 60000 },
+  { id: 'led-008', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-28', entryType: 'CUSTOMER_PAYMENT', description: 'Customer payment for INV-2026-002', debit: 0, credit: 50000, runningBalance: 10000 },
+  { id: 'led-009', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-06-10', entryType: 'CUSTOMER_PAYMENT', description: 'Customer final payment for INV-2026-002', debit: 0, credit: 10000, runningBalance: 0 },
 ]
 
 export const MOCK_COMPANY_INFO: CompanyInfo = {

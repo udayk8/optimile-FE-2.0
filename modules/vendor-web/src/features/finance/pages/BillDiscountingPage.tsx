@@ -12,7 +12,7 @@ const STATUS_BADGE: Record<DiscountingStatus, string> = {
   ELIGIBLE: 'bg-emerald-50 text-emerald-700',
   SUBMITTED: 'bg-blue-50 text-blue-700',
   APPROVED: 'bg-violet-50 text-violet-700',
-  DISBURSED: 'bg-cyan-50 text-cyan-700',
+  DISBURSED: 'bg-violet-50 text-violet-700',
   REJECTED: 'bg-rose-50 text-rose-700',
 }
 
@@ -20,7 +20,7 @@ const STATUS_LABEL: Record<DiscountingStatus, string> = {
   ELIGIBLE: 'Eligible',
   SUBMITTED: 'Submitted',
   APPROVED: 'Approved',
-  DISBURSED: 'Disbursed',
+  DISBURSED: 'Approved',
   REJECTED: 'Rejected',
 }
 
@@ -65,11 +65,8 @@ export default function BillDiscountingPage() {
     const approvedAmount = rows
       .filter((r) => r.status === 'APPROVED')
       .reduce((sum, r) => sum + (r.approvedAmount || 0), 0)
-    const disbursedAmount = rows
-      .filter((r) => r.status === 'DISBURSED')
-      .reduce((sum, r) => sum + (r.approvedAmount || 0), 0)
     const approvedCount = rows.filter((r) => r.status === 'APPROVED').length
-    return { eligibleAmount, approvedAmount, disbursedAmount, approvedCount }
+    return { eligibleAmount, approvedAmount, approvedCount }
   }, [rows])
 
   return (
@@ -81,7 +78,7 @@ export default function BillDiscountingPage() {
         icon={<Banknote className="h-6 w-6 text-primary" />}
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">Invoices Approved</div>
           <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.approvedCount}</div>
@@ -93,10 +90,6 @@ export default function BillDiscountingPage() {
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">Approved Amount</div>
           <div className="mt-2 text-3xl font-semibold tracking-tight text-violet-700">₹{summary.approvedAmount.toLocaleString('en-IN')}</div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="text-sm font-medium text-gray-500">Disbursed Amount</div>
-          <div className="mt-2 text-3xl font-semibold tracking-tight text-cyan-700">₹{summary.disbursedAmount.toLocaleString('en-IN')}</div>
         </div>
       </div>
 
@@ -114,7 +107,7 @@ export default function BillDiscountingPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 border-b border-gray-100 px-5 py-3">
-          {(['ALL', 'ELIGIBLE', 'SUBMITTED', 'APPROVED', 'DISBURSED', 'REJECTED'] as const).map((status) => (
+          {(['ALL', 'ELIGIBLE', 'SUBMITTED', 'APPROVED', 'REJECTED'] as const).map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}

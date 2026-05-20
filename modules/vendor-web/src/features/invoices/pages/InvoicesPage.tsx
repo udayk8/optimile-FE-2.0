@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
+import { Input } from '@vendor/components/ui/input'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -41,6 +43,8 @@ export default function InvoicesPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | 'ALL'>('ALL')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [selectedBookings, setSelectedBookings] = useState<string[]>([])
   const [invoicePage, setInvoicePage] = useState(1)
   const activeTab = getInvoiceTab(location.pathname, location.search)
@@ -66,7 +70,26 @@ export default function InvoicesPage() {
   }, [disputes])
 
   const uninvoicedBookings = trips.filter((t) => t.status === 'COMPLETED' && !t.isInvoiced)
-  const filteredInvoices = invoices.filter((inv) => statusFilter === 'ALL' || inv.status === statusFilter)
+  const filteredInvoices = invoices.filter((inv) => {
+    if (statusFilter !== 'ALL' && inv.status !== statusFilter) return false
+    if (fromDate && inv.invoiceDate < fromDate) return false
+    if (toDate && inv.invoiceDate > toDate) return false
+    return true
+  })
+
+  const approvedInvoicesInRange = invoices.filter((inv) => {
+    if (inv.status !== 'APPROVED') return false
+    if (fromDate && inv.invoiceDate < fromDate) return false
+    if (toDate && inv.invoiceDate > toDate) return false
+    return true
+  })
+
+  const approvedSummary = useMemo(() => {
+    const totalInvoiceApproved = approvedInvoicesInRange.reduce((sum, inv) => sum + inv.grandTotal, 0)
+    const totalGstApproved = approvedInvoicesInRange.reduce((sum, inv) => sum + inv.gstAmount, 0)
+    const approvedCount = approvedInvoicesInRange.length
+    return { totalInvoiceApproved, totalGstApproved, approvedCount }
+  }, [approvedInvoicesInRange])
 
   const invoicePageSize = 5
   const invoiceTotalPages = Math.max(1, Math.ceil(filteredInvoices.length / invoicePageSize))
@@ -205,6 +228,31 @@ export default function InvoicesPage() {
       {/* My Invoices */}
       {activeTab === 'list' && (
         <div>
+          <div className="mb-4 grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Approved Invoices</div>
+                <div className="mt-2 text-2xl font-bold text-text">{approvedSummary.approvedCount}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Invoice Approved</div>
+                <div className="mt-2 text-2xl font-bold text-text">
+                  <CurrencyDisplay amount={approvedSummary.totalInvoiceApproved} />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total GST Approved</div>
+                <div className="mt-2 text-2xl font-bold text-amber-700">
+                  <CurrencyDisplay amount={approvedSummary.totalGstApproved} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
               {STATUS_FILTERS.map((f) => (
@@ -214,6 +262,13 @@ export default function InvoicesPage() {
                 </button>
               ))}
             </div>
+            <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)} className="w-[180px]" />
+            <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} className="w-[180px]" />
+            {(fromDate || toDate) && (
+              <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate('') }}>
+                Clear dates
+              </Button>
+            )}
           </div>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
             {filteredInvoices.length === 0 ? (

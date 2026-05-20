@@ -1,93 +1,126 @@
 import { useMemo, useState } from 'react'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CalendarDays, Download, FileSpreadsheet } from 'lucide-react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
 import { useAppStore } from '@vendor/stores/app.store'
-import type { LedgerEntry } from '@vendor/types'
+import type { LedgerEntry, LedgerType } from '@vendor/types'
 
-const monthOrder = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']
+type LedgerTab = LedgerType
 
-const historicalMonthlyData: Record<string, { invoiced: number; payments: number }> = {
-  '2026-01': { invoiced: 420000, payments: 380000 },
-  '2026-02': { invoiced: 510000, payments: 460000 },
-  '2026-03': { invoiced: 385000, payments: 350000 },
-  '2026-04': { invoiced: 620000, payments: 575000 },
-  '2026-05': { invoiced: 490000, payments: 420000 },
+const ENTRY_TYPE_LABEL: Record<string, string> = {
+  INVOICE_APPROVED: 'Invoice Approved',
+  CUSTOMER_PAYMENT: 'Customer Payment',
+  TDS_DEDUCTION: 'TDS Deduction',
+  CUSTOMER_ADJUSTMENT: 'Customer Adjustment',
+  NBFC_FINANCING_APPROVED: 'NBFC Financing Approved',
+  NBFC_DISBURSEMENT: 'NBFC Advance Received',
+  NBFC_CHARGE: 'NBFC Charge',
+  NBFC_REPAYMENT: 'Repaid to NBFC',
+  NBFC_ADJUSTMENT: 'NBFC Adjustment',
 }
 
-const COLUMN_OPTIONS = [
-  { key: 'date', label: 'Date' },
-  { key: 'invoiceId', label: 'Invoice ID' },
-  { key: 'reference', label: 'Reference' },
-  { key: 'type', label: 'Type' },
-  { key: 'description', label: 'Description' },
-  { key: 'credit', label: 'Credit' },
-  { key: 'debit', label: 'Debit' },
-  { key: 'balance', label: 'Balance' },
-]
+function formatBalance(balance: number, tab: LedgerTab) {
+  if (balance === 0) return '₹0'
+  return `₹${balance.toLocaleString('en-IN')} ${tab === 'CUSTOMER' ? 'Dr' : 'Cr'}`
+}
 
 export default function LedgerPage() {
   const [fromDate, setFromDate] = useState('2026-04-01')
   const [toDate, setToDate] = useState('2026-05-31')
+  const [invoiceFilter, setInvoiceFilter] = useState('ALL')
+  const [search, setSearch] = useState('')
+  const [activeTab, setActiveTab] = useState<LedgerTab>('CUSTOMER')
   const [page, setPage] = useState(1)
   const { ledger } = useAppStore()
 
-  const ALLOWED_TYPES = ['INVOICE_APPROVED', 'PAYMENT_RECEIVED', 'NBFC_FINANCING_RECEIVED', 'NBFC_CHARGES', 'RESIDUAL_PAYMENT_RECEIVED', 'TDS_DEDUCTION']
-
-  const filteredEntries = useMemo(() => {
-    const allowed = ledger
-      .filter((entry) =>
-        entry.date >= fromDate && entry.date <= toDate &&
-        ALLOWED_TYPES.includes(entry.entryType)
-      )
+  const dateFilteredEntries = useMemo(() => {
+    return ledger
+      .filter((entry) => entry.date >= fromDate && entry.date <= toDate)
       .sort((a, b) => a.date.localeCompare(b.date))
-
-    let balance = 0
-    return allowed.map((entry) => {
-      if (entry.entryType === 'INVOICE_APPROVED') balance += entry.debit
-      else if (entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'NBFC_FINANCING_RECEIVED' || entry.entryType === 'NBFC_CHARGES' || entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED') balance -= entry.credit
-      else if (entry.entryType === 'TDS_DEDUCTION') balance -= entry.credit
-      return { ...entry, runningBalance: balance }
-    })
   }, [fromDate, toDate, ledger])
 
-  const monthlyGraph = useMemo(() => {
-    const liveByMonth: Record<string, { invoiced: number; payments: number }> = {}
-    for (const entry of ledger) {
-      const monthKey = entry.date.slice(0, 7)
-      liveByMonth[monthKey] ??= { invoiced: 0, payments: 0 }
-      if (entry.entryType === 'INVOICE_APPROVED') liveByMonth[monthKey].invoiced += entry.debit
-      if (entry.entryType === 'PAYMENT_RECEIVED' || entry.entryType === 'NBFC_FINANCING_RECEIVED' || entry.entryType === 'NBFC_CHARGES' || entry.entryType === 'RESIDUAL_PAYMENT_RECEIVED') liveByMonth[monthKey].payments += entry.credit
-    }
+  const invoiceOptions = useMemo(() => {
+    return Array.from(new Set(dateFilteredEntries.map((entry) => entry.invoiceId))).sort()
+  }, [dateFilteredEntries])
 
-    return monthOrder.map((monthKey) => {
-      const monthLabel = new Date(`${monthKey}-01T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      const data = liveByMonth[monthKey] ?? historicalMonthlyData[monthKey] ?? { invoiced: 0, payments: 0 }
-      return { month: monthLabel, invoiced: data.invoiced, payments: data.payments }
-    })
-  }, [])
+  const tabEntries = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return dateFilteredEntries
+      .filter((entry) => entry.ledgerType === activeTab)
+      .filter((entry) => invoiceFilter === 'ALL' || entry.invoiceId === invoiceFilter)
+      .filter((entry) => {
+        if (!q) return true
+        return [entry.invoiceId, entry.referenceNumber ?? '', entry.description, ENTRY_TYPE_LABEL[entry.entryType] ?? entry.entryType]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      })
+  }, [activeTab, dateFilteredEntries, invoiceFilter, search])
 
   const summary = useMemo(() => {
-    const totalInvoiced = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'INVOICE_APPROVED' ? e.debit : 0), 0)
-    const totalReceived = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'PAYMENT_RECEIVED' || e.entryType === 'NBFC_FINANCING_RECEIVED' || e.entryType === 'NBFC_CHARGES' || e.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? e.credit : 0), 0)
-    const tdsDeducted = filteredEntries.reduce((sum, e) => sum + (e.entryType === 'TDS_DEDUCTION' ? e.credit : 0), 0)
-    return {
-      totalInvoiced,
-      totalInvoicedCount: filteredEntries.filter((e) => e.entryType === 'INVOICE_APPROVED').length,
-      pendingPayments: Math.max(0, totalInvoiced - totalReceived - tdsDeducted),
-      tdsDeducted,
+    const latestByInvoiceLedger = new Map<string, LedgerEntry>()
+    const sorted = [...ledger].sort((a, b) => a.date.localeCompare(b.date))
+    for (const entry of sorted) {
+      latestByInvoiceLedger.set(`${entry.invoiceId}::${entry.ledgerType}`, entry)
     }
-  }, [filteredEntries])
 
-  const totalPages = Math.max(1, Math.ceil(filteredEntries.length / 10))
+    let customerPending = 0
+    let nbfcPending = 0
+    let customerSettledInvoices = 0
+    let customerCollected = 0
+    let tdsDeducted = 0
+
+    for (const entry of latestByInvoiceLedger.values()) {
+      if (entry.ledgerType === 'CUSTOMER') {
+        customerPending += Math.max(0, entry.runningBalance)
+        if (entry.runningBalance === 0) customerSettledInvoices += 1
+      }
+      if (entry.ledgerType === 'NBFC') {
+        nbfcPending += Math.max(0, entry.runningBalance)
+      }
+    }
+
+    for (const entry of dateFilteredEntries) {
+      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'CUSTOMER_PAYMENT') customerCollected += entry.credit
+      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'TDS_DEDUCTION') tdsDeducted += entry.credit
+    }
+
+    return { customerPending, nbfcPending, customerSettledInvoices, customerCollected, tdsDeducted }
+  }, [ledger, dateFilteredEntries])
+
+  const totalPages = Math.max(1, Math.ceil(tabEntries.length / 10))
   const safePage = Math.min(page, totalPages)
-  const pagedEntries = filteredEntries.slice((safePage - 1) * 10, safePage * 10)
+  const pagedEntries = tabEntries.slice((safePage - 1) * 10, safePage * 10)
 
   const handleRangeChange = (setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setPage(1)
     setter(event.target.value)
+  }
+
+  const handleExport = () => {
+    const fileName = `${activeTab === 'CUSTOMER' ? 'customer' : 'nbfc'}-ledger_${fromDate}_${toDate}.csv`
+    const header = ['Date', 'Invoice ID', 'Reference', 'Type', 'Description', 'Debit', 'Credit', 'Balance']
+    const rows = tabEntries.map((row) => [
+      row.date,
+      row.invoiceId,
+      row.referenceNumber ?? row.id,
+      ENTRY_TYPE_LABEL[row.entryType] ?? row.entryType,
+      row.description,
+      row.debit > 0 ? String(row.debit) : '',
+      row.credit > 0 ? String(row.credit) : '',
+      formatBalance(row.runningBalance, activeTab),
+    ])
+    const csv = [header, ...rows].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -99,7 +132,7 @@ export default function LedgerPage() {
               <HeroCard
                 eyebrow="FINANCE"
                 title="Transaction Ledger"
-                subtitle="Chronological history of all financial transactions"
+                subtitle="Customer ledger tracks receivable (Dr). NBFC ledger tracks loan outstanding (Cr)."
                 icon={<FileSpreadsheet className="h-6 w-6 text-primary" />}
               />
             </div>
@@ -111,7 +144,7 @@ export default function LedgerPage() {
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-text">Date Filter</div>
-                  <div className="text-xs text-gray-500">Select a range to update the table and summary cards</div>
+                  <div className="text-xs text-gray-500">Select range for table and export</div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-4">
@@ -124,79 +157,83 @@ export default function LedgerPage() {
 
         <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Total Invoiced</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.totalInvoiced.toLocaleString('en-IN')}</div>
-            <div className="mt-2 text-sm text-gray-500">Filtered by the selected date range.</div>
+            <div className="text-sm font-medium text-gray-500">Customer Pending</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.customerPending.toLocaleString('en-IN')} Dr</div>
+            <div className="mt-2 text-xs text-gray-500">Amount customer still owes across invoices.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Total Invoices Raised</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.totalInvoicedCount}</div>
-            <div className="mt-2 text-sm text-gray-500">Invoices raised in selected range.</div>
+            <div className="text-sm font-medium text-gray-500">NBFC Pending</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.nbfcPending.toLocaleString('en-IN')} Cr</div>
+            <div className="mt-2 text-xs text-gray-500">Amount still payable to NBFC.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Pending Payments</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.pendingPayments.toLocaleString('en-IN')}</div>
-            <div className="mt-2 text-sm text-gray-500">Outstanding at end of filtered period.</div>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">TDS Deducted</div>
+            <div className="text-sm font-medium text-gray-500">TDS Deducted (Selected Range)</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.tdsDeducted.toLocaleString('en-IN')}</div>
-            <div className="mt-2 text-sm text-gray-500">Tax deductions in the filtered period.</div>
+            <div className="mt-2 text-xs text-gray-500">Total TDS posted in current date filter.</div>
           </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-text">Invoiced vs Payments</h3>
-            <p className="mt-1 text-sm text-gray-500">Last 6 months, backed by the same ledger records used by invoice payments.</p>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-medium text-gray-500">Customer Settled Invoices</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.customerSettledInvoices}</div>
+            <div className="mt-2 text-xs text-gray-500">Invoices with zero customer pending balance.</div>
           </div>
-          <div className="flex items-center gap-4 text-xs font-medium text-gray-500">
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-emerald-500" /> Invoiced</span>
-            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-primary" /> Payments</span>
-          </div>
-        </div>
-        <div className="h-[320px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthlyGraph} margin={{ top: 10, right: 12, left: 0, bottom: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(value) => `₹${Math.round(Number(value) / 1000)}k`} />
-              <Tooltip
-                cursor={{ fill: '#f9fafb' }}
-                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.08)' }}
-                formatter={(value: number, name: string) => [`₹${value.toLocaleString('en-IN')}`, name]}
-              />
-              <Legend iconType="circle" wrapperStyle={{ paddingTop: '16px' }} />
-              <Bar dataKey="invoiced" name="Invoiced" fill="#10b981" radius={[6, 6, 0, 0]} barSize={28} />
-              <Bar dataKey="payments" name="Payments Received" fill="#2563eb" radius={[6, 6, 0, 0]} barSize={28} />
-            </BarChart>
-          </ResponsiveContainer>
         </div>
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 p-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-text">Ledger entries</h3>
-            <p className="mt-1 text-sm text-gray-500">Chronological financial history with running balance.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Button>
-                Export Statement
-                <Download className="ml-2 h-4 w-4" />
-              </Button>
+        <div className="flex flex-col gap-4 border-b border-gray-100 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-text">Ledger entries</h3>
+              <p className="mt-1 text-sm text-gray-500">Clean statement view by ledger type.</p>
             </div>
+            <Button onClick={handleExport}>
+              Export {activeTab === 'CUSTOMER' ? 'Customer' : 'NBFC'} Statement
+              <Download className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+              <button
+                onClick={() => { setActiveTab('CUSTOMER'); setPage(1) }}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${activeTab === 'CUSTOMER' ? 'bg-white text-primary shadow-sm' : 'text-gray-600'}`}
+              >
+                Customer Ledger
+              </button>
+              <button
+                onClick={() => { setActiveTab('NBFC'); setPage(1) }}
+                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${activeTab === 'NBFC' ? 'bg-white text-primary shadow-sm' : 'text-gray-600'}`}
+              >
+                NBFC Loan Ledger
+              </button>
+            </div>
+
+            <select
+              value={invoiceFilter}
+              onChange={(e) => { setInvoiceFilter(e.target.value); setPage(1) }}
+              className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"
+            >
+              <option value="ALL">All Invoices</option>
+              {invoiceOptions.map((invoiceId) => (
+                <option key={invoiceId} value={invoiceId}>{invoiceId}</option>
+              ))}
+            </select>
+
+            <Input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search type, description, reference"
+              className="max-w-[320px]"
+            />
           </div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="p-4">Date</th>
-                <th className="p-4">Invoice ID</th>
+                <th className="p-4">Particular</th>
                 <th className="p-4">Reference</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Description</th>
@@ -206,37 +243,32 @@ export default function LedgerPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
+              {pagedEntries.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-sm text-gray-500">
+                    No {activeTab === 'CUSTOMER' ? 'customer' : 'NBFC'} ledger entries for selected filters.
+                  </td>
+                </tr>
+              )}
               {pagedEntries.map((row) => (
                 <tr key={`${row.date}-${row.id}`} className="hover:bg-gray-50">
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
-                  <td className="p-4 font-mono text-xs font-semibold text-text">{row.description.match(/INV-\d{4}-\d{3}/)?.[0] ?? '-'}</td>
-                  <td className="p-4 font-mono text-xs text-gray-500">{row.id}</td>
-                  <td className="p-4 font-medium text-text">
-                    {row.entryType === 'INVOICE_APPROVED' ? 'Invoice Approved'
-                      : row.entryType === 'NBFC_FINANCING_RECEIVED' ? 'NBFC Financing Received'
-                      : row.entryType === 'NBFC_CHARGES' ? 'NBFC Charges'
-                      : row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' ? 'Residual Payment from Escrow'
-                      : row.entryType === 'PAYMENT_RECEIVED' ? (row.description.toLowerCase().includes('partial') ? 'Partial Payment from Customer' : 'Final Payment from Customer')
-                      : row.entryType === 'TDS_DEDUCTION' ? 'TDS Deduction'
-                      : row.entryType}
-                  </td>
+                  <td className="p-4 font-mono text-xs font-semibold text-text">{ENTRY_TYPE_LABEL[row.entryType] ?? row.entryType.replace(/_/g, ' ')}</td>
+                  <td className="p-4 font-mono text-xs text-gray-500">{row.referenceNumber ?? row.id}</td>
+                  <td className="p-4 font-medium text-text">{row.invoiceId}</td>
                   <td className="p-4 text-gray-600">{row.description}</td>
-                  <td className="p-4 text-right font-medium text-rose-600">
-                    {row.entryType === 'INVOICE_APPROVED' ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}
-                  </td>
-                  <td className="p-4 text-right font-medium text-emerald-600">
-                    {row.entryType === 'PAYMENT_RECEIVED' || row.entryType === 'NBFC_FINANCING_RECEIVED' || row.entryType === 'NBFC_CHARGES' || row.entryType === 'RESIDUAL_PAYMENT_RECEIVED' || row.entryType === 'TDS_DEDUCTION'
-                      ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}
-                  </td>
-                  <td className="p-4 text-right font-mono">₹{row.runningBalance.toLocaleString('en-IN')}</td>
+                  <td className="p-4 text-right font-medium text-rose-600">{row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
+                  <td className="p-4 text-right font-medium text-emerald-600">{row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
+                  <td className="p-4 text-right font-mono">{formatBalance(row.runningBalance, activeTab)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
         <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 text-sm text-gray-600">
           <span>
-            Showing {filteredEntries.length === 0 ? 0 : (safePage - 1) * 10 + 1}-{Math.min(safePage * 10, filteredEntries.length)} of {filteredEntries.length}
+            Showing {tabEntries.length === 0 ? 0 : (safePage - 1) * 10 + 1}-{Math.min(safePage * 10, tabEntries.length)} of {tabEntries.length}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -256,11 +288,6 @@ export default function LedgerPage() {
             >
               Next
             </button>
-          </div>
-        </div>
-        <div className="border-t border-gray-100 p-6">
-          <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
-            Latest balance snapshot is based on the selected range and updates with the table below.
           </div>
         </div>
       </div>

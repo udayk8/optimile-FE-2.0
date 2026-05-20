@@ -475,34 +475,46 @@ export interface Dispute {
   notes?: string
 }
 
-export type LedgerEntryType =
+export type LedgerType = 'CUSTOMER' | 'NBFC'
+
+export type CustomerLedgerEntryType =
   | 'INVOICE_APPROVED'
-  | 'PAYMENT_RECEIVED'
-  | 'NBFC_FINANCING_RECEIVED'
-  | 'NBFC_CHARGES'
-  | 'RESIDUAL_PAYMENT_RECEIVED'
-  | 'SLA_PENALTY'
-  | 'OTHER_DEDUCTION'
+  | 'CUSTOMER_PAYMENT'
   | 'TDS_DEDUCTION'
+  | 'CUSTOMER_ADJUSTMENT'
+
+export type NbfcLedgerEntryType =
+  | 'NBFC_FINANCING_APPROVED'
+  | 'NBFC_DISBURSEMENT'
+  | 'NBFC_CHARGE'
+  | 'NBFC_REPAYMENT'
+  | 'NBFC_ADJUSTMENT'
+
+export type LedgerEntryType = CustomerLedgerEntryType | NbfcLedgerEntryType
 
 export interface LedgerEntry {
   id: string
+  invoiceId: string
+  ledgerType: LedgerType
   date: string
   entryType: LedgerEntryType
   description: string
   credit: number
   debit: number
   runningBalance: number
+  counterparty?: string
+  mode?: 'BANK' | 'CASH' | 'ESCROW' | 'ADJUSTMENT'
+  referenceNumber?: string
+  notes?: string
   documentUrl?: string
 }
 
 export type PaymentKind =
-  | 'PARTIAL_PAYMENT'
-  | 'FINAL_PAYMENT'
-  | 'NBFC_FINANCING_RECEIVED'
-  | 'NBFC_CHARGES'
-  | 'RESIDUAL_PAYMENT_RECEIVED'
+  | 'CUSTOMER_PAYMENT'
   | 'TDS_DEDUCTION'
+  | 'NBFC_DISBURSEMENT'
+  | 'NBFC_REPAYMENT'
+  | 'NBFC_CHARGE'
 export type PaymentState = 'POSTED' | 'PENDING'
 
 export interface PaymentRecord {
@@ -521,6 +533,28 @@ export interface PaymentRecord {
   status: PaymentState
   createdAt: string
   ledgerEntryIds: string[]
+}
+
+export interface CustomerLedgerPostPayload {
+  invoiceId: string
+  entryType: CustomerLedgerEntryType
+  amount: number
+  date: string
+  description: string
+  referenceNumber?: string
+  mode?: 'BANK' | 'CASH' | 'ESCROW' | 'ADJUSTMENT'
+  notes?: string
+}
+
+export interface NbfcLedgerPostPayload {
+  invoiceId: string
+  entryType: NbfcLedgerEntryType
+  amount: number
+  date: string
+  description: string
+  referenceNumber?: string
+  mode?: 'BANK' | 'CASH' | 'ADJUSTMENT'
+  notes?: string
 }
 
 export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
