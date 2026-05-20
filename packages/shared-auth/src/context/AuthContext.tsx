@@ -75,11 +75,11 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     modules: ['tracking'],
   },
   // TMS Booking — standalone booking module
-  'tms-booking@optimile.com': {
-    name: 'TMS Booking User',
+  'tms@optimile.com': {
+    name: 'TMS User',
     role: 'TMS',
-    permissions: ['tms-booking:read', 'tms-booking:write'],
-    modules: ['tms-booking'],
+    permissions: ['tms:read', 'tms:write'],
+    modules: ['tms'],
   },
   // Driver — driver app
   'driver@optimile.com': {
@@ -113,12 +113,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ENV_TENANT_HINT = (import.meta.env.VITE_AUTH_TENANT_ID as string | undefined)?.trim() ?? ''
-const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl', 'platform-admin', 'tenant-admin', 'tms-booking', 'driver-app']
+const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl', 'platform-admin', 'tenant-admin', 'driver-app']
 const TENANT_STATUSES: Tenant['status'][] = ['active', 'suspended', 'trial']
 const USER_STATUSES: User['status'][] = ['active', 'inactive']
+const LEGACY_ERP_MODULE_ALIASES: Record<string, ERPModule> = {
+  'tms-booking': 'tms',
+}
 
 function isERPModule(value: string): value is ERPModule {
   return ALL_ERP_MODULES.includes(value as ERPModule)
+}
+
+function normalizeERPModule(value: string): ERPModule | null {
+  const normalizedValue = LEGACY_ERP_MODULE_ALIASES[value] ?? value
+  return isERPModule(normalizedValue) ? normalizedValue : null
 }
 
 function mapTenant(apiTenant: AuthTenantDto): Tenant {
@@ -126,7 +134,9 @@ function mapTenant(apiTenant: AuthTenantDto): Tenant {
     ? (apiTenant.status as Tenant['status']) : 'active'
   return {
     id: apiTenant.id, name: apiTenant.name, slug: apiTenant.slug,
-    modules: (apiTenant.modules ?? []).filter(isERPModule), status, createdAt: apiTenant.createdAt,
+    modules: Array.from(new Set((apiTenant.modules ?? []).map(normalizeERPModule).filter((module): module is ERPModule => module !== null))),
+    status,
+    createdAt: apiTenant.createdAt,
   }
 }
 
@@ -139,7 +149,8 @@ function mapUser(apiUser: AuthUserDto): User {
     department: (apiUser.department || 'IT Admin') as User['department'],
     region: apiUser.region || undefined,
     permissions: apiUser.permissions ?? [],
-    modules: (apiUser.modules ?? []).filter(isERPModule), status,
+    modules: Array.from(new Set((apiUser.modules ?? []).map(normalizeERPModule).filter((module): module is ERPModule => module !== null))),
+    status,
   }
 }
 
@@ -169,7 +180,6 @@ function getPrimaryPortal(modules: ERPModule[]): Portal {
   if (modules.includes('admin')) return 'admin'
   if (modules.includes('platform-admin')) return 'platform-admin'
   if (modules.includes('tenant-admin')) return 'tenant-admin'
-  if (modules.includes('tms-booking')) return 'tms-booking'
   if (modules.includes('driver-app')) return 'driver-app'
   if (modules.includes('tracking')) return 'tracking'
   if (modules.includes('tms')) return 'tms'

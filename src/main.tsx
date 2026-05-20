@@ -105,7 +105,7 @@ function HostRouter() {
             {/* Extracted console modules */}
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/tenant-admin/*" element={<ProtectedRoute portal="tenant-admin"><TenantAdminApp /></ProtectedRoute>} />
-            <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms-booking"><TmsBookingApp /></ProtectedRoute>} />
+            <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms"><TmsBookingApp /></ProtectedRoute>} />
             <Route path="/driver-app/*" element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
 
             {/* Default */}

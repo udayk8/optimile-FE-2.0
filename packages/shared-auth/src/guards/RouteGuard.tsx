@@ -9,10 +9,10 @@ const PORTAL_MODULES: Record<string, ERPModule> = {
   vendor: 'vendor',
   fleet: 'fleet',
   customer: 'customer',
+  tms: 'tms',
   tracking: 'tracking',
   'platform-admin': 'platform-admin',
   'tenant-admin':   'tenant-admin',
-  'tms-booking':    'tms-booking',
   'driver-app':     'driver-app',
 }
 

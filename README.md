@@ -90,7 +90,7 @@ frontend-main/
     ├── vendor-web/         # Vendor Portal
     ├── customer-web/       # Customer Booking Dashboard
     ├── console-web/        # Console (shared admin shell)
-    ├── platform-admin/ # Platform Administration
+    ├── platform-admin/     # Platform Administration
     ├── tenant-admin/       # Tenant Administration
     ├── tms/                # TMS Booking
     └── tms-driver-app-web/ # Driver App
