@@ -19,46 +19,58 @@
     "baseUrl": ".",
     "paths": {
       "@/shared/components/common": [
-        "modules/platform-admin-web/src/components/common"
+        "modules/platform-admin/src/components/common"
       ],
       "@/shared/components/common/*": [
-        "modules/platform-admin-web/src/components/common/*"
+        "modules/platform-admin/src/components/common/*"
       ],
       "@/shared/components/ui": [
-        "modules/platform-admin-web/src/components/ui"
+        "modules/platform-admin/src/components/ui"
       ],
       "@/shared/components/ui/*": [
-        "modules/platform-admin-web/src/components/ui/*"
+        "modules/platform-admin/src/components/ui/*"
       ],
       "@/shared/auth": [
-        "modules/platform-admin-web/src/shared/auth"
+        "modules/platform-admin/src/shared/auth"
       ],
       "@/shared/auth/*": [
-        "modules/platform-admin-web/src/shared/auth/*"
+        "modules/platform-admin/src/shared/auth/*"
       ],
       "@/shared/lib": [
-        "modules/platform-admin-web/src/lib"
+        "modules/platform-admin/src/lib"
       ],
       "@/shared/lib/*": [
-        "modules/platform-admin-web/src/lib/*"
+        "modules/platform-admin/src/lib/*"
       ],
       "@/shared/store": [
-        "modules/platform-admin-web/src/store"
+        "modules/platform-admin/src/store"
       ],
       "@/shared/store/*": [
-        "modules/platform-admin-web/src/store/*"
+        "modules/platform-admin/src/store/*"
       ],
       "@/types": [
-        "modules/platform-admin-web/src/types"
+        "modules/platform-admin/src/types"
       ],
       "@/types/*": [
-        "modules/platform-admin-web/src/types/*"
+        "modules/platform-admin/src/types/*"
       ],
       "@/modules/platform-admin": [
-        "modules/platform-admin"
+        "modules/platform-admin/src/modules/platform-admin"
       ],
       "@/modules/platform-admin/*": [
-        "modules/platform-admin/*"
+        "modules/platform-admin/src/modules/platform-admin/*"
+      ],
+      "@/modules/tenant-admin": [
+        "modules/tenant-admin/src/modules/tenant-admin"
+      ],
+      "@/modules/tenant-admin/*": [
+        "modules/tenant-admin/src/modules/tenant-admin/*"
+      ],
+      "@/modules/tms": [
+        "modules/tms/src/modules/tms"
+      ],
+      "@/modules/tms/*": [
+        "modules/tms/src/modules/tms/*"
       ],
       "@admin": [
         "modules/auction-web/src"
@@ -103,22 +115,22 @@
         "modules/console-web/src/*"
       ],
       "@platform-admin": [
-        "modules/platform-admin-web/src"
+        "modules/platform-admin/src"
       ],
       "@platform-admin/*": [
-        "modules/platform-admin-web/src/*"
+        "modules/platform-admin/src/*"
       ],
       "@tenant-admin": [
-        "modules/tenant-admin-web/src"
+        "modules/tenant-admin/src"
       ],
       "@tenant-admin/*": [
-        "modules/tenant-admin-web/src/*"
+        "modules/tenant-admin/src/*"
       ],
       "@tms-booking": [
-        "modules/tms-booking-web/src"
+        "modules/tms/src"
       ],
       "@tms-booking/*": [
-        "modules/tms-booking-web/src/*"
+        "modules/tms/src/*"
       ],
       "@tms-driver-app": [
         "modules/tms-driver-app-web/src"

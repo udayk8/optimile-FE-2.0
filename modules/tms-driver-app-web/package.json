@@ -28,7 +28,7 @@
     "@optimile/shared-auth": "file:../../packages/shared-auth",
     "@optimile/shared-ui": "file:../../packages/shared-ui",
     "@optimile/shared-utils": "file:../../packages/shared-utils",
-    "@optimile/tms-booking-web": "file:../tms-booking-web"
+    "@optimile/tms": "file:../tms"
   },
   "devDependencies": {
     "@types/node": "^22.15.24",

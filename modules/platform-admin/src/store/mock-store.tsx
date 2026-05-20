@@ -1381,6 +1381,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       industry: "Logistics",
       planId: input.planId,
       status: input.status,
+      tenantType: "LOGISTICS_PROVIDER_3PL",
+      customerPortalEnabled: false,
       enabledModuleCodes: input.enabledModuleCodes,
       initialHierarchyTemplate: input.defaultHierarchyTemplate,
       primaryAdminUserId: bootstrapUser.id,

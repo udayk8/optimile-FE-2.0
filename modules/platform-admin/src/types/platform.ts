@@ -1,3 +1,9 @@
+export type TenantType = "DIRECT_CUSTOMER" | "LOGISTICS_PROVIDER_3PL";
+
+export type TenantAssignmentMode = "AUTO_VENDOR_FLOW" | "CONTROLLED_ASSIGNMENT";
+
+export type TenantCommercialMode = "SIMPLE" | "BUY_SELL_MARGIN";
+
 export interface TenantPlan {
   id: string;
   code: string;
@@ -31,6 +37,8 @@ export interface TenantRecord {
   industry: string;
   planId: string;
   status: "active" | "trial" | "paused";
+  tenantType: TenantType;
+  customerPortalEnabled: boolean;
   enabledModuleCodes: string[];
   initialHierarchyTemplate: string;
   primaryAdminUserId: string;
