@@ -21,6 +21,7 @@ export default defineConfig({
       '@fleet': path.resolve(rootDir, 'modules/fleet-web/src'),
       '@customer': path.resolve(rootDir, 'modules/customer-web/src'),
       '@console': path.resolve(rootDir, 'modules/console-web/src'),
+      '@track-trace': path.resolve(rootDir, 'modules/track-trace-web/src'),
       '@platform-admin': path.resolve(rootDir, 'modules/platform-admin-web/src'),
       '@tenant-admin': path.resolve(rootDir, 'modules/tenant-admin-web/src'),
       '@tms-booking': path.resolve(rootDir, 'modules/tms-booking-web/src'),

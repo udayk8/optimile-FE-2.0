@@ -6,6 +6,7 @@ export default {
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
     './modules/*/src/**/*.{js,ts,jsx,tsx}',
+    './modules/fleet-web/**/*.{js,ts,jsx,tsx}',
     './packages/*/src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
@@ -19,6 +20,15 @@ export default {
         text: 'hsl(var(--text))',
         danger: 'hsl(var(--danger))',
         primary: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
         },

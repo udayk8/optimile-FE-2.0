@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
@@ -14,51 +18,144 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/shared/components/common": ["modules/platform-admin-web/src/components/common"],
-      "@/shared/components/common/*": ["modules/platform-admin-web/src/components/common/*"],
-      "@/shared/components/ui": ["modules/platform-admin-web/src/components/ui"],
-      "@/shared/components/ui/*": ["modules/platform-admin-web/src/components/ui/*"],
-      "@/shared/auth": ["modules/platform-admin-web/src/shared/auth"],
-      "@/shared/auth/*": ["modules/platform-admin-web/src/shared/auth/*"],
-      "@/shared/lib": ["modules/platform-admin-web/src/lib"],
-      "@/shared/lib/*": ["modules/platform-admin-web/src/lib/*"],
-      "@/shared/store": ["modules/platform-admin-web/src/store"],
-      "@/shared/store/*": ["modules/platform-admin-web/src/store/*"],
-      "@/types": ["modules/platform-admin-web/src/types"],
-      "@/types/*": ["modules/platform-admin-web/src/types/*"],
-      "@/modules/platform-admin": ["modules/platform-admin"],
-      "@/modules/platform-admin/*": ["modules/platform-admin/*"],
-      "@admin":    ["modules/auction-web/src"],
-      "@admin/*":  ["modules/auction-web/src/*"],
-      "@admin-web":    ["modules/admin-web/src"],
-      "@admin-web/*":  ["modules/admin-web/src/*"],
-      "@auction":  ["modules/auction-web/src"],
-      "@auction/*":["modules/auction-web/src/*"],
-      "@vendor": ["modules/vendor-web/src"],
-      "@vendor/*": ["modules/vendor-web/src/*"],
-      "@fleet": ["modules/fleet-web/src"],
-      "@fleet/*": ["modules/fleet-web/src/*"],
-      "@customer": ["modules/customer-web/src"],
-      "@customer/*": ["modules/customer-web/src/*"],
-      "@console": ["modules/console-web/src"],
-      "@console/*": ["modules/console-web/src/*"],
-      "@platform-admin": ["modules/platform-admin-web/src"],
-      "@platform-admin/*": ["modules/platform-admin-web/src/*"],
-      "@tenant-admin": ["modules/tenant-admin-web/src"],
-      "@tenant-admin/*": ["modules/tenant-admin-web/src/*"],
-      "@tms-booking": ["modules/tms-booking-web/src"],
-      "@tms-booking/*": ["modules/tms-booking-web/src/*"],
-      "@tms-driver-app": ["modules/tms-driver-app-web/src"],
-      "@tms-driver-app/*": ["modules/tms-driver-app-web/src/*"],
-      "@shared-api": ["packages/shared-api/src"],
-      "@shared-api/*": ["packages/shared-api/src/*"],
-      "@shared-auth": ["packages/shared-auth/src"],
-      "@shared-auth/*": ["packages/shared-auth/src/*"],
-      "@shared-ui": ["packages/shared-ui/src"],
-      "@shared-ui/*": ["packages/shared-ui/src/*"],
-      "@shared-utils": ["packages/shared-utils/src"],
-      "@shared-utils/*": ["packages/shared-utils/src/*"]
+      "@/shared/components/common": [
+        "modules/platform-admin-web/src/components/common"
+      ],
+      "@/shared/components/common/*": [
+        "modules/platform-admin-web/src/components/common/*"
+      ],
+      "@/shared/components/ui": [
+        "modules/platform-admin-web/src/components/ui"
+      ],
+      "@/shared/components/ui/*": [
+        "modules/platform-admin-web/src/components/ui/*"
+      ],
+      "@/shared/auth": [
+        "modules/platform-admin-web/src/shared/auth"
+      ],
+      "@/shared/auth/*": [
+        "modules/platform-admin-web/src/shared/auth/*"
+      ],
+      "@/shared/lib": [
+        "modules/platform-admin-web/src/lib"
+      ],
+      "@/shared/lib/*": [
+        "modules/platform-admin-web/src/lib/*"
+      ],
+      "@/shared/store": [
+        "modules/platform-admin-web/src/store"
+      ],
+      "@/shared/store/*": [
+        "modules/platform-admin-web/src/store/*"
+      ],
+      "@/types": [
+        "modules/platform-admin-web/src/types"
+      ],
+      "@/types/*": [
+        "modules/platform-admin-web/src/types/*"
+      ],
+      "@/modules/platform-admin": [
+        "modules/platform-admin"
+      ],
+      "@/modules/platform-admin/*": [
+        "modules/platform-admin/*"
+      ],
+      "@admin": [
+        "modules/auction-web/src"
+      ],
+      "@admin/*": [
+        "modules/auction-web/src/*"
+      ],
+      "@admin-web": [
+        "modules/admin-web/src"
+      ],
+      "@admin-web/*": [
+        "modules/admin-web/src/*"
+      ],
+      "@auction": [
+        "modules/auction-web/src"
+      ],
+      "@auction/*": [
+        "modules/auction-web/src/*"
+      ],
+      "@vendor": [
+        "modules/vendor-web/src"
+      ],
+      "@vendor/*": [
+        "modules/vendor-web/src/*"
+      ],
+      "@fleet": [
+        "modules/fleet-web/src"
+      ],
+      "@fleet/*": [
+        "modules/fleet-web/src/*"
+      ],
+      "@customer": [
+        "modules/customer-web/src"
+      ],
+      "@customer/*": [
+        "modules/customer-web/src/*"
+      ],
+      "@console": [
+        "modules/console-web/src"
+      ],
+      "@console/*": [
+        "modules/console-web/src/*"
+      ],
+      "@platform-admin": [
+        "modules/platform-admin-web/src"
+      ],
+      "@platform-admin/*": [
+        "modules/platform-admin-web/src/*"
+      ],
+      "@tenant-admin": [
+        "modules/tenant-admin-web/src"
+      ],
+      "@tenant-admin/*": [
+        "modules/tenant-admin-web/src/*"
+      ],
+      "@tms-booking": [
+        "modules/tms-booking-web/src"
+      ],
+      "@tms-booking/*": [
+        "modules/tms-booking-web/src/*"
+      ],
+      "@tms-driver-app": [
+        "modules/tms-driver-app-web/src"
+      ],
+      "@tms-driver-app/*": [
+        "modules/tms-driver-app-web/src/*"
+      ],
+      "@shared-api": [
+        "packages/shared-api/src"
+      ],
+      "@shared-api/*": [
+        "packages/shared-api/src/*"
+      ],
+      "@shared-auth": [
+        "packages/shared-auth/src"
+      ],
+      "@shared-auth/*": [
+        "packages/shared-auth/src/*"
+      ],
+      "@shared-ui": [
+        "packages/shared-ui/src"
+      ],
+      "@shared-ui/*": [
+        "packages/shared-ui/src/*"
+      ],
+      "@shared-utils": [
+        "packages/shared-utils/src"
+      ],
+      "@shared-utils/*": [
+        "packages/shared-utils/src/*"
+      ]
     }
   },
-  "include": ["src", "modules", "packages", "vite.config.ts"]
+  "include": [
+    "src",
+    "modules",
+    "packages",
+    "vite.config.ts"
+  ]
 }
