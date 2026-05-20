@@ -11,12 +11,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/vendor': 'Dashboard',
   '/vendor/sourcing': 'Sourcing',
   '/vendor/contracts': 'Contracts',
-  '/vendor/bookings': 'Bookings',
-  '/vendor/trips': 'Bookings',
+  '/vendor/trips': 'Trips',
+  '/vendor/expenses': 'Expenses',
   '/vendor/fleet': 'Fleet',
-  '/vendor/receivables': 'Bill Discounting',
-  '/vendor/record-payments': 'Record Payments',
-  '/vendor/ledger': 'Ledger',
+  '/vendor/invoices': 'Invoices',
   '/vendor/profile': 'Profile',
 }
 

@@ -1,63 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { FileClock, Gavel, ScrollText } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { KPICard } from '@auction/components/cards/KPICard'
+import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Button } from '@auction/components/ui/button'
-import { LoadingSkeleton } from '@auction/components/shared/LoadingSkeleton'
-import { ErrorState } from '@auction/components/shared/ErrorState'
-import { fetchAuctions, fetchContracts } from '@auction/lib/mock-services'
-import type { Auction, Contract } from '@auction/types'
+import { StatusBadge } from '@auction/components/shared/StatusBadge'
+import { SLACountdown } from '@auction/components/shared/SLACountdown'
+import { MOCK_DASHBOARD } from '@auction/lib/mock-data'
+import { useAppStore } from '@auction/stores/app.store'
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
-  const [auctions, setAuctions] = useState<Auction[]>([])
-  const [contracts, setContracts] = useState<Contract[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { auctions, contracts } = useAppStore()
 
-  const load = () => {
-    setLoading(true)
-    setError(null)
-    Promise.all([fetchAuctions(), fetchContracts()])
-      .then(([auctionData, contractData]) => {
-        setAuctions(auctionData)
-        setContracts(contractData)
-      })
-      .catch((e) => setError(e.message ?? 'Failed to load dashboard'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    load()
-  }, [])
-
-  const liveAuctions = useMemo(() => auctions.filter((item) => item.status === 'LIVE'), [auctions])
-  const pendingAwards = useMemo(() => auctions.filter((item) => item.status === 'COMPLETED'), [auctions])
-  const expiringContracts = useMemo(() => contracts.filter((item) => item.status === 'EXPIRING_SOON'), [contracts])
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <LoadingSkeleton lines={2} className="h-24 rounded-xl border bg-white p-6" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <LoadingSkeleton key={i} lines={3} className="rounded-xl border bg-white p-5" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return <ErrorState message={error} onRetry={load} />
-  }
+  const liveAuctions = auctions.filter((item) => item.status === 'LIVE')
+  const pendingAwards = auctions.filter((item) => item.status === 'COMPLETED')
+  const expiringContracts = contracts.filter((item) => item.status === 'EXPIRING_SOON')
 
   return (
-    <div className="space-y-6">
+    <div>
       <HeroCard
         eyebrow="Auction Control Tower"
-        title="Procurement Control Dashboard"
+        title="Customer Procurement Dashboard"
         subtitle="Monitor live auctions, award deadlines, and contract outcomes from a single operational view."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
@@ -67,30 +30,81 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <KPICard
-          title="Live Auctions"
+          title={MOCK_DASHBOARD.liveAuctions.label}
           value={liveAuctions.length}
-          insight="Auctions currently accepting bids."
+          insight={MOCK_DASHBOARD.liveAuctions.insight}
           icon={<Gavel className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/auction/auctions?tab=LIVE')}
         />
         <KPICard
-          title="Pending Awards"
+          title={MOCK_DASHBOARD.pendingAwards.label}
           value={pendingAwards.length}
-          insight="Completed auctions waiting for award decision."
+          insight={MOCK_DASHBOARD.pendingAwards.insight}
           icon={<FileClock className="h-4 w-4 text-warning" />}
-          onClick={() => navigate('/auction/auctions?tab=COMPLETED')}
         />
         <KPICard
-          title="Expiring Contracts"
+          title={MOCK_DASHBOARD.expiringContracts.label}
           value={expiringContracts.length}
-          insight="Contracts entering expiry warning window."
+          insight={MOCK_DASHBOARD.expiringContracts.insight}
           icon={<ScrollText className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/auction/contracts?tab=expiring_soon')}
         />
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Priority Auctions</CardTitle>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/auction/auctions">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {auctions.slice(0, 4).map((auction) => (
+              <Link
+                key={auction.id}
+                to={`/auction/auctions/${auction.id}`}
+                className="flex items-start justify-between rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-semibold text-[#0F172A]">{auction.id}</span>
+                    <StatusBadge status={auction.status} />
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-[#0F172A]">{auction.title}</p>
+                  <p className="mt-1 text-xs text-[#64748B]">
+                    {auction.type} · {auction.lanes.length} lane{auction.lanes.length > 1 ? 's' : ''} · Created by {auction.createdBy}
+                  </p>
+                </div>
+                {(auction.status === 'LIVE' || auction.status === 'COMPLETED') && <SLACountdown deadline={auction.awardDeadline} />}
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Expiring Contracts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {expiringContracts.length === 0 && <p className="text-sm text-[#64748B]">No contracts are currently expiring.</p>}
+            {expiringContracts.map((contract) => (
+              <Link
+                key={contract.id}
+                to={`/auction/contracts/${contract.id}`}
+                className="block rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-sm font-semibold">{contract.id}</span>
+                  <StatusBadge status={contract.status} />
+                </div>
+                <p className="mt-2 text-sm text-[#0F172A]">{contract.lane}</p>
+                <p className="mt-1 text-xs text-[#64748B]">{contract.vendorName} · {contract.vehicleType}</p>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

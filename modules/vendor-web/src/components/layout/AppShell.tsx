@@ -1,24 +1,18 @@
 import { useEffect } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
 
 export function AppShell() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { isAuthenticated, loading, vendor } = useVendorAuth()
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       navigate('/login', { replace: true })
-      return
     }
-
-    if (!loading && isAuthenticated && vendor?.status === 'ONBOARDING_INCOMPLETE' && !location.pathname.startsWith('/vendor/onboarding')) {
-      navigate('/vendor/onboarding', { replace: true })
-    }
-  }, [isAuthenticated, loading, navigate, vendor?.status, location.pathname])
+  }, [isAuthenticated, loading, navigate])
 
   if (loading || !isAuthenticated) return null
 
@@ -26,7 +20,7 @@ export function AppShell() {
     <div className="optimile-vendor-root flex min-h-screen bg-background text-text">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col min-h-screen min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-screen">
         {/* Suspended / Blacklisted banners */}
         {vendor?.status === 'SUSPENDED' && (
           <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 text-center text-sm text-amber-700">

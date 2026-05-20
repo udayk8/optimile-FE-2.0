@@ -12,9 +12,9 @@ const NAV_SECTIONS = [
   {
     label: 'Workspace',
     items: [
-      { label: 'Live Trips', icon: Truck },
-      { label: 'Milestones', icon: Route },
-      { label: 'Control Tower', icon: Bell },
+      { label: 'Live Trips', icon: Truck, active: false },
+      { label: 'Milestones', icon: Route, active: false },
+      { label: 'Control Tower', icon: Bell, active: false },
     ],
   },
 ]

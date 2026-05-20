@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
+import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
@@ -20,15 +21,6 @@ const STATUS_FILTERS: { value: ExpenseStatus | 'ALL'; label: string }[] = [
   { value: 'REJECTED', label: 'Rejected' },
 ]
 
-const COLUMN_OPTIONS = [
-  { key: 'expense', label: 'Expense' },
-  { key: 'booking', label: 'Booking' },
-  { key: 'status', label: 'Status' },
-  { key: 'lineItems', label: 'Line Items' },
-  { key: 'submitted', label: 'Submitted' },
-  { key: 'amount', label: 'Amount' },
-]
-
 export default function ExpensesPage() {
   const [statusFilter, setStatusFilter] = useState<ExpenseStatus | 'ALL'>('ALL')
   const { expenses } = useAppStore()
@@ -38,6 +30,9 @@ export default function ExpensesPage() {
   const { tripId } = useParams()
 
   const filtered = expenses.filter((expense) => statusFilter === 'ALL' || expense.status === statusFilter)
+  const approvedExpenses = expenses.filter((e) => e.status === 'APPROVED')
+  const totalApproved = approvedExpenses.reduce((sum, e) => sum + e.amount, 0)
+
   const closeAddExpenseModal = () => {
     setIsAddExpenseOpen(false)
     if (location.pathname.startsWith('/vendor/expenses/add/')) navigate('/vendor/expenses')
@@ -51,18 +46,29 @@ export default function ExpensesPage() {
     <div>
       <HeroCard 
         eyebrow="FINANCE"
-        title="Booking Expenses" 
-        subtitle="Submit one bundled expense claim per booking and track its approval status" 
+        title="Expenses" 
+        subtitle="Submit one bundled expense claim per trip and track its approval status" 
         icon={<Receipt className="h-5 w-5" />}
         action={
-            <Button onClick={() => setIsAddExpenseOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" /> Add Booking Expense
-            </Button>
+          <Button onClick={() => setIsAddExpenseOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Add Trip Expense
+          </Button>
         }
       />
 
+      {/* Summary bar */}
+      <div className="mb-6 flex items-center justify-between rounded-xl border border-success/20 bg-success/10 p-4">
+        <div>
+          <p className="text-sm text-gray-600">Approved Expense Claims</p>
+          <CurrencyDisplay amount={totalApproved} className="text-2xl font-bold text-success" />
+        </div>
+        <div className="text-sm text-gray-600">
+          {approvedExpenses.length} approved trip claim{approvedExpenses.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+
       {/* Filters */}
-      <div className="mt-6 mb-6 flex flex-wrap items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
           {STATUS_FILTERS.map((f) => (
             <button key={f.value} onClick={() => setStatusFilter(f.value)}
@@ -74,46 +80,40 @@ export default function ExpensesPage() {
       </div>
 
       {/* List */}
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="space-y-3">
         {filtered.length === 0 ? (
-          <div className="p-8">
-            <EmptyState icon={<Receipt className="h-12 w-12" />} title="No expense claims found" description="Booking-level expense submissions will appear here once sent for approval." />
-          </div>
+          <EmptyState icon={<Receipt className="h-12 w-12" />} title="No expense claims found" description="Trip-level expense submissions will appear here once sent for approval." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1020px] text-left">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-5 py-3 font-bold">Expense</th>
-                  <th className="px-5 py-3 font-bold">Booking</th>
-                  <th className="px-5 py-3 font-bold">Status</th>
-                  <th className="px-5 py-3 font-bold">Line Items</th>
-                  <th className="px-5 py-3 font-bold">Submitted</th>
-                  <th className="px-5 py-3 font-bold text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filtered.map((expense) => (
-                  <tr key={expense.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-4">
-                      <div className="font-mono text-sm font-semibold text-text">{expense.id}</div>
-                      {expense.rejectionReason && <div className="mt-1 text-xs text-danger">{expense.rejectionReason}</div>}
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="font-semibold text-text">{expense.tripReference}</div>
-                      <div className="mt-1 text-xs text-gray-500">Booking-level claim</div>
-                    </td>
-                    <td className="px-5 py-4"><StatusBadge status={expense.status} /></td>
-                    <td className="px-5 py-4 text-sm text-text">{expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}</td>
-                    <td className="px-5 py-4 text-sm text-text">{formatDate(expense.submittedAt)}</td>
-                    <td className="px-5 py-4 text-right">
-                      <CurrencyDisplay amount={expense.amount} className="text-sm font-semibold" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          filtered.map((expense) => (
+            <Card key={expense.id} className="hover:border-primary/30">
+              <CardContent className="p-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-sm">{expense.tripReference}</span>
+                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{expense.lineItems.length} line item{expense.lineItems.length !== 1 ? 's' : ''}</span>
+                      <StatusBadge status={expense.status} />
+                    </div>
+                    <p className="text-xs text-gray-500">Submitted: {formatDate(expense.submittedAt)}</p>
+                    {expense.rejectionReason && <p className="mt-2 text-sm text-danger">Rejected: {expense.rejectionReason}</p>}
+                  </div>
+                  <CurrencyDisplay amount={expense.amount} className="text-lg font-semibold" />
+                </div>
+
+                <div className="mt-4 space-y-2 rounded-lg bg-gray-50 p-3">
+                  {expense.lineItems.map((line) => (
+                    <div key={line.id} className="flex flex-col gap-1 rounded-md border border-gray-200 bg-white p-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="text-sm font-bold text-text">{line.expenseType.replace(/_/g, ' / ')}</div>
+                        {line.description && <p className="text-sm text-gray-500">{line.description}</p>}
+                      </div>
+                      <CurrencyDisplay amount={line.amount} className="text-sm font-semibold" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
         )}
       </div>
 

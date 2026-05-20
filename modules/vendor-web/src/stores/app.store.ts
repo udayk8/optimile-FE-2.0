@@ -11,14 +11,10 @@ import {
   MOCK_LEDGER,
   MOCK_CAPACITY,
   MOCK_NOTIFICATIONS,
-  MOCK_EXCEPTIONS,
-  MOCK_DISPUTES,
 } from '@vendor/lib/mock-data'
-import {
+import { 
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
-  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
-  ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
-  Dispute, DisputeStatus, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
+  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification
 } from '@vendor/types'
 
 interface AppState {
@@ -31,41 +27,11 @@ interface AppState {
   contracts: Contract[]
   invoices: Invoice[]
   ledger: LedgerEntry[]
-  payments: PaymentRecord[]
-  nbfcApplications: NBFCApplication[]
-  exceptions: ExceptionRecord[]
   capacity: CapacityDeclaration[]
   notifications: Notification[]
 
-  disputes: Dispute[]
-  raiseDispute: (invoiceId: string, invoiceNumber: string, invoiceAmount: number, reason: string) => void
-  updateDisputeStatus: (disputeId: string, status: DisputeStatus, notes?: string) => void
-  acceptDispute: (disputeId: string) => void
-  cancelDispute: (disputeId: string) => void
-  resubmitInvoice: (invoiceId: string, lineItems: InvoiceLineItem[]) => void
-  recordInvoicePayment: (payload: {
-    invoiceId: string
-    paymentKind: PaymentKind
-    paymentDate: string
-    cashAmount: number
-    tdsAmount: number
-    referenceNumber?: string
-    note?: string
-  }) => void
-  postCustomerLedgerEntry: (payload: CustomerLedgerPostPayload) => void
-  postNbfcLedgerEntry: (payload: NbfcLedgerPostPayload) => void
-  recordPaymentReminder: (payload: {
-    invoiceId: string
-    paymentKind: PaymentKind
-    paymentDate: string
-    amount: number
-    referenceNumber?: string
-    note?: string
-  }) => void
-
   // Actions
-  acceptIndent: (indentId: string) => void
-  assignVehicleToTrip: (tripId: string, vehicleId: string, driverId: string) => void
+  acceptIndent: (indentId: string, vehicleId: string, driverId: string) => void
   declineIndent: (indentId: string) => void
   submitBid: (auctionId: string, laneId: string, amount: number) => void
   addVehicle: (vehicle: Vehicle) => void
@@ -73,175 +39,13 @@ interface AppState {
   addDriver: (driver: Driver) => void
   updateDriver: (driver: Driver) => void
   addExpense: (expense: Expense) => void
-  generateInvoice: (payload: {
-    tripIds: string[]
-    invoiceDate?: string
-    dueDate?: string
-    gstRate?: number
-    invoiceNumber?: string
-  }) => void
-  submitNbfcApplication: (payload: {
-    invoiceId: string
-    invoiceNumber: string
-    customerName: string
-    partnerId: string
-    partnerName: string
-    requestedAmount: number
-    charges: number
-    netAmount: number
-    emailTitle?: string
-    recipientEmail?: string
-    emailDescription?: string
-    invoiceFileName?: string
-  }) => void
-  updateNbfcApplicationFinancials: (payload: {
-    invoiceId: string
-    approvedAmount: number
-    approvedCharges: number
-    netAmount: number
-    referenceNumber?: string
-    remarks?: string
-  }) => void
-  markNbfcApplicationStatus: (invoiceId: string, status: Exclude<NBFCDiscountingStatus, 'ELIGIBLE'>) => void
-  createException: (payload: {
-    bookingId: string
-    route: string
-    vehicle: string
-    driver: string
-    issueType: ExceptionIssueType
-    severity: ExceptionSeverity
-    description: string
-    evidence?: string[]
-  }) => void
-  updateExceptionStatus: (exceptionId: string, status: ExceptionStatus, notes?: string) => void
-  changeTripAssignment: (tripId: string, payload: {
-    vehicleId?: string
-    driverId?: string
-    issueReason?: DisruptionReason
-    notes?: string
-    resolve?: boolean
-  }) => void
+  generateInvoice: (tripIds: string[]) => void
   addCapacityDeclaration: (declaration: CapacityDeclaration) => void
   markNotificationRead: (notificationId: string) => void
   markAllNotificationsRead: () => void
   addNotification: (notification: Notification) => void
-  loadBackendData: () => Promise<void>
   resetStore: () => void
 }
-
-const INITIAL_NBFC_APPLICATIONS: NBFCApplication[] = [
-  {
-    id: 'nbfc-app-001',
-    invoiceId: 'INV-2026-001',
-    invoiceNumber: 'INV-2026-001',
-    customerName: 'HUL',
-    partnerId: 'nbfc-1',
-    partnerName: 'FinEdge Capital',
-    status: 'SUBMITTED',
-    appliedAt: '2026-05-10T10:00:00Z',
-    requestedAmount: 90000,
-    charges: 1500,
-    netAmount: 88500,
-    referenceNumber: 'NBFC-REF-001',
-    remarks: 'Awaiting final approval',
-    emailTitle: 'Bill Discounting Request - INV-2026-001',
-    recipientEmail: 'finedge@nbfc.com',
-    emailDescription: 'Please process the request for INV-2026-001.',
-    invoiceFileName: 'inv-2026-001.pdf',
-  },
-  {
-    id: 'nbfc-app-002',
-    invoiceId: 'INV-2026-002',
-    invoiceNumber: 'INV-2026-002',
-    customerName: 'HUL',
-    partnerId: 'nbfc-2',
-    partnerName: 'Prime Credit',
-    status: 'DISBURSED',
-    appliedAt: '2026-05-11T09:30:00Z',
-    approvedAt: '2026-05-12T15:30:00Z',
-    requestedAmount: 92000,
-    approvedAmount: 90000,
-    charges: 1800,
-    approvedCharges: 2000,
-    netAmount: 88000,
-    referenceNumber: 'NBFC-REF-002',
-    remarks: 'Disbursed — NBFC financing and charges posted to ledger',
-    emailTitle: 'Bill Discounting Request - INV-2026-002',
-    recipientEmail: 'prime@nbfc.com',
-    emailDescription: 'Please process the request for INV-2026-002.',
-    invoiceFileName: 'inv-2026-002.pdf',
-  },
-  {
-    id: 'nbfc-app-003',
-    invoiceId: 'INV-2026-003',
-    invoiceNumber: 'INV-2026-003',
-    customerName: 'HUL',
-    partnerId: 'nbfc-3',
-    partnerName: 'Axis Finance',
-    status: 'REJECTED',
-    appliedAt: '2026-05-12T11:00:00Z',
-    requestedAmount: 76000,
-    charges: 1400,
-    netAmount: 74600,
-    referenceNumber: 'NBFC-REF-003',
-    remarks: 'Rejected due to credit policy mismatch',
-    emailTitle: 'Bill Discounting Request - INV-2026-003',
-    recipientEmail: 'axis@nbfc.com',
-    emailDescription: 'Please process the request for INV-2026-003.',
-    invoiceFileName: 'inv-2026-003.pdf',
-  },
-  {
-    id: 'nbfc-app-004',
-    invoiceId: 'INV-2026-004',
-    invoiceNumber: 'INV-2026-004',
-    customerName: 'HUL',
-    partnerId: 'nbfc-4',
-    partnerName: 'Tata Capital',
-    status: 'APPROVED',
-    appliedAt: '2026-05-15T09:00:00Z',
-    approvedAt: '2026-05-17T11:00:00Z',
-    requestedAmount: 76000,
-    approvedAmount: 75000,
-    charges: 1500,
-    approvedCharges: 1600,
-    netAmount: 73400,
-    referenceNumber: 'NBFC-REF-004',
-    remarks: 'Approved — awaiting disbursal',
-    emailTitle: 'Bill Discounting Request - INV-2026-004',
-    recipientEmail: 'tata@nbfc.com',
-    emailDescription: 'Please process the request for INV-2026-004.',
-    invoiceFileName: 'inv-2026-004.pdf',
-  },
-]
-
-const buildInitialPayments = (): PaymentRecord[] =>
-  MOCK_LEDGER
-    .filter((entry) => ['CUSTOMER_PAYMENT', 'TDS_DEDUCTION', 'NBFC_DISBURSEMENT', 'NBFC_REPAYMENT', 'NBFC_CHARGE'].includes(entry.entryType))
-    .map((entry, index) => {
-      const invoiceId = entry.invoiceId
-      const paymentKind: PaymentKind =
-        entry.entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION'
-          : entry.entryType === 'NBFC_DISBURSEMENT' ? 'NBFC_DISBURSEMENT'
-          : entry.entryType === 'NBFC_REPAYMENT' ? 'NBFC_REPAYMENT'
-          : entry.entryType === 'NBFC_CHARGE' ? 'NBFC_CHARGE'
-          : 'CUSTOMER_PAYMENT'
-      const amount = entry.credit > 0 ? entry.credit : entry.debit
-      return {
-        id: `pay-seed-${index + 1}`,
-        invoiceId,
-        invoiceNumber: invoiceId,
-        customerName: invoiceId,
-        paymentKind,
-        paymentDate: entry.date,
-        cashAmount: entry.entryType === 'TDS_DEDUCTION' ? 0 : amount,
-        tdsAmount: entry.entryType === 'TDS_DEDUCTION' ? entry.credit : 0,
-        referenceNumber: entry.referenceNumber ?? entry.id.toUpperCase(),
-        note: entry.description,
-        status: 'POSTED',
-        createdAt: `${entry.date}T00:00:00Z`,
-        ledgerEntryIds: [entry.id],
-      } as PaymentRecord
-    })
 
 export const useAppStore = create<AppState>((set) => ({
   indents: [...MOCK_INDENTS],
@@ -253,19 +57,19 @@ export const useAppStore = create<AppState>((set) => ({
   contracts: [...MOCK_CONTRACTS],
   invoices: [...MOCK_INVOICES],
   ledger: [...MOCK_LEDGER],
-  payments: buildInitialPayments(),
-  exceptions: [...MOCK_EXCEPTIONS],
-  nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
   capacity: [...MOCK_CAPACITY],
   notifications: [...MOCK_NOTIFICATIONS],
-  disputes: [...MOCK_DISPUTES],
 
-  acceptIndent: (indentId) => {
+  acceptIndent: (indentId, vehicleId, driverId) =>
     set((state) => {
       const indentIndex = state.indents.findIndex((i) => i.id === indentId)
       if (indentIndex === -1) return state
 
       const indent = state.indents[indentIndex] as Indent
+      const vehicle = state.vehicles.find((v) => v.id === vehicleId)
+      const driver = state.drivers.find((d) => d.id === driverId)
+
+      if (!vehicle || !driver) return state
 
       const updatedIndents = [...state.indents]
       updatedIndents[indentIndex] = { ...indent, status: 'ACCEPTED' }
@@ -275,11 +79,10 @@ export const useAppStore = create<AppState>((set) => ({
         contractId: indent.contractId,
         indentId: indent.id,
         laneDetails: indent.laneDetails,
-        assignedVehicle: { id: '', registrationNumber: '—', type: '—' },
-        assignedDriver: { id: '', name: '—', mobile: '—' },
-        status: 'ACCEPTED',
-        slaFlag: 'ON_TIME',
-        freightRate: 0,
+        assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
+        assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
+        status: 'DISPATCHED',
+        freightRate: 0, // Should come from contract, simplify for now
         expenseSummary: { total: 0, approved: 0, pending: 0 },
         isInvoiced: false,
         createdAt: new Date().toISOString(),
@@ -289,45 +92,19 @@ export const useAppStore = create<AppState>((set) => ({
         indents: updatedIndents,
         trips: [newTrip, ...state.trips],
       }
-    })
-  },
+    }),
 
-  assignVehicleToTrip: (tripId, vehicleId, driverId) => {
-    set((state) => {
-      const tripIndex = state.trips.findIndex((t) => t.id === tripId)
-      if (tripIndex === -1) return state
-
-      const trip = state.trips[tripIndex] as Trip
-      if (trip.status !== 'ACCEPTED') return state
-
-      const vehicle = state.vehicles.find((v) => v.id === vehicleId)
-      const driver = state.drivers.find((d) => d.id === driverId)
-      if (!vehicle || !driver) return state
-
-      const updatedTrips = [...state.trips]
-      updatedTrips[tripIndex] = {
-        ...trip,
-        assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
-        assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
-        status: 'ASSIGNED',
-      }
-
-      return { trips: updatedTrips }
-    })
-  },
-
-  declineIndent: (indentId) => {
+  declineIndent: (indentId) =>
     set((state) => {
       const indentIndex = state.indents.findIndex((i) => i.id === indentId)
       if (indentIndex === -1) return state
-
+      
       const updatedIndents = [...state.indents]
       updatedIndents[indentIndex] = { ...state.indents[indentIndex], status: 'DECLINED' } as Indent
       return { indents: updatedIndents }
-    })
-  },
+    }),
 
-  submitBid: (auctionId, laneId, amount) => {
+  submitBid: (auctionId, laneId, amount) =>
     set((state) => {
       const auctionIndex = state.auctions.findIndex((a) => a.id === auctionId)
       if (auctionIndex === -1) return state
@@ -366,30 +143,25 @@ export const useAppStore = create<AppState>((set) => ({
       updatedAuctions[auctionIndex] = updatedAuction
 
       return { auctions: updatedAuctions }
-    })
-  },
+    }),
 
-  addVehicle: (vehicle) => {
-    set((state) => ({ vehicles: [vehicle, ...state.vehicles] }))
-  },
+  addVehicle: (vehicle) =>
+    set((state) => ({ vehicles: [vehicle, ...state.vehicles] })),
 
-  updateVehicle: (vehicle) => {
+  updateVehicle: (vehicle) =>
     set((state) => ({
       vehicles: state.vehicles.map((item) => (item.id === vehicle.id ? vehicle : item)),
-    }))
-  },
+    })),
 
-  addDriver: (driver) => {
-    set((state) => ({ drivers: [driver, ...state.drivers] }))
-  },
+  addDriver: (driver) =>
+    set((state) => ({ drivers: [driver, ...state.drivers] })),
 
-  updateDriver: (driver) => {
+  updateDriver: (driver) =>
     set((state) => ({
       drivers: state.drivers.map((item) => (item.id === driver.id ? driver : item)),
-    }))
-  },
+    })),
 
-  addExpense: (expense) => {
+  addExpense: (expense) =>
     set((state) => {
       const tripIndex = state.trips.findIndex((t) => t.id === expense.tripId)
       const existingExpense = state.expenses.find((item) => item.tripId === expense.tripId)
@@ -421,66 +193,22 @@ export const useAppStore = create<AppState>((set) => ({
         expenses: updatedExpenses,
         trips: updatedTrips,
       }
-    })
-  },
+    }),
 
-  generateInvoice: (payload) => {
+  generateInvoice: (tripIds) =>
     set((state) => {
-      const { tripIds, invoiceDate = new Date().toISOString(), dueDate, gstRate = 12, invoiceNumber } = payload
       if (tripIds.length === 0) return state
 
-      const selectedTrips = tripIds
-        .map((id) => state.trips.find((trip) => trip.id === id))
-        .filter((trip): trip is Trip => Boolean(trip))
-
-      if (selectedTrips.length === 0) return state
-
-      const subtotal = selectedTrips.reduce(
-        (sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0),
-        0
-      )
-      const gstAmount = Math.round(subtotal * (gstRate / 100))
-      const finalDueDate = dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-      const generatedInvoiceNumber = invoiceNumber ?? `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-
-      const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
-        const freightCharge = trip.freightRate || 0
-        const expenses: { type: ExpenseType; amount: number }[] = trip.expenseSummary.approved > 0
-          ? [{ type: 'OTHER', amount: trip.expenseSummary.approved }]
-          : []
-        const lineTotal = freightCharge + trip.expenseSummary.approved
-        return {
-          tripId: trip.id,
-          tripReference: trip.id,
-          freightCharge,
-          expenses,
-          lineTotal,
-        }
-      })
-
       const newInvoice = {
-        id: generatedInvoiceNumber,
-        invoiceNumber: generatedInvoiceNumber,
-        invoiceDate,
-        paymentDueDate: finalDueDate,
-        subtotal,
-        gstAmount,
-        grandTotal: subtotal + gstAmount,
+        id: `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+        invoiceNumber: `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+        invoiceDate: new Date().toISOString(),
+        grandTotal: tripIds.reduce((sum, id) => {
+          const trip = state.trips.find(t => t.id === id)
+          return sum + (trip?.freightRate || 0) + (trip?.expenseSummary.approved || 0)
+        }, 0),
         status: 'SUBMITTED' as any,
-        lineItems,
-        vendorGstin: '29AABCF1234M1ZP',
-        customerGstin: selectedTrips[0]?.contractId ? '27AABCU9603R1ZM' : '27AABCU9603R1ZM',
-        billingPeriod: {
-          from: selectedTrips
-            .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
-            .sort()[0],
-          to: selectedTrips
-            .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
-            .sort().slice(-1)[0],
-        },
-        pdfUrl: `/invoices/${generatedInvoiceNumber}.pdf`,
-        tripReferences: selectedTrips.map((trip) => trip.id),
-        createdAt: invoiceDate,
+        lineItems: tripIds.map(id => ({ tripId: id, description: 'Freight & Expenses', amount: 0 })),
       } as unknown as Invoice
 
       // Mark trips as invoiced
@@ -492,477 +220,25 @@ export const useAppStore = create<AppState>((set) => ({
         invoices: [newInvoice, ...state.invoices],
         trips: updatedTrips
       }
-    })
-  },
-
-  recordInvoicePayment: ({ invoiceId, paymentDate, cashAmount, tdsAmount, referenceNumber, note }) =>
-    set((state) => {
-      const invoice = state.invoices.find((item) => item.id === invoiceId)
-      if (!invoice) return state
-      const amount = Math.max(0, cashAmount) + Math.max(0, tdsAmount)
-      if (amount <= 0) return state
-      const entryType = tdsAmount > 0 ? 'TDS_DEDUCTION' : 'CUSTOMER_PAYMENT'
-      const customerEntries = state.ledger
-        .filter((entry) => entry.invoiceId === invoiceId && entry.ledgerType === 'CUSTOMER')
-        .sort((a, b) => a.date.localeCompare(b.date))
-      const currentBalance = customerEntries.length > 0 ? customerEntries[customerEntries.length - 1].runningBalance : 0
-      if (amount > currentBalance) return state
-      const nextBalance = Math.max(0, currentBalance - amount)
-      const ledgerEntry: LedgerEntry = {
-        id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceId,
-        ledgerType: 'CUSTOMER',
-        date: paymentDate,
-        entryType,
-        description: note?.trim() || `${entryType === 'TDS_DEDUCTION' ? 'TDS deduction' : 'Customer payment'} for ${invoice.invoiceNumber}`,
-        credit: amount,
-        debit: 0,
-        runningBalance: nextBalance,
-        referenceNumber,
-        notes: note,
-        mode: entryType === 'TDS_DEDUCTION' ? 'ADJUSTMENT' : 'BANK',
-      }
-
-      const paymentRecord: PaymentRecord = {
-        id: `pay-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceId,
-        invoiceNumber: invoice.invoiceNumber,
-        customerName: invoice.invoiceNumber,
-        paymentKind: entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION' : 'CUSTOMER_PAYMENT',
-        paymentDate,
-        cashAmount: entryType === 'TDS_DEDUCTION' ? 0 : amount,
-        tdsAmount: entryType === 'TDS_DEDUCTION' ? amount : 0,
-        referenceNumber,
-        note,
-        recordedBy: 'Vendor finance user',
-        recordedAt: new Date().toISOString(),
-        status: 'POSTED',
-        createdAt: new Date().toISOString(),
-        ledgerEntryIds: [ledgerEntry.id],
-      }
-
-      return {
-        payments: [paymentRecord, ...state.payments],
-        ledger: [ledgerEntry, ...state.ledger],
-        invoices: state.invoices.map((item) =>
-          item.id === invoiceId ? { ...item, paymentDate: nextBalance === 0 ? paymentDate : item.paymentDate } : item
-        ),
-      }
     }),
-
-  postCustomerLedgerEntry: ({ invoiceId, entryType, amount, date, description, referenceNumber, mode, notes }) =>
-    set((state) => {
-      const invoice = state.invoices.find((item) => item.id === invoiceId)
-      if (!invoice || amount <= 0) return state
-      const customerEntries = state.ledger
-        .filter((entry) => entry.invoiceId === invoiceId && entry.ledgerType === 'CUSTOMER')
-        .sort((a, b) => a.date.localeCompare(b.date))
-      const currentBalance = customerEntries.length > 0 ? customerEntries[customerEntries.length - 1].runningBalance : 0
-      if (entryType !== 'INVOICE_APPROVED' && amount > currentBalance) return state
-      const nextBalance = entryType === 'INVOICE_APPROVED' ? currentBalance + amount : Math.max(0, currentBalance - amount)
-
-      const ledgerEntry: LedgerEntry = {
-        id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceId,
-        ledgerType: 'CUSTOMER',
-        date,
-        entryType,
-        description: description.trim(),
-        credit: entryType === 'INVOICE_APPROVED' ? 0 : amount,
-        debit: entryType === 'INVOICE_APPROVED' ? amount : 0,
-        runningBalance: nextBalance,
-        referenceNumber,
-        mode: mode ?? (entryType === 'TDS_DEDUCTION' ? 'ADJUSTMENT' : 'BANK'),
-        notes,
-      }
-
-      const payments = entryType === 'INVOICE_APPROVED'
-        ? state.payments
-        : [{
-          id: `pay-${Math.floor(1000 + Math.random() * 9000)}`,
-          invoiceId,
-          invoiceNumber: invoice.invoiceNumber,
-          customerName: invoice.invoiceNumber,
-          paymentKind: entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION' : 'CUSTOMER_PAYMENT',
-          paymentDate: date,
-          cashAmount: entryType === 'TDS_DEDUCTION' ? 0 : amount,
-          tdsAmount: entryType === 'TDS_DEDUCTION' ? amount : 0,
-          referenceNumber,
-          note: notes ?? description,
-          status: 'POSTED' as const,
-          createdAt: new Date().toISOString(),
-          ledgerEntryIds: [ledgerEntry.id],
-        } as PaymentRecord, ...state.payments]
-
-      return {
-        ledger: [ledgerEntry, ...state.ledger],
-        payments,
-        invoices: state.invoices.map((item) =>
-          item.id === invoiceId ? { ...item, paymentDate: nextBalance === 0 ? date : item.paymentDate } : item
-        ),
-      }
-    }),
-
-  postNbfcLedgerEntry: ({ invoiceId, entryType, amount, date, description, referenceNumber, mode, notes }) =>
-    set((state) => {
-      const invoice = state.invoices.find((item) => item.id === invoiceId)
-      if (!invoice || amount <= 0) return state
-      const nbfcEntries = state.ledger
-        .filter((entry) => entry.invoiceId === invoiceId && entry.ledgerType === 'NBFC')
-        .sort((a, b) => a.date.localeCompare(b.date))
-      const currentBalance = nbfcEntries.length > 0 ? nbfcEntries[nbfcEntries.length - 1].runningBalance : 0
-      const isDebit = entryType === 'NBFC_FINANCING_APPROVED' || entryType === 'NBFC_CHARGE' || entryType === 'NBFC_ADJUSTMENT'
-      const nextBalance = isDebit ? currentBalance + amount : Math.max(0, currentBalance - amount)
-      const ledgerEntry: LedgerEntry = {
-        id: `led-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceId,
-        ledgerType: 'NBFC',
-        date,
-        entryType,
-        description: description.trim(),
-        credit: isDebit ? 0 : amount,
-        debit: isDebit ? amount : 0,
-        runningBalance: nextBalance,
-        referenceNumber,
-        mode: mode ?? 'BANK',
-        notes,
-      }
-      return {
-        ledger: [ledgerEntry, ...state.ledger],
-        payments: (entryType === 'NBFC_DISBURSEMENT' || entryType === 'NBFC_REPAYMENT' || entryType === 'NBFC_CHARGE')
-          ? [{
-            id: `pay-${Math.floor(1000 + Math.random() * 9000)}`,
-            invoiceId,
-            invoiceNumber: invoice.invoiceNumber,
-            customerName: invoice.invoiceNumber,
-            paymentKind:
-              entryType === 'NBFC_DISBURSEMENT' ? 'NBFC_DISBURSEMENT'
-              : entryType === 'NBFC_REPAYMENT' ? 'NBFC_REPAYMENT'
-              : 'NBFC_CHARGE',
-            paymentDate: date,
-            cashAmount: amount,
-            tdsAmount: 0,
-            referenceNumber,
-            note: notes ?? description,
-            status: 'POSTED' as const,
-            createdAt: new Date().toISOString(),
-            ledgerEntryIds: [ledgerEntry.id],
-          } as PaymentRecord, ...state.payments]
-          : state.payments,
-      }
-    }),
-
-  recordPaymentReminder: ({ invoiceId, paymentKind, paymentDate, amount, referenceNumber, note }) =>
-    set((state) => {
-      const invoice = state.invoices.find((item) => item.id === invoiceId)
-      if (!invoice || amount <= 0) return state
-      const paymentRecord: PaymentRecord = {
-        id: `pay-${Math.floor(1000 + Math.random() * 9000)}`,
-        invoiceId,
-        invoiceNumber: invoice.invoiceNumber,
-        customerName: invoice.invoiceNumber,
-        paymentKind,
-        paymentDate,
-        cashAmount: amount,
-        tdsAmount: 0,
-        referenceNumber,
-        note,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
-        ledgerEntryIds: [],
-      }
-      return { payments: [paymentRecord, ...state.payments] }
-    }),
-
-  submitNbfcApplication: ({ invoiceId, invoiceNumber, customerName, partnerId, partnerName, requestedAmount, charges, netAmount, emailTitle, recipientEmail, emailDescription, invoiceFileName }) =>
-    set((state) => {
-      const application: NBFCApplication = {
-        id: `nbfc-app-${Math.floor(100 + Math.random() * 900)}`,
-        invoiceId,
-        invoiceNumber,
-        customerName,
-        partnerId,
-        partnerName,
-        status: 'SUBMITTED',
-        appliedAt: new Date().toISOString(),
-        referenceNumber: `NBFC-${Math.floor(100000 + Math.random() * 900000)}`,
-        requestedAmount,
-        charges,
-        netAmount,
-        emailTitle,
-        recipientEmail,
-        emailDescription,
-        invoiceFileName,
-      }
-
-      return {
-        nbfcApplications: [
-          application,
-          ...state.nbfcApplications.filter((item) => item.invoiceId !== invoiceId),
-        ],
-        invoices: state.invoices.map((invoice) =>
-          invoice.id === invoiceId ? { ...invoice, nbfcDiscountingStatus: 'SUBMITTED' } : invoice
-        ),
-      }
-    }),
-
-  updateNbfcApplicationFinancials: ({ invoiceId, approvedAmount, approvedCharges, netAmount, referenceNumber, remarks }) =>
-    set((state) => ({
-      nbfcApplications: state.nbfcApplications.map((application) =>
-        application.invoiceId === invoiceId
-          ? {
-              ...application,
-              approvedAmount,
-              approvedCharges,
-              netAmount,
-              referenceNumber: referenceNumber ?? application.referenceNumber,
-              remarks: remarks ?? application.remarks,
-            }
-          : application
-      ),
-    })),
-
-  markNbfcApplicationStatus: (invoiceId, status) =>
-    set((state) => {
-      const nowIso = new Date().toISOString()
-
-      const updatedApplications = state.nbfcApplications.map((application) =>
-        application.invoiceId === invoiceId
-          ? {
-              ...application,
-              status,
-              approvedAt: status === 'APPROVED' && !application.approvedAt ? nowIso : application.approvedAt,
-            }
-          : application
-      )
-
-      const nbfcDiscountingStatus: Invoice['nbfcDiscountingStatus'] =
-        status === 'SUBMITTED' ? 'SUBMITTED'
-        : status === 'APPROVED' ? 'APPROVED'
-        : status === 'DISBURSED' ? 'DISBURSED'
-        : 'REJECTED'
-
-      const invoices = state.invoices.map((invoice) =>
-        invoice.id === invoiceId ? { ...invoice, nbfcDiscountingStatus } : invoice
-      )
-      return { nbfcApplications: updatedApplications, invoices }
-    }),
-
-  createException: ({ bookingId, route, vehicle, driver, issueType, severity, description, evidence = [] }) => {
-    set((state) => {
-      const timestamp = new Date().toISOString()
-      const exception: ExceptionRecord = {
-        id: `EXC-${Math.floor(1000 + Math.random() * 9000)}`,
-        bookingId,
-        route,
-        vehicle,
-        driver,
-        issueType,
-        severity,
-        status: 'OPEN',
-        slaDueAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        description,
-        evidence,
-        timeline: [
-          {
-            id: `exc-${Math.floor(1000 + Math.random() * 9000)}-1`,
-            action: 'Reported',
-            notes: description,
-            timestamp,
-            by: 'Vendor portal',
-          },
-        ],
-      }
-
-      return {
-        exceptions: [exception, ...state.exceptions],
-      }
-    })
-  },
-
-  updateExceptionStatus: (exceptionId, status, notes) => {
-    set((state) => ({
-      exceptions: state.exceptions.map((exception) => {
-        if (exception.id !== exceptionId) return exception
-
-        const timestamp = new Date().toISOString()
-        const action =
-          status === 'ACKNOWLEDGED'
-            ? 'Acknowledged'
-            : status === 'IN_PROGRESS'
-              ? 'In Progress'
-              : status === 'RESOLVED'
-                ? 'Resolved'
-                : 'Closed'
-
-        const defaultNotes =
-          status === 'ACKNOWLEDGED'
-            ? 'Operations confirmed receipt and started triage.'
-            : status === 'IN_PROGRESS'
-              ? 'Working on recovery and customer communication.'
-              : status === 'RESOLVED'
-                ? 'Issue has been resolved.'
-                : 'Exception closed after resolution.'
-
-        return {
-          ...exception,
-          status,
-          updatedAt: timestamp,
-          timeline: [
-            ...exception.timeline,
-            {
-              id: `exc-${exception.id.toLowerCase()}-${exception.timeline.length + 1}`,
-              action,
-              notes: notes ?? defaultNotes,
-              timestamp,
-              by: 'Operations',
-            } as ExceptionTimelineEntry,
-          ],
-        }
-      }),
-    }))
-  },
 
   addCapacityDeclaration: (declaration) =>
     set((state) => ({ capacity: [declaration, ...state.capacity] })),
 
-  changeTripAssignment: (tripId, { vehicleId, driverId, issueReason, notes, resolve }) =>
-    set((state) => {
-      const tripIndex = state.trips.findIndex((t) => t.id === tripId)
-      if (tripIndex === -1) return state
-      const trip = state.trips[tripIndex] as Trip
-      const nextVehicle = vehicleId
-        ? state.vehicles.find((v) => v.id === vehicleId)
-        : undefined
-      const nextDriver = driverId
-        ? state.drivers.find((d) => d.id === driverId)
-        : undefined
-
-      const now = new Date().toISOString()
-      const updatedTrip: Trip = {
-        ...trip,
-        assignedVehicle: nextVehicle
-          ? { id: nextVehicle.id, registrationNumber: nextVehicle.registrationNumber, type: nextVehicle.vehicleType }
-          : trip.assignedVehicle,
-        assignedDriver: nextDriver
-          ? { id: nextDriver.id, name: nextDriver.name, mobile: nextDriver.mobile }
-          : trip.assignedDriver,
-      }
-
-      if (resolve) {
-        updatedTrip.disruption = trip.disruption ? { ...trip.disruption, resolvedAt: now } : undefined
-        updatedTrip.exceptionFlag = false
-        updatedTrip.slaFlag = 'ON_TIME'
-      } else if (issueReason) {
-        updatedTrip.disruption = {
-          reason: issueReason,
-          reportedAt: trip.disruption?.reportedAt ?? now,
-          notes: notes ?? trip.disruption?.notes,
-        }
-        updatedTrip.exceptionFlag = true
-      } else if (notes && trip.disruption) {
-        updatedTrip.disruption = { ...trip.disruption, notes }
-      }
-
-      const updatedTrips = [...state.trips]
-      updatedTrips[tripIndex] = updatedTrip
-      return { trips: updatedTrips }
-    }),
-
-  markNotificationRead: (notificationId) => {
+  markNotificationRead: (notificationId) =>
     set((state) => ({
       notifications: state.notifications.map((notification) =>
         notification.id === notificationId ? { ...notification, isRead: true } : notification
       ),
-    }))
-  },
+    })),
 
-  markAllNotificationsRead: () => {
+  markAllNotificationsRead: () =>
     set((state) => ({
       notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
-    }))
-  },
+    })),
 
   addNotification: (notification) =>
     set((state) => ({ notifications: [notification, ...state.notifications] })),
-
-  loadBackendData: async () => {
-    // Mock-only mode: backend not called.
-  },
-
-  raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) => {
-    set((state) => {
-      if (state.disputes.find((d) => d.invoiceId === invoiceId)) return state
-      const num = state.disputes.length + 1
-      const newDispute: Dispute = {
-        id: `DSP-${new Date().getFullYear()}-${String(num).padStart(3, '0')}`,
-        invoiceId,
-        invoiceNumber,
-        invoiceAmount,
-        reason,
-        status: 'OPEN',
-        raisedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-      return { disputes: [newDispute, ...state.disputes] }
-    })
-  },
-
-  updateDisputeStatus: (disputeId, status, notes) =>
-    set((state) => ({
-      disputes: state.disputes.map((d) =>
-        d.id === disputeId ? { ...d, status, notes: notes ?? d.notes, updatedAt: new Date().toISOString() } : d
-      ),
-    })),
-
-  acceptDispute: (disputeId) =>
-    set((state) => {
-      const dispute = state.disputes.find((d) => d.id === disputeId)
-      if (!dispute) return state
-      return {
-        disputes: state.disputes.map((d) =>
-          d.id === disputeId ? { ...d, status: 'ACCEPTED', updatedAt: new Date().toISOString() } : d
-        ),
-        invoices: state.invoices.map((inv) =>
-          inv.id === dispute.invoiceId ? { ...inv, status: 'APPROVED' } : inv
-        ),
-      }
-    }),
-
-  cancelDispute: (disputeId) =>
-    set((state) => {
-      const dispute = state.disputes.find((d) => d.id === disputeId)
-      if (!dispute) return state
-      return {
-        disputes: state.disputes.map((d) =>
-          d.id === disputeId ? { ...d, status: 'CANCELLED', updatedAt: new Date().toISOString() } : d
-        ),
-        invoices: state.invoices.map((inv) =>
-          inv.id === dispute.invoiceId ? { ...inv, status: 'CANCELLED' } : inv
-        ),
-      }
-    }),
-
-  resubmitInvoice: (invoiceId, updatedLineItems) =>
-    set((state) => {
-      const invoice = state.invoices.find((inv) => inv.id === invoiceId)
-      if (!invoice) return state
-      const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const gstRate = invoice.subtotal > 0 ? invoice.gstAmount / invoice.subtotal : 0.12
-      const gstAmount = Math.round(subtotal * gstRate)
-      return {
-        invoices: state.invoices.map((inv) =>
-          inv.id === invoiceId
-            ? { ...inv, status: 'SUBMITTED', lineItems: updatedLineItems, subtotal, gstAmount, grandTotal: subtotal + gstAmount }
-            : inv
-        ),
-        disputes: state.disputes.map((d) =>
-          d.invoiceId === invoiceId ? { ...d, status: 'CLOSED', updatedAt: new Date().toISOString() } : d
-        ),
-      }
-    }),
 
   resetStore: () =>
     set(() => ({
@@ -975,11 +251,7 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       invoices: [...MOCK_INVOICES],
       ledger: [...MOCK_LEDGER],
-      payments: buildInitialPayments(),
-      exceptions: [...MOCK_EXCEPTIONS],
-      nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
       capacity: [...MOCK_CAPACITY],
       notifications: [...MOCK_NOTIFICATIONS],
-      disputes: [...MOCK_DISPUTES],
     }))
 }))

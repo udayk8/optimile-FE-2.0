@@ -1,100 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Gavel, PlusCircle } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Eye, Gavel, PlusCircle } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
+import { SLACountdown } from '@auction/components/shared/SLACountdown'
 import { formatDateTime } from '@auction/lib/date-utils'
-import { fetchAuctions } from '@auction/lib/mock-services'
-import type { Auction } from '@auction/types'
-import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
+import { useAppStore } from '@auction/stores/app.store'
 
-const AUCTION_TABS = ['ALL', 'DRAFT', 'UPCOMING', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
-const PAGE_SIZE = 6
-
-const TAB_LABELS: Record<(typeof AUCTION_TABS)[number], string> = {
-  ALL: 'All',
-  DRAFT: 'Draft',
-  UPCOMING: 'Upcoming',
-  LIVE: 'Live',
-  COMPLETED: 'Completed',
-  AWARDED: 'Awarded',
-  NO_BIDS: 'No Bids',
-  CANCELLED: 'Cancelled',
-}
-
-function normalizeTab(tab: string | null) {
-  const normalizedTab = tab?.toUpperCase() ?? null
-  return AUCTION_TABS.includes(normalizedTab as (typeof AUCTION_TABS)[number]) ? (normalizedTab as (typeof AUCTION_TABS)[number]) : 'ALL'
-}
+const STATUS_FILTERS = ['ALL', 'DRAFT', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
+const TYPE_FILTERS = ['ALL', 'SPOT', 'BULK', 'LOT'] as const
 
 export default function AuctionsPage() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [auctions, setAuctions] = useState<Auction[]>([])
-  const [loading, setLoading] = useState(true)
+  const { auctions } = useAppStore()
+  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('ALL')
+  const [typeFilter, setTypeFilter] = useState<(typeof TYPE_FILTERS)[number]>('ALL')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const activeTab = normalizeTab(searchParams.get('tab'))
-
-  useEffect(() => {
-    setLoading(true)
-    fetchAuctions({
-      status: activeTab === 'ALL' ? undefined : activeTab === 'UPCOMING' ? 'DRAFT' : activeTab,
-      search: search || undefined,
-    })
-      .then(setAuctions)
-      .catch(() => setAuctions([]))
-      .finally(() => setLoading(false))
-  }, [activeTab, search])
 
   const filteredAuctions = useMemo(() => {
-    const query = search.trim().toLowerCase()
     return auctions.filter((auction) => {
-      const matchesTab = activeTab === 'ALL' || auction.status === activeTab || (activeTab === 'UPCOMING' && auction.status === 'DRAFT')
+      const matchesStatus = statusFilter === 'ALL' || auction.status === statusFilter
+      const matchesType = typeFilter === 'ALL' || auction.type === typeFilter
+      const query = search.trim().toLowerCase()
       const matchesSearch =
         query.length === 0 ||
         auction.id.toLowerCase().includes(query) ||
         auction.title.toLowerCase().includes(query) ||
-        auction.type.toLowerCase().includes(query) ||
-        auction.createdBy.toLowerCase().includes(query)
-      return matchesTab && matchesSearch
-    })
-  }, [activeTab, auctions, search])
+        auction.type.toLowerCase().includes(query)
 
-  const columns = useMemo<DataTableColumn<(typeof filteredAuctions)[number]>[]>(
-    () => [
-      { key: 'auction', header: 'Auction Name', render: (auction) => <span className="font-medium text-[#0F172A]">{auction.title}</span> },
-      { key: 'type', header: 'Type', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.type}</span> },
-      { key: 'status', header: 'Status', render: (auction) => <StatusBadge status={auction.status} /> },
-      { key: 'createdBy', header: 'Created By', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.createdBy}</span> },
-      { key: 'createdAt', header: 'Created At', render: (auction) => <span className="text-sm text-[#0F172A]">{formatDateTime(auction.createdAt)}</span> },
-      { key: 'start', header: 'Auction Start Time', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.startAt ? formatDateTime(auction.startAt) : '-'}</span> },
-      { key: 'lanes', header: 'Lanes', align: 'right', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.lanes.length}</span> },
-      {
-        key: 'action',
-        header: 'Action',
-        align: 'right',
-        render: (auction) => (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(event) => {
-                event.stopPropagation()
-                navigate(`/auction/auctions/${auction.id}`)
-              }}
-            >
-              {auction.status === 'LIVE' ? 'Enter' : 'View'}
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    [navigate]
-  )
+      return matchesStatus && matchesType && matchesSearch
+    })
+  }, [auctions, search, statusFilter, typeFilter])
 
   return (
     <div>
@@ -111,52 +50,103 @@ export default function AuctionsPage() {
       />
 
       <Card className="mb-6">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle>Auction Queue</CardTitle>
+        <CardHeader className="gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <CardTitle>Auction Queue</CardTitle>
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
             <Input
               value={search}
-              onChange={(event) => {
-                setSearch(event.target.value)
-                setPage(1)
-              }}
-              placeholder="Search by auction ID, title, or creator"
-              className="w-full lg:w-[320px]"
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by auction ID, title, or type"
+              className="w-full xl:w-[280px]"
             />
-          </div>
-          <div className="flex w-fit gap-1 overflow-x-auto border-b border-gray-200">
-            {AUCTION_TABS.map((tab) => (
-              <Button
-                key={tab}
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-bold transition-all ${
-                  activeTab === tab ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-primary'
-                }`}
-                onClick={() => {
-                  setSearchParams({ tab })
-                  setPage(1)
-                }}
-              >
-                {TAB_LABELS[tab]}
-              </Button>
-            ))}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#64748B]">Auction State</label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value as (typeof STATUS_FILTERS)[number])}
+                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                >
+                  {STATUS_FILTERS.map((filter) => (
+                    <option key={filter} value={filter}>
+                      {filter === 'ALL' ? 'All States' : filter.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-[#64748B]">Auction Type</label>
+                <select
+                  value={typeFilter}
+                  onChange={(event) => setTypeFilter(event.target.value as (typeof TYPE_FILTERS)[number])}
+                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                >
+                  {TYPE_FILTERS.map((filter) => (
+                    <option key={filter} value={filter}>
+                      {filter === 'ALL' ? 'All Types' : filter}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">Loading auctions…</div>
-          ) : (
-            <DataTable
-              rows={filteredAuctions}
-              columns={columns}
-              getRowKey={(auction) => auction.id}
-              page={page}
-              onPageChange={setPage}
-              pageSize={PAGE_SIZE}
-              emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No auctions match the current filters.</div>}
-            />
+        <CardContent className="space-y-3">
+          {filteredAuctions.map((auction) => (
+            <button
+              key={auction.id}
+              onClick={() => navigate(`/auction/auctions/${auction.id}`)}
+              className="grid w-full gap-3 rounded-xl border border-[#E5E7EB] p-4 text-left transition hover:bg-[#F8FAFC] lg:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr_0.6fr_auto]"
+            >
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-semibold text-[#0F172A]">{auction.id}</span>
+                  <StatusBadge status={auction.status} />
+                </div>
+                <p className="mt-2 text-sm font-medium text-[#0F172A]">{auction.title}</p>
+                <p className="mt-1 text-xs text-[#64748B]">{auction.type} · {auction.lanes.length} lanes</p>
+                {auction.status === 'COMPLETED' && (
+                  <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">
+                    Pending Award: {auction.type === 'SPOT' ? 'confirm R1 winner' : 'select allocations, then Final Award'}
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Created</p>
+                <p className="mt-1 text-sm text-[#0F172A]">{formatDateTime(auction.createdAt)}</p>
+                <p className="mt-1 text-xs text-[#64748B]">{auction.createdBy}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Contract Window</p>
+                <p className="mt-1 text-sm text-[#0F172A]">{auction.contractStartDate ?? 'Spot'}</p>
+                <p className="mt-1 text-xs text-[#64748B]">{auction.contractEndDate ?? 'Single booking'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award SLA</p>
+                <div className="mt-1">
+                  {(auction.status === 'LIVE' || auction.status === 'COMPLETED') ? (
+                    <SLACountdown deadline={auction.awardDeadline} />
+                  ) : (
+                    <span className="text-sm text-[#64748B]">Not active</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Vendors</p>
+                <p className="mt-1 text-sm text-[#0F172A]">{auction.invitedVendorIds.length}</p>
+              </div>
+              <div className="flex items-center justify-end">
+                <span className="inline-flex items-center gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2 text-sm text-[#0F172A]">
+                  <Eye className="h-4 w-4" />
+                  Open
+                </span>
+              </div>
+            </button>
+          ))}
+          {filteredAuctions.length === 0 && (
+            <div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">
+              No auctions match the current filters.
+            </div>
           )}
         </CardContent>
       </Card>

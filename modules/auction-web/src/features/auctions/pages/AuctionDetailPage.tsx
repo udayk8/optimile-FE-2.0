@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
@@ -9,19 +9,9 @@ import { Input } from '@auction/components/ui/input'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { SLACountdown } from '@auction/components/shared/SLACountdown'
+import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { formatDateTime } from '@auction/lib/date-utils'
-import {
-  fetchAuction,
-  fetchBooking,
-  launchAuction,
-  cancelAuction,
-  completeAuction,
-  awardAuction,
-  finalizeAuction,
-  rejectAuction,
-} from '@auction/lib/mock-services'
-import { fetchContracts } from '@auction/lib/mock-services'
-import type { Auction, BookingReference, Contract } from '@auction/types'
+import { useAppStore } from '@auction/stores/app.store'
 
 const TABS = ['overview', 'lanes', 'ranking', 'award'] as const
 
@@ -31,74 +21,44 @@ type AwardModalState =
 
 export default function AuctionDetailPage() {
   const { id } = useParams()
-  const [auction, setAuction] = useState<Auction | null>(null)
-  const [booking, setBooking] = useState<BookingReference | null>(null)
-  const [linkedContracts, setLinkedContracts] = useState<Contract[]>([])
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const { auctions, contracts, launchAuction, cancelAuction, awardSpotAuction, finalizeLaneAward } = useAppStore()
+  const { auctionUser } = useAuctionAuth()
+  const auction = auctions.find((item) => item.id === id)
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('overview')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('Configuration issue found after internal review.')
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [rejectReason, setRejectReason] = useState('No valid bids were received for this auction.')
-  const [awardSelection, setAwardSelection] = useState<Record<string, { L1?: 'L1' | 'L2' | 'L3'; L2?: 'L1' | 'L2' | 'L3'; L3?: 'L1' | 'L2' | 'L3' }>>({})
+  const [awardSelection, setAwardSelection] = useState<Record<string, { R1?: 'R1' | 'R2' | 'R3'; R2?: 'R1' | 'R2' | 'R3'; R3?: 'R1' | 'R2' | 'R3' }>>({})
   const [awardModal, setAwardModal] = useState<AwardModalState | null>(null)
-  const [awardModalBidRank, setAwardModalBidRank] = useState<'L1' | 'L2' | 'L3'>('L1')
+  const [awardModalBidRank, setAwardModalBidRank] = useState<'R1' | 'R2' | 'R3'>('R1')
   const [awardModalReason, setAwardModalReason] = useState('')
 
-  const loadAuction = async () => {
-    if (!id) return
-    try {
-      const data = await fetchAuction(id)
-      setAuction(data)
-      if (data.bookingId) {
-        try {
-          setBooking(await fetchBooking(data.bookingId))
-        } catch {
-          setBooking(null)
-        }
-      } else {
-        setBooking(null)
-      }
-    } catch {
-      setAuction(null)
-      setBooking(null)
-    }
+  const linkedContracts = useMemo(
+    () => contracts.filter((item) => item.sourceAuctionId === auction?.id),
+    [auction?.id, contracts]
+  )
+
+  if (!auction) {
+    return <div className="rounded-xl border border-[#E5E7EB] bg-white p-8 text-sm text-[#64748B]">Auction not found.</div>
   }
 
-  const loadContracts = async () => {
-    if (!id) return
-    try {
-      const all = await fetchContracts()
-      setLinkedContracts(all.filter((c) => c.sourceAuctionId === id))
-    } catch {
-      setLinkedContracts([])
-    }
-  }
+  const actor = auctionUser?.name ?? 'Demo User'
+  const spotLane = auction.lanes[0]
+  const rankOrder = { R1: 0, R2: 1, R3: 2 } as const
 
-  useEffect(() => {
-    setLoading(true)
-    Promise.all([loadAuction(), loadContracts()]).finally(() => setLoading(false))
-  }, [id])
-
-  const spotLane = auction?.lanes[0]
-  const rankOrder = { L1: 0, L2: 1, L3: 2 } as const
-  const hasAnyBids = auction?.lanes.some((lane) => lane.ranking.length > 0) ?? false
-
-  const getDefaultSelection = (laneId: string, rank: 'L1' | 'L2' | 'L3') => {
+  const getDefaultSelection = (laneId: string, rank: 'R1' | 'R2' | 'R3') => {
     const selected = awardSelection[laneId]?.[rank]
     if (selected) return selected
     return rank
   }
 
   const getLaneSelectionRows = (laneId: string) => {
-    const lane = auction?.lanes.find((item) => item.id === laneId)
+    const lane = auction.lanes.find((item) => item.id === laneId)
     if (!lane) return []
 
     return [
-      { rank: 'L1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.l1 },
-      { rank: 'L2' as const, allocation: lane.allocation.l2 },
-      { rank: 'L3' as const, allocation: lane.allocation.l3 },
+      { rank: 'R1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.r1 },
+      { rank: 'R2' as const, allocation: lane.allocation.r2 },
+      { rank: 'R3' as const, allocation: lane.allocation.r3 },
     ]
       .filter((entry) => entry.allocation > 0)
       .map((entry) => {
@@ -108,162 +68,54 @@ export default function AuctionDetailPage() {
           allocationRank: entry.rank,
           bidRank,
           allocationPercent: entry.allocation,
-          vendorId: bid?.vendorId,
           vendorName: bid?.vendorName ?? 'Unassigned',
-          awardedAmount: bid?.amount,
           isOverride: bidRank !== entry.rank,
         }
       })
   }
 
-  const openAwardModal = (target: AwardModalState, defaultBidRank: 'L1' | 'L2' | 'L3') => {
+  const openAwardModal = (target: AwardModalState, defaultBidRank: 'R1' | 'R2' | 'R3') => {
     setAwardModal(target)
     setAwardModalBidRank(defaultBidRank)
     setAwardModalReason('')
   }
 
-  const handleLaunch = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await launchAuction(auction.id)
-      setAuction(updated)
-      toast.success('Draft launched.')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to launch auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleCancel = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await cancelAuction(auction.id, cancelReason)
-      setAuction(updated)
-      toast.success('Auction cancelled.')
-      setCancelOpen(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to cancel auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleComplete = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await completeAuction(auction.id)
-      setAuction(updated)
-      toast.success('Auction completed.')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to complete auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReject = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await rejectAuction(auction.id, rejectReason)
-      setAuction(updated)
-      toast.success('Auction marked as no bids.')
-      setRejectOpen(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to reject auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const confirmAward = async () => {
-    if (!awardModal || !auction) return
+  const confirmAward = () => {
+    if (!awardModal) return
 
     if (awardModal.scope === 'SPOT') {
       if (!spotLane) return
-      if (awardModalBidRank !== 'L1' && !awardModalReason.trim()) {
-        toast.error('A reason is required when awarding away from L1.')
+      if (awardModalBidRank !== 'R1' && !awardModalReason.trim()) {
+        toast.error('A reason is required when awarding away from R1.')
         return
       }
-      setSaving(true)
-      try {
-        const selectedBid = spotLane.ranking[rankOrder[awardModalBidRank]]
-        if (!selectedBid) {
-          toast.error('Selected bid is not available.')
-          return
-        }
-        const decisions = [{
-          laneId: spotLane.id,
-          vendorId: selectedBid.vendorId,
-          vendorName: selectedBid.vendorName,
-          allocationRank: 'L1',
-          awardedBidRank: awardModalBidRank,
-          awardedAmount: selectedBid.amount,
-          allocationPercent: 100,
-          overrideReason: awardModalBidRank !== 'L1' ? awardModalReason.trim() : undefined,
-        }]
-        await awardAuction(auction.id, decisions)
-        await finalizeAuction(auction.id)
-        const updated = await fetchAuction(auction.id)
-        setAuction(updated)
-        await loadContracts()
-        toast.success(`Spot awarded to ${awardModalBidRank}.`)
-        setAwardModal(null)
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Failed to award auction.')
-      } finally {
-        setSaving(false)
-      }
+      awardSpotAuction(auction.id, actor, awardModalBidRank)
+      toast.success(`Spot awarded to ${awardModalBidRank}.`)
+      setAwardModal(null)
       return
     }
 
     const laneSelections = getLaneSelectionRows(awardModal.laneId)
-    if (laneSelections.some((entry) => !entry.vendorId || entry.awardedAmount == null)) {
-      toast.error('Every allocation needs a selected bid before award.')
-      return
-    }
     if (laneSelections.some((entry) => entry.isOverride) && !awardModalReason.trim()) {
       toast.error('A reason is required when awarding away from the selected rank.')
       return
     }
 
-    setSaving(true)
-    try {
-      const decisions = laneSelections.map((entry) => ({
-        laneId: awardModal.laneId,
-        vendorId: entry.vendorId,
-        vendorName: entry.vendorName,
-        allocationRank: entry.allocationRank,
-        awardedBidRank: entry.bidRank,
-        awardedAmount: entry.awardedAmount,
-        allocationPercent: entry.allocationPercent,
-        overrideReason: entry.isOverride ? awardModalReason.trim() || undefined : undefined,
-      }))
-      await awardAuction(auction.id, decisions)
-      await finalizeAuction(auction.id)
-      const updated = await fetchAuction(auction.id)
-      setAuction(updated)
-      // refresh contracts after finalize
-      await loadContracts()
-      toast.success(`Lane ${awardModal.laneId} awarded.`)
-      setAwardModal(null)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to award lane.')
-    } finally {
-      setSaving(false)
-    }
+    finalizeLaneAward(
+      auction.id,
+      awardModal.laneId,
+      laneSelections.map((entry) => ({ allocationRank: entry.allocationRank, bidRank: entry.bidRank })),
+      actor,
+      laneSelections.some((entry) => entry.isOverride) ? awardModalReason.trim() || undefined : undefined
+    )
+    toast.success(`Lane ${awardModal.laneId} awarded.`)
+    setAwardModal(null)
   }
 
-  if (loading) {
-    return <div className="rounded-xl border border-[#E5E7EB] bg-white p-8 text-sm text-[#64748B]">Loading auction…</div>
-  }
-
-  if (!auction) {
-    return <div className="rounded-xl border border-[#E5E7EB] bg-white p-8 text-sm text-[#64748B]">Auction not found.</div>
+  const handleCancel = () => {
+    cancelAuction(auction.id, actor, cancelReason)
+    toast.success('Auction cancelled in mock state.')
+    setCancelOpen(false)
   }
 
   return (
@@ -275,23 +127,9 @@ export default function AuctionDetailPage() {
         action={
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={auction.status} />
-            {auction.status === 'DRAFT' && (
-              <Button disabled={saving} onClick={handleLaunch}>
-                {saving ? 'Launching…' : 'Launch'}
-              </Button>
-            )}
-            {auction.status === 'LIVE' && (
-              <Button disabled={saving} onClick={handleComplete}>
-                {saving ? 'Completing...' : 'Complete'}
-              </Button>
-            )}
-            {(auction.status === 'LIVE' || auction.status === 'COMPLETED') && !hasAnyBids && (
-              <Button variant="outline" disabled={saving} onClick={() => setRejectOpen(true)}>
-                No Bids
-              </Button>
-            )}
+            {auction.status === 'DRAFT' && <Button onClick={() => { launchAuction(auction.id, actor); toast.success('Draft launched.'); }}>Launch</Button>}
             {(auction.status === 'DRAFT' || auction.status === 'LIVE' || auction.status === 'COMPLETED') && (
-              <Button variant="destructive" disabled={saving} onClick={() => setCancelOpen(true)}>Cancel</Button>
+              <Button variant="destructive" onClick={() => setCancelOpen(true)}>Cancel</Button>
             )}
           </div>
         }
@@ -322,13 +160,6 @@ export default function AuctionDetailPage() {
                 <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Created</p>
                 <p className="mt-2 text-sm text-[#0F172A]">{formatDateTime(auction.createdAt)}</p>
               </div>
-              {booking && (
-                <div className="rounded-xl border border-[#E5E7EB] p-4">
-                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Booking</p>
-                  <p className="mt-2 text-sm font-semibold text-[#0F172A]">{booking.id}</p>
-                  <p className="mt-1 text-xs text-[#64748B]">{booking.commodity} - {booking.quantity} {booking.uom}</p>
-                </div>
-              )}
               <div className="rounded-xl border border-[#E5E7EB] p-4">
                 <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award deadline</p>
                 <div className="mt-2">{(auction.status === 'LIVE' || auction.status === 'COMPLETED') ? <SLACountdown deadline={auction.awardDeadline} /> : <span className="text-sm text-[#64748B]">Not active</span>}</div>
@@ -344,10 +175,10 @@ export default function AuctionDetailPage() {
                 <p className="text-xs uppercase tracking-wide text-[#B45309]">Pending Award</p>
                 <p className="mt-2 text-sm text-[#78350F]">
                   {auction.type === 'SPOT'
-                    ? 'Spot: confirm the selected winning rank in the award modal. L1 is the current top bidder.'
+                    ? 'Spot: confirm the selected winning rank in the award modal. R1 is the current top bidder.'
                     : auction.type === 'BULK'
-                      ? 'Bulk: single-lane auction with one winner. Click Final Award to confirm the winning vendor.'
-                      : 'Lot: select the allocation mappings (L1/L2/L3) for each lane first, then click Final Award to confirm the lane.'}
+                      ? 'Bulk: select the allocation mappings for each lane first, then click Final Award to confirm the lane.'
+                      : 'Lot: select the allocation mappings for each lane first, then click Final Award to confirm the lane.'}
                 </p>
               </div>
             </CardContent>
@@ -360,7 +191,9 @@ export default function AuctionDetailPage() {
             <CardContent className="space-y-3">
               {linkedContracts.length === 0 && (
                 <p className="text-sm text-[#64748B]">
-                  No contracts linked yet. Award the auction to generate contract records.
+                  {auction.type === 'SPOT'
+                    ? 'Spot awards do not create contracts.'
+                    : 'No contracts linked yet. Award the auction to generate contract records.'}
                 </p>
               )}
               {linkedContracts.map((contract) => (
@@ -427,7 +260,7 @@ export default function AuctionDetailPage() {
                 {lane.ranking.map((bid) => (
                   <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] p-4">
                     <div>
-                      <p className="text-sm font-semibold text-[#0F172A]">L{bid.rank} · {bid.vendorName}</p>
+                      <p className="text-sm font-semibold text-[#0F172A]">R{bid.rank} · {bid.vendorName}</p>
                       <p className="mt-1 text-xs text-[#64748B]">{formatDateTime(bid.timestamp)}</p>
                     </div>
                     <CurrencyDisplay amount={bid.amount} className="text-base" />
@@ -447,12 +280,12 @@ export default function AuctionDetailPage() {
                 <CardTitle>Spot Award</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-[#475569]">Confirm any ranked bidder for the spot auction. Finalizing the award creates the linked contract record.</p>
+                <p className="text-sm text-[#475569]">Spot awards stay inside Auctions. Procurement can confirm any ranked bidder, and the selected winner will be shown in the award record. No contract is created.</p>
                 <Button
                   disabled={auction.status !== 'COMPLETED' || spotLane?.ranking.length === 0}
                   onClick={() => {
                     if (!spotLane) return
-                    openAwardModal({ scope: 'SPOT', laneId: spotLane.id }, 'L1')
+                    openAwardModal({ scope: 'SPOT', laneId: spotLane.id }, 'R1')
                   }}
                 >
                   Award Spot
@@ -478,7 +311,7 @@ export default function AuctionDetailPage() {
                       {lane.ranking.map((bid) => (
                         <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] p-4">
                           <div>
-                            <p className="text-sm font-semibold text-[#0F172A]">L{bid.rank} · {bid.vendorName}</p>
+                            <p className="text-sm font-semibold text-[#0F172A]">R{bid.rank} · {bid.vendorName}</p>
                             <p className="mt-1 text-xs text-[#64748B]">{formatDateTime(bid.timestamp)}</p>
                           </div>
                           <CurrencyDisplay amount={bid.amount} className="text-base" />
@@ -488,12 +321,12 @@ export default function AuctionDetailPage() {
 
                     <div className="rounded-xl border border-[#E5E7EB] p-4">
                       <p className="text-sm font-semibold text-[#0F172A]">Award Selection</p>
-                      <p className="mt-1 text-xs text-[#64748B]">L1, L2, and L3 are the allocation ranks used across auctions, awards, and contracts.</p>
+                      <p className="mt-1 text-xs text-[#64748B]">R1, R2, and R3 are the auction ranks used across auctions, awards, and contracts.</p>
                       <div className="mt-4 grid gap-4 md:grid-cols-3">
                         {([
-                          { rank: 'L1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.l1 },
-                          { rank: 'L2' as const, allocation: lane.allocation.l2 },
-                          { rank: 'L3' as const, allocation: lane.allocation.l3 },
+                          { rank: 'R1' as const, allocation: lane.allocationMode === 'SINGLE' ? 100 : lane.allocation.r1 },
+                          { rank: 'R2' as const, allocation: lane.allocation.r2 },
+                          { rank: 'R3' as const, allocation: lane.allocation.r3 },
                         ]
                           .filter((entry) => entry.allocation > 0)
                           .map((entry) => (
@@ -503,7 +336,7 @@ export default function AuctionDetailPage() {
                               <select
                                 value={getDefaultSelection(lane.id, entry.rank)}
                                 onChange={(event) => {
-                                  const value = event.target.value as 'L1' | 'L2' | 'L3'
+                                  const value = event.target.value as 'R1' | 'R2' | 'R3'
                                   setAwardSelection((current) => ({
                                     ...current,
                                     [lane.id]: {
@@ -515,8 +348,8 @@ export default function AuctionDetailPage() {
                                 className="mt-3 flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                               >
                                 {lane.ranking.map((bid) => (
-                                  <option key={`${lane.id}-${entry.rank}-${bid.rank}`} value={`L${bid.rank}`}>
-                                    {`L${bid.rank}`} - {bid.vendorName}
+                                  <option key={`${lane.id}-${entry.rank}-${bid.rank}`} value={`R${bid.rank}`}>
+                                    {`R${bid.rank}`} - {bid.vendorName}
                                   </option>
                                 ))}
                               </select>
@@ -527,8 +360,8 @@ export default function AuctionDetailPage() {
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <p className="text-xs text-[#64748B]">Pick the bidder for each allocation rank, then finalize the lane award.</p>
                         <Button
-                          disabled={saving || auction.status !== 'COMPLETED' || lane.awardDecision !== undefined || lane.ranking.length === 0}
-                          onClick={() => openAwardModal({ scope: 'LANE', laneId: lane.id }, 'L1')}
+                          disabled={auction.status !== 'COMPLETED' || lane.awardDecision !== undefined || lane.ranking.length === 0}
+                          onClick={() => openAwardModal({ scope: 'LANE', laneId: lane.id }, 'R1')}
                         >
                           Final Award
                         </Button>
@@ -565,25 +398,7 @@ export default function AuctionDetailPage() {
           <Input value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelOpen(false)}>Back</Button>
-            <Button variant="destructive" disabled={saving} onClick={handleCancel}>
-              {saving ? 'Cancelling…' : 'Confirm Cancel'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark No Bids</DialogTitle>
-            <DialogDescription>This closes the auction without creating award decisions or contracts.</DialogDescription>
-          </DialogHeader>
-          <Input value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>Back</Button>
-            <Button variant="destructive" disabled={saving} onClick={handleReject}>
-              {saving ? 'Saving...' : 'Confirm No Bids'}
-            </Button>
+            <Button variant="destructive" onClick={handleCancel}>Confirm Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -605,10 +420,10 @@ export default function AuctionDetailPage() {
                   {awardModal.scope === 'SPOT' ? spotLane?.lane : auction.lanes.find((lane) => lane.id === awardModal.laneId)?.lane}
                 </p>
                 {awardModal.scope === 'SPOT' && spotLane && (
-                  <p className="mt-1 text-xs text-[#64748B]">Spot ranks are shown in bid order. L1 is the current top bidder.</p>
+                  <p className="mt-1 text-xs text-[#64748B]">Spot ranks are shown in bid order. R1 is the current top bidder.</p>
                 )}
                 {awardModal.scope === 'LANE' && (
-                  <p className="mt-1 text-xs text-[#64748B]">L1, L2, and L3 are the allocation ranks used across auctions, awards, and contracts.</p>
+                  <p className="mt-1 text-xs text-[#64748B]">R1, R2, and R3 are the auction ranks used across auctions, awards, and contracts.</p>
                 )}
               </div>
 
@@ -617,22 +432,22 @@ export default function AuctionDetailPage() {
                   <label className="mb-1 block text-sm font-medium text-[#334155]">Award To</label>
                   <select
                     value={awardModalBidRank}
-                    onChange={(event) => setAwardModalBidRank(event.target.value as 'L1' | 'L2' | 'L3')}
+                    onChange={(event) => setAwardModalBidRank(event.target.value as 'R1' | 'R2' | 'R3')}
                     className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                   >
                     {(spotLane?.ranking ?? []).map((bid) => (
-                      <option key={`${awardModal.laneId}-${bid.rank}`} value={`L${bid.rank}`}>
-                        {`L${bid.rank}`} - {bid.vendorName}
+                      <option key={`${awardModal.laneId}-${bid.rank}`} value={`R${bid.rank}`}>
+                        {`R${bid.rank}`} - {bid.vendorName}
                       </option>
                     ))}
                   </select>
-                  {awardModalBidRank !== 'L1' && (
+                  {awardModalBidRank !== 'R1' && (
                     <div className="mt-4">
                       <label className="mb-1 block text-sm font-medium text-[#334155]">Reason</label>
                       <Input
                         value={awardModalReason}
                         onChange={(event) => setAwardModalReason(event.target.value)}
-                        placeholder="Required when awarding away from L1"
+                        placeholder="Required when awarding away from R1"
                       />
                     </div>
                   )}
@@ -663,9 +478,7 @@ export default function AuctionDetailPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setAwardModal(null)}>Cancel</Button>
-            <Button disabled={saving} onClick={confirmAward}>
-              {saving ? 'Confirming…' : 'Confirm Award'}
-            </Button>
+            <Button onClick={confirmAward}>Confirm Award</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

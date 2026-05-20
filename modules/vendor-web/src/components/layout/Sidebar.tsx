@@ -5,14 +5,11 @@ import {
   FileText,
   Truck,
   Ship,
-  CreditCard,
+  Receipt,
+  ReceiptText,
   User,
   ChevronLeft,
   ChevronRight,
-  Wallet,
-  ReceiptText,
-  ShieldAlert,
-  Banknote,
 } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
@@ -21,13 +18,10 @@ const NAV_ITEMS = [
   { path: '/vendor', label: 'Home', subtitle: 'Executive overview', icon: Home },
   { path: '/vendor/sourcing', label: 'Sourcing', subtitle: 'Auctions and bids', icon: Search },
   { path: '/vendor/contracts', label: 'Contracts', subtitle: 'Active agreements', icon: FileText },
-  { path: '/vendor/bookings', label: 'Bookings', subtitle: 'Indents and deliveries', icon: Truck },
+  { path: '/vendor/trips', label: 'Trips', subtitle: 'Indents and deliveries', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', subtitle: 'Vehicles and drivers', icon: Ship },
-  { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Create and track bills', icon: CreditCard },
-  { path: '/vendor/receivables', label: 'Bill Discounting', subtitle: 'Invoice and NBFC tracking', icon: Banknote },
-  { path: '/vendor/record-payments', label: 'Record Payments', subtitle: 'Post settlements and TDS', icon: ReceiptText },
-  { path: '/vendor/ledger', label: 'Ledger', subtitle: 'Read-only reconciliation trail', icon: Wallet },
-  { path: '/vendor/exceptions', label: 'Exceptions', subtitle: 'Incidents and breakdowns', icon: ShieldAlert },
+  { path: '/vendor/expenses', label: 'Expenses', subtitle: 'Trip-linked costs', icon: Receipt },
+  { path: '/vendor/invoices', label: 'Invoices', subtitle: 'Billing and payments', icon: ReceiptText },
   { path: '/vendor/profile', label: 'Profile', subtitle: 'Company settings', icon: User },
 ]
 
@@ -75,14 +69,10 @@ export function Sidebar() {
               )}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <div className="relative shrink-0">
-                <Icon className={cn('h-[18px] w-[18px]', isActive ? 'text-primary' : 'text-gray-400')} />
-              </div>
+              <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-primary' : 'text-gray-400')} />
               {!sidebarCollapsed && (
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="truncate leading-tight">{item.label}</span>
-                  </div>
+                <div className="min-w-0">
+                  <div className="truncate leading-tight">{item.label}</div>
                   <div className={cn('mt-0.5 truncate text-[11px] leading-tight', isActive ? 'text-primary/70' : 'text-gray-500')}>
                     {item.subtitle}
                   </div>

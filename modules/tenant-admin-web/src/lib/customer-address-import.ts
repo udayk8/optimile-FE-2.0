@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import type {
   AddressImportResult,
   AddressImportRow,
@@ -182,7 +182,14 @@ function parseStructuredRows(rows: AddressSpreadsheetRow[]): AddressImportResult
   return result;
 }
 
-function parseAddressWorksheet(rows: unknown[][]): AddressImportResult {
+function parseAddressWorksheet(worksheet: XLSX.WorkSheet): AddressImportResult {
+  const rows = XLSX.utils.sheet_to_json<(string | number | Date)[]>(worksheet, {
+    header: 1,
+    blankrows: false,
+    defval: "",
+    raw: false,
+  });
+
   if (!rows.length) {
     return { validRows: [], invalidRows: [] };
   }
@@ -229,6 +236,11 @@ function parseAddressWorksheet(rows: unknown[][]): AddressImportResult {
 export async function parseCustomerAddressFile(file: File): Promise<AddressImportResult> {
   const extension = file.name.split(".").pop()?.toLowerCase();
   const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+  if (!workbook.SheetNames.length) {
+    return { validRows: [], invalidRows: [] };
+  }
+
   if (extension !== "csv" && extension !== "xlsx") {
     return {
       validRows: [],
@@ -256,37 +268,14 @@ export async function parseCustomerAddressFile(file: File): Promise<AddressImpor
     };
   }
 
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(arrayBuffer);
-  const worksheet = workbook.worksheets[0];
-  if (!worksheet) {
-    return { validRows: [], invalidRows: [] };
-  }
-
-  const rows: unknown[][] = [];
-  worksheet.eachRow({ includeEmpty: true }, (row) => {
-    rows.push((row.values as unknown[]).slice(1));
-  });
-
-  return parseAddressWorksheet(rows);
+  return parseAddressWorksheet(workbook.Sheets[workbook.SheetNames[0]]);
 }
 
-export async function downloadCustomerAddressTemplateWorkbook() {
-  const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet("Customer Addresses");
-  worksheet.addRow([...addressTemplateColumns]);
-  customerAddressTemplateRows.forEach((row) => {
-    worksheet.addRow(addressTemplateColumns.map((column) => row[column] ?? ""));
+export function downloadCustomerAddressTemplateWorkbook() {
+  const worksheet = XLSX.utils.json_to_sheet(customerAddressTemplateRows, {
+    header: [...addressTemplateColumns],
   });
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "customer-address-template.xlsx";
-  anchor.click();
-  URL.revokeObjectURL(url);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Customer Addresses");
+  XLSX.writeFile(workbook, "customer-address-template.xlsx");
 }

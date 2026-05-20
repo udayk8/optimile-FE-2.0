@@ -1,23 +1,27 @@
-import type { ReactNode } from "react";
+import { cn } from "../../lib/utils";
 
-export function Tabs<T extends string>({
-  value,
-  options,
+export function Tabs({
+  tabs,
+  active,
   onChange,
 }: {
-  value: T;
-  options: { value: T; label: ReactNode }[];
-  onChange: (value: T) => void;
+  tabs: string[];
+  active: string;
+  onChange: (tab: string) => void;
 }) {
   return (
-    <div className="tabs">
-      {options.map((option) => (
+    <div className="inline-flex rounded-2xl border bg-card p-1">
+      {tabs.map((tab) => (
         <button
-          key={option.value}
-          className={`tab ${option.value === value ? "tab-active" : ""}`}
-          onClick={() => onChange(option.value)}
+          key={tab}
+          type="button"
+          onClick={() => onChange(tab)}
+          className={cn(
+            "rounded-xl px-4 py-2 text-sm font-medium transition",
+            active === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+          )}
         >
-          {option.label}
+          {tab}
         </button>
       ))}
     </div>

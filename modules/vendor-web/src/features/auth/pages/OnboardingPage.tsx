@@ -42,7 +42,7 @@ export default function OnboardingPage() {
 
   const finish = () => {
     completeOnboarding()
-    navigate('/vendor', { replace: true })
+    navigate('/vendor/profile/company')
   }
 
   return (

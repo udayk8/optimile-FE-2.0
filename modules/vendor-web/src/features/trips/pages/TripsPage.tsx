@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
+import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
@@ -8,566 +9,231 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
-import { Truck, MapPin, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
+import { Truck, ArrowRight, MapPin, Package, User, CheckCircle, XCircle } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
+import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
-import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
-import type { Trip } from '@vendor/types'
 
-type BookingsTab =
-  | 'pending-allocation'
-  | 'assignment'
-  | 'in-transit'
-  | 'pending-pod'
-  | 'completed'
-  | 'exception'
-  | 'cancelled'
-  | 'rejected'
+type TripsTab = 'indents' | 'active' | 'completed' | 'penalties'
 
-const BOOKING_TABS: BookingsTab[] = [
-  'pending-allocation',
-  'assignment',
-  'in-transit',
-  'pending-pod',
-  'completed',
-  'exception',
-  'cancelled',
-  'rejected',
-]
+const TRIPS_TABS: TripsTab[] = ['indents', 'active', 'completed', 'penalties']
 
-const ASSIGNMENT_STATES = new Set<Trip['status']>([
-  'ACCEPTED',
-  'ASSIGNED',
-  'OUT_FOR_PICKUP',
-  'PICKUP_REACHED',
-  'LOADING_STARTED',
-  'LOADING_COMPLETED',
-])
-
-const IN_TRANSIT_STATES = new Set<Trip['status']>(['IN_TRANSIT', 'DESTINATION_REACHED'])
-
-const REASON_LABEL: Record<string, string> = {
-  VEHICLE_BREAKDOWN: 'Vehicle Breakdown',
-  DRIVER_BREAKDOWN: 'Driver Breakdown',
-  VEHICLE_OR_DRIVER_BREAKDOWN: 'Vehicle / Driver Breakdown',
-}
-
-function getBookingsTab(pathname: string, search: string): BookingsTab {
+function getTripsTab(pathname: string, search: string): TripsTab {
   const pathTab = pathname.split('/')[2]
-  if (BOOKING_TABS.includes(pathTab as BookingsTab)) return pathTab as BookingsTab
+  if (TRIPS_TABS.includes(pathTab as TripsTab)) return pathTab as TripsTab
 
   const searchTab = new URLSearchParams(search).get('tab')
-  return BOOKING_TABS.includes(searchTab as BookingsTab) ? (searchTab as BookingsTab) : 'pending-allocation'
-}
-
-function BookingCard({ title, count, active, onClick }: { title: string; count: number; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${
-        active ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'
-      }`}
-    >
-      {title}
-      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs text-primary">{count}</span>
-    </button>
-  )
+  return TRIPS_TABS.includes(searchTab as TripsTab) ? (searchTab as TripsTab) : 'indents'
 }
 
 export default function TripsPage() {
   const location = useLocation()
   const navigate = useNavigate()
-  const activeTab = getBookingsTab(location.pathname, location.search)
-
-  const { indents, trips, declineIndent, acceptIndent } = useAppStore()
-  const [assignTripId, setAssignTripId] = useState<string | null>(null)
+  const activeTab = getTripsTab(location.pathname, location.search)
+  
+  const { indents, trips, declineIndent } = useAppStore()
+  
+  const [selectedIndentId, setSelectedIndentId] = useState<string | null>(null)
+  const [selectedTripForExpense, setSelectedTripForExpense] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
-  const [reassignTripId, setReassignTripId] = useState<string | null>(null)
 
-  const pendingAllocation = indents.filter((indent) => indent.status === 'PENDING')
+  const pendingIndents = indents.filter((i) => i.status === 'PENDING')
+  const activeTrips = trips.filter((t) => t.status !== 'DELIVERED')
+  const completedTrips = trips.filter((t) => t.status === 'DELIVERED')
+  const declinedIndents = indents.filter((i) => i.status === 'DECLINED')
 
-  const exceptionBookings = trips.filter((trip) => trip.exceptionFlag === true)
-  const exceptionTripIds = new Set(exceptionBookings.map((t) => t.id))
-
-  const assignmentBookings = trips.filter((trip) =>
-    ASSIGNMENT_STATES.has(trip.status) && !exceptionTripIds.has(trip.id)
-  )
-  const inTransitBookings = trips.filter((trip) =>
-    IN_TRANSIT_STATES.has(trip.status) && !exceptionTripIds.has(trip.id)
-  )
-  const pendingPodBookings = trips.filter((trip) => trip.status === 'POD_PENDING')
-  const completedBookings = trips.filter((trip) => trip.status === 'COMPLETED')
-  const cancelledTripBookings = trips.filter((trip) => trip.status === 'CANCELLED')
-  const cancelledBookings = cancelledTripBookings.map((trip) => ({
-    id: trip.id,
-    route: `${trip.laneDetails.origin.city} → ${trip.laneDetails.destination.city}`,
-    stage: 'Post Dispatch',
-    cancelledBy: 'Vendor',
-    reason: 'Booking cancelled',
-    detailsPath: `/vendor/bookings/cancelled/${trip.id}`,
-  }))
-  const rejectedIndentBookings = indents.filter((indent) => indent.status === 'DECLINED')
-  const rejectedBookings = rejectedIndentBookings.map((indent) => ({
-    id: indent.id,
-    route: `${indent.laneDetails.origin.city} → ${indent.laneDetails.destination.city}`,
-    stage: 'Pending Transport Allocation',
-    rejectedBy: 'Vendor',
-    reason: indent.rejectionReason ?? 'Declined before allocation',
-    detailsPath: `/vendor/bookings/rejected/${indent.id}`,
-  }))
-
-  const tabs: { key: BookingsTab; label: string; count: number }[] = [
-    { key: 'pending-allocation', label: 'Pending Allocation', count: pendingAllocation.length },
-    { key: 'assignment', label: 'Assignment', count: assignmentBookings.length },
-    { key: 'in-transit', label: 'In Transit', count: inTransitBookings.length },
-    { key: 'pending-pod', label: 'Pending POD', count: pendingPodBookings.length },
-    { key: 'completed', label: 'Completed', count: completedBookings.length },
-    { key: 'exception', label: 'Exception', count: exceptionBookings.length },
-    { key: 'cancelled', label: 'Cancelled', count: cancelledBookings.length },
-    { key: 'rejected', label: 'Rejected', count: rejectedBookings.length },
+  const tabs: { key: TripsTab; label: string; count: number }[] = [
+    { key: 'indents', label: 'Indent Requests', count: pendingIndents.length },
+    { key: 'active', label: 'Active Trips', count: activeTrips.length },
+    { key: 'completed', label: 'Completed', count: completedTrips.length },
+    { key: 'penalties', label: 'Declined & Penalties', count: declinedIndents.length },
   ]
 
   return (
     <div>
-      <HeroCard
-        eyebrow="BOOKINGS"
-        title="Bookings"
-        subtitle="Manage booking requests, active bookings, delivery confirmation, and exceptions"
+      <HeroCard 
+        eyebrow="TRIPS & INDENTS"
+        title="Trips" 
+        subtitle="Manage your operational indents, active trips, and completed journeys"
         icon={<Truck className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mt-6 mb-6 flex items-center justify-between gap-4">
-        <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
-          {tabs.map((tab) => (
-            <BookingCard
-              key={tab.key}
-              title={tab.label}
-              count={tab.count}
-              active={activeTab === tab.key}
-              onClick={() => navigate(`/vendor/bookings?tab=${tab.key}`)}
-            />
-          ))}
-        </div>
+      <div className="mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+        {tabs.map((tab) => (
+          <button key={tab.key} onClick={() => navigate(`/vendor/trips?tab=${tab.key}`)}
+            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.key ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
+            {tab.label}
+            <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">{tab.count}</span>
+          </button>
+        ))}
       </div>
 
-      {activeTab === 'pending-allocation' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {pendingAllocation.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Package className="h-12 w-12" />} title="No bookings pending allocation" /></div>
+      {/* Indent Requests */}
+      {activeTab === 'indents' && (
+        <div className="space-y-4">
+          {pendingIndents.length === 0 ? (
+            <EmptyState icon={<Package className="h-12 w-12" />} title="No pending indents" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Load</th>
-                    <th className="px-5 py-3 font-bold">SLA</th>
-                    <th className="px-5 py-3 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {pendingAllocation.map((indent) => (
-                    <tr key={indent.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status={indent.status} label="Pending Allocation" /></td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{indent.id}</div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2 text-sm text-text">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {indent.laneDetails.origin.city} → {indent.laneDetails.destination.city}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">{formatDateTime(indent.reportingDateTime)}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{indent.loadDetails.commodity}, {indent.loadDetails.weightKg / 1000}T</td>
-                      <td className="px-5 py-4"><SLACountdown deadline={indent.slaDeadline} /></td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <Button size="sm" variant="success" onClick={() => { acceptIndent(indent.id); navigate('/vendor/bookings?tab=assignment') }}>
-                            <CheckCircle className="mr-1 h-3.5 w-3.5" /> Accept
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => setDeclineConfirmId(indent.id)}>
-                            <XCircle className="mr-1 h-3.5 w-3.5" /> Decline
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/new/${indent.id}`)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            pendingIndents.map((indent) => (
+              <Card key={indent.id} className="border-l-4 border-l-warning cursor-pointer hover:border-primary/40" onClick={() => navigate(`/vendor/trips/indents/${indent.id}`)}>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-sm font-semibold">{indent.id}</span>
+                        <StatusBadge status={indent.status} />
+                        <span className="text-xs text-muted-foreground">Contract: {indent.contractReference}</span>
+                      </div>
+                    </div>
+                    <SLACountdown deadline={indent.slaDeadline} />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm mb-4">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      {indent.laneDetails.origin.city} → {indent.laneDetails.destination.city}
+                    </div>
+                    <div><span className="text-muted-foreground">Load: </span>{indent.loadDetails.commodity}, {indent.loadDetails.weightKg / 1000}T</div>
+                    <div><span className="text-muted-foreground">Vehicle: </span>{indent.vehicleTypeRequired}</div>
+                    <div><span className="text-muted-foreground">Report by: </span>{formatDateTime(indent.reportingDateTime)}</div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button size="sm" variant="success" onClick={(e) => { e.stopPropagation(); setSelectedIndentId(indent.id) }}>
+                      <CheckCircle className="h-3.5 w-3.5 mr-1" /> Accept & Assign
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setDeclineConfirmId(indent.id) }}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" /> Decline
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); navigate(`/vendor/trips/indents/${indent.id}`) }}>
+                      View details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
           )}
         </div>
       )}
 
-      {activeTab === 'assignment' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {assignmentBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Truck className="h-12 w-12" />} title="No bookings in assignment" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Vehicle</th>
-                    <th className="px-5 py-3 font-bold">Driver</th>
-                    <th className="px-5 py-3 text-right font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {assignmentBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          {trip.status === 'ACCEPTED' && (
-                            <Button size="sm" variant="success" onClick={() => setAssignTripId(trip.id)}>
-                              <Truck className="mr-1 h-3.5 w-3.5" /> Assign Vehicle & Driver
-                            </Button>
-                          )}
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/assignment/${trip.id}`)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'in-transit' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {inTransitBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Truck className="h-12 w-12" />} title="No bookings in transit" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Vehicle</th>
-                    <th className="px-5 py-3 font-bold">Driver</th>
-                    <th className="px-5 py-3 text-right font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {inTransitBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          <StatusBadge status={trip.status} />
-                          {trip.slaFlag && <StatusBadge status={trip.slaFlag} />}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
-                      <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/in-transit/${trip.id}`)}>
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'pending-pod' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {pendingPodBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Package className="h-12 w-12" />} title="No pending POD bookings" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Delivered</th>
-                    <th className="px-5 py-3 font-bold">Expenses</th>
-                    <th className="px-5 py-3 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {pendingPodBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status="POD_PENDING" /></td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.pending} /></td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-text hover:bg-gray-50">
-                            <Upload className="h-3.5 w-3.5" /> Upload POD
-                            <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => {
-                              const file = e.target.files?.[0]
-                              if (file) window.alert(`POD document "${file.name}" uploaded for ${trip.id}`)
-                              e.target.value = ''
-                            }} />
-                          </label>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'completed' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {completedBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<CheckCircle className="h-12 w-12" />} title="No completed bookings" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Delivered</th>
-                    <th className="px-5 py-3 font-bold">Freight</th>
-                    <th className="px-5 py-3 font-bold">Approved Expenses</th>
-                    <th className="px-5 py-3 text-right font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {completedBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4">
-                        <StatusBadge status="COMPLETED" />
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
-                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.approved} /></td>
-                      <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/completed/${trip.id}`)}>
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'cancelled' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {cancelledBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<XCircle className="h-12 w-12" />} title="No cancelled bookings" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Stage</th>
-                    <th className="px-5 py-3 font-bold">Cancelled By</th>
-                    <th className="px-5 py-3 font-bold">Reason</th>
-                    <th className="px-5 py-3 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {cancelledBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status="CANCELLED" /></td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{booking.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.cancelledBy}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
-                      <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(booking.detailsPath)}>
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'rejected' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {rejectedBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<XCircle className="h-12 w-12" />} title="No rejected bookings" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Stage</th>
-                    <th className="px-5 py-3 font-bold">Rejected By</th>
-                    <th className="px-5 py-3 font-bold">Reason</th>
-                    <th className="px-5 py-3 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {rejectedBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4"><StatusBadge status="REJECTED" /></td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{booking.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.rejectedBy}</td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
-                      <td className="px-5 py-4 text-right">
-                        <Button size="sm" variant="outline" onClick={() => navigate(booking.detailsPath)}>
-                          View Details
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === 'exception' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {exceptionBookings.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Route className="h-12 w-12" />} title="No exception bookings" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="px-5 py-3 font-bold">Status</th>
-                    <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Issue</th>
-                    <th className="px-5 py-3 font-bold">Vehicle / Driver</th>
-                    <th className="px-5 py-3 font-bold text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {exceptionBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          <StatusBadge status={trip.status} />
-                          <StatusBadge status="EXCEPTION" />
-                          {trip.slaFlag && <StatusBadge status={trip.slaFlag} />}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4">
-                        <div className="font-mono text-sm font-semibold">{trip.id}</div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
-                      <td className="px-5 py-4">
-                        {trip.disruption ? (
-                          <div className="space-y-1">
-                            <StatusBadge status={trip.disruption.reason} label={REASON_LABEL[trip.disruption.reason] ?? trip.disruption.reason} />
-                            {trip.disruption.notes && <p className="text-xs text-gray-500">{trip.disruption.notes}</p>}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-500">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-text">
-                        <div>{trip.assignedVehicle.registrationNumber}</div>
-                        <div className="text-xs text-gray-500">{trip.assignedDriver.name}</div>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => setReassignTripId(trip.id)}>
-                            <Wrench className="mr-1 h-3.5 w-3.5" /> Change Assignment
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/exception/${trip.id}`)}>
-                            View Details
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {assignTripId && (
-        <AssignVehicleModal
-          isOpen={!!assignTripId}
-          onClose={() => setAssignTripId(null)}
-          tripId={assignTripId}
+      {selectedIndentId && (
+        <AssignVehicleModal 
+          isOpen={!!selectedIndentId} 
+          onClose={() => setSelectedIndentId(null)} 
+          indentId={selectedIndentId} 
         />
       )}
 
-      <ChangeAssignmentModal
-        isOpen={reassignTripId !== null}
-        onClose={() => setReassignTripId(null)}
-        tripId={reassignTripId}
+      {/* Active Trips */}
+      {activeTab === 'active' && (
+        <div className="space-y-4">
+          {activeTrips.length === 0 ? (
+            <EmptyState icon={<Truck className="h-12 w-12" />} title="No active trips" />
+          ) : (
+            activeTrips.map((trip) => (
+              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/trips/active/${trip.id}`)}>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-semibold">{trip.id}</span>
+                      <StatusBadge status={trip.status} />
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" />{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</div>
+                    <div className="flex items-center gap-2"><Truck className="h-3.5 w-3.5 text-muted-foreground" />{trip.assignedVehicle.registrationNumber}</div>
+                    <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" />{trip.assignedDriver.name}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Completed Trips */}
+      {activeTab === 'completed' && (
+        <div className="space-y-4">
+          {completedTrips.length === 0 ? (
+            <EmptyState icon={<CheckCircle className="h-12 w-12" />} title="No completed trips" />
+          ) : (
+            completedTrips.map((trip) => (
+              <Card key={trip.id} className="cursor-pointer hover:border-primary/30" onClick={() => navigate(`/vendor/trips/completed/${trip.id}`)}>
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-semibold">{trip.id}</span>
+                      <StatusBadge status="DELIVERED" />
+                      {trip.podStatus === 'CONFIRMED' && <StatusBadge status="CONFIRMED" label="POD ✓" />}
+                      {trip.isInvoiced ? <StatusBadge status="INVOICED" /> : <StatusBadge status="PENDING" label="Uninvoiced" />}
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+                    <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground" />{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</div>
+                    <div><span className="text-muted-foreground">Delivered: </span>{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</div>
+                    <div><span className="text-muted-foreground">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
+                    <div><span className="text-muted-foreground">Expenses: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
+                  </div>
+                  {!trip.isInvoiced && trip.podStatus === 'CONFIRMED' && (
+                    <div className="mt-3 pt-3 border-t">
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setSelectedTripForExpense(trip.id) }}>
+                        Add Expenses
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Penalties */}
+      {activeTab === 'penalties' && (
+        <div className="space-y-4">
+          {declinedIndents.length === 0 ? (
+            <EmptyState icon={<XCircle className="h-12 w-12" />} title="No Declined Trips or Penalties" description="You have no declined bookings or SLA penalties." />
+          ) : (
+            declinedIndents.map((indent) => (
+              <Card key={indent.id} className="border-l-4 border-l-destructive">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-mono text-sm font-semibold">{indent.id}</span>
+                        <StatusBadge status="DECLINED" />
+                        <span className="text-xs text-muted-foreground">Contract: {indent.contractReference}</span>
+                      </div>
+                      <p className="text-sm font-medium text-destructive mt-1">Declined Booking Penalty</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-destructive">
+                        <CurrencyDisplay amount={5000} />
+                      </div>
+                      <span className="text-xs text-muted-foreground">Will be deducted from next invoice</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                      {indent.laneDetails.origin.city} → {indent.laneDetails.destination.city}
+                    </div>
+                    <div><span className="text-muted-foreground">Load: </span>{indent.loadDetails.commodity}</div>
+                    <div><span className="text-muted-foreground">Vehicle: </span>{indent.vehicleTypeRequired}</div>
+                    <div><span className="text-muted-foreground">Reported by: </span>{formatDateTime(indent.reportingDateTime)}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+
+      <AddExpenseModal
+        isOpen={!!selectedTripForExpense}
+        onClose={() => setSelectedTripForExpense(null)}
+        initialTripId={selectedTripForExpense ?? undefined}
       />
 
       <ConfirmDialog
@@ -575,12 +241,10 @@ export default function TripsPage() {
         onClose={() => setDeclineConfirmId(null)}
         onConfirm={() => {
           if (declineConfirmId) declineIndent(declineConfirmId)
-          setDeclineConfirmId(null)
-          navigate('/vendor/bookings?tab=rejected')
         }}
-        title="Decline booking?"
-        description="This will mark the booking as rejected in the mock data."
-        confirmLabel="Decline Booking"
+        title="Decline Indent?"
+        description="Are you sure you want to decline this indent? A penalty of ₹5,000 will be applied and deducted from your next invoice."
+        confirmLabel="Decline Indent"
         variant="destructive"
       />
     </div>

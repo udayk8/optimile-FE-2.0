@@ -30,7 +30,7 @@ export const MOCK_DASHBOARD: DashboardData = {
 export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/trips/indents/IND-001', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
   { id: 'n2', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/vendor/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
-  { id: 'n3', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense expense ₹2,500 for TRP-045 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
+  { id: 'n3', type: 'EXPENSES', title: 'Expense Approved', message: 'Toll expense ₹2,500 for TRP-045 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
   { id: 'n4', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 3600000).toISOString() },
   { id: 'n5', type: 'CONTRACTS', title: 'Contract Ready', message: 'Contract CNT-005 from Tata Steel awaiting your signature', deepLink: '/vendor/contracts/CNT-005', isRead: false, createdAt: new Date(Date.now() - 7200000).toISOString() },
 ]
@@ -110,7 +110,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     vendorBids: [], createdAt: new Date().toISOString(),
   },
   {
-    id: 'AUC-015', type: 'BULK', customerName: 'Nestle India', state: 'PENDING_AWARD', pricingUnit: 'PER_MT',
+    id: 'AUC-010', type: 'BULK', customerName: 'Nestle India', state: 'CLOSED', pricingUnit: 'PER_MT',
     lanes: [{
       id: 'L1',
       laneDetails: { origin: { name: 'Moga Factory', city: 'Moga', state: 'PB' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 400 },
@@ -120,54 +120,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 172800000).toISOString(), endTime: new Date(Date.now() - 86400000).toISOString(),
     vendorBids: [{ id: 'b5', laneId: 'L1', amount: 1500, placedAt: new Date(Date.now() - 90000000).toISOString(), status: 'ACTIVE' }],
     createdAt: new Date(Date.now() - 259200000).toISOString(),
-  },
-  {
-    id: 'AUC-016', type: 'SPOT', customerName: 'Mahindra Logistics', state: 'AWARDED', pricingUnit: 'PER_KM',
-    lanes: [{
-      id: 'L1',
-      laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'MH' }, distanceKm: 700 },
-      currentBestBid: 16500,
-      minBidDecrement: 250
-    }],
-    vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
-    awardDate: new Date(Date.now() - 86400000).toISOString(),
-    contractReference: 'CNT-008 / MAHINDRA',
-    vendorBids: [{ id: 'b6', laneId: 'L1', amount: 16500, placedAt: new Date(Date.now() - 200000000).toISOString(), status: 'ACTIVE' }],
-    createdAt: new Date(Date.now() - 345600000).toISOString(),
-  },
-  {
-    id: 'AUC-017', type: 'LOT', customerName: 'Adani Ports', state: 'NOT_AWARDED', pricingUnit: 'PER_TRIP',
-    lanes: [{
-      id: 'L1',
-      laneDetails: { origin: { name: 'Mundra Port', city: 'Mundra', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 320 },
-      currentBestBid: 9800,
-      minBidDecrement: 100
-    }],
-    vehicleTypeRequired: '32ft Container', startTime: new Date(Date.now() - 432000000).toISOString(), endTime: new Date(Date.now() - 345600000).toISOString(),
-    vendorBids: [],
-    createdAt: new Date(Date.now() - 432000000).toISOString(),
-  },
-  {
-    id: 'AUC-019', type: 'SPOT', customerName: 'Bharat Petroleum', state: 'NOT_PARTICIPATED', pricingUnit: 'PER_KM',
-    lanes: [{
-      id: 'L1',
-      laneDetails: { origin: { name: 'Refinery', city: 'Mumbai', state: 'MH' }, destination: { name: 'Depot', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 530 },
-      minBidDecrement: 100
-    }],
-    vehicleTypeRequired: '32ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
-    vendorBids: [],
-    createdAt: new Date(Date.now() - 302400000).toISOString(),
-  },
-  {
-    id: 'AUC-018', type: 'SPOT', customerName: 'Blue Dart', state: 'CANCELLED', pricingUnit: 'PER_KM',
-    lanes: [{
-      id: 'L1',
-      laneDetails: { origin: { name: 'Mumbai Hub', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat DC', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
-      minBidDecrement: 100
-    }],
-    vehicleTypeRequired: 'LCV', startTime: new Date(Date.now() - 86400000).toISOString(), endTime: new Date(Date.now() - 43200000).toISOString(),
-    vendorBids: [],
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
   }
 ]
 
@@ -254,7 +206,7 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
-    id: 'TRP-043', contractId: 'CNT-001', indentId: 'IND-097', status: 'COMPLETED',
+    id: 'TRP-043', contractId: 'CNT-001', indentId: 'IND-097', status: 'DELIVERED',
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
@@ -263,7 +215,7 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
-    id: 'TRP-042', contractId: 'CNT-002', indentId: 'IND-096', status: 'IN_TRANSIT',
+    id: 'TRP-042', contractId: 'CNT-002', indentId: 'IND-096', status: 'DISPATCHED',
     laneDetails: { origin: { name: 'Pune', city: 'Pune', state: 'MH' }, destination: { name: 'Chennai', city: 'Chennai', state: 'TN' }, distanceKm: 1200 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
@@ -271,7 +223,7 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    id: 'TRP-041', contractId: 'CNT-001', indentId: 'IND-095', status: 'COMPLETED',
+    id: 'TRP-041', contractId: 'CNT-001', indentId: 'IND-095', status: 'DELIVERED',
     laneDetails: { origin: { name: 'Mumbai', city: 'Mumbai', state: 'MH' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 1420 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
@@ -280,48 +232,12 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
-    id: 'TRP-045', contractId: 'CNT-002', indentId: 'IND-099', status: 'IN_TRANSIT', exceptionFlag: true,
+    id: 'TRP-045', contractId: 'CNT-002', indentId: 'IND-099', status: 'EXCEPTION',
     laneDetails: { origin: { name: 'Chennai', city: 'Chennai', state: 'TN' }, destination: { name: 'Bangalore', city: 'Bangalore', state: 'KA' }, distanceKm: 350 },
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     freightRate: 15000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'TRP-046', contractId: 'CNT-001', indentId: 'IND-100', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Mumbai', city: 'Mumbai', state: 'MH' }, destination: { name: 'Pune', city: 'Pune', state: 'MH' }, distanceKm: 150 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    deliveredDate: '2026-05-11T10:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-046',
-    freightRate: 32000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
-    createdAt: '2026-05-10T07:00:00Z',
-  },
-  {
-    id: 'TRP-047', contractId: 'CNT-001', indentId: 'IND-101', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Nashik', city: 'Nashik', state: 'MH' }, destination: { name: 'Surat', city: 'Surat', state: 'GJ' }, distanceKm: 240 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
-    deliveredDate: '2026-05-12T15:30:00Z', podStatus: 'CONFIRMED', podReference: 'POD-047',
-    freightRate: 28000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
-    createdAt: '2026-05-11T06:30:00Z',
-  },
-  {
-    id: 'TRP-048', contractId: 'CNT-002', indentId: 'IND-102', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Nagpur', city: 'Nagpur', state: 'MH' }, destination: { name: 'Indore', city: 'Indore', state: 'MP' }, distanceKm: 450 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    deliveredDate: '2026-05-17T17:30:00Z', podStatus: 'PENDING',
-    freightRate: 36000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
-    createdAt: '2026-05-16T08:30:00Z',
-  },
-  {
-    id: 'TRP-049', contractId: 'CNT-002', indentId: 'IND-103', status: 'CANCELLED',
-    laneDetails: { origin: { name: 'Bhiwandi', city: 'Bhiwandi', state: 'MH' }, destination: { name: 'Ahmedabad', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 520 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
-    deliveredDate: '2026-05-18T09:30:00Z', podStatus: 'PENDING',
-    freightRate: 34500, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
-    createdAt: '2026-05-17T07:45:00Z',
   }
 ]
 
@@ -331,7 +247,7 @@ export const MOCK_EXPENSES: Expense[] = [
     tripId: 'TRP-043',
     tripReference: 'TRP-043',
     lineItems: [
-      { id: 'EXP-101-1', expenseType: 'EXPENSE', amount: 3000, description: 'Mumbai-Delhi highway toll' },
+      { id: 'EXP-101-1', expenseType: 'TOLL', amount: 3000, description: 'Mumbai-Delhi highway toll' },
     ],
     amount: 3000,
     status: 'APPROVED',
@@ -353,7 +269,7 @@ export const MOCK_EXPENSES: Expense[] = [
     tripId: 'TRP-042',
     tripReference: 'TRP-042',
     lineItems: [
-      { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800 },
+      { id: 'EXP-103-1', expenseType: 'TOLL', amount: 1800 },
     ],
     amount: 1800,
     status: 'PENDING',
@@ -433,91 +349,40 @@ export const MOCK_CAPACITY: CapacityDeclaration[] = [
 
 export const MOCK_INVOICES: Invoice[] = [
   {
-    id: 'INV-2026-001', invoiceNumber: 'INV-2026-001', invoiceDate: '2026-04-15', vendorGstin: '29AABCF1234M1ZP',
+    id: 'INV-2026-028', invoiceNumber: 'INV-2026-028', invoiceDate: '2026-04-15', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-01', to: '2026-04-15' },
-    paymentDueDate: '2026-05-15', status: 'APPROVED', paymentDate: '2026-05-12',
+    paymentDueDate: '2026-05-15', status: 'PAID', paymentDate: '2026-05-10',
     lineItems: [
-      { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
-      { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
+      { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 45000, expenses: [{ type: 'TOLL', amount: 3000 }], lineTotal: 48000 },
+      { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 45000, expenses: [{ type: 'TOLL', amount: 2800 }, { type: 'DETENTION', amount: 2000 }], lineTotal: 49800 },
     ],
-    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', createdAt: '2026-04-15T12:00:00Z',
+    subtotal: 97800, gstAmount: 17604, grandTotal: 115404, pdfUrl: '/invoices/INV-2026-028.pdf', createdAt: '2026-04-15T12:00:00Z',
   },
   {
-    id: 'INV-2026-002', invoiceNumber: 'INV-2026-002', invoiceDate: '2026-05-13', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-01', to: '2026-05-13' },
-    paymentDueDate: '2026-06-12', status: 'APPROVED',
+    id: 'INV-2026-029', invoiceNumber: 'INV-2026-029', invoiceDate: '2026-04-20', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-16', to: '2026-04-20' },
+    paymentDueDate: '2026-05-20', status: 'SUBMITTED',
     lineItems: [
-      { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
+      { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 65000, expenses: [], lineTotal: 65000 }
     ],
-    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', createdAt: '2026-05-13T10:00:00Z',
+    subtotal: 65000, gstAmount: 11700, grandTotal: 76700, pdfUrl: '/invoices/INV-2026-029.pdf', createdAt: '2026-04-20T10:00:00Z',
   },
   {
-    id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
-    paymentDueDate: '2026-06-16', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-046', tripReference: 'TRP-046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
-    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', createdAt: '2026-05-17T10:00:00Z',
-  },
-  {
-    id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
-    paymentDueDate: '2026-06-17', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
-    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', createdAt: '2026-05-18T10:00:00Z',
-  },
-  {
-    id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
-    paymentDueDate: '2026-06-18', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-048', tripReference: 'TRP-048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
-    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', createdAt: '2026-05-19T10:00:00Z',
-  },
-  {
-    id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-17', to: '2026-05-19' },
-    paymentDueDate: '2026-06-18', status: 'SUBMITTED',
-    lineItems: [{
-      tripId: 'TRP-049', tripReference: 'TRP-049', freightCharge: 74000,
-      expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
-      lineTotal: 74800,
-    }],
-    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', createdAt: '2026-05-19T11:00:00Z',
-  },
-  {
-    id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
-    paymentDueDate: '2026-06-17', status: 'REJECTED',
-    lineItems: [{
-      tripId: 'TRP-050', tripReference: 'TRP-050', freightCharge: 58000,
-      expenses: [
-        { type: 'DETENTION', amount: 3000 },
-        { type: 'LOADING_UNLOADING', amount: 1500 },
-      ],
-      lineTotal: 62500,
-    }],
-    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', notes: 'POD missing for TRP-050 and expense amounts need correction', createdAt: '2026-05-18T09:30:00Z',
-  },
-  {
-    id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
-    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
-    paymentDueDate: '2026-06-16', status: 'CANCELLED',
-    lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
-    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
+    id: 'INV-2026-027', invoiceNumber: 'INV-2026-027', invoiceDate: '2026-04-01', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-03-15', to: '2026-03-31' },
+    paymentDueDate: '2026-05-01', status: 'REJECTED',
+    lineItems: [
+      { tripId: 'TRP-030', tripReference: 'TRP-030', freightCharge: 30000, expenses: [], lineTotal: 30000 }
+    ],
+    subtotal: 30000, gstAmount: 5400, grandTotal: 35400, pdfUrl: '/invoices/INV-2026-027.pdf', createdAt: '2026-04-01T09:00:00Z',
   }
 ]
 
 export const MOCK_LEDGER: LedgerEntry[] = [
-  { id: 'led-001', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-04-15', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-001 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
-  { id: 'led-002', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-04-20', entryType: 'CUSTOMER_PAYMENT', description: 'Partial payment from customer for INV-2026-001', debit: 0, credit: 40000, runningBalance: 60000 },
-  { id: 'led-003', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-05-10', entryType: 'CUSTOMER_PAYMENT', description: 'Final payment from customer for INV-2026-001', debit: 0, credit: 58000, runningBalance: 2000 },
-  { id: 'led-004', invoiceId: 'INV-2026-001', ledgerType: 'CUSTOMER', date: '2026-05-12', entryType: 'TDS_DEDUCTION', description: 'TDS deduction against INV-2026-001', debit: 0, credit: 2000, runningBalance: 0 },
-  { id: 'led-005', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-13', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-002 approved (Taxable ₹100,000 + GST ₹0)', debit: 100000, credit: 0, runningBalance: 100000 },
-  { id: 'led-006', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-14', entryType: 'NBFC_DISBURSEMENT', description: 'NBFC advance received for INV-2026-002', debit: 0, credit: 90000, runningBalance: 90000 },
-  { id: 'led-006a', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-20', entryType: 'NBFC_REPAYMENT', description: 'Repaid to NBFC for INV-2026-002', debit: 40000, credit: 0, runningBalance: 50000 },
-  { id: 'led-006b', invoiceId: 'INV-2026-002', ledgerType: 'NBFC', date: '2026-05-28', entryType: 'NBFC_REPAYMENT', description: 'Repaid to NBFC for INV-2026-002', debit: 50000, credit: 0, runningBalance: 0 },
-  { id: 'led-007', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-20', entryType: 'CUSTOMER_PAYMENT', description: 'Customer payment for INV-2026-002', debit: 0, credit: 40000, runningBalance: 60000 },
-  { id: 'led-008', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-05-28', entryType: 'CUSTOMER_PAYMENT', description: 'Customer payment for INV-2026-002', debit: 0, credit: 50000, runningBalance: 10000 },
-  { id: 'led-009', invoiceId: 'INV-2026-002', ledgerType: 'CUSTOMER', date: '2026-06-10', entryType: 'CUSTOMER_PAYMENT', description: 'Customer final payment for INV-2026-002', debit: 0, credit: 10000, runningBalance: 0 },
+  { id: 'led1', date: '2026-04-18', entryType: 'INVOICE_APPROVED', description: 'Invoice INV-2026-028 approved', credit: 115404, debit: 0, runningBalance: 115404 },
+  { id: 'led2', date: '2026-04-20', entryType: 'TDS_DEDUCTION', description: 'TDS @ 2% on INV-2026-028', credit: 0, debit: 2308, runningBalance: 113096, documentUrl: '/tds/tds-apr-2026.pdf' },
+  { id: 'led3', date: '2026-05-10', entryType: 'PAYMENT_RECEIVED', description: 'Payment for INV-2026-028', credit: 113096, debit: 0, runningBalance: 0, documentUrl: '/payments/pa-2026-028.pdf' },
+  { id: 'led4', date: '2026-05-11', entryType: 'SLA_PENALTY', description: 'Penalty for Declined Indent IND-004', credit: 0, debit: 5000, runningBalance: -5000 },
 ]
 
 export const MOCK_COMPANY_INFO: CompanyInfo = {

@@ -54,8 +54,6 @@ const initialForm: CreateTenantInput = {
   code: "",
   status: "trial",
   planId: "",
-  tenantType: "DIRECT_CUSTOMER",
-  customerPortalEnabled: false,
   primaryContactName: "",
   primaryContactEmail: "",
   starterRole: "tenant_admin",

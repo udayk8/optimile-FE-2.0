@@ -1,12 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, FileText, FileSpreadsheet, Gavel, LayoutDashboard } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Gavel, LayoutDashboard } from 'lucide-react'
 import { cn } from '@auction/lib/cn'
 import { useUIStore } from '@auction/stores/ui.store'
 
 const NAV_ITEMS = [
   { path: '/auction/dashboard', label: 'Dashboard', subtitle: 'Operational overview', icon: LayoutDashboard },
-  { path: '/auction/sourcing', label: 'Client Hub', subtitle: 'RFI & RFQ Events', icon: FileText },
-  { path: '/auction/rfq-responses', label: 'RFQ Responses', subtitle: 'Lane pricing from vendors', icon: FileSpreadsheet },
   { path: '/auction/auctions', label: 'Auctions', subtitle: 'Create, monitor, award', icon: Gavel },
   { path: '/auction/contracts', label: 'Contracts', subtitle: 'Award outputs and status', icon: FileText },
 ]
@@ -53,14 +51,10 @@ export function Sidebar() {
               )}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <div className="relative shrink-0">
-                <Icon className={cn('h-[18px] w-[18px]', isActive ? 'text-[#2563EB]' : 'text-[#94A3B8]')} />
-              </div>
+              <Icon className={cn('h-[18px] w-[18px] shrink-0', isActive ? 'text-[#2563EB]' : 'text-[#94A3B8]')} />
               {!sidebarCollapsed && (
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="truncate leading-tight">{item.label}</span>
-                  </div>
+                <div className="min-w-0">
+                  <div className="truncate leading-tight">{item.label}</div>
                   <div className={cn('mt-0.5 truncate text-[11px] leading-tight', isActive ? 'text-[#2563EB]/60' : 'text-[#94A3B8]')}>
                     {item.subtitle}
                   </div>

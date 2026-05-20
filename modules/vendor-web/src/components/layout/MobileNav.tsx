@@ -1,22 +1,19 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { Home, Truck, Ship, MoreHorizontal, Search, FileText, User, X, Wallet, ShieldAlert, ReceiptText, Banknote } from 'lucide-react'
+import { Home, Truck, Ship, Receipt, ReceiptText, MoreHorizontal, Search, FileText, User, X } from 'lucide-react'
 import { cn } from '@vendor/lib/cn'
 import { useUIStore } from '@vendor/stores/ui.store'
 
 const BOTTOM_NAV = [
   { path: '/vendor', label: 'Home', icon: Home },
-  { path: '/vendor/bookings', label: 'Bookings', icon: Truck },
+  { path: '/vendor/trips', label: 'Trips', icon: Truck },
   { path: '/vendor/fleet', label: 'Fleet', icon: Ship },
+  { path: '/vendor/expenses', label: 'Expenses', icon: Receipt },
 ]
 
 const MORE_NAV = [
   { path: '/vendor/sourcing', label: 'Sourcing', icon: Search },
   { path: '/vendor/contracts', label: 'Contracts', icon: FileText },
-  { path: '/vendor/invoices', label: 'Invoices', icon: FileText },
-  { path: '/vendor/receivables', label: 'Bill Discounting', icon: Banknote },
-  { path: '/vendor/record-payments', label: 'Record Payments', icon: ReceiptText },
-  { path: '/vendor/ledger', label: 'Ledger', icon: Wallet },
-  { path: '/vendor/exceptions', label: 'Exceptions', icon: ShieldAlert },
+  { path: '/vendor/invoices', label: 'Invoices', icon: ReceiptText },
   { path: '/vendor/profile', label: 'Profile', icon: User },
 ]
 
@@ -84,9 +81,7 @@ export function MobileNav() {
                       isActive ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-gray-50 hover:text-primary'
                     )}
                   >
-                    <div className="relative">
-                      <Icon className="h-6 w-6" />
-                    </div>
+                    <Icon className="h-6 w-6" />
                     <span className="text-xs font-semibold">{item.label}</span>
                   </NavLink>
                 )

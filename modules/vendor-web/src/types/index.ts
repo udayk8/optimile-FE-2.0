@@ -133,13 +133,12 @@ export interface DashboardData {
 
 
 export type AuctionType = 'SPOT' | 'LOT' | 'BULK'
-export type AuctionState = 'UPCOMING' | 'LIVE' | 'PENDING_AWARD' | 'AWARDED' | 'NOT_AWARDED' | 'NOT_PARTICIPATED' | 'CANCELLED'
+export type AuctionState = 'UPCOMING' | 'LIVE' | 'EXTENDED' | 'CLOSED' | 'AWARDED' | 'NOT_AWARDED'
 
 export interface AuctionLane {
   id: string
   laneDetails: LaneDetails
   volumeRequirement?: VolumeRequirement
-  basePrice?: number
   currentBestBid?: number
   minBidDecrement?: number
 }
@@ -234,31 +233,7 @@ export interface Indent {
   createdAt: string
 }
 
-export type BookingState =
-  | 'ACCEPTED'
-  | 'ASSIGNED'
-  | 'OUT_FOR_PICKUP'
-  | 'PICKUP_REACHED'
-  | 'LOADING_STARTED'
-  | 'LOADING_COMPLETED'
-  | 'IN_TRANSIT'
-  | 'DESTINATION_REACHED'
-  | 'POD_PENDING'
-  | 'COMPLETED'
-  | 'CANCELLED'
-
-export type TripStatus = BookingState
-
-export type BookingSlaFlag = 'ON_TIME' | 'DELAYED'
-
-export type DisruptionReason = 'VEHICLE_BREAKDOWN' | 'DRIVER_BREAKDOWN' | 'VEHICLE_OR_DRIVER_BREAKDOWN'
-
-export interface TripDisruption {
-  reason: DisruptionReason
-  reportedAt: string
-  notes?: string
-  resolvedAt?: string
-}
+export type TripStatus = 'DISPATCHED' | 'IN_TRANSIT' | 'AT_DELIVERY' | 'EXCEPTION' | 'DELIVERED'
 
 export interface Trip {
   id: string
@@ -267,10 +242,7 @@ export interface Trip {
   laneDetails: LaneDetails
   assignedVehicle: { id: string; registrationNumber: string; type: string }
   assignedDriver: { id: string; name: string; mobile: string }
-  status: BookingState
-  slaFlag?: BookingSlaFlag
-  exceptionFlag?: boolean
-  disruption?: TripDisruption
+  status: TripStatus
   deliveredDate?: string
   podStatus?: 'PENDING' | 'CONFIRMED'
   podReference?: string
@@ -282,7 +254,7 @@ export interface Trip {
   createdAt: string
 }
 
-export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'LR_COPY' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
+export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
 
 export interface TripDocument {
   id: string
@@ -305,7 +277,7 @@ export interface TripTimelineEvent {
 
 // ==================== EXPENSE TYPES ====================
 export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type ExpenseType = 'EXPENSE' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
+export type ExpenseType = 'TOLL' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
 
 export interface ExpenseLineItem {
   id: string
@@ -327,31 +299,23 @@ export interface Expense {
 }
 
 // ==================== FLEET TYPES ====================
-export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED' | 'PENDING_DOCS'
+export type ComplianceStatus = 'COMPLIANT' | 'EXPIRING_SOON' | 'EXPIRED'
 export type OperationalStatus = 'ACTIVE' | 'INACTIVE' | 'UNDER_MAINTENANCE'
 export type DriverStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED'
 
 export interface Vehicle {
   id: string
   registrationNumber: string
-  vehicleType: string
-  manufacturer?: string
   model?: string
-  year?: string
-  fuelType?: string
   engineNumber?: string
   chassisNumber?: string
-  capacityKg?: string
-  baseLocation: string
-  operationalStatus: OperationalStatus
-  complianceStatus: ComplianceStatus
-  complianceDocuments: ComplianceDocument[]
-  blackoutDates: { from: string; to: string }[]
-  // legacy fields kept for existing mock data
   odometerReading?: string
+  manufacturer?: string
   manufactureDate?: string
   registrationDate?: string
+  vehicleType: string
   permitType?: string
+  capacityKg?: string
   capacityCubicMeter?: string
   capacityLiters?: string
   length?: string
@@ -362,30 +326,32 @@ export interface Vehicle {
   rcFileName?: string
   trackingSelections?: VehicleTrackingSelection[]
   additionalDocuments?: VehicleAdditionalDocument[]
+  baseLocation: string
+  operationalStatus: OperationalStatus
+  complianceStatus: ComplianceStatus
   gpsDeviceId?: string
+  complianceDocuments: ComplianceDocument[]
+  blackoutDates: { from: string; to: string }[]
 }
 
 export interface Driver {
   id: string
   name: string
+  dateOfBirth?: string
+  dlName?: string
+  dlVerified?: boolean
   mobile: string
   licenseNumber: string
+  dlValidTillDate?: string
+  gender?: 'Male' | 'Female' | 'Other'
+  email?: string
+  dlCopyFileName?: string
+  trackingSelections?: DriverTrackingSelection[]
   licenseExpiry: string
   licenseClass: string[]
   complianceStatus: ComplianceStatus
   currentStatus: DriverStatus
   complianceDocuments: ComplianceDocument[]
-  dateOfBirth?: string
-  gender?: 'Male' | 'Female' | 'Other'
-  email?: string
-  baseLocation?: string
-  aadhaarMasked?: string
-  // legacy fields
-  dlName?: string
-  dlVerified?: boolean
-  dlValidTillDate?: string
-  dlCopyFileName?: string
-  trackingSelections?: DriverTrackingSelection[]
 }
 
 export interface VehicleTrackingSelection {
@@ -413,7 +379,6 @@ export interface DriverTrackingSelection {
 export interface ComplianceDocument {
   id: string
   type: string
-  referenceNo?: string
   fileName: string
   fileUrl: string
   expiryDate: string
@@ -430,7 +395,7 @@ export interface CapacityDeclaration {
 }
 
 // ==================== INVOICE TYPES ====================
-export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID'
 
 export interface Invoice {
   id: string
@@ -450,7 +415,6 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
-  nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
 }
 
 export interface InvoiceLineItem {
@@ -461,154 +425,17 @@ export interface InvoiceLineItem {
   lineTotal: number
 }
 
-export type DisputeStatus = 'OPEN' | 'IN_REVIEW' | 'ACCEPTED' | 'CANCELLED' | 'CLOSED'
-
-export interface Dispute {
-  id: string
-  invoiceId: string
-  invoiceNumber: string
-  invoiceAmount: number
-  reason: string
-  status: DisputeStatus
-  raisedAt: string
-  updatedAt: string
-  notes?: string
-}
-
-export type LedgerType = 'CUSTOMER' | 'NBFC'
-
-export type CustomerLedgerEntryType =
-  | 'INVOICE_APPROVED'
-  | 'CUSTOMER_PAYMENT'
-  | 'TDS_DEDUCTION'
-  | 'CUSTOMER_ADJUSTMENT'
-
-export type NbfcLedgerEntryType =
-  | 'NBFC_FINANCING_APPROVED'
-  | 'NBFC_DISBURSEMENT'
-  | 'NBFC_CHARGE'
-  | 'NBFC_REPAYMENT'
-  | 'NBFC_ADJUSTMENT'
-
-export type LedgerEntryType = CustomerLedgerEntryType | NbfcLedgerEntryType
+export type LedgerEntryType = 'INVOICE_APPROVED' | 'PAYMENT_RECEIVED' | 'SLA_PENALTY' | 'OTHER_DEDUCTION' | 'TDS_DEDUCTION'
 
 export interface LedgerEntry {
   id: string
-  invoiceId: string
-  ledgerType: LedgerType
   date: string
   entryType: LedgerEntryType
   description: string
   credit: number
   debit: number
   runningBalance: number
-  counterparty?: string
-  mode?: 'BANK' | 'CASH' | 'ESCROW' | 'ADJUSTMENT'
-  referenceNumber?: string
-  notes?: string
   documentUrl?: string
-}
-
-export type PaymentKind =
-  | 'CUSTOMER_PAYMENT'
-  | 'TDS_DEDUCTION'
-  | 'NBFC_DISBURSEMENT'
-  | 'NBFC_REPAYMENT'
-  | 'NBFC_CHARGE'
-export type PaymentState = 'POSTED' | 'PENDING'
-
-export interface PaymentRecord {
-  id: string
-  invoiceId: string
-  invoiceNumber: string
-  customerName: string
-  paymentKind: PaymentKind
-  paymentDate: string
-  cashAmount: number
-  tdsAmount: number
-  referenceNumber?: string
-  note?: string
-  recordedBy?: string
-  recordedAt?: string
-  status: PaymentState
-  createdAt: string
-  ledgerEntryIds: string[]
-}
-
-export interface CustomerLedgerPostPayload {
-  invoiceId: string
-  entryType: CustomerLedgerEntryType
-  amount: number
-  date: string
-  description: string
-  referenceNumber?: string
-  mode?: 'BANK' | 'CASH' | 'ESCROW' | 'ADJUSTMENT'
-  notes?: string
-}
-
-export interface NbfcLedgerPostPayload {
-  invoiceId: string
-  entryType: NbfcLedgerEntryType
-  amount: number
-  date: string
-  description: string
-  referenceNumber?: string
-  mode?: 'BANK' | 'CASH' | 'ADJUSTMENT'
-  notes?: string
-}
-
-export type NBFCDiscountingStatus = 'ELIGIBLE' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
-
-export interface NBFCApplication {
-  id: string
-  invoiceId: string
-  invoiceNumber: string
-  customerName: string
-  partnerId?: string
-  partnerName?: string
-  status: NBFCDiscountingStatus
-  appliedAt?: string
-  approvedAt?: string
-  referenceNumber?: string
-  requestedAmount: number
-  approvedAmount?: number
-  charges: number
-  approvedCharges?: number
-  netAmount: number
-  remarks?: string
-  emailTitle?: string
-  recipientEmail?: string
-  emailDescription?: string
-  invoiceFileName?: string
-}
-
-export type ExceptionSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type ExceptionStatus = 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
-export type ExceptionIssueType = 'Breakdown' | 'Delay' | 'Accident' | 'Route deviation' | 'Cargo issue'
-
-export interface ExceptionTimelineEntry {
-  id: string
-  action: string
-  notes: string
-  timestamp: string
-  by: string
-}
-
-export interface ExceptionRecord {
-  id: string
-  bookingId: string
-  route: string
-  vehicle: string
-  driver: string
-  issueType: ExceptionIssueType
-  severity: ExceptionSeverity
-  status: ExceptionStatus
-  slaDueAt: string
-  createdAt: string
-  updatedAt: string
-  description: string
-  evidence: string[]
-  timeline: ExceptionTimelineEntry[]
 }
 
 export interface AppNotification extends Notification {

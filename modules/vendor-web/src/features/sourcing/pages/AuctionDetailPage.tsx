@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
@@ -6,9 +6,8 @@ import { PageHeader } from '@vendor/components/layout/PageHeader'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
-import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
+import { ArrowLeft, Gavel, MapPin, Clock, Truck, ShieldAlert } from 'lucide-react'
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,8 +18,6 @@ export default function AuctionDetailPage() {
 
   // Local state for bidding
   const [bids, setBids] = useState<Record<string, number>>({})
-  const [submitted, setSubmitted] = useState(false)
-  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
 
   // If auction not found
   if (!auction) {
@@ -55,12 +52,6 @@ export default function AuctionDetailPage() {
 
   const isValid = (isLot ? hasBidAll : hasBidAny) && !hasErrors
 
-  useEffect(() => {
-    if (!submitted) return
-    const timer = window.setTimeout(() => setSubmitted(false), 2000)
-    return () => window.clearTimeout(timer)
-  }, [submitted])
-
   const handleBidChange = (laneId: string, value: string) => {
     const numValue = Number(value)
     if (!isNaN(numValue)) {
@@ -69,13 +60,12 @@ export default function AuctionDetailPage() {
   }
 
   const handleSubmit = () => {
-    if (!isValid) return
     Object.entries(bids).forEach(([laneId, amount]) => {
       if (amount > 0) {
         submitBid(auction.id, laneId, amount)
       }
     })
-    setSubmitted(true)
+    navigate('/vendor/sourcing?tab=auctions')
   }
 
   const getPricingUnitLabel = () => {
@@ -89,14 +79,6 @@ export default function AuctionDetailPage() {
 
   return (
     <div className="pb-20">
-      <button
-        type="button"
-        onClick={() => setExitConfirmOpen(true)}
-        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-primary"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </button>
-
       <PageHeader
         title={`Auction ${auction.id}`}
         description={auction.customerName}
@@ -113,12 +95,6 @@ export default function AuctionDetailPage() {
           </div>
         }
       />
-
-      {submitted && (
-        <div className="mb-6 rounded-xl border border-success/20 bg-success/10 px-4 py-3 text-sm font-medium text-success">
-          Bid submitted successfully
-        </div>
-      )}
 
       {/* Auction Info Summary */}
       <Card className="mb-6">
@@ -147,6 +123,15 @@ export default function AuctionDetailPage() {
         </CardContent>
       </Card>
 
+      {isLot && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/10 p-4 text-primary">
+          <ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
+          <p className="text-sm">
+            <strong>LOT Auction Rules:</strong> You must submit a bid for <strong>all {auction.lanes.length} lanes</strong>. Partial bids are not allowed.
+          </p>
+        </div>
+      )}
+
       {/* Lanes Table */}
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -155,18 +140,17 @@ export default function AuctionDetailPage() {
               <tr>
                 <th className="min-w-[180px] px-4 py-3 text-xs font-bold uppercase tracking-wide">Lane Details</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Volume</th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Initial Base Price</th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Winning Bid</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">L1 Bid</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Active Bid</th>
-                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Rank</th>
                 <th className="min-w-[200px] px-4 py-3 text-right text-xs font-bold uppercase tracking-wide">Enter New Bid (₹)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {auction.lanes.map((lane) => {
+                // Find existing active bid
                 const activeBid = auction.vendorBids.find(b => b.laneId === lane.id && b.status === 'ACTIVE')
-                const isWinning = activeBid && lane.currentBestBid ? activeBid.amount <= lane.currentBestBid : false
-                const rank = activeBid ? (isWinning ? 'Winning' : 'Outbid') : '-'
+                const isL1 = activeBid && lane.currentBestBid ? activeBid.amount <= lane.currentBestBid : false
+                const rank = activeBid ? (isL1 ? 1 : 2) : '-'
 
                 return (
                   <tr key={lane.id} className="transition-colors hover:bg-gray-50">
@@ -188,15 +172,6 @@ export default function AuctionDetailPage() {
                       ) : '-'}
                     </td>
                     <td className="px-4 py-4">
-                      {lane.basePrice ? (
-                        <div className="font-semibold text-text">
-                          <CurrencyDisplay amount={lane.basePrice} />
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
                       {lane.currentBestBid ? (
                         <div>
                           <div className="font-semibold text-success">
@@ -214,16 +189,10 @@ export default function AuctionDetailPage() {
                       {activeBid ? (
                         <div>
                           <div className="font-bold text-text"><CurrencyDisplay amount={activeBid.amount} /></div>
+                          <span className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isL1 ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}>
+                            Rank {rank}
+                          </span>
                         </div>
-                      ) : (
-                        <span className="text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      {activeBid ? (
-                        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isWinning ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}>
-                          {rank}
-                        </span>
                       ) : (
                         <span className="text-gray-500">-</span>
                       )}
@@ -261,24 +230,18 @@ export default function AuctionDetailPage() {
             <div className="font-bold text-text">
               {Object.keys(bids).filter(k => (bids[k] || 0) > 0).length} of {auction.lanes.length} lanes bid
             </div>
+            {isLot && !hasBidAll && (
+              <div className="text-xs text-danger">You must bid on all lanes for this LOT auction.</div>
+            )}
           </div>
           <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setBids({})}>Clear</Button>
             <Button onClick={handleSubmit} disabled={!isValid}>
               <Gavel className="h-4 w-4 mr-2" /> Submit Bids
             </Button>
           </div>
         </div>
       )}
-
-      <ConfirmDialog
-        isOpen={exitConfirmOpen}
-        onClose={() => setExitConfirmOpen(false)}
-        onConfirm={() => navigate(-1)}
-        title="Exit auction?"
-        description="Are you sure you want to exit auction?"
-        confirmLabel="Exit"
-        variant="destructive"
-      />
     </div>
   )
 }

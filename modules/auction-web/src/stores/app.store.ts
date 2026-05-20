@@ -8,10 +8,6 @@ import type {
   BookingReference,
   Contract,
   VendorOption,
-  RfiType,
-  RfqType,
-  RfqResponse,
-  VendorResponseStatus,
 } from '@auction/types'
 
 interface CreateAuctionInput {
@@ -33,60 +29,27 @@ interface CreateAuctionInput {
   launchNow?: boolean
 }
 
-interface CreateRfiInput {
-  title: string
-  description: string
-  deadline: string
-  targetEmails: string[]
-  messageToVendor?: string
-  templateFileName?: string
-  createdBy: string
-}
-
-interface CreateRfqInput {
-  title: string
-  deadline: string
-  targetEmails: string[]
-  messageToVendor?: string
-  templateFileName?: string
-  createdBy: string
-}
-
-interface CreateRfqResponseInput {
-  fileName: string
-  vendorName?: string
-  rfqId?: string
-  rows: RfqResponse['rows']
-}
-
 interface AppState {
   auctions: Auction[]
   contracts: Contract[]
   bookings: BookingReference[]
   vendors: VendorOption[]
-  rfis: RfiType[]
-  rfqs: RfqType[]
-  rfqResponses: RfqResponse[]
   createAuction: (input: CreateAuctionInput) => string
-  createRfi: (input: CreateRfiInput) => string
-  createRfq: (input: CreateRfqInput) => string
-  addRfqResponse: (input: CreateRfqResponseInput) => void
-  updateSourcingVendorStatus: (type: 'RFI' | 'RFQ', id: string, vendorIdOrEmail: string, status: VendorResponseStatus) => void
   launchAuction: (auctionId: string, actor: string) => void
   cancelAuction: (auctionId: string, actor: string, reason: string) => void
-  awardSpotAuction: (auctionId: string, actor: string, bidRank?: 'L1' | 'L2' | 'L3') => void
+  awardSpotAuction: (auctionId: string, actor: string, bidRank?: 'R1' | 'R2' | 'R3') => void
   awardLaneToAllocationRank: (
     auctionId: string,
     laneId: string,
-    allocationRank: 'L1' | 'L2' | 'L3',
-    bidRank: 'L1' | 'L2' | 'L3',
+    allocationRank: 'R1' | 'R2' | 'R3',
+    bidRank: 'R1' | 'R2' | 'R3',
     actor: string,
     reason?: string
   ) => void
   finalizeLaneAward: (
     auctionId: string,
     laneId: string,
-    selections: { allocationRank: 'L1' | 'L2' | 'L3'; bidRank: 'L1' | 'L2' | 'L3' }[],
+    selections: { allocationRank: 'R1' | 'R2' | 'R3'; bidRank: 'R1' | 'R2' | 'R3' }[],
     actor: string,
     reason?: string
   ) => void
@@ -104,9 +67,9 @@ function makeEvent(id: string, type: AuctionEvent['type'], message: string, acto
   }
 }
 
-function toRankIndex(rank: 'L1' | 'L2' | 'L3') {
-  if (rank === 'L1') return 0
-  if (rank === 'L2') return 1
+function toRankIndex(rank: 'R1' | 'R2' | 'R3') {
+  if (rank === 'R1') return 0
+  if (rank === 'R2') return 1
   return 2
 }
 
@@ -115,84 +78,7 @@ export const useAppStore = create<AppState>((set) => ({
   contracts: [...MOCK_CONTRACTS],
   bookings: [...MOCK_BOOKINGS],
   vendors: [...MOCK_VENDORS],
-  rfis: [
-    {
-      id: 'RFI-1001',
-      title: 'Q3 Pan-India Fleet Discovery',
-      description: 'Looking for vendors with 32ft closed body capacity in South India.',
-      deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'PUBLISHED',
-      targetEmails: ['vendor1@example.com', 'transport2@example.com'],
-      messageToVendor: 'Please fill out the attached matrix.',
-      templateFileName: 'RFI_Template_v2.xlsx',
-      vendorTracking: [
-        { vendorIdOrEmail: 'vendor1@example.com', status: 'RESPONDED' },
-        { vendorIdOrEmail: 'transport2@example.com', status: 'PENDING' },
-      ],
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      createdBy: 'Procurement User',
-    }
-  ],
-  rfqs: [
-    {
-      id: 'RFQ-2001',
-      title: 'Dedicated capacity for Q3',
-      deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-      status: 'PUBLISHED',
-      targetEmails: ['vendor1@example.com', 'vendor2@example.com', 'external_vendor@example.com'],
-      messageToVendor: 'Please quote your best rates.',
-      templateFileName: 'RFQ_Lane_Pricing.xlsx',
-      vendorTracking: [
-        { vendorIdOrEmail: 'vendor1@example.com', status: 'PENDING' },
-        { vendorIdOrEmail: 'vendor2@example.com', status: 'RESPONDED' },
-        { vendorIdOrEmail: 'external_vendor@example.com', status: 'PENDING' },
-      ],
-      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      createdBy: 'Procurement User',
-    }
-  ],
-  rfqResponses: [
-    {
-      id: 'RFQR-001',
-      fileName: 'FastLogistics_RFQ2001_Response.xlsx',
-      vendorName: 'Fast Logistics',
-      rfqId: 'RFQ-2001',
-      uploadedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'Procurement User',
-      rows: [
-        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8500 },
-        { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: 12000 },
-        { lane: 'Pune → Nagpur', vehicleType: '32ft SXL', price: 18500 },
-      ],
-    },
-    {
-      id: 'RFQR-002',
-      fileName: 'PrimeTransport_Q3_Rates.xlsx',
-      vendorName: 'Prime Transport Co',
-      rfqId: 'RFQ-2001',
-      uploadedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'Procurement User',
-      rows: [
-        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8200 },
-        { lane: 'Mumbai → Nashik', vehicleType: '20ft Container', price: 11800 },
-        { lane: 'Pune → Nagpur', vehicleType: '32ft SXL', price: 17500 },
-        { lane: 'Delhi → Jaipur', vehicleType: '20ft Container', price: 9000 },
-      ],
-    },
-    {
-      id: 'RFQR-003',
-      fileName: 'SunriseCarriers_Response.xlsx',
-      vendorName: 'Sunrise Carriers',
-      rfqId: 'RFQ-2001',
-      uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      uploadedBy: 'Procurement User',
-      rows: [
-        { lane: 'Mumbai → Pune', vehicleType: '20ft Container', price: 8800 },
-        { lane: 'Delhi → Jaipur', vehicleType: '20ft Container', price: 9500 },
-        { lane: 'Chennai → Bangalore', vehicleType: '32ft SXL', price: 14200 },
-      ],
-    },
-  ],
+
   createAuction: (input) => {
     const auctionId = `AUC-${input.type}-${Math.floor(100 + Math.random() * 900)}`
     const now = new Date()
@@ -238,76 +124,6 @@ export const useAppStore = create<AppState>((set) => ({
     return auctionId
   },
 
-  createRfi: (input) => {
-    const rfiId = `RFI-${Math.floor(1000 + Math.random() * 9000)}`
-    const newRfi: RfiType = {
-      id: rfiId,
-      ...input,
-      status: 'PUBLISHED',
-      vendorTracking: input.targetEmails.map((email) => ({ vendorIdOrEmail: email, status: 'PENDING' as const })),
-      createdAt: new Date().toISOString(),
-    }
-    set((state) => ({ rfis: [newRfi, ...state.rfis] }))
-    return rfiId
-  },
-
-  createRfq: (input) => {
-    const rfqId = `RFQ-${Math.floor(1000 + Math.random() * 9000)}`
-    const newRfq: RfqType = {
-      id: rfqId,
-      ...input,
-      status: 'PUBLISHED',
-      vendorTracking: input.targetEmails.map((email) => ({ vendorIdOrEmail: email, status: 'PENDING' as const })),
-      createdAt: new Date().toISOString(),
-    }
-    set((state) => ({ rfqs: [newRfq, ...state.rfqs] }))
-    return rfqId
-  },
-
-  addRfqResponse: (input) => {
-    const responseId = `RFQR-${Math.floor(1000 + Math.random() * 9000)}`
-    const newResponse: RfqResponse = {
-      id: responseId,
-      fileName: input.fileName,
-      vendorName: input.vendorName,
-      rfqId: input.rfqId,
-      uploadedAt: new Date().toISOString(),
-      uploadedBy: 'Procurement User',
-      rows: input.rows,
-    }
-    set((state) => ({ rfqResponses: [newResponse, ...state.rfqResponses] }))
-  },
-
-  updateSourcingVendorStatus: (type, id, vendorIdOrEmail, status) => {
-    set((state) => {
-      if (type === 'RFI') {
-        return {
-          rfis: state.rfis.map(rfi => {
-            if (rfi.id !== id) return rfi
-            return {
-              ...rfi,
-              vendorTracking: rfi.vendorTracking.map(vt => 
-                vt.vendorIdOrEmail === vendorIdOrEmail ? { ...vt, status } : vt
-              )
-            }
-          })
-        }
-      } else {
-        return {
-          rfqs: state.rfqs.map(rfq => {
-            if (rfq.id !== id) return rfq
-            return {
-              ...rfq,
-              vendorTracking: rfq.vendorTracking.map(vt => 
-                vt.vendorIdOrEmail === vendorIdOrEmail ? { ...vt, status } : vt
-              )
-            }
-          })
-        }
-      }
-    })
-  },
-
   launchAuction: (auctionId, actor) =>
     set((state) => ({
       auctions: state.auctions.map((auction) =>
@@ -341,7 +157,7 @@ export const useAppStore = create<AppState>((set) => ({
       ),
     })),
 
-  awardSpotAuction: (auctionId, actor, bidRank = 'L1') =>
+  awardSpotAuction: (auctionId, actor, bidRank = 'R1') =>
     set((state) => ({
       auctions: state.auctions.map((auction) => {
         if (auction.id !== auctionId || auction.type !== 'SPOT') return auction
@@ -358,7 +174,7 @@ export const useAppStore = create<AppState>((set) => ({
                   {
                     vendorId: winningBid.vendorId,
                     vendorName: winningBid.vendorName,
-                    allocationRank: 'L1',
+                    allocationRank: 'R1',
                     awardedBidRank: bidRank,
                     awardedAmount: winningBid.amount,
                     allocationPercent: 100,
@@ -387,11 +203,11 @@ export const useAppStore = create<AppState>((set) => ({
 
       const defaultSlots =
         lane.allocationMode === 'SINGLE'
-          ? [{ allocationRank: 'L1' as const, allocationPercent: 100, awardedBidRank: 'L1' as const }]
+          ? [{ allocationRank: 'R1' as const, allocationPercent: 100, awardedBidRank: 'R1' as const }]
           : [
-              { allocationRank: 'L1' as const, allocationPercent: lane.allocation.l1, awardedBidRank: 'L1' as const },
-              { allocationRank: 'L2' as const, allocationPercent: lane.allocation.l2, awardedBidRank: 'L2' as const },
-              { allocationRank: 'L3' as const, allocationPercent: lane.allocation.l3, awardedBidRank: 'L3' as const },
+              { allocationRank: 'R1' as const, allocationPercent: lane.allocation.r1, awardedBidRank: 'R1' as const },
+              { allocationRank: 'R2' as const, allocationPercent: lane.allocation.r2, awardedBidRank: 'R2' as const },
+              { allocationRank: 'R3' as const, allocationPercent: lane.allocation.r3, awardedBidRank: 'R3' as const },
             ].filter((entry) => entry.allocationPercent > 0)
 
       const currentAwardDecision = lane.awardDecision ? [...lane.awardDecision] : defaultSlots
@@ -445,7 +261,7 @@ export const useAppStore = create<AppState>((set) => ({
               endDate: auction.contractEndDate ?? new Date().toISOString().slice(0, 10),
               estimatedTrips: lane.estimatedTrips ?? 0,
               status: 'ACTIVE' as const,
-              l1OverrideReason: decision.overrideReason,
+              r1OverrideReason: decision.overrideReason,
               rateSyncedToTms: true,
               placementFailures: [],
               rateDeviationOpen: false,
@@ -508,9 +324,9 @@ export const useAppStore = create<AppState>((set) => ({
             awardedBidRank: selection.bidRank,
             awardedAmount: bid.amount,
             allocationPercent:
-              selection.allocationRank === 'L1' && lane.allocationMode === 'SINGLE'
+              selection.allocationRank === 'R1' && lane.allocationMode === 'SINGLE'
                 ? 100
-                : lane.allocation[selection.allocationRank.toLowerCase() as 'l1' | 'l2' | 'l3'],
+                : lane.allocation[selection.allocationRank.toLowerCase() as 'r1' | 'r2' | 'r3'],
             overrideReason: selection.bidRank !== selection.allocationRank ? reason : undefined,
           }
         })
@@ -542,7 +358,7 @@ export const useAppStore = create<AppState>((set) => ({
               endDate: auction.contractEndDate ?? new Date().toISOString().slice(0, 10),
               estimatedTrips: lane.estimatedTrips ?? 0,
               status: 'ACTIVE' as const,
-              l1OverrideReason: decision.overrideReason,
+              r1OverrideReason: decision.overrideReason,
               rateSyncedToTms: true,
               placementFailures: [],
               rateDeviationOpen: false,
@@ -609,8 +425,5 @@ export const useAppStore = create<AppState>((set) => ({
       contracts: [...MOCK_CONTRACTS],
       bookings: [...MOCK_BOOKINGS],
       vendors: [...MOCK_VENDORS],
-      rfis: [],
-      rfqs: [],
-      rfqResponses: [],
     })),
 }))

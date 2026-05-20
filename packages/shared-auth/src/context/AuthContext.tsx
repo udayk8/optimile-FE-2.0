@@ -8,6 +8,7 @@ import { canUserAccessModule, getPostLoginRouteForUser } from '../moduleRoutes'
 import {
   clearAuthState,
   clearDemoSession,
+  getStoredDemoSessionEmail,
   storeDemoLogin,
   storeDemoSession,
   type Portal,
@@ -207,7 +208,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const restore = async () => {
       const storedSession = getStoredAuthSession()
       if (!storedSession) {
-        clearDemoSession()
+        const storedDemoEmail = getStoredDemoSessionEmail()?.trim().toLowerCase() ?? ''
+        const storedDemoUser = DEMO_CREDENTIALS[storedDemoEmail]
+        if (storedDemoUser && mounted) {
+          setUser(buildDemoUser(storedDemoEmail, storedDemoUser))
+          setTenant(DEMO_TENANT)
+        }
         if (mounted) setLoading(false)
         return
       }
@@ -255,7 +261,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshToken: res.refreshToken,
         tokenType: res.tokenType || 'Bearer',
         expiresAt: Date.now() + Math.max(0, res.expiresInSeconds) * 1000,
-      }, rememberMe, res.tenant.id)
+      }, rememberMe, res.tenant.internalId)
       clearLegacyKeys()
       const nextUser = mapUser(res.user)
       setUser(nextUser)

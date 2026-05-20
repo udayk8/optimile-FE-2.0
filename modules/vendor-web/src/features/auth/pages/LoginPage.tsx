@@ -16,40 +16,43 @@ export default function LoginPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (otp !== '123456') return
-    setOnboardingDraft({
-      companyName: MOCK_VENDOR.tradingName,
-      legalName: MOCK_VENDOR.legalName,
-      gstin: MOCK_VENDOR.gstin,
-      pan: MOCK_VENDOR.pan,
-      registeredAddress: {
-        street: '45, Transport Nagar',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        pincode: '400001',
-      },
-      primaryContact: { ...MOCK_VENDOR.primaryContact },
-      serviceRegions: ['Maharashtra', 'Gujarat'],
-      supportedVehicleTypes: ['20ft Container', 'Flatbed'],
-      bankName: 'HDFC Bank',
-      branch: 'Andheri East, Mumbai',
-      accountNumber: '50100123456789',
-      ifscCode: 'HDFC0001234',
-      accountType: 'CURRENT',
-    })
+    const nextStatus = vendor?.status === 'ACTIVE' ? 'ACTIVE' : 'ONBOARDING_INCOMPLETE'
+    if (nextStatus !== 'ACTIVE') {
+      setOnboardingDraft({
+        companyName: MOCK_VENDOR.tradingName,
+        legalName: MOCK_VENDOR.legalName,
+        gstin: MOCK_VENDOR.gstin,
+        pan: MOCK_VENDOR.pan,
+        registeredAddress: {
+          street: '45, Transport Nagar',
+          city: 'Mumbai',
+          state: 'Maharashtra',
+          pincode: '400001',
+        },
+        primaryContact: { ...MOCK_VENDOR.primaryContact },
+        serviceRegions: ['Maharashtra', 'Gujarat'],
+        supportedVehicleTypes: ['20ft Container', 'Flatbed'],
+        bankName: 'HDFC Bank',
+        branch: 'Andheri East, Mumbai',
+        accountNumber: '50100123456789',
+        ifscCode: 'HDFC0001234',
+        accountType: 'CURRENT',
+      })
+    }
     setAuth(
       {
         ...MOCK_VENDOR,
         ...(vendor ?? {}),
         primaryContact: vendor?.primaryContact ?? MOCK_VENDOR.primaryContact,
-        status: 'ONBOARDING_INCOMPLETE',
-        onboardingStep: 'SETUP',
-        kycStatus: 'DRAFT',
-        profileCompletion: 25,
-        bankStatus: 'PENDING',
+        status: nextStatus,
+        onboardingStep: nextStatus === 'ACTIVE' ? 'COMPLETE' : 'SETUP',
+        kycStatus: nextStatus === 'ACTIVE' ? 'APPROVED' : 'DRAFT',
+        profileCompletion: nextStatus === 'ACTIVE' ? 100 : 25,
+        bankStatus: nextStatus === 'ACTIVE' ? 'VERIFIED' : 'PENDING',
       },
       'mock-jwt-token-xyz'
     )
-    navigate('/vendor/onboarding')
+    navigate(nextStatus === 'ACTIVE' ? '/vendor' : '/vendor/onboarding')
   }
 
   return (

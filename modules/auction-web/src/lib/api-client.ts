@@ -3,7 +3,7 @@ import { clearStoredAuthSession, getStoredAuthSession } from '@shared-auth/servi
 import { useAuthStore } from '@auction/stores/auth.store'
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -14,7 +14,6 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  config.headers['X-User-Id'] = '71234567-0000-0000-0000-000000000001'
   return config
 })
 

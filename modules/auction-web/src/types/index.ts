@@ -60,9 +60,9 @@ export interface AuctionLane {
   basePriceSource: 'MANUAL'
   allocationMode: 'SINGLE' | 'SPLIT'
   allocation: {
-    l1: number
-    l2: number
-    l3: number
+    r1: number
+    r2: number
+    r3: number
   }
   eligibleVendorIds: string[]
   timerEndsAt: string
@@ -72,8 +72,8 @@ export interface AuctionLane {
   awardDecision?: {
     vendorId: string
     vendorName: string
-    allocationRank: 'L1' | 'L2' | 'L3'
-    awardedBidRank: 'L1' | 'L2' | 'L3'
+    allocationRank: 'R1' | 'R2' | 'R3'
+    awardedBidRank: 'R1' | 'R2' | 'R3'
     awardedAmount: number
     overrideReason?: string
     allocationPercent: number
@@ -132,12 +132,12 @@ export interface Contract {
   contractedRate: number
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
-  allocationRank: 'L1' | 'L2' | 'L3'
+  allocationRank: 'R1' | 'R2' | 'R3'
   startDate: string
   endDate: string
   estimatedTrips: number
   status: ContractStatus
-  l1OverrideReason?: string
+  r1OverrideReason?: string
   rateSyncedToTms: boolean
   placementFailures: PlacementFailure[]
   rateDeviationOpen: boolean
@@ -159,58 +159,4 @@ export interface DashboardData {
   liveAuctions: DashboardMetric
   pendingAwards: DashboardMetric
   expiringContracts: DashboardMetric
-}
-
-export type RfiStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED'
-export type VendorResponseStatus = 'PENDING' | 'RESPONDED' | 'DECLINED'
-
-export interface SourcingVendorTracking {
-  vendorIdOrEmail: string
-  name?: string
-  status: VendorResponseStatus
-}
-
-export interface RfiType {
-  id: string
-  title: string
-  description: string
-  deadline: string
-  status: RfiStatus
-  targetEmails: string[]
-  messageToVendor?: string
-  templateFileName?: string
-  vendorTracking: SourcingVendorTracking[]
-  createdAt: string
-  createdBy: string
-}
-
-export type RfqStatus = 'DRAFT' | 'PUBLISHED' | 'EVALUATING' | 'AWARDED' | 'CANCELLED'
-
-export interface RfqType {
-  id: string
-  title: string
-  deadline: string
-  status: RfqStatus
-  targetEmails: string[]
-  messageToVendor?: string
-  templateFileName?: string
-  vendorTracking: SourcingVendorTracking[]
-  createdAt: string
-  createdBy: string
-}
-
-export interface RfqResponseRow {
-  lane: string
-  vehicleType: string
-  price: number
-}
-
-export interface RfqResponse {
-  id: string
-  fileName: string
-  vendorName?: string
-  rfqId?: string
-  uploadedAt: string
-  uploadedBy: string
-  rows: RfqResponseRow[]
 }

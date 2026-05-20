@@ -17,7 +17,7 @@ export const MODULE_ROUTES: Record<ERPModule, string> = {
   'platform-admin': '/platform-admin/dashboard',
   'tenant-admin':   '/tenant-admin/tenant/tenant-northstar/dashboard',
   'tms-booking':    '/tms/booking/tenant/tenant-northstar/bookings',
-  'driver-app':     '/driver-app',
+  'driver-app':     '/driver-app/tenant/tenant-northstar/driver-app/login',
 }
 
 export function canUserAccessModule(user: User | null, module: ERPModule): boolean {
