@@ -39,6 +39,7 @@ function seedDirectPortalSession(portal: Portal) {
     customer: { email: 'cbd@optimile.com', role: 'CBD' },
     tracking: { email: 'tracking@optimile.com', role: 'Track and Trace' },
     admin: { email: 'ceo@uday.ts.com', role: 'CEO' },
+    driver: { email: 'driver@optimile.com', role: 'Driver' },
     'platform-admin': { email: 'platform-admin@optimile.com', role: 'Platform Admin' },
     'tenant-admin': { email: 'tenant-admin@optimile.com', role: 'Tenant Admin' },
     'tms-booking': { email: 'tms-booking@optimile.com', role: 'TMS' },
@@ -89,6 +90,7 @@ function HostRouter() {
             <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackingApp /></ProtectedRoute>} />
 
             {/* Extracted console modules */}
+            <Route path="/admin/*" element={<ProtectedRoute portal="admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/tenant-admin/*"   element={<ProtectedRoute portal="tenant-admin"><TenantAdminApp /></ProtectedRoute>} />
             <Route path="/tms/booking/*"    element={<ProtectedRoute portal="tms-booking"><TmsBookingApp /></ProtectedRoute>} />

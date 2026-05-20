@@ -4,8 +4,9 @@ import { WorkspaceShell } from "../shared/workspace-shell";
 
 export function PlatformLayout() {
   const location = useLocation();
-  const embedded = useMatch("/platform-admin/*");
-  const BASE = embedded ? "/platform-admin" : "";
+  const platformAdminMatch = useMatch("/platform-admin/*");
+  const adminMatch = useMatch("/admin/*");
+  const BASE = platformAdminMatch ? "/platform-admin" : adminMatch ? "/admin" : "";
 
   const platformNav = [
     { to: `${BASE}/dashboard`, label: "Platform Dashboard", icon: LayoutDashboard },

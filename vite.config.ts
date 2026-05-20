@@ -9,6 +9,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      '@/shared/components/common': path.resolve(rootDir, 'modules/platform-admin-web/src/components/common'),
+      '@/shared/components/ui': path.resolve(rootDir, 'modules/platform-admin-web/src/components/ui'),
+      '@/shared/auth': path.resolve(rootDir, 'modules/platform-admin-web/src/shared/auth'),
+      '@/shared/lib': path.resolve(rootDir, 'modules/platform-admin-web/src/lib'),
+      '@/shared/store': path.resolve(rootDir, 'modules/platform-admin-web/src/store'),
+      '@/types': path.resolve(rootDir, 'modules/platform-admin-web/src/types'),
+      '@/modules/platform-admin': path.resolve(rootDir, 'modules/platform-admin'),
       '@auction': path.resolve(rootDir, 'modules/auction-web/src'),
       '@vendor': path.resolve(rootDir, 'modules/vendor-web/src'),
       '@fleet': path.resolve(rootDir, 'modules/fleet-web/src'),

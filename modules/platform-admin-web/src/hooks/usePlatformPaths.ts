@@ -1,8 +1,9 @@
 import { useMatch } from "react-router-dom";
 
 export function usePlatformPaths() {
-  const embedded = useMatch("/platform-admin/*");
-  const base = embedded ? "/platform-admin" : "";
+  const platformAdminMatch = useMatch("/platform-admin/*");
+  const adminMatch = useMatch("/admin/*");
+  const base = platformAdminMatch ? "/platform-admin" : adminMatch ? "/admin" : "";
 
   return {
     dashboard: `${base}/dashboard`,

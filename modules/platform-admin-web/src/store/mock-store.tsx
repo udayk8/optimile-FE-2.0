@@ -44,6 +44,10 @@ import {
   normalizeModuleKey,
   normalizeModuleKeys,
 } from "../lib/tenant-admin";
+import {
+  getDefaultAssignmentMode,
+  getDefaultCommercialMode,
+} from "../lib/tenant-config";
 import { buildMockLRNumber, canTransitionBooking, normalizeBookingId } from "../modules/tms/booking/services/booking-engine";
 import { ensureShipmentDocuments } from "../modules/tms/booking/services/shipment-documents";
 import type { AuditLogRecord, Capability } from "../types/abac";
@@ -138,7 +142,20 @@ interface MockStoreValue {
   updatePlatformTenant: (
     tenantId: string,
     updates: Partial<
-      Pick<TenantRecord, "name" | "code" | "region" | "industry" | "planId" | "status" | "enabledModuleCodes">
+      Pick<
+        TenantRecord,
+        | "name"
+        | "code"
+        | "region"
+        | "industry"
+        | "planId"
+        | "status"
+        | "tenantType"
+        | "customerPortalEnabled"
+        | "assignmentMode"
+        | "commercialMode"
+        | "enabledModuleCodes"
+      >
     >,
   ) => void;
   savePlatformSettings: (settings: PlatformSettings) => void;
@@ -329,6 +346,19 @@ function buildSeedWorkspaces() {
 
 function loadSeededState<T>(key: string, seed: T) {
   return readStoredValue(key, seed);
+}
+
+function normalizeStoredPlatformTenants(storedTenants: TenantRecord[]) {
+  return storedTenants.map((tenant) => {
+    const tenantType = tenant.tenantType ?? "DIRECT_CUSTOMER";
+    return {
+      ...tenant,
+      tenantType,
+      customerPortalEnabled: tenant.customerPortalEnabled ?? false,
+      assignmentMode: tenant.assignmentMode ?? getDefaultAssignmentMode(tenantType),
+      commercialMode: tenant.commercialMode ?? getDefaultCommercialMode(tenantType),
+    };
+  });
 }
 
 function normalizeStoredRoles(
@@ -1143,7 +1173,9 @@ function matchesBookingId(booking: BookingRecord, bookingId: string) {
 
 export function MockStoreProvider({ children }: PropsWithChildren) {
   const seededWorkspaces = loadSeededState(storageKeys.tenantWorkspaces, buildSeedWorkspaces());
-  const seededPlatformTenants = loadSeededState(storageKeys.platformTenants, mockPlatformTenants);
+  const seededPlatformTenants = normalizeStoredPlatformTenants(
+    loadSeededState(storageKeys.platformTenants, mockPlatformTenants),
+  );
   const seededRolePermissions = loadSeededState(storageKeys.tenantRolePermissions, mockRolePermissions);
   const legacyStoredCustomers = loadSeededState<LegacyGlobalCustomer[]>(storageKeys.globalCustomers, []);
   const legacyStoredVendors = loadSeededState<LegacyGlobalVendor[]>(storageKeys.globalVendors, []);
@@ -1381,6 +1413,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       industry: "Logistics",
       planId: input.planId,
       status: input.status,
+      tenantType: input.tenantType,
+      customerPortalEnabled: input.customerPortalEnabled,
+      assignmentMode: getDefaultAssignmentMode(input.tenantType),
+      commercialMode: getDefaultCommercialMode(input.tenantType),
       enabledModuleCodes: input.enabledModuleCodes,
       initialHierarchyTemplate: input.defaultHierarchyTemplate,
       primaryAdminUserId: bootstrapUser.id,
@@ -1512,6 +1548,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           code: `st${count}`,
           status: "trial",
           planId: mockPlans[0].id,
+          tenantType: "DIRECT_CUSTOMER",
+          customerPortalEnabled: false,
           primaryContactName: "Sample Admin",
           primaryContactEmail: `sample${count}@tenant.test`,
           starterRole: "tenant_admin",

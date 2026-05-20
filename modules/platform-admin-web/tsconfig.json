@@ -17,6 +17,20 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@/shared/components/common": ["./src/components/common"],
+      "@/shared/components/common/*": ["./src/components/common/*"],
+      "@/shared/components/ui": ["./src/components/ui"],
+      "@/shared/components/ui/*": ["./src/components/ui/*"],
+      "@/shared/auth": ["./src/shared/auth"],
+      "@/shared/auth/*": ["./src/shared/auth/*"],
+      "@/shared/lib": ["./src/lib"],
+      "@/shared/lib/*": ["./src/lib/*"],
+      "@/shared/store": ["./src/store"],
+      "@/shared/store/*": ["./src/store/*"],
+      "@/types": ["./src/types"],
+      "@/types/*": ["./src/types/*"],
+      "@/modules/platform-admin": ["../platform-admin"],
+      "@/modules/platform-admin/*": ["../platform-admin/*"],
       "@platform-admin/*": ["./src/*"],
       "@shared-auth": ["../../packages/shared-auth/src"],
       "@shared-auth/*": ["../../packages/shared-auth/src/*"],
@@ -28,5 +42,5 @@
       "@shared-utils/*": ["../../packages/shared-utils/src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../packages"]
+  "include": ["src", "../platform-admin", "vite.config.ts", "../../packages"]
 }

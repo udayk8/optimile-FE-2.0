@@ -35,6 +35,8 @@ export interface CreateTenantInput {
   code: string;
   status: "active" | "trial" | "paused";
   planId: string;
+  tenantType: "DIRECT_CUSTOMER" | "LOGISTICS_PROVIDER_3PL";
+  customerPortalEnabled: boolean;
   primaryContactName: string;
   primaryContactEmail: string;
   starterRole: "tenant_admin" | "ceo";
