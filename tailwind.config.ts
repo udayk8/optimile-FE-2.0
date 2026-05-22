@@ -6,6 +6,9 @@ export default {
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
     './modules/*/src/**/*.{js,ts,jsx,tsx}',
+    './modules/fleet-web/components/**/*.{js,ts,jsx,tsx}',
+    './modules/fleet-web/pages/**/*.{js,ts,jsx,tsx}',
+    './modules/fleet-web/tyre-intelligence/**/*.{js,ts,jsx,tsx}',
     './packages/*/src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
