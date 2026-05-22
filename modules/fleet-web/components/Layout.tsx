@@ -92,7 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: 'fleet',        label: 'Fleet Management',  icon: IconTruck },
       { id: 'drivers',      label: 'Driver Management', icon: IconUsers },
-      { id: 'marketplace',  label: 'Marketplace',       icon: IconBriefcase },
+      // { id: 'marketplace',  label: 'Marketplace',       icon: IconBriefcase },
       { id: 'compliance',   label: 'Compliance',        icon: IconFile },
       { id: 'behavior',     label: 'Driver Behavior',   icon: IconZap },
     ],

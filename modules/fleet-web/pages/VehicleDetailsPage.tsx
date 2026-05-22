@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vehicle, VehicleDocument, TelemetryEvent, DocumentStatus, DerivedVehicleStatus, VehicleComponent, ComponentType, ComponentStatus, DocumentType, VehicleMaintenanceItem, ComponentHistoryRecord, TyreHealthSignal, TyreEventSignal, TyreSignalType, EnergyMetrics, EnergyAnomaly, EmissionStandard, Battery, BatteryStatus, VehicleTrackingDevice, TrackerProtocol, TrackerPowerSource, TrackerStatus, TrackerDeviceKind } from '../types';
-import { VehicleAPI, ComplianceAPI, TelematicsAPI, ComponentAPI, MaintenanceAPI, TyreAPI, EnergyAPI, TrackingDeviceAPI } from '../services/mockDatabase';
+import { Vehicle, VehicleDocument, TelemetryEvent, DocumentStatus, DerivedVehicleStatus, VehicleComponent, ComponentType, ComponentStatus, DocumentType, VehicleMaintenanceItem, ComponentHistoryRecord, TyreHealthSignal, TyreEventSignal, TyreSignalType, EnergyMetrics, EnergyAnomaly, EmissionStandard, Battery, BatteryStatus, VehicleTrackingDevice, TrackerProtocol, TrackerPowerSource, TrackerStatus, TrackerDeviceKind, Trip, TripStatus } from '../types';
+import { VehicleAPI, ComplianceAPI, TelematicsAPI, ComponentAPI, MaintenanceAPI, TyreAPI, EnergyAPI, TrackingDeviceAPI, TripAPI } from '../services/mockDatabase';
 import { BatteryAPI } from '../services/mockDatabase2';
 import { IconTruck, IconFile, IconMap, IconAlert, IconCheck, IconArrowRight, IconCpu, IconPlus, IconUpload, IconEye, IconEdit, IconDownload, IconWrench, IconHistory, IconTyre, IconFuel, IconDroplet, IconZap, IconBattery } from '../components/Icons';
 import { Badge, Button, Modal, Input, Select } from '../components/UI';
@@ -25,7 +25,9 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
     const [batteries, setBatteries] = useState<Battery[]>([]);
     const [availableBatteries, setAvailableBatteries] = useState<Battery[]>([]);
     
-    const [activeTab, setActiveTab] = useState<'overview' | 'components' | 'batteries' | 'maintenance' | 'compliance' | 'telemetry'>('overview');
+    const [trips, setTrips] = useState<Trip[]>([]);
+    const [bookingSubTab, setBookingSubTab] = useState<'current' | 'history'>('current');
+    const [activeTab, setActiveTab] = useState<'overview' | 'components' | 'batteries' | 'maintenance' | 'compliance' | 'telemetry' | 'bookings'>('overview');
     const [isLoading, setIsLoading] = useState(true);
 
     // Component Modal
@@ -181,7 +183,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
 
     const loadData = async () => {
         setIsLoading(true);
-        const [v, d, c, s, h, th, te, em, ea, batts, allBatts, trk] = await Promise.all([
+        const [v, d, c, s, h, th, te, em, ea, batts, allBatts, trk, allTrips] = await Promise.all([
             VehicleAPI.getById(vehicleId),
             ComplianceAPI.getDocuments(vehicleId),
             ComponentAPI.getByVehicleId(vehicleId),
@@ -194,6 +196,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
             BatteryAPI.getByVehicle(vehicleId),
             BatteryAPI.getAll(),
             TrackingDeviceAPI.getAllByVehicleId(vehicleId),
+            TripAPI.getAll(),
         ]);
         setVehicle(v || null);
         setDocuments(d.sort((a,b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime()));
@@ -499,7 +502,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-6">
                 <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                    {['Overview', 'Components', 'Batteries', 'Maintenance', 'Compliance', 'Telemetry'].map((tab) => (
+                    {['Overview', 'Components', /* 'Batteries', */ 'Maintenance', 'Compliance', 'Telemetry'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab.toLowerCase() as any)}

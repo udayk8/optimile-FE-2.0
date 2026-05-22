@@ -74,6 +74,17 @@ export interface MarketplaceProvider {
   city: string;
   status: 'Active' | 'Inactive';
   created_at: string;
+  // Extended vendor details
+  gstin?: string;
+  pan?: string;
+  address?: string;
+  website?: string;
+  fleet_size?: number;
+  lease_term_months?: number;
+  contract_start_date?: string;
+  contract_end_date?: string;
+  account_manager?: string;
+  account_manager_phone?: string;
 }
 
 export enum DriverStatus {

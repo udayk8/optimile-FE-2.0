@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Filter } from 'lucide-react';
-import { Vehicle, VehicleType, AxleConfiguration, VehicleStatus, Driver, OwnershipType, FuelType, BulkValidationResult, MaintenanceTemplate, EmissionStandard, MarketplaceProvider } from '../types';
+import { Vehicle, VehicleType, AxleConfiguration, VehicleStatus, Driver, OwnershipType, FuelType, MaintenanceTemplate, EmissionStandard, MarketplaceProvider } from '../types';
 import { VehicleAPI, DriverAPI, MaintenanceAPI, MarketplaceAPI } from '../services/mockDatabase';
 import { Button, Input, Select, Badge, Modal } from '../components/UI';
-import { IconPlus, IconSearch, IconEdit, IconTrash, IconArrowRight, IconSave, IconFileExcel, IconUploadCloud, IconCheckCircle, IconXCircle, IconAlertTriangle, IconX } from '../components/Icons';
+import { IconPlus, IconSearch, IconEdit, IconTrash, IconArrowRight, IconSave, IconFileExcel, IconAlertTriangle, IconX } from '../components/Icons';
 import { VehicleDetailsPage } from './VehicleDetailsPage';
 
 export const FleetPage: React.FC = () => {
@@ -46,12 +46,6 @@ export const FleetPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
-  // Bulk Import State
-  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-  const [bulkStep, setBulkStep] = useState<'upload' | 'review' | 'success'>('upload');
-  const [bulkValidation, setBulkValidation] = useState<BulkValidationResult | null>(null);
-  const [isBulkValidating, setIsBulkValidating] = useState(false);
-  const [isBulkImporting, setIsBulkImporting] = useState(false);
   const [showBulkFeatureWarning, setShowBulkFeatureWarning] = useState(false);
 
   // Form State
@@ -180,41 +174,6 @@ export const FleetPage: React.FC = () => {
     }
   };
 
-  // --- Bulk Import Handlers ---
-  const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-          setIsBulkValidating(true);
-          try {
-              const result = await VehicleAPI.validateBulkImport(e.target.files[0]);
-              setBulkValidation(result);
-              setBulkStep('review');
-          } catch(e) {
-              alert("Error validating file");
-          } finally {
-              setIsBulkValidating(false);
-          }
-      }
-  };
-
-  const confirmBulkImport = async () => {
-      if (!bulkValidation || bulkValidation.validCount === 0) return;
-      setIsBulkImporting(true);
-      try {
-          await VehicleAPI.importBulk(bulkValidation.parsedData);
-          setBulkStep('success');
-          fetchData();
-      } catch (e) {
-          alert("Import failed");
-      } finally {
-          setIsBulkImporting(false);
-      }
-  };
-
-  const closeBulkModal = () => {
-      setIsBulkModalOpen(false);
-      setBulkStep('upload');
-      setBulkValidation(null);
-  };
 
   const handleBulkFeatureNotice = () => {
     setShowBulkFeatureWarning(true);
@@ -437,7 +396,7 @@ export const FleetPage: React.FC = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type / Config</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specs</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ownership</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marketplace</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor / Leasing Company</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Emission</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -575,46 +534,116 @@ export const FleetPage: React.FC = () => {
                 />
                 <Select
                     label="Ownership"
-                    options={Object.values(OwnershipType).map(v => ({ label: v, value: v }))}
+                    options={Object.values(OwnershipType).filter(v => v !== OwnershipType.RENTED).map(v => ({ label: v, value: v }))}
                     value={formData.ownership_type}
                     onChange={e => setFormData({...formData, ownership_type: e.target.value as OwnershipType, marketplace_provider_id: ''})}
                 />
               </div>
 
-              {/* Marketplace provider — required for Rented or Leased vehicles */}
-              {(formData.ownership_type === OwnershipType.RENTED || formData.ownership_type === OwnershipType.LEASED) && (
-                <div className="mt-3 rounded-lg border border-primary-200 bg-primary-50/50 px-4 py-3">
-                  <Select
-                    label="Marketplace Provider *"
-                    options={[
-                      { label: 'Select a provider…', value: '' },
-                      ...marketplaceProviders
-                        .filter(p => p.status === 'Active')
-                        .map(p => ({ label: `${p.name} — ${p.city} (${p.category})`, value: p.provider_id }))
-                    ]}
-                    value={formData.marketplace_provider_id}
-                    onChange={e => setFormData({...formData, marketplace_provider_id: e.target.value})}
-                    required
-                  />
-                  {!formData.marketplace_provider_id && (
-                    <p className="mt-1 text-xs font-medium text-amber-700">
-                      A marketplace provider must be selected for {formData.ownership_type.toLowerCase()} vehicles.
-                    </p>
-                  )}
-                  {formData.marketplace_provider_id && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Vehicle will be tagged to this provider in the Marketplace registry.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="mt-1 text-xs font-medium text-primary-600 hover:underline"
-                    onClick={() => window.open('/fleet/marketplace', '_blank')}
-                  >
-                    + Add or manage providers →
-                  </button>
-                </div>
-              )}
+              {/* Vendor / Leasing provider — required for Leased vehicles */}
+              {formData.ownership_type === OwnershipType.LEASED && (() => {
+                const selectedProvider = marketplaceProviders.find(p => p.provider_id === formData.marketplace_provider_id);
+                return (
+                  <div className="mt-3 space-y-3">
+                    <div className="rounded-lg border border-primary-200 bg-primary-50/50 px-4 py-3">
+                      <Select
+                        label="Vendor / Leasing Company *"
+                        options={marketplaceProviders
+                          .filter(p => p.status === 'Active' && p.category === 'Leasing')
+                          .map(p => ({ label: `${p.name} — ${p.city}`, value: p.provider_id }))
+                        }
+                        value={formData.marketplace_provider_id}
+                        onChange={e => setFormData({...formData, marketplace_provider_id: e.target.value})}
+                        required
+                      />
+                      {!formData.marketplace_provider_id && (
+                        <p className="mt-1 text-xs font-medium text-amber-700">
+                          A vendor must be selected for leased vehicles.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Vendor detail card */}
+                    {selectedProvider && (
+                      <div className="rounded-lg border border-gray-200 bg-white divide-y divide-gray-100 text-sm">
+                        <div className="px-4 py-3 flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-gray-900">{selectedProvider.name}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">{selectedProvider.city} · {selectedProvider.category}</p>
+                          </div>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            {selectedProvider.status}
+                          </span>
+                        </div>
+                        <div className="px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-2">
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase tracking-wide">Contact Person</p>
+                            <p className="text-gray-800 font-medium">{selectedProvider.contact_name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase tracking-wide">Phone</p>
+                            <p className="text-gray-800">{selectedProvider.phone}</p>
+                          </div>
+                          {selectedProvider.email && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Email</p>
+                              <p className="text-gray-800">{selectedProvider.email}</p>
+                            </div>
+                          )}
+                          {selectedProvider.account_manager && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Account Manager</p>
+                              <p className="text-gray-800">{selectedProvider.account_manager} · {selectedProvider.account_manager_phone}</p>
+                            </div>
+                          )}
+                          {selectedProvider.gstin && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">GSTIN</p>
+                              <p className="text-gray-800 font-mono text-xs">{selectedProvider.gstin}</p>
+                            </div>
+                          )}
+                          {selectedProvider.pan && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">PAN</p>
+                              <p className="text-gray-800 font-mono text-xs">{selectedProvider.pan}</p>
+                            </div>
+                          )}
+                          {selectedProvider.address && (
+                            <div className="col-span-2">
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Address</p>
+                              <p className="text-gray-800">{selectedProvider.address}</p>
+                            </div>
+                          )}
+                          {selectedProvider.fleet_size && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Fleet Size</p>
+                              <p className="text-gray-800">{selectedProvider.fleet_size.toLocaleString()} vehicles</p>
+                            </div>
+                          )}
+                          {selectedProvider.lease_term_months && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Lease Term</p>
+                              <p className="text-gray-800">{selectedProvider.lease_term_months} months</p>
+                            </div>
+                          )}
+                          {selectedProvider.contract_start_date && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Contract Period</p>
+                              <p className="text-gray-800">{selectedProvider.contract_start_date} → {selectedProvider.contract_end_date}</p>
+                            </div>
+                          )}
+                          {selectedProvider.website && (
+                            <div>
+                              <p className="text-xs text-gray-400 uppercase tracking-wide">Website</p>
+                              <a href={`https://${selectedProvider.website}`} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">{selectedProvider.website}</a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
           </div>
 
           {/* Section 2: Technical Specs */}
