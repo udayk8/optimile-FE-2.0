@@ -1,7 +1,7 @@
-import { Navigate, useRoutes } from 'react-router-dom'
-import { ProtectedRoute } from '@shared-auth'
-import { AppShell } from '@auction/components/layout/AppShell'
-import LoginPage from '@auction/features/auth/pages/LoginPage'
+import { type ReactNode } from 'react'
+import { Navigate } from 'react-router-dom'
+import { Gavel } from 'lucide-react'
+import type { ModuleManifest } from '../../../../src/shell/manifest'
 import DashboardPage from '@auction/features/dashboard/pages/DashboardPage'
 import AuctionsPage from '@auction/features/auctions/pages/AuctionsPage'
 import AuctionCreatePage from '@auction/features/auctions/pages/AuctionCreatePage'
@@ -13,9 +13,37 @@ import RfiDetailPage from '@auction/features/sourcing/pages/RfiDetailPage'
 import RfqCreatePage from '@auction/features/sourcing/pages/RfqCreatePage'
 import RfqDetailPage from '@auction/features/sourcing/pages/RfqDetailPage'
 import RfqResponsesPage from '@auction/features/sourcing/pages/RfqResponsesPage'
+import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 
-export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) {
-  const protectedChildren = [
+function AuctionWrapper({ children }: { children: ReactNode }) {
+  const { auctionUser } = useAuctionAuth()
+  return (
+    <>
+      {auctionUser?.status === 'SUSPENDED' && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+          This demo user is suspended. Read-only access is recommended.
+        </div>
+      )}
+      {children}
+    </>
+  )
+}
+
+export const auctionManifest: ModuleManifest = {
+  key: 'auction',
+  label: 'Auction',
+  icon: Gavel,
+  basePath: '/auction',
+  defaultPath: '/auction/dashboard',
+  sidebar: [
+    { label: 'Dashboard', path: '/auction/dashboard' },
+    { label: 'Client Hub', path: '/auction/sourcing' },
+    { label: 'RFQ Responses', path: '/auction/rfq-responses' },
+    { label: 'Auctions', path: '/auction/auctions' },
+    { label: 'Contracts', path: '/auction/contracts' },
+  ],
+  Wrapper: AuctionWrapper,
+  routes: [
     { index: true, element: <Navigate to="dashboard" replace /> },
     { path: 'dashboard', element: <DashboardPage /> },
     { path: 'auctions', element: <AuctionsPage /> },
@@ -30,27 +58,6 @@ export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) 
     { path: 'sourcing/rfq/new', element: <RfqCreatePage /> },
     { path: 'sourcing/rfq/:id', element: <RfqDetailPage /> },
     { path: 'rfq-responses', element: <RfqResponsesPage /> },
-    { path: '*', element: <Navigate to="dashboard" replace /> },
-  ]
-
-  const routes = standalone
-    ? [
-        { path: '/login', element: <LoginPage /> },
-        { path: '/', element: <Navigate to="/auction" replace /> },
-        {
-          path: '/auction',
-          element: <ProtectedRoute portal="auction"><AppShell /></ProtectedRoute>,
-          children: protectedChildren,
-        },
-        { path: '*', element: <Navigate to="/auction/dashboard" replace /> },
-      ]
-    : [
-        {
-          path: '/',
-          element: <AppShell />,
-          children: protectedChildren,
-        },
-      ]
-
-  return useRoutes(routes)
+    { path: '*', element: <Navigate to="/auction/dashboard" replace /> },
+  ],
 }

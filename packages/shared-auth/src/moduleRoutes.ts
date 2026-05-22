@@ -35,10 +35,6 @@ export function getAccessibleModules(user: User | null) {
 
 export function getPostLoginRouteForUser(user: User | null): string {
   if (!user) return '/login'
-  const accessible = getAccessibleModules(user)
-  if (accessible.length === 1) {
-    const [onlyModule] = accessible
-    return onlyModule?.dashboardPath ?? '/modules'
-  }
-  return '/modules'
+  // All authenticated users land in the unified shell. ShellHome chooses the first available module.
+  return '/home'
 }
