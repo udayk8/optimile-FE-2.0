@@ -10,6 +10,7 @@ import {
   clearDemoSession,
   storeDemoLogin,
   storeDemoSession,
+  storeTokenLogin,
   type Portal,
 } from '../utils/authStorage'
 
@@ -260,6 +261,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const nextUser = mapUser(res.user)
       setUser(nextUser)
       setTenant(mapTenant(res.tenant))
+      storeTokenLogin(getPrimaryPortal(nextUser.modules))
       return getPostLoginRouteForUser(nextUser)
     } catch (err) {
       const message = mapLoginError(err)

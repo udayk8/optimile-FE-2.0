@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/udayyaduwanshi/optimile FE 2.0 /**)",
+      "Bash(npm install:*)",
+      "Bash(pkill -f \"vite --host 127.0.0.1\")",
+      "Read(//Users/udayyaduwanshi/optimile FE 2.0 /modules/fleet-web/**)",
+      "Read(//Users/udayyaduwanshi/optimile FE 2.0 /src/**)"
+    ]
+  }
+}
