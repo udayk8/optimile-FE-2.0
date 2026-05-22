@@ -9,6 +9,7 @@ export function LoginShell() {
   const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
+  const [showDemoAccounts, setShowDemoAccounts] = useState(false)
 
   const { login, loading, error, backendAvailable } = useAuth()
   const navigate = useNavigate()
@@ -62,7 +63,7 @@ export function LoginShell() {
           {backendAvailable === false && (
             <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-warning">
               <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Backend unavailable — use a demo account below.</span>
+              <span>Backend unavailable right now. Use the demo accounts below if you need temporary access.</span>
             </div>
           )}
 
@@ -145,39 +146,55 @@ export function LoginShell() {
             </button>
           </form>
 
-          {/* Demo accounts */}
           <div className="border-t border-gray-100 pt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-gray-400 text-center mb-3">
-              Quick Demo Login · password: <span className="font-mono">{DEMO_PASSWORD}</span>
-            </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {demoEntries.map(([demoEmail, info]) => (
-                <button
-                  key={demoEmail}
-                  type="button"
-                  onClick={() => handleDemoAutofill(demoEmail)}
-                  disabled={loading}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold text-text">{getRoleLabel(info.role)}</p>
-                        {getRoleHelper(info.role) && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                            {getRoleHelper(info.role)}
-                          </span>
-                        )}
+            <button
+              type="button"
+              onClick={() => setShowDemoAccounts((current) => !current)}
+              className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-gray-50"
+            >
+              <div>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-gray-400">
+                  Quick Demo Login
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Password: <span className="font-mono">{DEMO_PASSWORD}</span>
+                </p>
+              </div>
+              <span className="text-sm font-semibold text-primary">
+                {showDemoAccounts ? 'Hide' : 'Show'}
+              </span>
+            </button>
+
+            {showDemoAccounts && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {demoEntries.map(([demoEmail, info]) => (
+                  <button
+                    key={demoEmail}
+                    type="button"
+                    onClick={() => handleDemoAutofill(demoEmail)}
+                    disabled={loading}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-bold text-text">{getRoleLabel(info.role)}</p>
+                          {getRoleHelper(info.role) && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                              {getRoleHelper(info.role)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 truncate font-mono text-[11px] text-gray-400">{demoEmail}</p>
                       </div>
-                      <p className="mt-1 truncate font-mono text-[11px] text-gray-400">{demoEmail}</p>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-500">
+                        {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-500">
-                      {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
