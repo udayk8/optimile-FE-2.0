@@ -1,6 +1,19 @@
 import { type ReactNode, useEffect } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Briefcase } from 'lucide-react'
+import {
+  Banknote,
+  Briefcase,
+  CreditCard,
+  FileText,
+  Home,
+  ReceiptText,
+  Search,
+  ShieldAlert,
+  Ship,
+  Truck,
+  User,
+  Wallet,
+} from 'lucide-react'
 import type { ModuleManifest } from '../../../../src/shell/manifest'
 import OnboardingPage from '@vendor/features/auth/pages/OnboardingPage'
 import DashboardPage from '@vendor/features/home/pages/DashboardPage'
@@ -83,17 +96,17 @@ export const vendorManifest: ModuleManifest = {
   basePath: '/vendor',
   defaultPath: '/vendor',
   sidebar: [
-    { label: 'Dashboard', path: '/vendor' },
-    { label: 'Sourcing', path: '/vendor/sourcing' },
-    { label: 'Contracts', path: '/vendor/contracts' },
-    { label: 'Bookings', path: '/vendor/bookings' },
-    { label: 'Fleet', path: '/vendor/fleet' },
-    { label: 'Invoices', path: '/vendor/invoices' },
-    { label: 'Bill Discounting', path: '/vendor/receivables' },
-    { label: 'Record Payments', path: '/vendor/record-payments' },
-    { label: 'Ledger', path: '/vendor/ledger' },
-    { label: 'Exceptions', path: '/vendor/exceptions' },
-    { label: 'Profile', path: '/vendor/profile' },
+    { label: 'Dashboard', path: '/vendor', icon: Home },
+    { label: 'Sourcing', path: '/vendor/sourcing', icon: Search },
+    { label: 'Contracts', path: '/vendor/contracts', icon: FileText },
+    { label: 'Bookings', path: '/vendor/bookings', icon: Truck },
+    { label: 'Fleet', path: '/vendor/fleet', icon: Ship },
+    { label: 'Invoices', path: '/vendor/invoices', icon: CreditCard },
+    { label: 'Bill Discounting', path: '/vendor/receivables', icon: Banknote },
+    { label: 'Record Payments', path: '/vendor/record-payments', icon: ReceiptText },
+    { label: 'Ledger', path: '/vendor/ledger', icon: Wallet },
+    { label: 'Exceptions', path: '/vendor/exceptions', icon: ShieldAlert },
+    { label: 'Profile', path: '/vendor/profile', icon: User },
   ],
   Wrapper: VendorWrapper,
   routes: [

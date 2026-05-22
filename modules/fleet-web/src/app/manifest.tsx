@@ -1,6 +1,21 @@
 import { useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Truck } from 'lucide-react'
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  Boxes,
+  ClipboardCheck,
+  Cog,
+  Disc3,
+  LayoutDashboard,
+  Map,
+  Send,
+  ShoppingBag,
+  Truck,
+  Users,
+  Wrench,
+} from 'lucide-react'
 import type { ModuleManifest } from '../../../../src/shell/manifest'
 import { AlertManagementPage } from '../../pages/AlertManagementPage'
 import { BatteryPage } from '../../pages/BatteryPage'
@@ -48,20 +63,20 @@ export const fleetManifest: ModuleManifest = {
   basePath: '/fleet',
   defaultPath: '/fleet/dashboard',
   sidebar: [
-    { label: 'Dashboard', path: '/fleet/dashboard' },
-    { label: 'Ops Intelligence', path: '/fleet/ops-intel' },
-    { label: 'Exception Center', path: '/fleet/exceptions' },
-    { label: 'Live Map', path: '/fleet/live-map' },
-    { label: 'Dispatch Console', path: '/fleet/dispatch' },
-    { label: 'Fleet Management', path: '/fleet/fleet' },
-    { label: 'Driver Management', path: '/fleet/drivers' },
-    { label: 'Marketplace', path: '/fleet/marketplace' },
-    { label: 'Compliance', path: '/fleet/compliance' },
-    { label: 'Driver Behavior', path: '/fleet/behavior' },
-    { label: 'Maintenance', path: '/fleet/maintenance' },
-    { label: 'Garage', path: '/fleet/garage' },
-    { label: 'Tyre Management', path: '/fleet/tyres' },
-    { label: 'Inventory', path: '/fleet/inventory' },
+    { label: 'Dashboard', path: '/fleet/dashboard', icon: LayoutDashboard },
+    { label: 'Ops Intelligence', path: '/fleet/ops-intel', icon: BarChart3 },
+    { label: 'Exception Center', path: '/fleet/exceptions', icon: Bell },
+    { label: 'Live Map', path: '/fleet/live-map', icon: Map },
+    { label: 'Dispatch Console', path: '/fleet/dispatch', icon: Send },
+    { label: 'Fleet Management', path: '/fleet/fleet', icon: Truck },
+    { label: 'Driver Management', path: '/fleet/drivers', icon: Users },
+    { label: 'Marketplace', path: '/fleet/marketplace', icon: ShoppingBag },
+    { label: 'Compliance', path: '/fleet/compliance', icon: ClipboardCheck },
+    { label: 'Driver Behavior', path: '/fleet/behavior', icon: Activity },
+    { label: 'Maintenance', path: '/fleet/maintenance', icon: Wrench },
+    { label: 'Garage', path: '/fleet/garage', icon: Cog },
+    { label: 'Tyre Management', path: '/fleet/tyres', icon: Disc3 },
+    { label: 'Inventory', path: '/fleet/inventory', icon: Boxes },
   ],
   routes: [
     { index: true, element: <Navigate to="dashboard" replace /> },

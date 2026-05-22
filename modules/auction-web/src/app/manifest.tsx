@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Gavel } from 'lucide-react'
+import { FileCheck2, FileSpreadsheet, FileText, Gavel, LayoutDashboard } from 'lucide-react'
 import type { ModuleManifest } from '../../../../src/shell/manifest'
 import DashboardPage from '@auction/features/dashboard/pages/DashboardPage'
 import AuctionsPage from '@auction/features/auctions/pages/AuctionsPage'
@@ -36,11 +36,11 @@ export const auctionManifest: ModuleManifest = {
   basePath: '/auction',
   defaultPath: '/auction/dashboard',
   sidebar: [
-    { label: 'Dashboard', path: '/auction/dashboard' },
-    { label: 'Client Hub', path: '/auction/sourcing' },
-    { label: 'RFQ Responses', path: '/auction/rfq-responses' },
-    { label: 'Auctions', path: '/auction/auctions' },
-    { label: 'Contracts', path: '/auction/contracts' },
+    { label: 'Dashboard', path: '/auction/dashboard', icon: LayoutDashboard },
+    { label: 'Client Hub', path: '/auction/sourcing', icon: FileText },
+    { label: 'RFQ Responses', path: '/auction/rfq-responses', icon: FileSpreadsheet },
+    { label: 'Auctions', path: '/auction/auctions', icon: Gavel },
+    { label: 'Contracts', path: '/auction/contracts', icon: FileCheck2 },
   ],
   Wrapper: AuctionWrapper,
   routes: [
