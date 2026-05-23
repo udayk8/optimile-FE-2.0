@@ -119,9 +119,9 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
           {/* Avg CPK */}
           <div 
             onClick={() => onNavigate('inventory')}
-            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group active:scale-95"
+            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-primary-100 transition-all cursor-pointer group active:scale-95"
           >
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-600">Fleet Avg Cost / KM</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-primary-600">Fleet Avg Cost / KM</p>
             <p className="text-3xl font-black text-slate-900">₹{fleetMetrics.avgCpk.toFixed(2)}</p>
             <div className="mt-2 flex items-center gap-1">
                <span className="text-xs text-green-600 font-bold">● Within Goal</span>
@@ -132,10 +132,10 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
           {/* Health Distribution */}
           <div 
             onClick={() => onNavigate('inventory')}
-            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group active:scale-95"
+            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between hover:shadow-md hover:border-primary-100 transition-all cursor-pointer group active:scale-95"
           >
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-indigo-600">Health Distribution</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-primary-600">Health Distribution</p>
               <div className="flex h-3 w-full rounded-full overflow-hidden mb-3">
                 <div style={{ width: `${(fleetMetrics.healthyCount / (tyres.length || 1)) * 100}%` }} className="bg-green-500 h-full" title="Healthy"></div>
                 <div style={{ width: `${(fleetMetrics.watchCount / (tyres.length || 1)) * 100}%` }} className="bg-amber-500 h-full" title="Watch"></div>
@@ -165,9 +165,9 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
           {/* Total Spend */}
           <div 
             onClick={() => onNavigate('history')}
-            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer group active:scale-95"
+            className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md hover:border-primary-100 transition-all cursor-pointer group active:scale-95"
           >
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-600">Total Life Spend</p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-primary-600">Total Life Spend</p>
             <p className="text-3xl font-black text-slate-900">₹{(fleetMetrics.totalSpend / 100000).toFixed(2)}L</p>
             <p className="text-[10px] text-slate-400 mt-2 font-bold uppercase tracking-tight">Audit Fleet History →</p>
           </div>
@@ -186,7 +186,7 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
                   </div>
                   <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden relative">
                     <div 
-                      className={`h-full rounded-full transition-all duration-1000 ${brand.cpk < 2.0 ? 'bg-indigo-600' : brand.cpk < 2.5 ? 'bg-indigo-400' : 'bg-slate-400'}`} 
+                      className={`h-full rounded-full transition-all duration-1000 ${brand.cpk < 2.0 ? 'bg-primary-600' : brand.cpk < 2.5 ? 'bg-primary-400' : 'bg-slate-400'}`} 
                       style={{ width: `${(brand.cpk / 3.5) * 100}%` }}
                     ></div>
                     {/* Benchmark lines */}
@@ -212,7 +212,7 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
           <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
              <h3 className="font-black text-slate-800 uppercase tracking-widest text-xs mb-6">Strategic Directives</h3>
              <div className="space-y-4">
-                <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 transition-colors cursor-pointer group" onClick={handleRiskDrilldown}>
+                <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-primary-200 transition-colors cursor-pointer group" onClick={handleRiskDrilldown}>
                    <div className="flex items-start gap-5">
                       <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm group-hover:scale-110 transition-transform">⚠</div>
                       <div>
@@ -220,13 +220,13 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
                          <p className="text-[11px] text-slate-500 mt-2 leading-relaxed font-medium italic">
                            {fleetMetrics.replaceCount} tyres are currently performing at &gt; ₹3.00 CPK. Removing these from active long-haul duties will save approximately ₹800 per 1,000 KM traveled.
                          </p>
-                         <button className="mt-3 text-[9px] font-black text-indigo-600 uppercase tracking-widest group-hover:underline">Reconcile Assets →</button>
+                         <button className="mt-3 text-[9px] font-black text-primary-600 uppercase tracking-widest group-hover:underline">Reconcile Assets →</button>
                       </div>
                    </div>
                 </div>
-                <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-indigo-200 transition-colors cursor-pointer group" onClick={() => onNavigate('inventory')}>
+                <div className="p-6 bg-slate-50 border border-slate-100 rounded-3xl hover:border-primary-200 transition-colors cursor-pointer group" onClick={() => onNavigate('inventory')}>
                    <div className="flex items-start gap-5">
-                      <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm group-hover:scale-110 transition-transform">📊</div>
+                      <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-2xl flex items-center justify-center text-2xl shrink-0 shadow-sm group-hover:scale-110 transition-transform">📊</div>
                       <div>
                          <h4 className="text-xs font-black text-slate-900 uppercase">Retread Opportunity</h4>
                          <p className="text-[11px] text-slate-500 mt-2 leading-relaxed font-medium italic">
@@ -245,12 +245,12 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
             <div className="px-10 py-6 bg-slate-950 text-white flex justify-between items-center">
               <div>
                 <h3 className="font-black uppercase tracking-[0.2em] text-sm">Critical Efficiency Recovery</h3>
-                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">High-impact replacement candidates</p>
+                <p className="text-[9px] font-black text-primary-400 uppercase tracking-widest mt-1">High-impact replacement candidates</p>
               </div>
               <div className="flex gap-4">
                 <button 
                   onClick={() => onNavigate('inventory')}
-                  className="px-4 py-2 bg-indigo-600 text-white text-[9px] font-black uppercase rounded-lg hover:bg-indigo-700 transition-all"
+                  className="px-4 py-2 bg-primary-600 text-white text-[9px] font-black uppercase rounded-lg hover:bg-primary-700 transition-all"
                 >
                   Jump to Full Inventory
                 </button>
@@ -285,7 +285,7 @@ export const FleetAnalytics: React.FC<FleetAnalyticsProps> = ({ tyres, repairs, 
                           {m.riskFlags.join(' • ')}
                         </td>
                         <td className="px-8 py-5 text-right">
-                          <button onClick={() => onViewTyre(t.id)} className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">Inspect Detail</button>
+                          <button onClick={() => onViewTyre(t.id)} className="text-[10px] font-black text-primary-600 hover:text-primary-800 uppercase tracking-widest">Inspect Detail</button>
                         </td>
                       </tr>
                     );

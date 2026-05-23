@@ -137,7 +137,7 @@ const TyreTrackerContent: React.FC = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search by vehicle number..."
-              className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 pl-10 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/20 focus:border-indigo-400 transition-all"
+              className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 pl-10 text-sm font-medium outline-none focus:ring-2 ring-primary-500/20 focus:border-primary-400 transition-all"
             />
             <svg className="absolute left-3 top-3.5 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
           </div>
@@ -157,12 +157,12 @@ const TyreTrackerContent: React.FC = () => {
                     setSelectedTyre(null);
                   }}
                   className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${isSelected
-                    ? 'border-indigo-500 bg-indigo-50 shadow-lg'
+                    ? 'border-primary-500 bg-primary-50 shadow-lg'
                     : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
                     }`}
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100'}`}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${isSelected ? 'bg-primary-600 text-white' : 'bg-slate-100'}`}>
                       🚛
                     </div>
                     <div className="flex-1 min-w-0">
@@ -232,7 +232,7 @@ const TyreTrackerContent: React.FC = () => {
                       <button
                         key={tyre.id}
                         onClick={() => setSelectedTyre(tyre)}
-                        className={`p-3 rounded-xl border text-left transition-all hover:shadow-sm ${selectedTyre?.id === tyre.id ? 'border-indigo-500 bg-indigo-50' : 'border-slate-100'}`}
+                        className={`p-3 rounded-xl border text-left transition-all hover:shadow-sm ${selectedTyre?.id === tyre.id ? 'border-primary-500 bg-primary-50' : 'border-slate-100'}`}
                       >
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-slate-900">{formatPosition(tyre.position)}</span>
@@ -265,7 +265,7 @@ const TyreTrackerContent: React.FC = () => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-black text-slate-900">{selectedTyre.id}</h3>
-                  <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">
+                  <p className="text-[10px] font-bold text-primary-600 uppercase tracking-widest mt-1">
                     Position: {formatPosition(selectedTyre.position)}
                   </p>
                 </div>
@@ -320,7 +320,7 @@ const TyreTrackerContent: React.FC = () => {
                   if (!insp) return null;
                   return (
                     <div className="p-4 bg-slate-900 rounded-2xl text-white">
-                      <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mb-2">Last Inspection</p>
+                      <p className="text-[9px] font-bold text-primary-400 uppercase tracking-widest mb-2">Last Inspection</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div>
                           <p className="text-lg font-black">{insp.treadDepthMm || '--'}</p>
@@ -343,7 +343,7 @@ const TyreTrackerContent: React.FC = () => {
                 <div className="space-y-2 pt-2">
                   <button
                     onClick={() => navigate(`/fleet/tyres/${selectedTyre.id}`)}
-                    className="w-full py-3.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-indigo-700 transition-all shadow-lg"
+                    className="w-full py-3.5 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl hover:bg-primary-700 transition-all shadow-lg"
                   >
                     View Full Detail →
                   </button>
@@ -373,7 +373,7 @@ const TyreTrackerContent: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
               <div>
                 <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Log Inspection</h2>
-                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">{selectedTyre.id} · {formatPosition(selectedTyre.position)}</p>
+                <p className="text-[10px] font-bold text-primary-600 uppercase tracking-widest mt-1">{selectedTyre.id} · {formatPosition(selectedTyre.position)}</p>
               </div>
               <button onClick={() => setShowInspModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200">✕</button>
             </div>
@@ -383,7 +383,7 @@ const TyreTrackerContent: React.FC = () => {
                 <div className="flex flex-wrap gap-2">
                   {(['OK', 'Cut', 'Bulge', 'Uneven', 'Damaged'] as const).map(c => (
                     <button key={c} onClick={() => setInspCondition(c)}
-                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase border-2 transition-all ${inspCondition === c ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}>
+                      className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase border-2 transition-all ${inspCondition === c ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}>
                       {c}
                     </button>
                   ))}
@@ -393,23 +393,23 @@ const TyreTrackerContent: React.FC = () => {
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Pressure (PSI)</label>
                   <input type="number" value={inspPressure} onChange={e => setInspPressure(e.target.value)} placeholder="e.g. 110"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/20 focus:border-indigo-400" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-primary-500/20 focus:border-primary-400" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Tread Depth (mm)</label>
                   <input type="number" value={inspTread} onChange={e => setInspTread(e.target.value)} placeholder="e.g. 8"
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/20 focus:border-indigo-400" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-primary-500/20 focus:border-primary-400" />
                 </div>
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1">Remarks</label>
                 <textarea value={inspRemarks} onChange={e => setInspRemarks(e.target.value)} rows={2} placeholder="Optional notes..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/20 focus:border-indigo-400 resize-none" />
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-medium outline-none focus:ring-2 ring-primary-500/20 focus:border-primary-400 resize-none" />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowInspModal(false)} className="flex-1 py-3 border-2 border-slate-100 text-slate-700 text-[10px] font-black uppercase rounded-2xl hover:bg-slate-50">Cancel</button>
-              <button onClick={handleSubmitInspection} className="flex-1 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-indigo-700 shadow-lg">Save Inspection</button>
+              <button onClick={handleSubmitInspection} className="flex-1 py-3 bg-primary-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-primary-700 shadow-lg">Save Inspection</button>
             </div>
           </div>
         </div>

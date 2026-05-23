@@ -40,7 +40,7 @@ export const InspectionLog: React.FC<InspectionLogProps> = ({ inspections, tyres
                       <p className="text-[9px] text-slate-400 font-bold">{new Date(insp.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-xs font-black text-indigo-600 uppercase">{insp.tyreId}</p>
+                      <p className="text-xs font-black text-primary-600 uppercase">{insp.tyreId}</p>
                       <p className="text-[9px] text-slate-400 font-bold uppercase">{tyre?.brand} {tyre?.model}</p>
                     </td>
                     <td className="px-6 py-4">
@@ -62,7 +62,7 @@ export const InspectionLog: React.FC<InspectionLogProps> = ({ inspections, tyres
                     <td className="px-6 py-4 text-right">
                       <button 
                         onClick={() => onViewTyre(insp.tyreId)}
-                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                        className="text-[10px] font-black text-primary-600 hover:text-primary-800 uppercase tracking-widest"
                       >
                         View Asset
                       </button>

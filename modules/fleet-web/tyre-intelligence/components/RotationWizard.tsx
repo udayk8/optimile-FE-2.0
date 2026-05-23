@@ -129,7 +129,7 @@ export const RotationWizard: React.FC<RotationWizardProps> = ({
         <div className="bg-slate-950 px-10 py-8 text-white flex justify-between items-center shrink-0">
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight">Rotation Planner</h2>
-            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Interactive Layout Manager • {vehicle.plateNumber}</p>
+            <p className="text-primary-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Interactive Layout Manager • {vehicle.plateNumber}</p>
           </div>
           <div className="flex gap-4">
              <button onClick={() => { setPlannedTyres(JSON.parse(JSON.stringify(currentTyres))); setMoves([]); }} className="text-xs font-bold text-slate-400 hover:text-white uppercase transition-colors">Reset Plan</button>
@@ -143,7 +143,7 @@ export const RotationWizard: React.FC<RotationWizardProps> = ({
               <div className="absolute top-6 left-6 z-10 bg-white/80 backdrop-blur p-4 rounded-2xl border border-slate-200 shadow-sm">
                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Controls</p>
                  <div className="space-y-2">
-                    <button onClick={() => applyPattern('cross_steer')} className="block w-full text-left text-xs font-bold text-slate-700 hover:text-indigo-600">⇄ Cross Steer</button>
+                    <button onClick={() => applyPattern('cross_steer')} className="block w-full text-left text-xs font-bold text-slate-700 hover:text-primary-600">⇄ Cross Steer</button>
                     {/* Add more patterns as needed */}
                  </div>
               </div>
@@ -178,7 +178,7 @@ export const RotationWizard: React.FC<RotationWizardProps> = ({
                        </div>
                        <div className="text-slate-300">➔</div>
                        <div className="flex-1 text-right">
-                          <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mb-1">New Pos</p>
+                          <p className="text-[9px] font-black text-primary-500 uppercase tracking-widest mb-1">New Pos</p>
                           <p className="text-xs font-black text-slate-900">{formatPosition(move.to)}</p>
                        </div>
                     </div>
@@ -192,7 +192,7 @@ export const RotationWizard: React.FC<RotationWizardProps> = ({
                  <button 
                     disabled={finalDiff.length === 0}
                     onClick={() => onCreateJob(finalDiff)}
-                    className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-indigo-700 disabled:bg-slate-200 disabled:shadow-none transition-all"
+                    className="w-full py-4 bg-primary-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-primary-700 disabled:bg-slate-200 disabled:shadow-none transition-all"
                  >
                     Create Rotation Job ({finalDiff.length / 2} Swaps)
                  </button>

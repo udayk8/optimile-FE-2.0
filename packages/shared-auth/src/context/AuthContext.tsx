@@ -18,40 +18,12 @@ import {
 interface MockUser { name: string; role: SystemRole; modules: ERPModule[]; permissions: string[] }
 
 export const DEMO_CREDENTIALS: Record<string, MockUser> = {
-  // CEO — sees all 5 modules → goes to /modules dashboard
+  // CEO — full access to all in-scope modules → goes into unified shell
   'ceo@uday.ts.com': {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
-    modules: ['ams', 'fleet', 'vendor', 'customer'],
-  },
-  // Fleet Manager — only fleet → goes directly to /fleet
-  'fleet@uday.ts.com': {
-    name: 'Rahul Mehta',
-    role: 'Fleet Manager',
-    permissions: ['fleet:read', 'fleet:write'],
-    modules: ['fleet'],
-  },
-  // Auction Head — only auction → goes directly to /auction/dashboard
-  'auction@pranay.ts.com': {
-    name: 'Pranay Sharma',
-    role: 'Auction Head',
-    permissions: ['ams:read', 'ams:write'],
-    modules: ['ams'],
-  },
-  // Customer Booking Dashboard — only customer → goes directly to /customer
-  'cbd@optimile.com': {
-    name: 'Customer Booking Desk',
-    role: 'CBD',
-    permissions: ['customer:read', 'customer:write'],
-    modules: ['customer'],
-  },
-  // Vendor Manager — only vendor → goes directly to /vendor
-  'vendor@pranay.ts.com': {
-    name: 'Pranay Verma',
-    role: 'Vendor',
-    permissions: ['vendor:read', 'vendor:write'],
-    modules: ['vendor'],
+    modules: ['fleet', 'ams', 'vendor'],
   },
   // Platform Admin — platform administration console
   'platform-admin@optimile.com': {
@@ -67,26 +39,12 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['tenant-admin:read', 'tenant-admin:write'],
     modules: ['tenant-admin'],
   },
-  // Track and Trace — standalone visibility module
-  'tracking@optimile.com': {
-    name: 'Track and Trace User',
-    role: 'Track and Trace',
-    permissions: ['tracking:read'],
-    modules: ['tracking'],
-  },
   // TMS Booking — standalone booking module
   'tms-booking@optimile.com': {
     name: 'TMS Booking User',
     role: 'TMS',
     permissions: ['tms-booking:read', 'tms-booking:write'],
     modules: ['tms-booking'],
-  },
-  // Driver — driver app
-  'driver@optimile.com': {
-    name: 'Driver User',
-    role: 'Driver',
-    permissions: ['driver-app:read'],
-    modules: ['driver-app'],
   },
 }
 

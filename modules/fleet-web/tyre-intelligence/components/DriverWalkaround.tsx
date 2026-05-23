@@ -95,7 +95,7 @@ export const DriverWalkaround: React.FC<DriverWalkaroundProps> = ({
             <select 
                value={selectedVehicleId}
                onChange={e => { setSelectedVehicleId(e.target.value); setChecks({}); }}
-               className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 ring-indigo-500"
+               className="w-full bg-slate-800 text-white border border-slate-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 ring-primary-500"
             >
                {vehicles.map(v => <option key={v.id} value={v.id}>{v.plateNumber}</option>)}
             </select>
@@ -141,7 +141,7 @@ export const DriverWalkaround: React.FC<DriverWalkaroundProps> = ({
                onClick={handleSubmit}
                disabled={pendingCount > 0}
                className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all ${
-                  pendingCount === 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                  pendingCount === 0 ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                }`}
             >
                {pendingCount > 0 ? `Complete ${pendingCount} More Checks` : 'Submit Inspection Log'}

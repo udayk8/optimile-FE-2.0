@@ -48,14 +48,14 @@ export const JobCardBoard: React.FC<JobCardBoardProps> = ({ jobCards, onIssueSto
               {jobCards.filter(jc => jc.status === col.id).map(card => (
                 <div key={card.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group">
                   <div className="flex justify-between items-start mb-3">
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{card.id}</span>
+                    <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{card.id}</span>
                     <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${card.priority === 'High' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-slate-50 text-slate-500 border-slate-100'}`}>{card.priority}</span>
                   </div>
                   
                   <div className="mb-4">
                     <p className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
                         {card.vehicleId} 
-                        {card.type === 'ROTATION' && <span className="text-[9px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100">ROTATION</span>}
+                        {card.type === 'ROTATION' && <span className="text-[9px] bg-primary-50 text-primary-600 px-2 py-0.5 rounded border border-primary-100">ROTATION</span>}
                         {card.type === 'ALIGNMENT' && <span className="text-[9px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded border border-purple-100">ALIGNMENT</span>}
                     </p>
                     
@@ -82,7 +82,7 @@ export const JobCardBoard: React.FC<JobCardBoardProps> = ({ jobCards, onIssueSto
                         <>
                             <p className="text-[10px] text-slate-500 mt-1 uppercase font-medium">Remove: <span className="font-bold text-slate-700">{card.targetTyreId}</span> <span className="text-slate-300">•</span> {formatPosition(card.position)}</p>
                             {card.replacementTyreId && (
-                            <p className="text-[10px] text-slate-500 mt-0.5 uppercase font-medium">Install: <span className="font-bold text-indigo-600">{card.replacementTyreId}</span></p>
+                            <p className="text-[10px] text-slate-500 mt-0.5 uppercase font-medium">Install: <span className="font-bold text-primary-600">{card.replacementTyreId}</span></p>
                             )}
                         </>
                     )}
@@ -97,7 +97,7 @@ export const JobCardBoard: React.FC<JobCardBoardProps> = ({ jobCards, onIssueSto
                       <button 
                         onClick={() => onIssueStock(card.id)}
                         disabled={!canIssue}
-                        className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 py-1.5 bg-slate-900 text-white text-[9px] font-black uppercase rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {card.type === 'ROTATION' || card.type === 'ALIGNMENT' ? 'Approve Plan' : 'Issue Stock'}
                       </button>

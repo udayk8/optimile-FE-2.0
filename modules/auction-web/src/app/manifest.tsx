@@ -1,7 +1,7 @@
-import { Navigate, useRoutes } from 'react-router-dom'
-import { ProtectedRoute } from '@shared-auth'
-import { AppShell } from '@auction/components/layout/AppShell'
-import LoginPage from '@auction/features/auth/pages/LoginPage'
+import { Navigate } from 'react-router-dom'
+import { FileSpreadsheet, FileText, Gavel, LayoutDashboard } from 'lucide-react'
+import type { ModuleManifest } from '@shared-ui'
+import { AuctionRouteWrapper } from './AuctionRouteWrapper'
 import DashboardPage from '@auction/features/dashboard/pages/DashboardPage'
 import AuctionsPage from '@auction/features/auctions/pages/AuctionsPage'
 import AuctionCreatePage from '@auction/features/auctions/pages/AuctionCreatePage'
@@ -14,9 +14,21 @@ import RfqCreatePage from '@auction/features/sourcing/pages/RfqCreatePage'
 import RfqDetailPage from '@auction/features/sourcing/pages/RfqDetailPage'
 import RfqResponsesPage from '@auction/features/sourcing/pages/RfqResponsesPage'
 
-export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) {
-  const protectedChildren = [
-    { index: true, element: <Navigate to="dashboard" replace /> },
+export const auctionManifest: ModuleManifest = {
+  key: 'auction',
+  label: 'Auction',
+  icon: Gavel,
+  basePath: '/auction',
+  sidebar: [
+    { label: 'Dashboard', path: '/auction/dashboard', icon: LayoutDashboard },
+    { label: 'Client Hub', path: '/auction/sourcing', icon: FileText },
+    { label: 'RFQ Responses', path: '/auction/rfq-responses', icon: FileSpreadsheet },
+    { label: 'Auctions', path: '/auction/auctions', icon: Gavel },
+    { label: 'Contracts', path: '/auction/contracts', icon: FileText },
+  ],
+  wrapper: AuctionRouteWrapper,
+  routes: [
+    { index: true, element: <Navigate to="/auction/dashboard" replace /> },
     { path: 'dashboard', element: <DashboardPage /> },
     { path: 'auctions', element: <AuctionsPage /> },
     { path: 'auctions/new', element: <AuctionCreatePage /> },
@@ -30,27 +42,6 @@ export function AuctionRoutes({ standalone = false }: { standalone?: boolean }) 
     { path: 'sourcing/rfq/new', element: <RfqCreatePage /> },
     { path: 'sourcing/rfq/:id', element: <RfqDetailPage /> },
     { path: 'rfq-responses', element: <RfqResponsesPage /> },
-    { path: '*', element: <Navigate to="dashboard" replace /> },
-  ]
-
-  const routes = standalone
-    ? [
-        { path: '/login', element: <LoginPage /> },
-        { path: '/', element: <Navigate to="/auction" replace /> },
-        {
-          path: '/auction',
-          element: <ProtectedRoute portal="auction"><AppShell /></ProtectedRoute>,
-          children: protectedChildren,
-        },
-        { path: '*', element: <Navigate to="/auction/dashboard" replace /> },
-      ]
-    : [
-        {
-          path: '/',
-          element: <AppShell />,
-          children: protectedChildren,
-        },
-      ]
-
-  return useRoutes(routes)
+    { path: '*', element: <Navigate to="/auction/dashboard" replace /> },
+  ],
 }

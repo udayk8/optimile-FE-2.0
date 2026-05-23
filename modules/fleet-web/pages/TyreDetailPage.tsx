@@ -37,7 +37,7 @@ const TyreDetailContent: React.FC = () => {
                     <p className="text-sm text-slate-500 mb-6">ID: {tyreId}</p>
                     <button
                         onClick={() => navigate('/fleet/tyres')}
-                        className="px-6 py-3 bg-indigo-600 text-white text-xs font-bold uppercase rounded-xl"
+                        className="px-6 py-3 bg-primary-600 text-white text-xs font-bold uppercase rounded-xl"
                     >
                         Back to Inventory
                     </button>

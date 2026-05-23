@@ -205,7 +205,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
               <div className="mt-3 flex gap-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                 <span className="text-slate-900">{tyre.brand} {tyre.model}</span>
                 <span>•</span>
-                <span className="text-indigo-600">Stage {tyre.currentLifeNo === 0 ? 'NEW' : `RT${tyre.currentLifeNo}`}</span>
+                <span className="text-primary-600">Stage {tyre.currentLifeNo === 0 ? 'NEW' : `RT${tyre.currentLifeNo}`}</span>
                 {tyre.currentVehicleId && (() => {
                   const vehicle = vehicles.find(v => v.id === tyre.currentVehicleId);
                   return vehicle ? (
@@ -262,7 +262,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
             {tyre.position && (
               <div className="text-right">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Vehicle Position</p>
-                <p className="text-sm font-black text-indigo-600">{formatPosition(tyre.position)}</p>
+                <p className="text-sm font-black text-primary-600">{formatPosition(tyre.position)}</p>
               </div>
             )}
           </div>
@@ -273,11 +273,11 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
             <button
               key={id}
               onClick={() => setActiveTab(id as any)}
-              className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] relative transition-colors ${activeTab === id ? 'text-indigo-600' : 'text-slate-400'
+              className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] relative transition-colors ${activeTab === id ? 'text-primary-600' : 'text-slate-400'
                 }`}
             >
               {id}
-              {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 rounded-full"></div>}
+              {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-600 rounded-full"></div>}
             </button>
           ))}
         </div>
@@ -293,7 +293,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        <h4 className="font-black uppercase text-[10px] tracking-[0.3em] text-indigo-400">TPMS Live Telematics</h4>
+                        <h4 className="font-black uppercase text-[10px] tracking-[0.3em] text-primary-400">TPMS Live Telematics</h4>
                       </div>
                       <p className="text-xs font-bold text-slate-400">Sensor ID: {tyre.sensorId}</p>
                     </div>
@@ -321,7 +321,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                   {onLinkSensor && (
                     <button
                       onClick={() => onLinkSensor(tyre.id)}
-                      className="px-6 py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors"
+                      className="px-6 py-3 bg-primary-50 text-primary-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-100 transition-colors"
                     >
                       Link New Sensor
                     </button>
@@ -348,7 +348,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                 <div className="absolute top-0 right-0 p-8">
                   <span className="text-4xl opacity-20">💰</span>
                 </div>
-                <h4 className="font-black uppercase text-[10px] tracking-[0.3em] mb-6 text-indigo-400">Total Lifecycle Investment (Net)</h4>
+                <h4 className="font-black uppercase text-[10px] tracking-[0.3em] mb-6 text-primary-400">Total Lifecycle Investment (Net)</h4>
                 <div className="flex items-end gap-3">
                   <p className="text-5xl font-black">₹{metrics.totalCost.toLocaleString()}</p>
                   <p className="text-xs text-slate-400 font-bold mb-2 uppercase tracking-widest">Incurred to Date</p>
@@ -376,31 +376,31 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
           {/* ... other tabs same ... */}
           {activeTab === 'intelligence' && (
             <div className="space-y-8 animate-in fade-in duration-300">
-              <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-[32px] relative overflow-hidden">
-                <div className="absolute top-2 right-4 text-[8px] font-black text-indigo-300 bg-white px-2 py-1 rounded-full uppercase tracking-widest shadow-sm">AI Powered Analytics</div>
-                <h4 className="font-black text-indigo-900 uppercase text-[10px] tracking-widest mb-4 flex items-center gap-2">
+              <div className="p-8 bg-primary-50 border border-primary-100 rounded-[32px] relative overflow-hidden">
+                <div className="absolute top-2 right-4 text-[8px] font-black text-primary-300 bg-white px-2 py-1 rounded-full uppercase tracking-widest shadow-sm">AI Powered Analytics</div>
+                <h4 className="font-black text-primary-900 uppercase text-[10px] tracking-widest mb-4 flex items-center gap-2">
                   <span className="text-lg">🤖</span> Lifecycle Intelligence Forecast
                 </h4>
 
                 {isAiLoading ? (
                   <div className="py-10 flex flex-col items-center justify-center space-y-4">
-                    <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest animate-pulse">Running Monte Carlo Simulations...</p>
+                    <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                    <p className="text-[10px] font-black text-primary-400 uppercase tracking-widest animate-pulse">Running Monte Carlo Simulations...</p>
                   </div>
                 ) : (
-                  <div className="prose prose-sm prose-indigo max-w-none text-indigo-800 leading-relaxed font-medium">
+                  <div className="prose prose-sm prose-indigo max-w-none text-primary-800 leading-relaxed font-medium">
                     {aiAnalysis ? (
-                      <div dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\*\*(.*?)\*\*/g, '<b class="text-indigo-950 uppercase text-[9px] block mt-4 tracking-widest">$1</b>') }}></div>
+                      <div dangerouslySetInnerHTML={{ __html: aiAnalysis.replace(/\*\*(.*?)\*\*/g, '<b class="text-primary-950 uppercase text-[9px] block mt-4 tracking-widest">$1</b>') }}></div>
                     ) : "Generate predictive wear data by selecting this tab."}
                   </div>
                 )}
-                <button onClick={fetchAiAnalysis} className="mt-6 text-[9px] font-black text-indigo-600 uppercase tracking-widest border-b border-indigo-200 hover:border-indigo-600 transition-all">Re-run Predictive Model</button>
+                <button onClick={fetchAiAnalysis} className="mt-6 text-[9px] font-black text-primary-600 uppercase tracking-widest border-b border-primary-200 hover:border-primary-600 transition-all">Re-run Predictive Model</button>
               </div>
 
               <div className="space-y-3">
                 <div className="flex justify-between items-end">
                   <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Life-to-Cost Ratio</h4>
-                  <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
+                  <span className="text-[10px] font-black text-primary-600 bg-primary-50 px-3 py-1 rounded-full">
                     ₹{Math.round(metrics.totalCost / (tyre.currentLifeNo + 1)).toLocaleString()} / LIFE STAGE
                   </span>
                 </div>
@@ -421,7 +421,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
               <div className="bg-slate-950 px-10 py-8 text-white flex justify-between items-center">
                 <div>
                   <h2 className="text-lg font-black uppercase tracking-widest">Work Order Wizard</h2>
-                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mt-1">Step {changeStep} of 3</p>
+                  <p className="text-[10px] font-black text-primary-400 uppercase tracking-widest mt-1">Step {changeStep} of 3</p>
                 </div>
                 <button onClick={() => setModal(null)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold hover:bg-white/20">✕</button>
               </div>
@@ -438,7 +438,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                             setRemovalReason(reason);
                             setChangeStep(2);
                           }}
-                          className="p-5 border-2 border-slate-100 rounded-3xl text-[10px] font-black uppercase tracking-widest text-slate-700 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all text-center"
+                          className="p-5 border-2 border-slate-100 rounded-3xl text-[10px] font-black uppercase tracking-widest text-slate-700 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 transition-all text-center"
                         >
                           {reason}
                         </button>
@@ -462,9 +462,9 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                             setNextAction(action.id as any);
                             setChangeStep(3);
                           }}
-                          className="p-6 border-2 border-slate-100 rounded-3xl text-left hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+                          className="p-6 border-2 border-slate-100 rounded-3xl text-left hover:border-primary-500 hover:bg-primary-50 transition-all group"
                         >
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 group-hover:text-indigo-600">{action.label}</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-900 group-hover:text-primary-600">{action.label}</p>
                           <p className="text-[9px] text-slate-400 font-bold mt-1">{action.desc}</p>
                         </button>
                       ))}
@@ -481,7 +481,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                         <button
                           key={t.id}
                           onClick={() => setReplacementId(t.id)}
-                          className={`w-full p-4 border-2 rounded-2xl flex justify-between items-center transition-all ${replacementId === t.id ? 'border-indigo-600 bg-indigo-50' : 'border-slate-100 hover:border-slate-200'
+                          className={`w-full p-4 border-2 rounded-2xl flex justify-between items-center transition-all ${replacementId === t.id ? 'border-primary-600 bg-primary-50' : 'border-slate-100 hover:border-slate-200'
                             }`}
                         >
                           <div>
@@ -507,7 +507,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                 <button
                   disabled={changeStep !== 3 || !replacementId}
                   onClick={handleCreateOrder}
-                  className={`flex-[2] py-5 rounded-2xl text-[10px] font-black uppercase shadow-xl transition-all active:scale-95 ${changeStep === 3 && replacementId ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  className={`flex-[2] py-5 rounded-2xl text-[10px] font-black uppercase shadow-xl transition-all active:scale-95 ${changeStep === 3 && replacementId ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                 >
                   Create Work Order
@@ -520,7 +520,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
         {modal === 'inspect' && (
           <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-6 z-[100] animate-in fade-in duration-200">
             <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg p-10 animate-in zoom-in-95">
-              <h2 className="text-xl font-black uppercase tracking-[0.1em] mb-8 text-indigo-900">Yard Inspection Log</h2>
+              <h2 className="text-xl font-black uppercase tracking-[0.1em] mb-8 text-primary-900">Yard Inspection Log</h2>
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Physical Condition</label>
@@ -549,7 +549,7 @@ export const TyreDetail: React.FC<TyreDetailProps> = ({
                     setInspectPressure('');
                     setInspectTread('');
                     setInspectRemarks('');
-                  }} className="flex-[2] py-5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-indigo-700">Commit Log</button>
+                  }} className="flex-[2] py-5 bg-primary-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-primary-700">Commit Log</button>
                 </div>
               </div>
             </div>

@@ -31,12 +31,13 @@ export function LoginShell() {
   }
 
   const getRoleHelper = (role: string) => {
-    if (role === 'CEO') return 'All Access'
+    if (role === 'CEO') return 'ALL ACCESS'
     return null
   }
 
   const getRoleLabel = (role: string) => {
     if (role === 'Platform Admin') return 'Administration'
+    if (role === 'TMS') return 'TMS'
     return role
   }
 

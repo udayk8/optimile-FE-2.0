@@ -112,7 +112,7 @@ const getRuleIcon = (ruleName: string) => {
   if (ruleName === 'Geofence violation') return <MapPin className="h-6 w-6 text-blue-500" />;
   if (ruleName === 'Fuel theft detection') return <FlaskConical className="h-6 w-6 text-red-500" />;
   if (ruleName === 'Tampering / Device disconnect') return <ShieldAlert className="h-6 w-6 text-violet-500" />;
-  if (ruleName === 'Night driving') return <Moon className="h-6 w-6 text-indigo-500" />;
+  if (ruleName === 'Night driving') return <Moon className="h-6 w-6 text-primary-500" />;
   if (ruleName === 'Fatigue / sleeping') return <Coffee className="h-6 w-6 text-orange-700" />;
   if (ruleName === 'Accident / Impact violation') return <TriangleAlert className="h-6 w-6 text-red-600" />;
   if (ruleName === 'Harsh braking') return <TriangleAlert className="h-6 w-6 text-red-500" />;
@@ -239,7 +239,7 @@ export const AlertManagementPage: React.FC = () => {
 
   const getStatusPill = (status: AlertStatus) => {
     if (status === 'Active') return 'text-red-600 bg-red-100';
-    if (status === 'Assigned') return 'text-indigo-700 bg-indigo-100';
+    if (status === 'Assigned') return 'text-primary-700 bg-primary-100';
     if (status === 'Resolved') return 'text-green-700 bg-green-100';
     return 'text-gray-600 bg-gray-100';
   };
@@ -296,7 +296,7 @@ export const AlertManagementPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => openEditRule(rule)}
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-900 hover:text-indigo-700"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-primary-900 hover:text-primary-700"
                   >
                     <PencilLine className="h-5 w-5" />
                     Edit
@@ -323,7 +323,7 @@ export const AlertManagementPage: React.FC = () => {
                   <textarea
                     value={editDraft.description}
                     onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })}
-                    className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-slate-700 focus:border-indigo-500 focus:outline-none"
+                    className="h-28 w-full resize-none rounded-xl border border-gray-300 bg-gray-50 px-4 py-3 text-sm text-slate-700 focus:border-primary-500 focus:outline-none"
                   />
                 </div>
 
@@ -332,7 +332,7 @@ export const AlertManagementPage: React.FC = () => {
                   <input
                     value={editDraft.threshold}
                     onChange={(e) => setEditDraft({ ...editDraft, threshold: e.target.value })}
-                    className="h-11 w-full rounded-xl border border-gray-300 px-4 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+                    className="h-11 w-full rounded-xl border border-gray-300 px-4 text-sm text-slate-800 focus:border-primary-500 focus:outline-none"
                   />
                   <p className="mt-1 text-xs text-slate-500">{editDraft.helperText || 'Set rule trigger threshold'}</p>
                 </div>
@@ -342,7 +342,7 @@ export const AlertManagementPage: React.FC = () => {
                   <select
                     value={editDraft.priority}
                     onChange={(e) => setEditDraft({ ...editDraft, priority: e.target.value as 'High' | 'Medium' })}
-                    className="h-11 w-full rounded-xl border border-gray-300 px-4 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none"
+                    className="h-11 w-full rounded-xl border border-gray-300 px-4 text-sm text-slate-800 focus:border-primary-500 focus:outline-none"
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
@@ -361,7 +361,7 @@ export const AlertManagementPage: React.FC = () => {
                           type="button"
                           onClick={() => toggleRuleChannel(channel)}
                           className={`inline-flex h-11 items-center gap-2 rounded-xl border px-4 text-sm ${
-                            selected ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 text-slate-600 hover:bg-gray-50'
+                            selected ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-300 text-slate-600 hover:bg-gray-50'
                           }`}
                         >
                           {getRuleChannelIcon(channel)}
@@ -381,7 +381,7 @@ export const AlertManagementPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={saveRule}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-900 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-800"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary-900 px-5 py-3 text-sm font-semibold text-white hover:bg-primary-800"
                 >
                   <Save className="h-5 w-5" />
                   Save Changes

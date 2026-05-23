@@ -77,7 +77,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
           {!isAdding && (
             <button 
               onClick={() => setIsAdding(true)}
-              className="px-6 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all"
+              className="px-6 py-3 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-primary-700 transition-all"
             >
               + New Configuration
             </button>
@@ -94,7 +94,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                     type="text" 
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 ring-indigo-500/10"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-4 ring-primary-500/10"
                     placeholder="e.g. 5-Axle Heavy Hauler"
                   />
                 </div>
@@ -102,7 +102,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Axle Stack</h3>
-                    <button onClick={handleAddAxle} className="text-[10px] font-black text-indigo-600 uppercase">Add Axle +</button>
+                    <button onClick={handleAddAxle} className="text-[10px] font-black text-primary-600 uppercase">Add Axle +</button>
                   </div>
                   
                   <div className="space-y-3">
@@ -119,7 +119,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                               updated[idx].isDual = !updated[idx].isDual;
                               setNewAxles(updated);
                             }}
-                            className={`px-4 py-2 text-[8px] font-black uppercase rounded-lg border transition-all ${axle.isDual ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600'}`}
+                            className={`px-4 py-2 text-[8px] font-black uppercase rounded-lg border transition-all ${axle.isDual ? 'bg-primary-600 text-white shadow-md' : 'bg-white text-slate-600'}`}
                           >
                             Dual
                           </button>
@@ -129,7 +129,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                               updated[idx].isSteer = !updated[idx].isSteer;
                               setNewAxles(updated);
                             }}
-                            className={`px-4 py-2 text-[8px] font-black uppercase rounded-lg border transition-all ${axle.isSteer ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-slate-600'}`}
+                            className={`px-4 py-2 text-[8px] font-black uppercase rounded-lg border transition-all ${axle.isSteer ? 'bg-primary-600 text-white shadow-md' : 'bg-white text-slate-600'}`}
                           >
                             Steer
                           </button>
@@ -152,7 +152,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
 
                 <div className="pt-6 border-t border-slate-100 flex gap-4">
                   <button onClick={() => setIsAdding(false)} className="flex-1 py-5 border-2 border-slate-100 rounded-2xl text-[10px] font-black uppercase text-slate-500 hover:bg-slate-50 transition-colors">Cancel</button>
-                  <button onClick={handleSave} className="flex-[2] py-5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-2xl hover:bg-indigo-700 transition-all">Save Blueprint</button>
+                  <button onClick={handleSave} className="flex-[2] py-5 bg-primary-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-2xl hover:bg-primary-700 transition-all">Save Blueprint</button>
                 </div>
               </div>
 
@@ -208,7 +208,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
               >
                  <div>
                    <div className="flex justify-between items-start mb-6">
-                     <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-xl group-hover:bg-indigo-100 transition-colors">🚛</div>
+                     <div className="w-12 h-12 bg-primary-50 rounded-2xl flex items-center justify-center text-xl group-hover:bg-primary-100 transition-colors">🚛</div>
                      <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -220,7 +220,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                      </button>
                    </div>
                    <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight leading-tight mb-2">{type.name}</h3>
-                   <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">View Blueprint →</p>
+                   <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">View Blueprint →</p>
                  </div>
                  <div className="flex gap-6 border-t border-slate-100 pt-6 mt-4">
                    <div>
@@ -244,7 +244,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
               <div className="bg-slate-950 px-10 py-8 text-white flex justify-between items-center shrink-0">
                 <div>
                   <h2 className="text-2xl font-black uppercase tracking-tight">{viewingType.name}</h2>
-                  <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Technical specification & Position map</p>
+                  <p className="text-primary-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Technical specification & Position map</p>
                 </div>
                 <button onClick={() => setViewingType(null)} className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center font-bold text-lg hover:bg-white/20 transition-all">✕</button>
               </div>
@@ -296,7 +296,7 @@ export const VehicleMaster: React.FC<VehicleMasterProps> = ({ vehicleTypes, onAd
                               <div className="grid grid-cols-2 gap-2">
                                  {positions.map(pos => (
                                     <div key={formatPosition(pos)} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                                      <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight">
+                                      <p className="text-[9px] font-black text-primary-600 uppercase tracking-tight">
                                         {pos.side} {pos.position}
                                       </p>
                                       <p className="text-xs font-black text-slate-700 mt-1 uppercase tracking-tighter">

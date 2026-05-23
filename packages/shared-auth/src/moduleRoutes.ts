@@ -33,12 +33,11 @@ export function getAccessibleModules(user: User | null) {
     .map(m => ({ id: m, dashboardPath: MODULE_ROUTES[m] }))
 }
 
+/** Unified-shell landing — every logged-in user enters the shell.
+ *  RBAC filtering of sidebar sections will be added later. */
+const SHELL_LANDING = '/fleet/dashboard'
+
 export function getPostLoginRouteForUser(user: User | null): string {
   if (!user) return '/login'
-  const accessible = getAccessibleModules(user)
-  if (accessible.length === 1) {
-    const [onlyModule] = accessible
-    return onlyModule?.dashboardPath ?? '/modules'
-  }
-  return '/modules'
+  return SHELL_LANDING
 }
