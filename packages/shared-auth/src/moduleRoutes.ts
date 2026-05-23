@@ -34,10 +34,21 @@ export function getAccessibleModules(user: User | null) {
 }
 
 /** Unified-shell landing — every logged-in user enters the shell.
- *  RBAC filtering of sidebar sections will be added later. */
-const SHELL_LANDING = '/fleet/dashboard'
+ *  RBAC filtering of sidebar sections handled by the shell. */
+const SHELL_LANDING_BY_MODULE: Record<string, string> = {
+  fleet: '/fleet/dashboard',
+  ams: '/auction/dashboard',
+  vendor: '/vendor',
+}
+const SHELL_LANDING_DEFAULT = '/fleet/dashboard'
 
 export function getPostLoginRouteForUser(user: User | null): string {
   if (!user) return '/login'
-  return SHELL_LANDING
+  if (user.permissions.includes('all')) return SHELL_LANDING_DEFAULT
+  for (const code of ['fleet', 'ams', 'vendor'] as const) {
+    if (user.modules.includes(code) && SHELL_LANDING_BY_MODULE[code]) {
+      return SHELL_LANDING_BY_MODULE[code]
+    }
+  }
+  return SHELL_LANDING_DEFAULT
 }

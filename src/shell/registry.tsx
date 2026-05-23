@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { Navigate, Route, useNavigate } from 'react-router-dom'
-import { ProtectedRoute, useAuth, OptimileLogo } from '@shared-auth'
+import { ProtectedRoute, useAuth, OptimileLogo, getPostLoginRouteForUser } from '@shared-auth'
 import { ShellAppShell, type ModuleManifest } from '@shared-ui'
 import { vendorManifest } from '@vendor/app/manifest'
 import { auctionManifest } from '@auction/app/manifest'
@@ -84,10 +84,15 @@ export function ShellLayout() {
   )
 }
 
+function ShellIndexRedirect() {
+  const { user } = useAuth()
+  return <Navigate to={getPostLoginRouteForUser(user)} replace />
+}
+
 export function buildShellChildRoutes() {
   return (
     <>
-      <Route index element={<Navigate to={LANDING_PATH} replace />} />
+      <Route index element={<ShellIndexRedirect />} />
       {MODULES.map((manifest) => (
         <Route key={manifest.key} path={manifest.basePath}>
           {manifest.routes.map((route, idx) => {

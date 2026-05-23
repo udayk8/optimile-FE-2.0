@@ -53,6 +53,27 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['vendor:read', 'vendor:write', 'fleet:read', 'fleet:write'],
     modules: ['fleet', 'vendor'],
   },
+  // Auction only
+  'auction@optimile.com': {
+    name: 'Auction User',
+    role: 'Auction Only',
+    permissions: ['ams:read', 'ams:write'],
+    modules: ['ams'],
+  },
+  // Fleet only
+  'fleet@optimile.com': {
+    name: 'Fleet User',
+    role: 'Fleet Only',
+    permissions: ['fleet:read', 'fleet:write'],
+    modules: ['fleet'],
+  },
+  // Vendor only
+  'vendor@optimile.com': {
+    name: 'Vendor User',
+    role: 'Vendor Only',
+    permissions: ['vendor:read', 'vendor:write'],
+    modules: ['vendor'],
+  },
 }
 
 export const DEMO_PASSWORD = 'testing'
