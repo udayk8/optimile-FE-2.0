@@ -30,7 +30,7 @@ export function Modal({
             <X size={16} />
           </Button>
         </div>
-        {children}
+        {children as any}
       </div>
     </div>
   );

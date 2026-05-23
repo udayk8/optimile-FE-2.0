@@ -10,6 +10,25 @@ import { fleetManifest } from '@fleet/app/manifest'
 
 export const MODULES: ModuleManifest[] = [fleetManifest, auctionManifest, vendorManifest]
 
+/** manifest.key → ERPModule code on user.modules */
+const MODULE_KEY_TO_ERP: Record<string, string> = {
+  fleet: 'fleet',
+  auction: 'ams',
+  vendor: 'vendor',
+}
+
+function filterModulesForUser(
+  modules: ModuleManifest[],
+  user: { permissions: string[]; modules: string[] } | null,
+): ModuleManifest[] {
+  if (!user) return []
+  if (user.permissions.includes('all')) return modules
+  return modules.filter((m) => {
+    const erp = MODULE_KEY_TO_ERP[m.key]
+    return erp ? user.modules.includes(erp) : false
+  })
+}
+
 const LANDING_PATH = '/fleet/dashboard'
 
 const queryClient = new QueryClient({
@@ -34,9 +53,13 @@ function ShellWithAuth() {
     logout()
     navigate('/login', { replace: true })
   }
+  const visibleModules = filterModulesForUser(
+    MODULES,
+    user ? { permissions: user.permissions, modules: user.modules } : null,
+  )
   return (
     <ShellAppShell
-      modules={MODULES}
+      modules={visibleModules}
       user={user ? { name: user.name, email: user.email, role: user.role } : null}
       onLogout={onLogout}
       logo={<OptimileLogo className="text-white" style={{ height: 40, width: 'auto' }} />}

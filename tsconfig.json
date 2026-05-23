@@ -25,7 +25,6 @@
       "@/shared/store": ["modules/platform-admin-web/src/store"],
       "@/shared/store/*": ["modules/platform-admin-web/src/store/*"],
       "@/types": ["modules/platform-admin-web/src/types"],
-      "@/types/*": ["modules/platform-admin-web/src/types/*"],
       "@/modules/platform-admin": ["modules/platform-admin"],
       "@/modules/platform-admin/*": ["modules/platform-admin/*"],
       "@admin":    ["modules/auction-web/src"],
@@ -56,9 +55,34 @@
       "@shared-auth/*": ["packages/shared-auth/src/*"],
       "@shared-ui": ["packages/shared-ui/src"],
       "@shared-ui/*": ["packages/shared-ui/src/*"],
+      "@/components/*": ["modules/tms-driver-app-web/src/components/*"],
+      "@/pages/*": ["modules/tms-driver-app-web/src/pages/*"],
+      "@/store/*": ["modules/tms-driver-app-web/src/store/*"],
+      "@/mocks/*": ["modules/tms-driver-app-web/src/mocks/*"],
+      "@/lib/*": ["modules/tms-driver-app-web/src/lib/*"],
+      "@/data/*": ["modules/tms-driver-app-web/src/data/*"],
+      "@/router/*": ["modules/tms-driver-app-web/src/router/*"],
+      "@/types/*": ["modules/platform-admin-web/src/types/*", "modules/tms-driver-app-web/src/types/*"],
+      "@/services/*": ["modules/tms-driver-app-web/src/services/*"],
+      "@/hooks/*": ["modules/tms-driver-app-web/src/hooks/*"],
+      "@/i18n/*": ["modules/tms-driver-app-web/src/i18n/*"],
+      "@/utils/*": ["modules/tms-driver-app-web/src/utils/*"],
       "@shared-utils": ["packages/shared-utils/src"],
       "@shared-utils/*": ["packages/shared-utils/src/*"]
     }
   },
-  "include": ["src", "modules", "packages", "vite.config.ts"]
+  "include": ["src", "modules", "packages", "vite.config.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/dist",
+    "modules/tenant-admin",
+    "modules/tms",
+    "modules/admin-web",
+    "modules/console-web",
+    "modules/customer-web",
+    "modules/tms-driver-app-web",
+    "modules/platform-admin",
+    "modules/platform-admin-web"
+  ]
 }

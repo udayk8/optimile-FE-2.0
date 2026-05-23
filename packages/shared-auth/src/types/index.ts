@@ -46,6 +46,7 @@ export type SystemRole =
   | 'Viewer'
   | 'Platform Admin'
   | 'Tenant Admin'
+  | 'Vendor Fleet'
 
 export interface Tenant {
   id: string

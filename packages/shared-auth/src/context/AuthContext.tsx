@@ -46,6 +46,13 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['tms-booking:read', 'tms-booking:write'],
     modules: ['tms-booking'],
   },
+  // Vendor + Fleet combined — no auction
+  'vendor-fleet@optimile.com': {
+    name: 'Vendor Fleet User',
+    role: 'Vendor Fleet',
+    permissions: ['vendor:read', 'vendor:write', 'fleet:read', 'fleet:write'],
+    modules: ['fleet', 'vendor'],
+  },
 }
 
 export const DEMO_PASSWORD = 'testing'
