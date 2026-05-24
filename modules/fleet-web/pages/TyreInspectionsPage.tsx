@@ -61,7 +61,7 @@ const TyreInspectionsContent: React.FC = () => {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-6 py-3 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-indigo-700 transition-all active:scale-95"
+          className="px-6 py-3 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-primary-700 transition-all active:scale-95"
         >
           + Log New Inspection
         </button>
@@ -95,7 +95,7 @@ const TyreInspectionsContent: React.FC = () => {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search by Tyre ID or Inspector..."
-            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 pl-9 text-sm font-medium outline-none focus:ring-2 ring-indigo-500/20"
+            className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 pl-9 text-sm font-medium outline-none focus:ring-2 ring-primary-500/20"
           />
           <svg className="absolute left-3 top-3 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </div>
@@ -105,7 +105,7 @@ const TyreInspectionsContent: React.FC = () => {
               key={cond}
               onClick={() => setFilterCondition(cond)}
               className={`px-3 py-2 text-[10px] font-black uppercase rounded-xl transition-all ${filterCondition === cond
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-primary-600 text-white'
                 : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'
                 }`}
             >
@@ -141,7 +141,7 @@ const TyreInspectionsContent: React.FC = () => {
                       <p className="text-[9px] text-slate-400 font-bold">{new Date(insp.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-xs font-black text-indigo-600 uppercase">{insp.tyreId}</p>
+                      <p className="text-xs font-black text-primary-600 uppercase">{insp.tyreId}</p>
                       <p className="text-[9px] text-slate-400 font-bold uppercase">{tyre?.brand} {tyre?.model}</p>
                     </td>
                     <td className="px-6 py-4">
@@ -171,7 +171,7 @@ const TyreInspectionsContent: React.FC = () => {
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => navigate(`/fleet/tyres/${insp.tyreId}`)}
-                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest"
+                        className="text-[10px] font-black text-primary-600 hover:text-primary-800 uppercase tracking-widest"
                       >
                         View Asset →
                       </button>
@@ -196,7 +196,7 @@ const TyreInspectionsContent: React.FC = () => {
             <div className="bg-slate-950 px-10 py-8 text-white rounded-t-[40px] flex justify-between items-center">
               <div>
                 <h2 className="text-lg font-black uppercase tracking-widest">New Yard Inspection</h2>
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mt-1">Log physical check results</p>
+                <p className="text-[10px] font-bold text-primary-400 uppercase tracking-widest mt-1">Log physical check results</p>
               </div>
               <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold hover:bg-white/20">✕</button>
             </div>
@@ -208,7 +208,7 @@ const TyreInspectionsContent: React.FC = () => {
                 <select
                   value={modalVehicleId}
                   onChange={e => { setModalVehicleId(e.target.value); setSelectedTyreId(''); }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-primary-500/20"
                 >
                   <option value="">All vehicles (show all tyres)</option>
                   {vehicles.map(v => (
@@ -222,12 +222,12 @@ const TyreInspectionsContent: React.FC = () => {
               {/* Tyre Selector */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  Select Tyre {modalVehicleId && <span className="text-indigo-500">({fittedTyres.filter(t => !modalVehicleId || t.currentVehicleId === modalVehicleId).length} tyres)</span>}
+                  Select Tyre {modalVehicleId && <span className="text-primary-500">({fittedTyres.filter(t => !modalVehicleId || t.currentVehicleId === modalVehicleId).length} tyres)</span>}
                 </label>
                 <select
                   value={selectedTyreId}
                   onChange={e => setSelectedTyreId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-primary-500/20"
                 >
                   <option value="">Choose a tyre...</option>
                   {fittedTyres
@@ -271,7 +271,7 @@ const TyreInspectionsContent: React.FC = () => {
                     value={pressure}
                     onChange={e => setPressure(e.target.value)}
                     placeholder="e.g. 105"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-primary-500/20"
                   />
                 </div>
                 <div className="space-y-2">
@@ -282,7 +282,7 @@ const TyreInspectionsContent: React.FC = () => {
                     value={tread}
                     onChange={e => setTread(e.target.value)}
                     placeholder="e.g. 12.5"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-primary-500/20"
                   />
                 </div>
               </div>
@@ -295,7 +295,7 @@ const TyreInspectionsContent: React.FC = () => {
                   value={remarks}
                   onChange={e => setRemarks(e.target.value)}
                   placeholder="Any observations..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-indigo-500/20"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold outline-none focus:ring-2 ring-primary-500/20"
                 />
               </div>
 
@@ -311,7 +311,7 @@ const TyreInspectionsContent: React.FC = () => {
                   onClick={handleSubmitInspection}
                   disabled={!selectedTyreId}
                   className={`flex-[2] py-5 rounded-2xl text-[10px] font-black uppercase shadow-xl transition-all active:scale-95 ${selectedTyreId
-                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
                     }`}
                 >

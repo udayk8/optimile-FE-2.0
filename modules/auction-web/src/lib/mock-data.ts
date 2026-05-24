@@ -403,3 +403,24 @@ export const MOCK_CONTRACTS: Contract[] = [
     rateDeviationOpen: true,
   },
 ]
+
+export const MOCK_DASHBOARD_RESPONSE = {
+  liveAuctions: { value: MOCK_DASHBOARD.liveAuctions.value, insight: MOCK_DASHBOARD.liveAuctions.insight },
+  pendingAwards: { value: MOCK_DASHBOARD.pendingAwards.value, insight: MOCK_DASHBOARD.pendingAwards.insight },
+  expiringContracts: { value: MOCK_DASHBOARD.expiringContracts.value, insight: MOCK_DASHBOARD.expiringContracts.insight },
+  priorityAuctions: MOCK_AUCTIONS.slice(0, 3).map((auction) => ({
+    id: auction.id,
+    title: auction.title,
+    type: auction.type,
+    status: auction.status,
+    updatedAt: auction.completedAt ?? auction.startAt,
+    awardDeadline: auction.awardDeadline,
+  })),
+  expiringContractsList: MOCK_CONTRACTS.slice(0, 4).map((contract) => ({
+    id: contract.id,
+    vendorName: contract.vendorName,
+    lane: contract.lane,
+    endDate: contract.endDate,
+    status: contract.status,
+  })),
+}

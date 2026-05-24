@@ -317,7 +317,7 @@ export const VendorManagementPage: React.FC = () => {
                                 <tr key={inv.invoice_id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 text-sm text-gray-900">{new Date(inv.invoice_date).toLocaleDateString()}</td>
                                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{inv.invoice_number}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 text-xs font-mono">{inv.work_order_id.substring(0, 8)}...</td>
+                                    <td className="px-6 py-4 text-sm text-gray-500 text-xs font-mono">{inv.work_order_id ? `${inv.work_order_id.substring(0, 8)}...` : '—'}</td>
                                     <td className="px-6 py-4 text-sm text-gray-900">₹{inv.total_amount.toLocaleString()}</td>
                                     <td className="px-6 py-4 text-sm font-bold text-red-600">₹{inv.balance_amount?.toLocaleString()}</td>
                                     <td className="px-6 py-4">

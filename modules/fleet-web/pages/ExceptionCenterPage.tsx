@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { OpsException, ExceptionStatus, ExceptionSeverity, Vehicle, Driver } from '../types';
 import { ExceptionAPI, VehicleAPI, DriverAPI } from '../services/mockDatabase';
 import { IconBell, IconCheck, IconFilter, IconArrowRight, IconAlert, IconUsers, IconClock, IconShield, IconFuel, IconWrench, IconTyre, IconClipboardCheck } from '../components/Icons';
 import { Badge, Button, Modal, Input, Select } from '../components/UI';
 
 export const ExceptionCenterPage: React.FC = () => {
+    const location = useLocation();
     const [exceptions, setExceptions] = useState<OpsException[]>([]);
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -17,6 +19,10 @@ export const ExceptionCenterPage: React.FC = () => {
     // Modal
     const [selectedException, setSelectedException] = useState<OpsException | null>(null);
     const [isActioning, setIsActioning] = useState(false);
+    const [highlightedId, setHighlightedId] = useState<string | null>(
+        (location.state as { highlightId?: string } | null)?.highlightId ?? null
+    );
+    const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
     
     // Resolution Form
     const [resolutionNote, setResolutionNote] = useState('');
@@ -25,6 +31,23 @@ export const ExceptionCenterPage: React.FC = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    useEffect(() => {
+        const nextId = (location.state as { highlightId?: string } | null)?.highlightId ?? null;
+        if (nextId) {
+            setHighlightedId(nextId);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        if (!highlightedId) return;
+        const row = rowRefs.current[highlightedId];
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const timeoutId = window.setTimeout(() => setHighlightedId(null), 3000);
+        return () => window.clearTimeout(timeoutId);
+    }, [highlightedId, exceptions]);
 
     const loadData = async () => {
         setIsLoading(true);
@@ -216,7 +239,12 @@ export const ExceptionCenterPage: React.FC = () => {
                         return (
                             <div 
                                 key={exception.exception_id} 
-                                className={`bg-white rounded-lg shadow-sm border border-gray-200 border-l-4 ${styles.border} p-4 hover:shadow-md transition-shadow cursor-pointer`}
+                                ref={(node) => {
+                                    rowRefs.current[exception.exception_id] = node;
+                                }}
+                                className={`bg-white rounded-lg shadow-sm border border-gray-200 border-l-4 ${styles.border} p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                                    highlightedId === exception.exception_id ? 'ring-2 ring-primary-300 ring-offset-2' : ''
+                                }`}
                                 onClick={() => {
                                     setSelectedException(exception);
                                     setAssignee(exception.owner_id || '');

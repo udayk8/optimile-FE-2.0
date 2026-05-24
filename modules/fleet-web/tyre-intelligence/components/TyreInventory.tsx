@@ -108,7 +108,7 @@ export const TyreInventory: React.FC<TyreInventoryProps> = ({
              <select 
                value={selectedLocationId}
                onChange={e => setSelectedLocationId(e.target.value)}
-               className="bg-slate-50 text-sm font-bold text-slate-800 py-2 px-4 rounded-xl outline-none focus:ring-2 ring-indigo-500/20"
+               className="bg-slate-50 text-sm font-bold text-slate-800 py-2 px-4 rounded-xl outline-none focus:ring-2 ring-primary-500/20"
              >
                <option value="All">All Network Locations</option>
                {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
@@ -152,14 +152,14 @@ export const TyreInventory: React.FC<TyreInventoryProps> = ({
                     <>
                     <button
                         onClick={onReceiveRequest}
-                        className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow transition-all active:scale-95"
+                        className="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow transition-all active:scale-95"
                     >
                         + Goods Receipt (GRN)
                     </button>
                     {selectedLocationId !== 'All' && (
                         <button
                         onClick={() => onTransferRequest(selectedLocationId)}
-                        className="w-full py-2 bg-white border-2 border-indigo-100 text-indigo-600 hover:bg-indigo-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                        className="w-full py-2 bg-white border-2 border-primary-100 text-primary-600 hover:bg-primary-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
                         >
                         ⇄ Transfer Stock Out
                         </button>
@@ -201,7 +201,7 @@ export const TyreInventory: React.FC<TyreInventoryProps> = ({
               <input 
                 type="text" 
                 placeholder="Tyre ID / Vehicle..."
-                className="w-full pl-10 pr-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 ring-indigo-500/10 transition-all"
+                className="w-full pl-10 pr-6 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 ring-primary-500/10 transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -228,7 +228,7 @@ export const TyreInventory: React.FC<TyreInventoryProps> = ({
                   <tr 
                     key={tyre.id} 
                     onClick={() => onViewDetails(tyre.id)}
-                    className={`hover:bg-slate-50 cursor-pointer transition-colors group ${isSelected ? 'bg-indigo-50' : ''}`}
+                    className={`hover:bg-slate-50 cursor-pointer transition-colors group ${isSelected ? 'bg-primary-50' : ''}`}
                   >
                     {activeTab === 'Scrapped' && (
                         <td className="px-8 py-5">
@@ -237,19 +237,19 @@ export const TyreInventory: React.FC<TyreInventoryProps> = ({
                                 checked={isSelected} 
                                 onChange={(e) => toggleSelect(tyre.id, e)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" 
+                                className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" 
                             />
                         </td>
                     )}
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
-                        <span className="font-black text-slate-900 group-hover:text-indigo-600 transition-colors text-sm">{tyre.id}</span>
+                        <span className="font-black text-slate-900 group-hover:text-primary-600 transition-colors text-sm">{tyre.id}</span>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{tyre.brand} {tyre.model}</span>
                       </div>
                     </td>
                     <td className="px-8 py-5">
                       <div className="text-xs font-black text-slate-700 uppercase">{locName}</div>
-                      {tyre.currentVehicleId && <div className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">Mounted on {tyre.currentVehicleId}</div>}
+                      {tyre.currentVehicleId && <div className="text-[10px] font-bold text-primary-500 uppercase tracking-wider">Mounted on {tyre.currentVehicleId}</div>}
                     </td>
                     <td className="px-8 py-5">
                       <span className={`px-2 py-0.5 text-[9px] font-black rounded border inline-block whitespace-nowrap ${getStatusColor(tyre.status)}`}>

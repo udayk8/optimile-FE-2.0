@@ -729,12 +729,12 @@ export const DriverDetailsPage: React.FC<Props> = ({ driverId, onBack }) => {
                                     <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Uploaded By</dt>
                                     <dd className="mt-1 text-sm text-gray-900">{viewDoc.uploaded_by || '—'}</dd>
                                 </div>
-                                {viewDoc.file_name && (
+                                {viewDoc.document_url && (
                                     <div className="col-span-2">
                                         <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">File</dt>
                                         <dd className="mt-1 text-sm text-gray-900 flex items-center gap-2">
                                             <IconFile className="w-4 h-4 text-gray-400" />
-                                            {viewDoc.file_name}
+                                            {decodeURIComponent(viewDoc.document_url.split('/').pop() || 'Uploaded file')}
                                         </dd>
                                     </div>
                                 )}

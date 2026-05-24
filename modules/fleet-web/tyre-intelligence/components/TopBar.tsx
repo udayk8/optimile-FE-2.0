@@ -25,7 +25,7 @@ export const TopBar: React.FC<TopBarProps> = ({ user, setUserRole }) => {
           <select 
             value={user.role}
             onChange={(e) => setUserRole(e.target.value as UserRole)}
-            className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none focus:ring-1 ring-indigo-500"
+            className="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1 outline-none focus:ring-1 ring-primary-500"
           >
             <option value={UserRole.FLEET_ADMIN}>{UserRole.FLEET_ADMIN}</option>
             <option value={UserRole.MAINTENANCE_MANAGER}>{UserRole.MAINTENANCE_MANAGER}</option>

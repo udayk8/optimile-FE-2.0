@@ -21,7 +21,7 @@ export const TyreAPI = {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    return MOCK_TYRES.filter(t => t.position?.vehicleId === vehicleId);
+    return MOCK_TYRES.filter(t => t.currentVehicleId === vehicleId);
   },
 
   /**
@@ -45,7 +45,7 @@ export const TyreAPI = {
     // Identify critical tyres based on multiple criteria
     const criticalTyres = tyres.filter(t => {
       // Low tread depth (less than 3mm is critical)
-      if (t.treadDepthMm && t.treadDepthMm < 3) return true;
+      if (t.initialTreadDepthMm && t.initialTreadDepthMm < 3) return true;
 
       // Near end of life (95% of expected life)
       if (t.totalKm > (t.expectedLifeKm * 0.95)) return true;
@@ -59,7 +59,7 @@ export const TyreAPI = {
     // Build warning messages
     const warnings: string[] = [];
 
-    const lowTreadTyres = tyres.filter(t => t.treadDepthMm && t.treadDepthMm < 3);
+    const lowTreadTyres = tyres.filter(t => t.initialTreadDepthMm && t.initialTreadDepthMm < 3);
     if (lowTreadTyres.length > 0) {
       warnings.push(`${lowTreadTyres.length} tyre(s) with low tread depth (<3mm)`);
     }

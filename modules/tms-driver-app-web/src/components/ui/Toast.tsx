@@ -20,7 +20,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <ToastContext.Provider value={value}>
-      {children}
+      {children as any}
       {toast ? <div className={`toast toast-${toast.type}`}>{toast.message}</div> : null}
     </ToastContext.Provider>
   );

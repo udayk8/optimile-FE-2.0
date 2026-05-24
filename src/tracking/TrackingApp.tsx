@@ -2,7 +2,13 @@ import { Bell, Clock3, LogOut, MapPinned, RadioTower, Route, ShieldCheck, Truck 
 import { useNavigate } from 'react-router-dom'
 import { OptimileLogo, useAuth } from '@shared-auth'
 
-const NAV_SECTIONS = [
+interface NavItem {
+  label: string
+  icon: typeof RadioTower
+  active?: boolean
+}
+
+const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overview',
     items: [

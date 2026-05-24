@@ -11,6 +11,7 @@ import {
   getStoredDemoSessionEmail,
   storeDemoLogin,
   storeDemoSession,
+  storeTokenLogin,
   type Portal,
 } from '../utils/authStorage'
 
@@ -18,35 +19,35 @@ import {
 interface MockUser { name: string; role: SystemRole; modules: ERPModule[]; permissions: string[] }
 
 export const DEMO_CREDENTIALS: Record<string, MockUser> = {
-  // CEO â€” sees all 5 modules â†’ goes to /modules dashboard
+  // CEO demo user.
   'ceo@uday.ts.com': {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
     modules: ['ams', 'fleet', 'vendor', 'customer'],
   },
-  // Fleet Manager â€” only fleet â†’ goes directly to /fleet
+  // Fleet-only demo user.
   'fleet@uday.ts.com': {
     name: 'Rahul Mehta',
     role: 'Fleet Manager',
     permissions: ['fleet:read', 'fleet:write'],
     modules: ['fleet'],
   },
-  // Auction Head â€” only auction â†’ goes directly to /auction/dashboard
+  // Auction-only demo user.
   'auction@pranay.ts.com': {
     name: 'Pranay Sharma',
     role: 'Auction Head',
     permissions: ['ams:read', 'ams:write'],
     modules: ['ams'],
   },
-  // Customer Booking Dashboard â€” only customer â†’ goes directly to /customer
+  // Customer-only demo user.
   'cbd@optimile.com': {
     name: 'Customer Booking Desk',
     role: 'CBD',
     permissions: ['customer:read', 'customer:write'],
     modules: ['customer'],
   },
-  // Vendor Manager â€” only vendor â†’ goes directly to /vendor
+  // Vendor-only demo user.
   'vendor@pranay.ts.com': {
     name: 'Pranay Verma',
     role: 'Vendor',
@@ -60,26 +61,67 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['platform-admin:read', 'platform-admin:write'],
     modules: ['platform-admin'],
   },
-  // Track and Trace â€” standalone visibility module
+  // Tenant Admin demo user.
+  'tenant-admin@optimile.com': {
+    name: 'Tenant Administrator',
+    role: 'Tenant Admin',
+    permissions: ['tenant-admin:read', 'tenant-admin:write'],
+    modules: ['tenant-admin'],
+  },
+  // Track and Trace demo user.
   'tracking@optimile.com': {
     name: 'Track and Trace User',
     role: 'Track and Trace',
     permissions: ['tracking:read'],
     modules: ['tracking'],
   },
-  // TMS Booking â€” standalone booking module
+  // TMS Booking demo user.
   'tms@optimile.com': {
     name: 'TMS User',
     role: 'TMS',
     permissions: ['tms:read', 'tms:write'],
     modules: ['tms'],
   },
-  // Driver â€” driver app
+  'tms-booking@optimile.com': {
+    name: 'TMS Booking User',
+    role: 'TMS',
+    permissions: ['tms:read', 'tms:write'],
+    modules: ['tms'],
+  },
+  // Driver app demo user.
   'driver@optimile.com': {
     name: 'Driver User',
     role: 'Driver',
     permissions: ['driver-app:read'],
     modules: ['driver-app'],
+  },
+  // Vendor and Fleet combined demo user.
+  'vendor-fleet@optimile.com': {
+    name: 'Vendor Fleet User',
+    role: 'Vendor Fleet',
+    permissions: ['vendor:read', 'vendor:write', 'fleet:read', 'fleet:write'],
+    modules: ['fleet', 'vendor'],
+  },
+  // Alternate auction-only demo user.
+  'auction@optimile.com': {
+    name: 'Auction User',
+    role: 'Auction Only',
+    permissions: ['ams:read', 'ams:write'],
+    modules: ['ams'],
+  },
+  // Alternate fleet-only demo user.
+  'fleet@optimile.com': {
+    name: 'Fleet User',
+    role: 'Fleet Only',
+    permissions: ['fleet:read', 'fleet:write'],
+    modules: ['fleet'],
+  },
+  // Alternate vendor-only demo user.
+  'vendor@optimile.com': {
+    name: 'Vendor User',
+    role: 'Vendor Only',
+    permissions: ['vendor:read', 'vendor:write'],
+    modules: ['vendor'],
   },
 }
 
@@ -269,6 +311,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const nextUser = mapUser(res.user)
       setUser(nextUser)
       setTenant(mapTenant(res.tenant))
+      storeTokenLogin(getPrimaryPortal(nextUser.modules))
       return getPostLoginRouteForUser(nextUser)
     } catch (err) {
       const message = mapLoginError(err)

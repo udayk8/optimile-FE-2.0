@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vehicle, VehicleDocument, TelemetryEvent, DocumentStatus, DerivedVehicleStatus, VehicleComponent, ComponentType, ComponentStatus, DocumentType, VehicleMaintenanceItem, ComponentHistoryRecord, TyreHealthSignal, TyreEventSignal, TyreSignalType, EnergyMetrics, EnergyAnomaly, EmissionStandard, Battery, BatteryStatus, VehicleTrackingDevice, TrackerProtocol, TrackerPowerSource, TrackerStatus, TrackerDeviceKind } from '../types';
-import { VehicleAPI, ComplianceAPI, TelematicsAPI, ComponentAPI, MaintenanceAPI, TyreAPI, EnergyAPI, TrackingDeviceAPI } from '../services/mockDatabase';
+import { Vehicle, VehicleDocument, TelemetryEvent, DocumentStatus, DerivedVehicleStatus, VehicleComponent, ComponentType, ComponentStatus, DocumentType, VehicleMaintenanceItem, ComponentHistoryRecord, TyreHealthSignal, TyreEventSignal, TyreSignalType, EnergyMetrics, EnergyAnomaly, EmissionStandard, Battery, BatteryStatus, VehicleTrackingDevice, TrackerProtocol, TrackerPowerSource, TrackerStatus, TrackerDeviceKind, Trip, TripStatus } from '../types';
+import { VehicleAPI, ComplianceAPI, TelematicsAPI, ComponentAPI, MaintenanceAPI, TyreAPI, EnergyAPI, TrackingDeviceAPI, TripAPI } from '../services/mockDatabase';
 import { BatteryAPI } from '../services/mockDatabase2';
 import { IconTruck, IconFile, IconMap, IconAlert, IconCheck, IconArrowRight, IconCpu, IconPlus, IconUpload, IconEye, IconEdit, IconDownload, IconWrench, IconHistory, IconTyre, IconFuel, IconDroplet, IconZap, IconBattery } from '../components/Icons';
 import { Badge, Button, Modal, Input, Select } from '../components/UI';
@@ -25,7 +25,9 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
     const [batteries, setBatteries] = useState<Battery[]>([]);
     const [availableBatteries, setAvailableBatteries] = useState<Battery[]>([]);
     
-    const [activeTab, setActiveTab] = useState<'overview' | 'components' | 'batteries' | 'maintenance' | 'compliance' | 'telemetry'>('overview');
+    const [trips, setTrips] = useState<Trip[]>([]);
+    const [bookingSubTab, setBookingSubTab] = useState<'current' | 'history'>('current');
+    const [activeTab, setActiveTab] = useState<'overview' | 'components' | 'batteries' | 'maintenance' | 'compliance' | 'telemetry' | 'bookings'>('overview');
     const [isLoading, setIsLoading] = useState(true);
 
     // Component Modal
@@ -181,7 +183,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
 
     const loadData = async () => {
         setIsLoading(true);
-        const [v, d, c, s, h, th, te, em, ea, batts, allBatts, trk] = await Promise.all([
+        const [v, d, c, s, h, th, te, em, ea, batts, allBatts, trk, allTrips] = await Promise.all([
             VehicleAPI.getById(vehicleId),
             ComplianceAPI.getDocuments(vehicleId),
             ComponentAPI.getByVehicleId(vehicleId),
@@ -194,6 +196,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
             BatteryAPI.getByVehicle(vehicleId),
             BatteryAPI.getAll(),
             TrackingDeviceAPI.getAllByVehicleId(vehicleId),
+            TripAPI.getAll(),
         ]);
         setVehicle(v || null);
         setDocuments(d.sort((a,b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime()));
@@ -499,7 +502,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-6">
                 <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                    {['Overview', 'Components', 'Batteries', 'Maintenance', 'Compliance', 'Telemetry'].map((tab) => (
+                    {['Overview', 'Components', /* 'Batteries', */ 'Maintenance', 'Compliance', 'Telemetry'].map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab.toLowerCase() as any)}
@@ -588,17 +591,17 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
                         <div className="bg-white shadow rounded-lg border border-gray-200 p-6">
                             <div className="flex items-center justify-between mb-4 border-b pb-2">
                                 <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                                    <IconCpu className="w-5 h-5 text-indigo-500" />
+                                    <IconCpu className="w-5 h-5 text-primary-500" />
                                     Primary Tracking Device
                                 </h3>
                                 <div className="flex items-center gap-3">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
                                         Primary
                                     </span>
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${primaryTracker.status === TrackerStatus.ACTIVE ? 'bg-green-100 text-green-800' : primaryTracker.status === TrackerStatus.FAULT ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
                                         {primaryTracker.status}
                                     </span>
-                                    <button onClick={() => setActiveTab('telemetry')} className="text-xs text-indigo-600 hover:underline font-medium">View Config →</button>
+                                    <button onClick={() => setActiveTab('telemetry')} className="text-xs text-primary-600 hover:underline font-medium">View Config →</button>
                                 </div>
                             </div>
                             <dl className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -851,7 +854,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
                                     <div key={tracker.tracker_id} className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden">
                                         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <IconCpu className="w-5 h-5 text-indigo-500" />
+                                                <IconCpu className="w-5 h-5 text-primary-500" />
                                                 <div>
                                                     <h3 className="text-base font-semibold text-gray-900">{tracker.manufacturer} {tracker.model}</h3>
                                                     <p className="text-xs text-gray-500">{tracker.device_kind} · IMEI: {tracker.imei} · S/N: {tracker.serial_number}</p>
@@ -860,7 +863,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
                                             <div className="flex items-center gap-3">
                                                 {tracker.is_primary ? (
                                                     <>
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-700">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
                                                             Primary
                                                         </span>
                                                         {trackers.length > 1 ? (
@@ -877,7 +880,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleSetPrimaryTracker(tracker.tracker_id)}
-                                                        className="text-xs text-indigo-600 hover:text-indigo-800 font-medium border border-indigo-200 rounded px-2 py-1 bg-indigo-50"
+                                                        className="text-xs text-primary-600 hover:text-primary-800 font-medium border border-primary-200 rounded px-2 py-1 bg-primary-50"
                                                     >
                                                         Switch To Primary
                                                     </button>
@@ -915,7 +918,7 @@ export const VehicleDetailsPage: React.FC<Props> = ({ vehicleId, onBack }) => {
                                                         Remove
                                                     </button>
                                                 )}
-                                                <button type="button" onClick={() => setExpandedTrackerId(isExpanded ? null : tracker.tracker_id)} className="text-xs text-indigo-600 hover:underline font-medium">
+                                                <button type="button" onClick={() => setExpandedTrackerId(isExpanded ? null : tracker.tracker_id)} className="text-xs text-primary-600 hover:underline font-medium">
                                                     {isExpanded ? 'Hide Config' : 'View Config'}
                                                 </button>
                                             </div>

@@ -18,19 +18,19 @@ export const Button: React.FC<ButtonProps> = ({
   type = 'button',
   ...props
 }) => {
-  const baseStyles = "inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyles = "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60";
 
   const variants = {
-    primary: "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500",
-    secondary: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-indigo-500",
-    danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
-    ghost: "bg-transparent text-gray-600 hover:bg-gray-100 focus:ring-gray-500"
+    primary: "border-primary bg-primary text-white hover:bg-secondary",
+    secondary: "border-gray-300 bg-white text-primary hover:bg-gray-50",
+    danger: "border-danger bg-danger text-white hover:bg-danger/90",
+    ghost: "border-transparent bg-transparent text-gray-700 hover:bg-gray-100"
   };
 
   const sizes = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base"
+    sm: "h-8 px-3 text-xs",
+    md: "h-10 px-4",
+    lg: "h-11 px-8"
   };
 
   return (
@@ -59,15 +59,15 @@ interface BadgeProps {
 
 export const Badge: React.FC<BadgeProps> = ({ children, color = 'gray' }) => {
   const colors = {
-    green: "bg-green-100 text-green-800",
-    red: "bg-red-100 text-red-800",
-    yellow: "bg-yellow-100 text-yellow-800",
-    gray: "bg-gray-100 text-gray-800",
-    blue: "bg-blue-100 text-blue-800"
+    green: "bg-success/10 text-success ring-success/20",
+    red: "bg-danger/10 text-danger ring-danger/20",
+    yellow: "bg-warning/10 text-warning ring-warning/20",
+    gray: "bg-gray-100 text-gray-700 ring-gray-200",
+    blue: "bg-primary/10 text-primary ring-primary/20"
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>
+    <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${colors[color]}`}>
       {children}
     </span>
   );
@@ -100,9 +100,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, 
 
         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
 
-        <div className={`inline-block w-full ${modalMaxWidth[size]} p-6 my-8 overflow-y-auto max-h-[calc(100vh-4rem)] text-left align-middle transition-all transform bg-white shadow-xl rounded-lg sm:my-8 sm:align-middle sm:w-full`}>
+        <div className={`inline-block w-full ${modalMaxWidth[size]} p-6 my-8 overflow-y-auto max-h-[calc(100vh-4rem)] text-left align-middle transition-all transform bg-white shadow-xl rounded-xl border border-gray-200 sm:my-8 sm:align-middle sm:w-full`}>
           <div className="flex justify-between items-center mb-5">
-            <h3 className="text-lg font-medium leading-6 text-gray-900">{title}</h3>
+            <h3 className="text-lg font-semibold leading-none tracking-tight text-text">{title}</h3>
             <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-500">
               <IconX className="w-5 h-5" />
             </button>
@@ -123,10 +123,10 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, error, className, ...props }, ref) => {
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</label>
       <input
         ref={ref}
-        className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border ${error ? 'border-red-300' : ''} ${className}`}
+        className={`flex h-10 w-full rounded-lg border bg-white px-3 text-sm transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20 ${error ? 'border-red-300' : 'border-gray-300'} ${className ?? ''}`}
         {...props}
       />
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
@@ -145,10 +145,10 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(({ label, error, options, className, ...props }, ref) => {
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</label>
       <select
         ref={ref}
-        className={`shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md p-2 border ${error ? 'border-red-300' : ''} ${className}`}
+        className={`flex h-10 w-full rounded-lg border bg-white px-3 text-sm transition focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/20 ${error ? 'border-red-300' : 'border-gray-300'} ${className ?? ''}`}
         {...props}
       >
         <option value="">Select an option</option>

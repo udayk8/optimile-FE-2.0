@@ -1,19 +1,20 @@
 import React, { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { AuthProvider, useAuth } from '@shared-auth/context/AuthContext'
-import { LoginShell } from '@shared-auth/components/LoginShell'
-import { ForgotPassword } from '@shared-auth/components/ForgotPassword'
-import { ResetPassword } from '@shared-auth/components/ResetPassword'
-import { PostLoginDashboard } from '@shared-auth/components/PostLoginDashboard'
-import { ProtectedRoute } from '@shared-auth/guards/RouteGuard'
+import {
+  AuthProvider,
+  ForgotPassword,
+  LoginShell,
+  PostLoginDashboard,
+  ProtectedRoute,
+  ResetPassword,
+  useAuth,
+} from '@shared-auth'
+import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './shell/registry'
 import './styles.css'
 
-const AuctionApp = lazy(() => import('@auction/app/AdminApp'))
-const VendorApp = lazy(() => import('@vendor/app/VendorApp'))
-const FleetApp = lazy(() => import('@fleet/app/FleetApp'))
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
-const TrackTraceApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
+const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
 const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
 const TmsDriverAppApp = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))
@@ -73,7 +74,15 @@ function EntryRoute() {
     return <LoginShell />
   }
 
-  return <Navigate to={getPostLoginRoute()} replace />
+  return <Navigate to={getPostLoginRoute() || getDefaultLandingPath()} replace />
+}
+
+function DefaultRedirect() {
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) return Fallback
+
+  return <Navigate to={isAuthenticated ? getDefaultLandingPath() : '/login'} replace />
 }
 
 function LegacyTenantRedirect() {
@@ -97,18 +106,22 @@ function HostRouter() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            <Route path="/modules" element={
-              <ProtectedRoute>
-                <PostLoginDashboard />
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/modules"
+              element={
+                <ProtectedRoute>
+                  <PostLoginDashboard />
+                </ProtectedRoute>
+              }
+            />
 
-            <Route path="/auction/*" element={<ProtectedRoute portal="auction"><AuctionApp /></ProtectedRoute>} />
-            <Route path="/vendor/*" element={<ProtectedRoute portal="vendor"><VendorApp /></ProtectedRoute>} />
-            <Route path="/fleet/*" element={<ProtectedRoute portal="fleet"><FleetApp /></ProtectedRoute>} />
+            <Route element={<ShellLayout />}>
+              {buildShellChildRoutes()}
+            </Route>
+
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
-            <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackTraceApp /></ProtectedRoute>} />
-
+            <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackingApp /></ProtectedRoute>} />
+            <Route path="/admin/*" element={<ProtectedRoute portal="admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTenantRedirect /></ProtectedRoute>} />
             <Route path="/tenant-admin/login" element={<TenantAdminLoginRedirect />} />
@@ -117,7 +130,7 @@ function HostRouter() {
             <Route path="/driver-app/*" element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
 
             <Route path="/" element={<EntryRoute />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<DefaultRedirect />} />
           </Routes>
         </Suspense>
       </AuthProvider>
@@ -130,5 +143,5 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <HostErrorBoundary>
       <HostRouter />
     </HostErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 )

@@ -382,7 +382,7 @@ export const LiveMapPage: React.FC = () => {
         <div className="flex h-full items-center justify-center bg-slate-50 p-8 text-center">
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 shadow-sm">
             <h2 className="text-xl font-semibold text-slate-900">Google Maps key missing</h2>
-            <p className="mt-2 text-sm text-slate-500">Set `VITE_GOOGLE_MAPS_API_KEY` in `frontend-main/.env.local` to load the live map.</p>
+            <p className="mt-2 text-sm text-slate-500">Set <code>VITE_GOOGLE_MAPS_API_KEY</code> in the repo root <code>.env.local</code> to load the live map.</p>
           </div>
         </div>
       ) : loadError ? (

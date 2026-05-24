@@ -1,0 +1,23 @@
+{
+  "name": "@optimile/fleet-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config ../../vite.config.ts --host 127.0.0.1 --port 3002",
+    "build": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@optimile/shared-auth": "file:../../packages/shared-auth",
+    "@optimile/shared-ui": "file:../../packages/shared-ui",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0"
+  }
+}

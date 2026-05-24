@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
@@ -17,17 +18,26 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@track-trace/*": ["./src/*"],
       "@shared-auth": ["../../packages/shared-auth/src"],
       "@shared-auth/*": ["../../packages/shared-auth/src/*"],
-      "@shared-api": ["../../packages/shared-api/src"],
-      "@shared-api/*": ["../../packages/shared-api/src/*"],
       "@shared-ui": ["../../packages/shared-ui/src"],
       "@shared-ui/*": ["../../packages/shared-ui/src/*"],
+      "@shared-api": ["../../packages/shared-api/src"],
+      "@shared-api/*": ["../../packages/shared-api/src/*"],
       "@shared-utils": ["../../packages/shared-utils/src"],
       "@shared-utils/*": ["../../packages/shared-utils/src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "../../packages"]
+  "include": [
+    "src",
+    "components",
+    "pages",
+    "services",
+    "types",
+    "types.ts",
+    "tyre-intelligence"
+  ]
 }

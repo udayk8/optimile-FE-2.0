@@ -108,6 +108,12 @@
       "@customer/*": [
         "modules/customer-web/src/*"
       ],
+      "@track-trace": [
+        "modules/track-trace-web/src"
+      ],
+      "@track-trace/*": [
+        "modules/track-trace-web/src/*"
+      ],
       "@console": [
         "modules/console-web/src"
       ],
@@ -161,6 +167,39 @@
       ],
       "@shared-utils/*": [
         "packages/shared-utils/src/*"
+      ],
+      "@/components/*": [
+        "modules/tms-driver-app-web/src/components/*"
+      ],
+      "@/pages/*": [
+        "modules/tms-driver-app-web/src/pages/*"
+      ],
+      "@/store/*": [
+        "modules/tms-driver-app-web/src/store/*"
+      ],
+      "@/mocks/*": [
+        "modules/tms-driver-app-web/src/mocks/*"
+      ],
+      "@/lib/*": [
+        "modules/tms-driver-app-web/src/lib/*"
+      ],
+      "@/data/*": [
+        "modules/tms-driver-app-web/src/data/*"
+      ],
+      "@/router/*": [
+        "modules/tms-driver-app-web/src/router/*"
+      ],
+      "@/services/*": [
+        "modules/tms-driver-app-web/src/services/*"
+      ],
+      "@/hooks/*": [
+        "modules/tms-driver-app-web/src/hooks/*"
+      ],
+      "@/i18n/*": [
+        "modules/tms-driver-app-web/src/i18n/*"
+      ],
+      "@/utils/*": [
+        "modules/tms-driver-app-web/src/utils/*"
       ]
     }
   },

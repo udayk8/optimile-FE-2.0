@@ -215,7 +215,7 @@ export const CompliancePage: React.FC = () => {
                             <button
                                 onClick={handleSubmitUpdate}
                                 disabled={!newDocNumber || !newExpiryDate}
-                                className="flex-1 py-2.5 rounded-lg bg-indigo-600 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
+                                className="flex-1 py-2.5 rounded-lg bg-primary-600 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-primary-300"
                             >
                                 Save Changes
                             </button>

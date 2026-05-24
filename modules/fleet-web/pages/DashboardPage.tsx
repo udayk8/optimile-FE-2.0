@@ -3,7 +3,7 @@ import { Vehicle, VehicleStatus, ExceptionSeverity, DocumentStatus } from '../ty
 import { VehicleAPI, ExceptionAPI, MaintenanceAPI, EnergyAPI, ComplianceAPI, ConfidenceAPI, SyncAPI, TyreAPI } from '../services/mockDatabase';
 import { IconCheck, IconAlert, IconWrench, IconZap, IconCircleDollar, IconTruck, IconArrowRight, IconSiren, IconTrendUp, IconTyre, IconMapPin, IconDroplet } from '../components/Icons';
 import { VehicleDetailsPage } from './VehicleDetailsPage';
-import { AIInsightsPanel } from '../../../shared/components/AIInsightsPanel';
+import { AIInsightsPanel, type AIInsightItem } from '../components/AIInsightsPanel';
 
 interface DashboardPageProps {
   onNavigate: (tab: any) => void;
@@ -171,7 +171,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     }
   };
 
-  const aiInsights = useMemo(() => ([
+  const aiInsights = useMemo<AIInsightItem[]>(() => ([
     {
       label: 'Readiness',
       title: 'Fleet readiness trend',
