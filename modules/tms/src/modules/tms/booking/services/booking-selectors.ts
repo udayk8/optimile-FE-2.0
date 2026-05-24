@@ -4,16 +4,18 @@ import type {
   TenantCustomer,
   TenantCustomerAddress,
   TenantCustomerRateCard,
-} from "../../../../types/customer";
-import type { TenantDriver, TenantVehicle } from "../../../../types/fleet";
+} from "@/types/customer";
+import type { TenantDriver, TenantVehicle } from "@/types/fleet";
 import type {
   TenantLRConfig,
   TenantMaterial,
   TenantUOMDefinition,
   TenantUOMMapping,
   TenantVehicleType,
-} from "../../../../types/master-data";
-import type { TenantVendor } from "../../../../types/vendor";
+} from "@/types/master-data";
+import type { TenantVendor } from "@/types/vendor";
+import type { TenantVendorRateCard } from "@/types/vendor";
+import { perKM, perMT, perTrip } from "@/modules/tms/booking/services/booking-engine";
 
 export function getCustomerMaterials(materials: TenantMaterial[], customerId: string) {
   return materials.filter(
@@ -59,24 +61,31 @@ function normalizeMatchValue(value?: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
 
-function isRateCardEffective(rateCard: TenantCustomerRateCard, bookingDate?: string | null) {
-  if (!bookingDate) {
-    return true;
-  }
-  const targetDate = new Date(bookingDate);
-  if (Number.isNaN(targetDate.getTime())) {
-    return true;
-  }
-  const targetTime = targetDate.getTime();
-  const fromTime = rateCard.effectiveFromDate ? new Date(rateCard.effectiveFromDate).getTime() : null;
-  const toTime = rateCard.effectiveToDate ? new Date(rateCard.effectiveToDate).getTime() : null;
-  if (fromTime != null && !Number.isNaN(fromTime) && targetTime < fromTime) {
-    return false;
-  }
-  if (toTime != null && !Number.isNaN(toTime) && targetTime > toTime) {
-    return false;
-  }
-  return true;
+function normalizeCityValue(value?: string | null) {
+  const normalized = normalizeMatchValue(value)
+    .replace(/[.,-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const cityAliases: Record<string, string> = {
+    bangalore: "bangalore",
+    bengaluru: "bangalore",
+    banglore: "bangalore",
+    blr: "bangalore",
+    delhi: "delhi",
+    "new delhi": "delhi",
+    ncr: "delhi",
+    mumbai: "mumbai",
+    bombay: "mumbai",
+    chennai: "chennai",
+    madras: "chennai",
+    kolkata: "kolkata",
+    calcutta: "kolkata",
+    pune: "pune",
+    poona: "pune",
+  };
+
+  return cityAliases[normalized] ?? normalized;
 }
 
 export type RateValidationInput = {
@@ -94,6 +103,54 @@ export type RateValidationInput = {
   rateType: "PER_MT" | "PER_KM" | "PER_TRIP";
   weight?: number | null;
 };
+
+function hasMatchValue(value?: string | null) {
+  return normalizeMatchValue(value) !== "";
+}
+
+export function getEffectiveRateMatchingBasis(
+  preferredBasis: CustomerRateMatchingBasis,
+  input: Pick<
+    RateValidationInput,
+    "lane" | "fromCity" | "toCity" | "fromLocation" | "toLocation" | "fromPincode" | "toPincode"
+  >,
+  options?: {
+    allowDestinationFallback?: boolean;
+  },
+) {
+  const allowDestinationFallback = options?.allowDestinationFallback ?? false;
+  const hasCities = hasMatchValue(input.fromCity) && hasMatchValue(input.toCity);
+  const hasLocations = hasMatchValue(input.fromLocation) && hasMatchValue(input.toLocation);
+  const hasPincodes = hasMatchValue(input.fromPincode) && hasMatchValue(input.toPincode);
+  const hasLane = hasMatchValue(input.lane);
+
+  switch (preferredBasis) {
+    case "LANE_TO_LANE":
+      if (hasLane) {
+        return "LANE_TO_LANE";
+      }
+      return allowDestinationFallback && hasCities && hasMatchValue(input.fromLocation) && !hasMatchValue(input.toLocation)
+        ? "CITY_TO_CITY"
+        : "LANE_TO_LANE";
+    case "PINCODE_TO_PINCODE":
+      if (hasPincodes) {
+        return "PINCODE_TO_PINCODE";
+      }
+      return allowDestinationFallback && hasCities && hasMatchValue(input.fromPincode) && !hasMatchValue(input.toPincode)
+        ? "CITY_TO_CITY"
+        : "PINCODE_TO_PINCODE";
+    case "ADDRESS_TO_ADDRESS":
+      if (hasLocations) {
+        return "ADDRESS_TO_ADDRESS";
+      }
+      return allowDestinationFallback && hasCities && hasMatchValue(input.fromLocation) && !hasMatchValue(input.toLocation)
+        ? "CITY_TO_CITY"
+        : "ADDRESS_TO_ADDRESS";
+    case "CITY_TO_CITY":
+    default:
+      return "CITY_TO_CITY";
+  }
+}
 
 export function validateRateCard(
   input: RateValidationInput,
@@ -113,16 +170,12 @@ export function validateRateCard(
     ) {
       return false;
     }
-    if (!isRateCardEffective(rateCard, input.bookingDate)) {
-      return false;
-    }
-
     switch (input.rateMatchingBasis) {
       case "CITY_TO_CITY":
         return (
-          normalizeMatchValue(rateCard.fromCity ?? rateCard.fromLocation) ===
-            normalizeMatchValue(input.fromCity) &&
-          normalizeMatchValue(rateCard.toCity ?? rateCard.toLocation) === normalizeMatchValue(input.toCity)
+          normalizeCityValue(rateCard.fromCity ?? rateCard.fromLocation) ===
+            normalizeCityValue(input.fromCity) &&
+          normalizeCityValue(rateCard.toCity ?? rateCard.toLocation) === normalizeCityValue(input.toCity)
         );
       case "PINCODE_TO_PINCODE":
         return (
@@ -177,6 +230,98 @@ export function buildDriverLookup(drivers: TenantDriver[]) {
 
 export function buildVendorLookup(vendors: TenantVendor[]) {
   return new Map(vendors.map((vendor) => [vendor.id, vendor]));
+}
+
+export type VendorRateValidationInput = {
+  bookingDate?: string | null;
+  fromCity?: string | null;
+  toCity?: string | null;
+  fromLocation?: string | null;
+  toLocation?: string | null;
+  fromPincode?: string | null;
+  toPincode?: string | null;
+  vehicleType?: string | null;
+  rateType: "PER_MT" | "PER_KM" | "PER_TRIP";
+};
+
+function normalizeVendorRateType(rateType?: TenantVendorRateCard["rateType"] | null) {
+  if (rateType === "PER_KM") {
+    return "PER_KM" as const;
+  }
+  if (rateType === "PER_MT") {
+    return "PER_MT" as const;
+  }
+  return "PER_TRIP" as const;
+}
+
+export function validateVendorRateCard(
+  input: VendorRateValidationInput,
+  rateCards: TenantVendorRateCard[],
+) {
+  const filteredRateCards = rateCards.filter((rateCard) => {
+    if (rateCard.status !== "active") {
+      return false;
+    }
+    if (normalizeVendorRateType(rateCard.rateType) !== input.rateType) {
+      return false;
+    }
+    if (
+      input.vehicleType &&
+      rateCard.vehicleType &&
+      normalizeMatchValue(rateCard.vehicleType) !== normalizeMatchValue(input.vehicleType)
+    ) {
+      return false;
+    }
+    if (
+      input.fromLocation &&
+      input.toLocation &&
+      normalizeMatchValue(rateCard.fromLocation) === normalizeMatchValue(input.fromLocation) &&
+      normalizeMatchValue(rateCard.toLocation) === normalizeMatchValue(input.toLocation)
+    ) {
+      return true;
+    }
+    if (
+      input.fromPincode &&
+      input.toPincode &&
+      normalizeMatchValue(rateCard.sourcePincode) === normalizeMatchValue(input.fromPincode) &&
+      normalizeMatchValue(rateCard.destinationPincode) === normalizeMatchValue(input.toPincode)
+    ) {
+      return true;
+    }
+    return (
+      normalizeCityValue(rateCard.fromCity ?? rateCard.fromLocation) === normalizeCityValue(input.fromCity) &&
+      normalizeCityValue(rateCard.toCity ?? rateCard.toLocation) === normalizeCityValue(input.toCity)
+    );
+  });
+
+  return filteredRateCards[0] ?? null;
+}
+
+export function getVendorRateCardUnitRate(rateCard?: TenantVendorRateCard | null) {
+  if (!rateCard) {
+    return null;
+  }
+  return Number(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0) || 0;
+}
+
+export function calculateVendorFreightFromRateCard(params: {
+  rateCard: TenantVendorRateCard | null;
+  weight: number;
+  distanceKm: number;
+}) {
+  const { rateCard, weight, distanceKm } = params;
+  if (!rateCard) {
+    return 0;
+  }
+  const unitRate = getVendorRateCardUnitRate(rateCard) ?? 0;
+  const normalizedRateType = normalizeVendorRateType(rateCard.rateType);
+  if (normalizedRateType === "PER_MT") {
+    return Number(perMT(unitRate, weight).toFixed(2));
+  }
+  if (normalizedRateType === "PER_KM") {
+    return Number(perKM(unitRate, distanceKm).toFixed(2));
+  }
+  return Number(perTrip(unitRate).toFixed(2));
 }
 
 export function getQuantityUOMOptions(

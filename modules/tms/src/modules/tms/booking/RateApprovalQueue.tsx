@@ -1,24 +1,26 @@
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
-import { DataTable } from "../../../components/common/data-table";
-import { PageHeader } from "../../../components/common/page-header";
-import { TenantSummaryCard } from "../../../components/tenant/tenant-primitives";
-import { Badge } from "../../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
-import { useTenantRouteContext } from "../../../hooks/useTenantRouteContext";
-import { useBookingPaths } from "../../../hooks/useBookingPaths";
-import { BookingStatusBadge } from "./components/BookingStatusBadge";
-import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
-import { useTenantBookings } from "./hooks/useTenantBookings";
-import { buildCustomerLookup } from "./services/booking-selectors";
+import { DataTable } from "@/shared/components/common/data-table";
+import { PageHeader } from "@/shared/components/common/page-header";
+import { TenantSummaryCard } from "@tms-booking/modules/tenant-admin/components/tenant-primitives";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { useTenantAccess } from "@tms-booking/modules/tenant-admin/hooks/useTenantAccess";
+import { useTenantRouteContext } from "@tms-booking/modules/tenant-admin/hooks/useTenantRouteContext";
+import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
+import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
+import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingPaths } from "@tms-booking/hooks/useBookingPaths";
+import { buildCustomerLookup } from "@/modules/tms/booking/services/booking-selectors";
 
 export function RateApprovalQueuePage() {
   const navigate = useNavigate();
   const { tenant } = useTenantRouteContext();
+  const paths = useBookingPaths();
+  const access = useTenantAccess();
   const { data: bookings, transitionBooking } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
-  const paths = useBookingPaths();
   const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
   const queue = bookings.filter((booking) => booking.status === "PENDING_RATE_APPROVAL");
 
@@ -87,12 +89,16 @@ export function RateApprovalQueuePage() {
           booking.pricing.approvalLevel ?? "AUTO",
           <BookingStatusBadge key={`${booking.id}-status`} status={booking.status} />,
           <div key={`${booking.id}-actions`} className="flex flex-wrap gap-2" onClick={(event) => event.stopPropagation()}>
-            <Button size="sm" onClick={() => approveBooking(booking.id)}>
-              Approve
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => rejectBooking(booking.id)}>
-              Reject
-            </Button>
+            {access.can("RATE_APPROVAL", "APPROVE_RATE") ? (
+              <Button size="sm" onClick={() => approveBooking(booking.id)}>
+                Approve
+              </Button>
+            ) : null}
+            {access.can("RATE_APPROVAL", "REJECT") ? (
+              <Button size="sm" variant="outline" onClick={() => rejectBooking(booking.id)}>
+                Reject
+              </Button>
+            ) : null}
             <Button asChild size="sm" variant="ghost">
               <Link to={paths.booking(booking.id)}>View</Link>
             </Button>
@@ -115,9 +121,9 @@ function ApprovalGuideCard({
   description: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <div className="rounded-[24px] border border-border/80 bg-gradient-to-br from-white to-slate-50/90 p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="rounded-xl bg-primary/[0.08] p-2 text-primary">
+        <div className="rounded-2xl bg-primary/[0.08] p-2 text-primary">
           <Icon className="size-4" />
         </div>
         <p className="font-semibold">{title}</p>
@@ -126,3 +132,5 @@ function ApprovalGuideCard({
     </div>
   );
 }
+
+

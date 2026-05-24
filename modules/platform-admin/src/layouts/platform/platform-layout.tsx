@@ -1,32 +1,35 @@
-import { Outlet, useLocation, useMatch } from "react-router-dom";
-import { Building2, Files, LayoutDashboard, Package2, ReceiptText, Settings2 } from "lucide-react";
-import { WorkspaceShell } from "../shared/workspace-shell";
+import { Outlet, useLocation } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Building2, LayoutDashboard, Package2 } from "lucide-react";
+import { WorkspaceShell } from "@layouts/shared/workspace-shell";
+import { usePlatformPaths } from "@platform-admin/hooks/usePlatformPaths";
 
 export function PlatformLayout() {
   const location = useLocation();
-  const embedded = useMatch("/platform-admin/*");
-  const BASE = embedded ? "/platform-admin" : "";
-
+  const paths = usePlatformPaths();
   const platformNav = [
-    { to: `${BASE}/dashboard`, label: "Platform Dashboard", icon: LayoutDashboard },
-    { to: `${BASE}/tenants`, label: "Tenants", icon: Building2 },
-    { to: `${BASE}/modules`, label: "Module Catalog", icon: Package2 },
-    { to: `${BASE}/plans`, label: "Plans", icon: ReceiptText },
-    { to: `${BASE}/audit-logs`, label: "Platform Audit Logs", icon: Files },
-    { to: `${BASE}/settings`, label: "Platform Settings", icon: Settings2 },
+    { to: paths.dashboard, label: "Dashboard", icon: LayoutDashboard },
+    { to: paths.tenants, label: "Tenants", icon: Building2 },
+    { to: paths.modules, label: "Modules", icon: Package2 },
   ];
 
   return (
     <WorkspaceShell
-      title="Optimile Super Admin"
-      subtitle="Platform governance and tenant oversight"
+      title="Optimile Admin"
+      subtitle="Tenants & modules"
       navItems={platformNav}
-      actorLabel="Platform login"
-      searchPlaceholder="Search tenants, plans, modules, and platform events"
+      actorLabel="Super Admin"
     >
-      <div key={location.pathname} className="px-4 py-6 sm:px-6 lg:px-8">
+      <motion.main
+        key={location.pathname}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.18, ease: "easeOut" }}
+        className="flex-1 px-5 py-5 xl:px-6"
+      >
         <Outlet />
-      </div>
+      </motion.main>
     </WorkspaceShell>
   );
 }
+

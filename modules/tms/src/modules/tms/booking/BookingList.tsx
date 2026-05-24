@@ -1,24 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Plus } from "lucide-react";
-import { DataTable } from "../../../components/common/data-table";
-import { PageHeader } from "../../../components/common/page-header";
-import { TenantFilterBar } from "../../../components/tenant/tenant-primitives";
-import { Badge } from "../../../components/ui/badge";
-import { Button } from "../../../components/ui/button";
-import { Input } from "../../../components/ui/input";
-import { Select } from "../../../components/ui/select";
-import { useTenantRouteContext } from "../../../hooks/useTenantRouteContext";
-import { useBookingPaths } from "../../../hooks/useBookingPaths";
-import { BookingStatusBadge } from "./components/BookingStatusBadge";
-import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
-import { useTenantBookings } from "./hooks/useTenantBookings";
+import { ArrowRight, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { PageHeader } from "@/shared/components/common/page-header";
+import { TenantFilterBar } from "@tms-booking/modules/tenant-admin/components/tenant-primitives";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
+import { Select } from "@/shared/components/ui/select";
+import { useTenantRouteContext } from "@tms-booking/modules/tenant-admin/hooks/useTenantRouteContext";
+import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
+import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
+import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingPaths } from "@tms-booking/hooks/useBookingPaths";
+import { formatCurrency } from "@/shared/lib/format-currency";
 import {
   buildAddressLookup,
   buildCustomerLookup,
   buildDriverLookup,
-} from "./services/booking-selectors";
-import type { BookingRecord, BookingStatus } from "./types";
+} from "@/modules/tms/booking/services/booking-selectors";
+import { getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
+import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
 
 const pipelineColumns: Array<{
   key: string;
@@ -26,43 +27,33 @@ const pipelineColumns: Array<{
   statuses: BookingStatus[];
 }> = [
   { key: "draft", label: "Draft", statuses: ["DRAFT"] },
-  { key: "approval", label: "Pending Rate Approval", statuses: ["PENDING_RATE_APPROVAL"] },
-  { key: "assignment", label: "Pending Assignment", statuses: ["PENDING_ASSIGNMENT"] },
-  {
-    key: "assigned",
-    label: "Assigned / Documents",
-    statuses: [
-      "VEHICLE_ASSIGNED",
-      "LOADING_STARTED",
-      "LOADING_COMPLETED",
-      "DOCUMENT_PENDING",
-      "DOCUMENT_COMPLETED",
-      "ASSIGNED",
-      "LOADING",
-      "LOADED",
-      "READY_FOR_DISPATCH",
-      "DISPATCHED",
-    ],
-  },
-  { key: "transit", label: "In Transit", statuses: ["IN_TRANSIT", "DELAYED", "EXCEPTION"] },
-  { key: "completed", label: "Delivered / Finance", statuses: ["DELIVERED", "INVOICED", "PAID", "DISPUTED"] },
+  { key: "approval", label: "Rate Approval", statuses: ["PENDING_RATE_APPROVAL"] },
+  { key: "assignment", label: "Assignment", statuses: ["PENDING_ASSIGNMENT"] },
+  { key: "transit", label: "In Transit", statuses: ["IN_TRANSIT"] },
+  { key: "pod", label: "POD Pending", statuses: ["POD_PENDING"] },
+  { key: "completed", label: "Completed", statuses: ["COMPLETED"] },
+  { key: "invoiced", label: "Invoiced", statuses: ["INVOICED"] },
+  { key: "exception", label: "Exception", statuses: ["EXCEPTION"] },
   { key: "cancelled", label: "Cancelled", statuses: ["CANCELLED"] },
 ];
+
+const PAGE_SIZE = 8;
 
 export function BookingListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant } = useTenantRouteContext();
+  const paths = useBookingPaths();
   const { data: bookings } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "pipeline">((searchParams.get("view") as "list" | "pipeline") ?? "pipeline");
+  const [selectedPipelineKey, setSelectedPipelineKey] = useState(searchParams.get("pipeline") ?? "assignment");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const paths = useBookingPaths();
   const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
   const addressMap = useMemo(
     () => buildAddressLookup(Array.from(adminSources.customerAddressMap.values()).flat()),
@@ -71,24 +62,18 @@ export function BookingListPage() {
   const driverMap = useMemo(() => buildDriverLookup(adminSources.drivers), [adminSources.drivers]);
 
   useEffect(() => {
-    const currentView = searchParams.get("view");
-    const currentStatus = searchParams.get("status");
-    const targetStatus = statusFilter !== "all" ? statusFilter : null;
-    if (currentView === viewMode && currentStatus === targetStatus) return;
-
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
-      next.set("view", viewMode);
-      if (statusFilter !== "all") {
-        next.set("status", statusFilter);
+      if (selectedPipelineKey) {
+        next.set("pipeline", selectedPipelineKey);
       } else {
-        next.delete("status");
+        next.delete("pipeline");
       }
       return next;
-    }, { replace: true });
-  }, [searchParams, setSearchParams, statusFilter, viewMode]);
+    });
+  }, [selectedPipelineKey, setSearchParams]);
 
-  const filteredBookings = useMemo(() => {
+  const baseFilteredBookings = useMemo(() => {
     const query = search.trim().toLowerCase();
     return bookings.filter((booking) => {
       const customer = customerMap.get(booking.customerId);
@@ -97,13 +82,10 @@ export function BookingListPage() {
       const driverName = booking.assignment?.driverName ?? "";
       const vehicleName = booking.assignment?.vehicleLabel ?? "";
       const haystack =
-        `${booking.bookingId} ${customer?.name ?? ""} ${source?.addressName ?? ""} ${destination?.addressName ?? ""} ${driverName} ${vehicleName}`
+        `${booking.bookingId} ${customer?.name ?? ""} ${source?.addressName ?? ""} ${source?.city ?? ""} ${destination?.addressName ?? ""} ${destination?.city ?? ""} ${driverName} ${vehicleName}`
           .toLowerCase();
 
       if (query && !haystack.includes(query)) {
-        return false;
-      }
-      if (statusFilter !== "all" && booking.status !== statusFilter) {
         return false;
       }
       if (customerFilter !== "all" && booking.customerId !== customerFilter) {
@@ -117,20 +99,53 @@ export function BookingListPage() {
       }
       return true;
     });
-  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search, statusFilter]);
+  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search]);
 
   const pipelineGroups = useMemo(
     () =>
       pipelineColumns.map((column) => {
-        const columnBookings = filteredBookings.filter((booking) => column.statuses.includes(booking.status));
+        const columnBookings = baseFilteredBookings
+          .filter((booking) => column.statuses.includes(getPrimaryBookingStatus(booking.status)))
+          .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
         return {
           ...column,
           bookings: columnBookings,
+          previewBookings: columnBookings.slice(0, 5),
           totalFreight: columnBookings.reduce((sum, booking) => sum + booking.pricing.calculatedFreight, 0),
         };
       }),
-    [filteredBookings],
+    [baseFilteredBookings],
   );
+
+  const activePipelineGroup =
+    pipelineGroups.find((column) => column.key === selectedPipelineKey) ??
+    pipelineGroups.find((column) => column.key === "assignment") ??
+    pipelineGroups[0];
+
+  const listBookings = useMemo(() => {
+    const stateScopedBookings = activePipelineGroup?.bookings ?? [];
+    if (statusFilter === "all") {
+      return stateScopedBookings;
+    }
+    return stateScopedBookings.filter((booking) => booking.status === statusFilter);
+  }, [activePipelineGroup, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(listBookings.length / PAGE_SIZE));
+  const pagedBookings = useMemo(
+    () => listBookings.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [currentPage, listBookings],
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, customerFilter, dateFrom, dateTo, selectedPipelineKey]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   function openBooking(bookingId: string) {
     navigate(paths.booking(bookingId));
@@ -140,8 +155,8 @@ export function BookingListPage() {
     <div className="space-y-4">
       <PageHeader
         eyebrow="TMS"
-        title="Booking Management"
-        description="Compact list and pipeline views for fast operational scanning."
+        title="Booking Dashboard"
+        description="Compact state-first workspace with short previews and a bounded full list."
         action={
           <Button asChild>
             <Link to={paths.createBooking}>
@@ -152,209 +167,246 @@ export function BookingListPage() {
         }
       />
 
-      <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1">
-          <button
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${viewMode === "list" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setViewMode("list")}
-            type="button"
-          >
-            List
-          </button>
-          <button
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${viewMode === "pipeline" ? "bg-white text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setViewMode("pipeline")}
-            type="button"
-          >
-            Pipeline
-          </button>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="accent">{filteredBookings.length} bookings</Badge>
-          <span>Click a row or card to open booking</span>
-        </div>
-      </div>
-      </div>
-
-      {viewMode === "list" ? (
-        <div className="space-y-4">
-          <TenantFilterBar
-            searchValue={search}
-            searchPlaceholder="Search booking, customer, lane, vehicle, or driver"
-            onSearchChange={setSearch}
-            filters={
-              <>
-                <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                  <option value="all">All statuses</option>
-                  {Array.from(new Set(bookings.map((booking) => booking.status))).map((status) => (
-                    <option key={status} value={status}>
-                      {status.replace(/_/g, " ")}
-                    </option>
-                  ))}
-                </Select>
-                <Select value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}>
-                  <option value="all">All customers</option>
-                  {adminSources.customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </Select>
-                <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-                <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-              </>
-            }
-          />
-
-          <DataTable
-            title="Bookings"
-            description="Entire row is clickable."
-            headers={["Booking ID", "Customer", "Lane", "Status", "Vehicle", "Driver", "Date"]}
-            rows={filteredBookings.map((booking) => {
-              const customer = customerMap.get(booking.customerId);
-              const source = addressMap.get(booking.sourceAddressId);
-              const destination = addressMap.get(booking.destinationAddressId);
-              const driver = booking.assignment?.driverId ? driverMap.get(booking.assignment.driverId) : null;
-
-              return [
-                <span key={`${booking.id}-id`} className="font-semibold">{booking.bookingId}</span>,
-                customer?.name ?? "Unknown customer",
-                `${source?.city ?? source?.addressName ?? "Origin"} → ${destination?.city ?? destination?.addressName ?? "Destination"}`,
-                <BookingStatusBadge key={`${booking.id}-status`} status={booking.status} />,
-                booking.assignment?.vehicleLabel ?? "Unassigned",
-                booking.assignment?.driverName ?? driver?.name ?? "Unassigned",
-                new Date(booking.createdAt).toLocaleDateString(),
-              ];
-            })}
-            onRowClick={(rowIndex) => openBooking(filteredBookings[rowIndex].id)}
-            emptyMessage="No bookings found."
-          />
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-          <div className="grid min-w-[1260px] grid-cols-7 gap-2.5">
-            {pipelineGroups.map((column) => (
-              <div key={column.key} className={`flex flex-col rounded-xl border ${getPipelineColumnClass(column.key)}`}>
-                {/* Column header */}
+      <div className="glass-panel overflow-x-auto p-3">
+        <div className="flex min-w-max gap-3">
+          {pipelineGroups.map((column) => {
+            const isActive = selectedPipelineKey === column.key;
+            return (
+              <div
+                key={column.key}
+                className={`flex h-[290px] w-[220px] shrink-0 flex-col rounded-[24px] border p-3 transition lg:w-[230px] xl:w-[240px] ${getPipelineColumnClass(column.key)} ${isActive ? "border-primary/45 ring-2 ring-primary/20" : "border-white/80"}`}
+              >
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-t-xl px-3 py-2.5 text-left transition hover:bg-white/60"
+                  className="flex items-start justify-between gap-3 rounded-[18px] px-1 py-1 text-left"
                   onClick={() => {
-                    setStatusFilter(column.statuses[0] ?? "all");
-                    setViewMode("list");
+                    setSelectedPipelineKey(column.key);
+                    setStatusFilter("all");
                   }}
                 >
-                  <span className="truncate text-[11px] font-extrabold uppercase tracking-wide text-gray-600">{column.label}</span>
-                  <span className="shrink-0 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-bold text-gray-500 ring-1 ring-gray-200">
-                    {column.bookings.length}
-                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">State</p>
+                    <p className="mt-1 text-sm font-semibold">{column.label}</p>
+                  </div>
+                  <Badge variant={isActive ? "accent" : "outline"}>{column.bookings.length}</Badge>
                 </button>
-                {/* Freight total */}
-                <div className="border-b border-dashed border-gray-200/80 px-3 pb-2">
-                  <span className="text-[11px] font-semibold text-gray-500">
-                    ₹{column.totalFreight > 0 ? column.totalFreight.toLocaleString("en-IN") : "0"}
-                  </span>
+
+                <div className="mt-3 flex-1 overflow-y-auto pr-1">
+                  <div className="space-y-2">
+                    {column.previewBookings.length ? (
+                      column.previewBookings.map((booking) => (
+                        <button
+                          key={booking.id}
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 rounded-2xl border border-white/80 bg-white/85 px-3 py-2 text-left transition hover:border-primary/25 hover:bg-white"
+                          onClick={() => openBooking(booking.id)}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-xs font-semibold">{booking.bookingId}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {customerMap.get(booking.customerId)?.name ?? "Unknown customer"}
+                            </p>
+                          </div>
+                          <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="flex h-full min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-white/45 px-3 text-center text-xs text-muted-foreground">
+                        No bookings
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {/* Cards */}
-                <div className="flex-1 space-y-2 p-2">
-                  {column.bookings.length ? (
-                    column.bookings.map((booking) => (
-                      <PipelineCard
-                        key={booking.id}
-                        booking={booking}
-                        customerName={customerMap.get(booking.customerId)?.name ?? "—"}
-                        onClick={() => openBooking(booking.id)}
-                      />
-                    ))
-                  ) : (
-                    <div className="flex min-h-[80px] items-center justify-center rounded-lg border border-dashed border-gray-300/70 bg-white/50">
-                      <span className="text-[11px] text-gray-400">Empty</span>
-                    </div>
-                  )}
-                </div>
+
+                <Button
+                  variant={isActive ? "default" : "outline"}
+                  className="mt-3 w-full"
+                  onClick={() => {
+                    setSelectedPipelineKey(column.key);
+                    setStatusFilter("all");
+                  }}
+                >
+                  View All
+                </Button>
               </div>
-            ))}
+            );
+          })}
+        </div>
+      </div>
+
+      <TenantFilterBar
+        searchValue={search}
+        searchPlaceholder="Search booking ID or customer"
+        onSearchChange={setSearch}
+        filters={
+          <>
+            <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">All execution statuses</option>
+              {Array.from(new Set((activePipelineGroup?.bookings ?? []).map((booking) => booking.status))).map((status) => (
+                <option key={status} value={status}>
+                  {status.replace(/_/g, " ")}
+                </option>
+              ))}
+            </Select>
+            <Select value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}>
+              <option value="all">All customers</option>
+              {adminSources.customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
+            </Select>
+            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </>
+        }
+      />
+
+      <div className="glass-panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
+          <div>
+            <p className="text-lg font-semibold">{activePipelineGroup?.label ?? "Bookings"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {listBookings.length} bookings · {formatCurrency(activePipelineGroup?.totalFreight ?? 0)}
+            </p>
+          </div>
+          <Badge variant="outline">
+            Page {currentPage} / {totalPages}
+          </Badge>
+        </div>
+
+        <div className="mt-4 h-[430px] overflow-y-auto pr-1">
+          {pagedBookings.length ? (
+            <div className="space-y-2">
+              {pagedBookings.map((booking) => (
+                <CompactBookingRow
+                  key={booking.id}
+                  booking={booking}
+                  customerName={customerMap.get(booking.customerId)?.name ?? "Unknown customer"}
+                  sourceLabel={getLanePoint(addressMap.get(booking.sourceAddressId))}
+                  destinationLabel={getLanePoint(addressMap.get(booking.destinationAddressId))}
+                  driverName={booking.assignment?.driverName ?? (booking.assignment?.driverId ? driverMap.get(booking.assignment.driverId)?.name ?? "Unassigned" : "Unassigned")}
+                  onOpen={() => openBooking(booking.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-[28px] border border-dashed border-border/70 bg-white/45 px-6 text-center text-sm text-muted-foreground">
+              No bookings match this state and filter combination.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {pagedBookings.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0}-
+            {Math.min(currentPage * PAGE_SIZE, listBookings.length)} of {listBookings.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}>
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function PipelineCard({
+function CompactBookingRow({
   booking,
   customerName,
-  onClick,
+  sourceLabel,
+  destinationLabel,
+  driverName,
+  onOpen,
 }: {
   booking: BookingRecord;
   customerName: string;
-  onClick: () => void;
+  sourceLabel: string;
+  destinationLabel: string;
+  driverName: string;
+  onOpen: () => void;
 }) {
-  const dateLabel = new Date(booking.createdAt).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-  });
-  const freightLabel = booking.pricing.calculatedFreight > 0
-    ? `₹${booking.pricing.calculatedFreight.toLocaleString("en-IN")}`
-    : "₹0";
-  const isContract = booking.commercialType === "CONTRACT";
-  const vehicleLabel = booking.assignment?.vehicleLabel;
-
+  const hasRevisionPending = (booking.destinationChangeRequests ?? []).some((request) =>
+    ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(request.status),
+  );
+  const isRevised = (booking.deliveries ?? []).some((delivery) => (delivery.revisions?.length ?? 0) > 0);
   return (
     <button
       type="button"
-      onClick={onClick}
-      className="group block w-full rounded-lg border border-gray-200 bg-white p-2.5 text-left shadow-sm transition hover:border-primary/40 hover:shadow-md active:scale-[0.98]"
+      onClick={onOpen}
+      className={`grid w-full gap-3 rounded-[22px] border px-4 py-3 text-left transition hover:border-primary/25 hover:bg-white lg:grid-cols-[140px_minmax(0,1fr)_170px_140px_90px_auto] ${hasRevisionPending || isRevised ? "border-amber-300 bg-amber-50/70" : "border-white/80 bg-white/85"}`}
     >
-      {/* Top row: booking ID + status */}
-      <div className="flex items-start justify-between gap-1.5">
-        <p className="truncate text-[12px] font-bold leading-tight text-text">{booking.bookingId}</p>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{booking.bookingId}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">{new Date(booking.createdAt).toLocaleDateString()}</p>
+        {hasRevisionPending ? <Badge variant="warning">EDITED BOOKING</Badge> : null}
+        {!hasRevisionPending && isRevised ? <Badge variant="accent">DESTINATION REVISED</Badge> : null}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{customerName}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {sourceLabel} → {destinationLabel}
+        </p>
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{booking.assignment?.vehicleLabel ?? "Pending vehicle"}</p>
+        <p className="mt-1 truncate text-xs text-muted-foreground">{driverName}</p>
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{formatCurrency(booking.pricing.calculatedFreight)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{getDeliveryProgressLabel(booking)}</p>
+      </div>
+      <div className="flex items-center lg:justify-center">
         <BookingStatusBadge status={booking.status} />
       </div>
-
-      {/* Customer */}
-      <p className="mt-0.5 truncate text-[11px] text-gray-500">{customerName}</p>
-
-      {/* Divider */}
-      <div className="my-2 border-t border-gray-100" />
-
-      {/* Bottom row: type | date | value */}
-      <div className="flex items-center justify-between gap-1 text-[10px]">
-        <span className={`rounded px-1.5 py-0.5 font-bold ${isContract ? "bg-blue-50 text-blue-600" : "bg-violet-50 text-violet-600"}`}>
-          {isContract ? "CTR" : "SPOT"}
-        </span>
-        <span className="text-gray-400">{dateLabel}</span>
-        <span className="font-bold text-text">{freightLabel}</span>
+      <div className="flex items-center justify-end">
+        <ArrowRight className="size-4 text-muted-foreground" />
       </div>
-
-      {/* Vehicle chip — only when assigned */}
-      {vehicleLabel ? (
-        <p className="mt-1.5 truncate rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
-          {vehicleLabel}
-        </p>
-      ) : null}
     </button>
   );
+}
+
+function getLanePoint(address?: { city?: string | null; addressName?: string | null }) {
+  return address?.city ?? address?.addressName ?? "Unknown";
+}
+
+function getDeliveryProgressLabel(booking: BookingRecord) {
+  const deliveries = booking.deliveries ?? [];
+  const total = deliveries.length || booking.numberOfDeliveries || 0;
+  const completed = deliveries.filter((delivery) => delivery.status === "COMPLETED").length;
+  return `${completed}/${total} deliveries done`;
 }
 
 function getPipelineColumnClass(columnKey: string) {
   switch (columnKey) {
     case "draft":
-      return "border-gray-200 bg-gray-50";
+      return "bg-gradient-to-b from-slate-100/95 to-blue-50/70";
     case "approval":
-      return "border-amber-200 bg-amber-50/70";
+      return "bg-gradient-to-b from-amber-100/95 to-orange-50/75";
     case "assignment":
-      return "border-sky-200 bg-sky-50/70";
-    case "assigned":
-      return "border-indigo-200 bg-indigo-50/70";
+      return "bg-gradient-to-b from-sky-100/95 to-cyan-50/75";
     case "transit":
-      return "border-cyan-200 bg-cyan-50/70";
+      return "bg-gradient-to-b from-cyan-100/95 to-blue-50/75";
+    case "pod":
+      return "bg-gradient-to-b from-violet-100/95 to-fuchsia-50/75";
     case "completed":
-      return "border-emerald-200 bg-emerald-50/70";
+      return "bg-gradient-to-b from-emerald-100/95 to-lime-50/75";
+    case "invoiced":
+      return "bg-gradient-to-b from-green-100/95 to-emerald-50/75";
+    case "exception":
+      return "bg-gradient-to-b from-rose-100/95 to-orange-50/75";
     case "cancelled":
-      return "border-rose-200 bg-rose-50/70";
+      return "bg-gradient-to-b from-rose-100/95 to-pink-50/75";
     default:
-      return "border-gray-200 bg-white";
+      return "bg-background/95";
   }
 }
+
+

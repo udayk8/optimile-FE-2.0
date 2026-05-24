@@ -30,6 +30,8 @@
       "@/shared/store/*": ["./src/store/*"],
       "@/types": ["./src/types"],
       "@/types/*": ["./src/types/*"],
+      "@/modules/tms": ["./src/modules/tms"],
+      "@/modules/tms/*": ["./src/modules/tms/*"],
       "@/modules/tenant-admin": ["./src/modules/tenant-admin"],
       "@/modules/tenant-admin/*": ["./src/modules/tenant-admin/*"],
       "@tenant-admin/*": ["./src/*"],

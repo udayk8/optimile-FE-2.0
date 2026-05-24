@@ -13,23 +13,35 @@ export interface CustomerSetupProgress {
 }
 
 export type CustomerAddressTag = "Billing" | "Warehouse" | "Consignor" | "Consignee";
+export type CustomerOperationalAddressType = "PRIMARY" | "ADDITIONAL" | "EMERGENCY";
 
 export interface CustomerAddressMasterEntry {
   id: string;
   addressCode?: string;
   type: CustomerAddressTag[];
+  consigneeId?: string;
+  consigneeName?: string;
+  operationalAddressType?: CustomerOperationalAddressType;
+  addressUsage?: "ORIGIN" | "DESTINATION" | "BOTH";
   contactCode?: string;
   name: string;
+  addressLabel?: string;
+  fullAddress?: string;
   line1: string;
   line2?: string;
   city: string;
   state: string;
   country?: string;
   pincode: string;
+  latitude?: number | null;
+  longitude?: number | null;
   gstin?: string;
   contactPerson?: string;
   contactNumber?: string;
   emailId?: string;
+  isActive?: boolean;
+  isTemporary?: boolean;
+  remarks?: string;
 }
 
 export interface CustomerUOMOverride {
@@ -95,14 +107,24 @@ export interface TenantCustomerAddress {
   id: string;
   tenantId: string;
   tenantCustomerId: string;
+  customerId?: string;
   addressCode?: string;
   addressType: "consignor" | "consignee" | "both";
   addressTypes?: CustomerAddressTag[];
+  consigneeId?: string;
+  consigneeName?: string;
+  operationalAddressType?: CustomerOperationalAddressType;
+  addressUsage?: "ORIGIN" | "DESTINATION" | "BOTH";
   addressName: string;
+  addressLabel?: string;
+  fullAddress?: string;
   contactCode?: string;
   gstin?: string;
+  contactPersonName?: string;
   contactPerson?: string;
+  phone?: string;
   contactNumber?: string;
+  email?: string;
   emailId?: string;
   addressLine1: string;
   addressLine2?: string;
@@ -111,8 +133,12 @@ export interface TenantCustomerAddress {
   state: string;
   country: string;
   pincode: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
   status: "active" | "inactive";
+  isTemporary?: boolean;
+  remarks?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -190,14 +216,24 @@ export interface TenantCustomerInput {
 }
 
 export interface TenantCustomerAddressInput {
+  customerId?: string;
   addressCode?: string;
   addressType: TenantCustomerAddress["addressType"];
   addressTypes?: CustomerAddressTag[];
+  consigneeId?: string;
+  consigneeName?: string;
+  operationalAddressType?: CustomerOperationalAddressType;
+  addressUsage?: "ORIGIN" | "DESTINATION" | "BOTH";
   addressName: string;
+  addressLabel?: string;
+  fullAddress?: string;
   contactCode?: string;
   gstin?: string;
+  contactPersonName?: string;
   contactPerson?: string;
+  phone?: string;
   contactNumber?: string;
+  email?: string;
   emailId?: string;
   addressLine1: string;
   addressLine2?: string;
@@ -206,8 +242,12 @@ export interface TenantCustomerAddressInput {
   state: string;
   country: string;
   pincode: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
   status: "active" | "inactive";
+  isTemporary?: boolean;
+  remarks?: string;
 }
 
 export interface TenantCustomerRateCardInput {

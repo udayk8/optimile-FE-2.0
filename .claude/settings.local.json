@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"dashboard:%{http_code} tenants:\" http://127.0.0.1:3000/platform-admin/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:3000/platform-admin/tenants)",
+      "Bash(curl -s -o /dev/null -w \"dash:%{http_code} tenants:\" http://127.0.0.1:3000/platform-admin/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} modules:\" http://127.0.0.1:3000/platform-admin/tenants)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:3000/platform-admin/modules)",
+      "Bash(curl -s -o /dev/null -w \"dash:%{http_code} list:\" http://127.0.0.1:3000/platform-admin/dashboard)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} polar:\" http://127.0.0.1:3000/platform-admin/tenants)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} modules:\" http://127.0.0.1:3000/platform-admin/tenants/tenant-polar)",
+      "Bash(curl -s -o /dev/null -w \"list:%{http_code} polar:\" http://127.0.0.1:3000/platform-admin/tenants)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} login:\" http://127.0.0.1:3000/platform-admin/tenants/tenant-polar)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} tenant-dash:\" \"http://127.0.0.1:3000/platform-admin/tenant-login?tenantId=tenant-polar\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:3000/platform-admin/tenant/tenant-polar/dashboard)",
+      "Bash(curl *)",
+      "Bash(awk 'NR<1660 || NR>=1969' \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(mv -f \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx.new\" \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(awk 'NR<250 || NR>=531' \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(awk 'NR<605 || NR>=1157' \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(awk 'NR<1571 || NR>=1865' \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(npm exec *)",
+      "Bash(node scripts/verify-rbac.mjs)",
+      "Bash(npm install *)",
+      "Bash(node scripts/verify-lr-routes.mjs)",
+      "Bash(awk 'NR<1612 || NR>=1924' \"D:/NEW_AI_WORKSPACE/optimile-FE-2.0/modules/platform-admin/src/modules/tenant-admin/pages/shared/tenant-placeholder-pages.tsx\")",
+      "Bash(node scripts/verify-role-perms.mjs)",
+      "Bash(node scripts/verify-lr-root.mjs)",
+      "Bash(npx --offline tsc -p tsconfig.json --noEmit)",
+      "Bash(grep -E \"lr-config|lr\\\\\\\\\\\\\\\\config\")"
+    ]
+  }
+}

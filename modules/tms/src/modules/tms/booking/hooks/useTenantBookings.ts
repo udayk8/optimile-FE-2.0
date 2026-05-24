@@ -1,10 +1,13 @@
-import { useAppStore } from "../../../../store/useAppStore";
+import { useAppStore } from "@tms-booking/shared/store/useAppStore";
 import type {
   BookingAssignmentInput,
   BookingInput,
+  BookingVehicleReplacementInput,
+  BookingVehicleReplacementVendorActionInput,
+  BookingReassignmentInput,
   BookingRecord,
   BookingStatusTransitionInput,
-} from "../types";
+} from "@/modules/tms/booking/types";
 
 export function useTenantBookings(tenantId: string) {
   const appStore = useAppStore(tenantId);
@@ -21,5 +24,12 @@ export function useTenantBookings(tenantId: string) {
       appStore.transitionBooking(bookingId, transition),
     assignBooking: (bookingId: string, input: BookingAssignmentInput) =>
       appStore.assignBooking(bookingId, input),
+    reassignBooking: (bookingId: string, input: BookingReassignmentInput) =>
+      appStore.reassignBooking(bookingId, input),
+    replaceBookingVehicle: (bookingId: string, input: BookingVehicleReplacementInput) =>
+      appStore.replaceBookingVehicle(bookingId, input),
+    actionBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) =>
+      appStore.actionBookingVehicleReplacement(bookingId, input),
   };
 }
+

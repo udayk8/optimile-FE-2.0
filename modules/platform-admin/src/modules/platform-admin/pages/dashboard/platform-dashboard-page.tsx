@@ -1,357 +1,191 @@
+import type { ComponentType } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, Building2, Package2, ReceiptText, ShieldCheck } from "lucide-react";
-import { usePlatformPaths } from "../../../../hooks/usePlatformPaths";
-import { MetricCard } from "../../../../components/common/metric-card";
-import { PageHeader } from "../../../../components/common/page-header";
-import {
-  PlatformInfoList,
-  PlatformPanel,
-  PlatformQuickLink,
-  PlatformTimeline,
-} from "../../../../components/platform/platform-primitives";
-import { Badge } from "../../../../components/ui/badge";
-import { Button } from "../../../../components/ui/button";
-import { usePlatformAuditLogs } from "../../hooks/usePlatformAuditLogs";
-import { usePlatformModules } from "../../hooks/usePlatformModules";
-import { usePlans } from "../../hooks/usePlans";
-import { useTenants } from "../../hooks/useTenants";
+import { Building2, CheckCircle2, Hourglass, Package2, Plus, Settings } from "lucide-react";
+import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
+import { usePlatformModules } from "@/modules/platform-admin/hooks/usePlatformModules";
+import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
+import { usePlatformPaths } from "@platform-admin/hooks/usePlatformPaths";
+import { displayModule } from "@/modules/platform-admin/lib/module-display";
 
 export function PlatformDashboardPage() {
-  const paths = usePlatformPaths();
   const { data: tenants, getTenantPrimaryAdminUser } = useTenants();
   const { data: modules } = usePlatformModules();
-  const { data: plans } = usePlans();
-  const { data: auditLogs } = usePlatformAuditLogs();
+  const paths = usePlatformPaths();
 
-  const activeTenants = tenants.filter((tenant) => tenant.status === "active");
-  const suspendedTenants = tenants.filter((tenant) => tenant.status === "paused");
-  const trialTenants = tenants.filter((tenant) => tenant.status === "trial");
-  const enabledModuleCount = tenants.reduce(
-    (total, tenant) => total + tenant.enabledModuleCodes.length,
-    0,
-  );
+  const totalTenants = tenants.length;
+  const activeTenants = tenants.filter((tenant) => tenant.status === "active").length;
+  const onboardingTenants = tenants.filter((tenant) => tenant.status === "trial").length;
+  const activeModules = modules.filter((module) => module.status === "active").length;
+
   const recentTenants = [...tenants]
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
-    .slice(0, 4);
-  const recentAudit = [...auditLogs]
-    .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
     .slice(0, 5);
-  const planDistribution = plans.map((plan) => ({
-    ...plan,
-    tenantCount: tenants.filter((tenant) => tenant.planId === plan.id).length,
-  }));
-  const moduleDistribution = modules
-    .map((module) => ({
-      ...module,
+
+  const moduleAdoption = modules.map((module) => {
+    const display = displayModule(module);
+    return {
+      code: display.code,
+      name: display.name,
+      status: module.status,
       tenantCount: tenants.filter((tenant) => tenant.enabledModuleCodes.includes(module.code)).length,
-    }))
-    .sort((left, right) => right.tenantCount - left.tenantCount)
-    .slice(0, 5);
-  const attentionTenants = tenants
-    .filter((tenant) => tenant.status !== "active" || tenant.health.auditEvents24h > 20)
-    .slice(0, 4);
+    };
+  });
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Optimile Super Admin"
-        title="Platform Dashboard"
-        description="Monitor tenant health, commercial coverage, module adoption, and platform activity without stepping into tenant-owned administration."
-        action={
-          <div className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link to={paths.tenants}>Review tenants</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link to={paths.auditLogs}>View platform activity</Link>
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Active tenants"
-          value={activeTenants.length}
-          icon={Building2}
-          note={`${trialTenants.length} in trial, ${suspendedTenants.length} paused`}
-          tone="success"
-        />
-        <MetricCard
-          label="Enabled module assignments"
-          value={enabledModuleCount}
-          icon={Package2}
-          note={`${modules.length} catalog modules available`}
-          tone="info"
-        />
-        <MetricCard
-          label="Plans in use"
-          value={planDistribution.filter((plan) => plan.tenantCount > 0).length}
-          icon={ReceiptText}
-          note="Commercial footprint across tenant portfolio"
-          tone="accent"
-        />
-        <MetricCard
-          label="Platform audit events"
-          value={auditLogs.length}
-          icon={Activity}
-          note="Governance actions recorded in the control plane"
-          tone="warning"
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <PlatformPanel
-          title="Operational focus"
-          description="The control plane highlights where Optimile admins should intervene next."
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <PlatformQuickLink
-              title="Tenant governance"
-              description="Review newly created tenants, paused tenants, and accounts with elevated activity."
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link to={paths.tenants}>Open tenant directory</Link>
-                </Button>
-              }
-            />
-            <PlatformQuickLink
-              title="Commercial setup"
-              description="Inspect plan mix, verify module coverage, and prepare provisioning defaults."
-              action={
-                <div className="flex gap-2">
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={paths.plans}>Plans</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={paths.modules}>Modules</Link>
-                  </Button>
-                </div>
-              }
-            />
-            <PlatformQuickLink
-              title="Platform settings"
-              description="Adjust branding, default provisioning settings, and internal operating guardrails."
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link to={paths.settings}>Open settings</Link>
-                </Button>
-              }
-            />
-            <PlatformQuickLink
-              title="Platform boundary"
-              description="Hierarchy, org units, users, roles, and tenant data scope remain tenant-owned. Platform surfaces only summarize them."
-              action={<Badge variant="secondary">Tenant-owned operations stay outside this workspace</Badge>}
-            />
-          </div>
-        </PlatformPanel>
-
-        <PlatformPanel
-          title="Tenants needing attention"
-          description="Platform-side flags based on tenant status and recent activity volume."
-        >
-          {attentionTenants.length ? (
-            <div className="space-y-3">
-              {attentionTenants.map((tenant) => (
-                <div
-                  key={tenant.id}
-                  className={`rounded-xl border p-4 ${
-                    tenant.status === "paused"
-                      ? "border-danger/20 bg-danger/5"
-                      : tenant.status === "trial"
-                        ? "border-primary/20 bg-primary/5"
-                        : "border-warning/20 bg-warning/5"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{tenant.name}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {tenant.code} · {tenant.region} · {tenant.health.auditEvents24h} audit events in 24h
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        tenant.status === "active"
-                          ? "success"
-                          : tenant.status === "trial"
-                            ? "info"
-                            : "danger"
-                      }
-                    >
-                      {tenant.status}
-                    </Badge>
-                  </div>
-                  <div className="mt-4">
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={paths.tenant(tenant.id)}>Review tenant</Link>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm text-success">
-              No tenant currently requires immediate attention.
-            </div>
-          )}
-        </PlatformPanel>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <PlatformPanel
-          title="Plan distribution"
-          description="Commercial mix across the current tenant portfolio."
-        >
-          <PlatformInfoList
-            items={planDistribution.map((plan) => ({
-              label: plan.name,
-              helper: `${plan.code} · $${plan.monthlyPriceUsd}/mo · ${plan.seatsIncluded} seats`,
-              value: (
-                <div className="flex items-center gap-3">
-                  <span>{plan.tenantCount} tenants</span>
-                  <Badge variant={plan.tenantCount ? "secondary" : "outline"}>
-                    {plan.tenantCount ? "In use" : "Unused"}
-                  </Badge>
-                </div>
-              ),
-            }))}
-          />
-        </PlatformPanel>
-
-        <PlatformPanel
-          title="Most adopted modules"
-          description="Top platform modules by tenant enablement."
-        >
-          <PlatformInfoList
-            items={moduleDistribution.map((module) => ({
-              label: module.name,
-              helper: module.description,
-              value: (
-                <div className="flex items-center gap-3">
-                  <span>{module.tenantCount} tenants</span>
-                  <Badge variant={module.status === "active" ? "success" : "warning"}>
-                    {module.status}
-                  </Badge>
-                </div>
-              ),
-            }))}
-          />
-        </PlatformPanel>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <PlatformPanel
-          title="Recent tenant activity"
-          description="Newly created or recently provisioned tenants in the platform layer."
-        >
-          <div className="space-y-3">
-            {recentTenants.map((tenant) => {
-              const primaryAdmin = getTenantPrimaryAdminUser(tenant.id);
-              return (
-                <div key={tenant.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{tenant.name}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {tenant.code} · {formatTimestamp(tenant.createdAt)}
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Primary admin: {primaryAdmin?.name ?? "Bootstrap user not available"}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{tenant.planId}</Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </PlatformPanel>
-
-        <PlatformPanel
-          title="Platform activity feed"
-          description="Most recent platform-level actions performed by Optimile administrators."
-          action={
-            <Button asChild variant="outline" size="sm">
-              <Link to={paths.auditLogs}>Open full audit log</Link>
-            </Button>
-          }
-        >
-          <PlatformTimeline
-            items={recentAudit.map((event) => ({
-              id: event.id,
-              title: `${event.action} · ${event.entityName}`,
-              description:
-                event.tenantId
-                  ? `Tenant reference: ${event.tenantId}`
-                  : "Global platform event with no tenant-specific ownership.",
-              meta: `${event.actor} · ${formatTimestamp(event.timestamp)}`,
-              badge: (
-                <Badge
-                  variant={
-                    event.result === "success"
-                      ? "success"
-                      : event.result === "warning"
-                        ? "warning"
-                        : "danger"
-                  }
-                >
-                  {event.result}
-                </Badge>
-              ),
-            }))}
-          />
-        </PlatformPanel>
-      </div>
-
-      <PlatformPanel
-        title="Control plane rules"
-        description="Quick reference for what this workspace owns and what stays with tenant admins."
-      >
-        <div className="grid gap-4 md:grid-cols-3">
-          <BoundaryCard
-            title="Platform-owned"
-            items={["Tenant provisioning", "Plan assignment", "Module enablement", "Platform settings"]}
-          />
-          <BoundaryCard
-            title="Tenant-owned"
-            items={["Hierarchy structure", "Org units", "Access Control System", "Role-to-level assignments"]}
-          />
-          <BoundaryCard
-            title="Escalation path"
-            items={["Review tenant detail", "Open tenant admin portal", "Inspect platform audit timeline"]}
-            accent
-          />
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Dashboard</h1>
+          <p className="mt-0.5 text-[13px] text-slate-500">Overview of tenants and modules.</p>
         </div>
-      </PlatformPanel>
-    </div>
-  );
-}
-
-function BoundaryCard({
-  title,
-  items,
-  accent,
-}: {
-  title: string;
-  items: string[];
-  accent?: boolean;
-}) {
-  return (
-    <div className={`rounded-xl border p-4 ${accent ? "border-warning/20 bg-warning/10" : "border-gray-200 bg-gray-50"}`}>
-      <div className="flex items-center gap-2">
-        {accent ? <AlertTriangle className="size-4 text-warning" /> : <ShieldCheck className="size-4 text-primary" />}
-        <p className="font-bold text-text">{title}</p>
+        <div className="flex gap-2">
+          <Button asChild size="sm">
+            <Link to={paths.tenants}>
+              <Plus className="size-4" />
+              Add Tenant
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link to={paths.modules}>
+              <Settings className="size-4" />
+              Manage Modules
+            </Link>
+          </Button>
+        </div>
       </div>
-      <ul className="mt-3 space-y-2 text-sm text-gray-600">
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Tenants" value={totalTenants} icon={Building2} tone="slate" />
+        <StatCard label="Active Tenants" value={activeTenants} icon={CheckCircle2} tone="emerald" />
+        <StatCard label="Onboarding" value={onboardingTenants} icon={Hourglass} tone="amber" />
+        <StatCard label="Active Modules" value={activeModules} icon={Package2} tone="indigo" />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+        <section className="rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <h2 className="text-[13px] font-semibold text-slate-900">Recent tenants</h2>
+              <p className="text-[11px] text-slate-500">Latest 5 tenants onboarded.</p>
+            </div>
+            <Link to={paths.tenants} className="text-[12px] font-medium text-primary hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="overflow-hidden">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                  <th className="px-4 py-2.5">Tenant</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">Admin</th>
+                  <th className="px-4 py-2.5">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTenants.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-6 text-center text-[12px] text-slate-500">
+                      No tenants yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentTenants.map((tenant) => {
+                    const admin = getTenantPrimaryAdminUser(tenant.id);
+                    return (
+                      <tr key={tenant.id} className="border-b last:border-0 hover:bg-slate-50/60">
+                        <td className="px-4 py-2.5">
+                          <Link to={paths.tenant(tenant.id)} className="font-medium text-slate-900 hover:underline">
+                            {tenant.name}
+                          </Link>
+                          <p className="text-[11px] text-slate-500">{tenant.code}</p>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <StatusBadge status={tenant.status} />
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-700">{admin?.name ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-slate-600">{formatDate(tenant.createdAt)}</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div>
+              <h2 className="text-[13px] font-semibold text-slate-900">Module enablement</h2>
+              <p className="text-[11px] text-slate-500">Tenants per module.</p>
+            </div>
+            <Link to={paths.modules} className="text-[12px] font-medium text-primary hover:underline">
+              Manage
+            </Link>
+          </div>
+          <ul className="divide-y">
+            {moduleAdoption.length === 0 ? (
+              <li className="px-4 py-6 text-center text-[12px] text-slate-500">No modules yet.</li>
+            ) : (
+              moduleAdoption.map((module) => (
+                <li key={module.code} className="flex items-center justify-between px-4 py-2.5 text-[13px]">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900">{module.name}</p>
+                    <p className="text-[11px] text-slate-500">{module.code}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant={module.status === "active" ? "success" : "warning"}>{module.status}</Badge>
+                    <span className="min-w-[3.5rem] text-right text-slate-700">{module.tenantCount} tenants</span>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        </section>
+      </div>
     </div>
   );
 }
 
-function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString();
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: number;
+  icon: ComponentType<{ className?: string }>;
+  tone: "slate" | "emerald" | "amber" | "indigo";
+}) {
+  const palette = {
+    slate: "bg-slate-100 text-slate-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    amber: "bg-amber-100 text-amber-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+  }[tone];
+
+  return (
+    <div className="flex items-center justify-between rounded-xl border bg-card px-4 py-3">
+      <div>
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
+        <p className="mt-1 text-[22px] font-semibold tracking-[-0.02em] text-slate-900">{value}</p>
+      </div>
+      <div className={`flex size-9 items-center justify-center rounded-lg ${palette}`}>
+        <Icon className="size-4" />
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: "active" | "trial" | "paused" }) {
+  if (status === "active") return <Badge variant="success">Active</Badge>;
+  if (status === "trial") return <Badge variant="info">Onboarding</Badge>;
+  return <Badge variant="warning">Inactive</Badge>;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString();
 }

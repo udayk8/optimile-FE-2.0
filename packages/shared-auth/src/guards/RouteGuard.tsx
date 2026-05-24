@@ -12,8 +12,8 @@ const PORTAL_MODULES: Record<string, ERPModule> = {
   tms: 'tms',
   tracking: 'tracking',
   'platform-admin': 'platform-admin',
-  'tenant-admin':   'tenant-admin',
-  'driver-app':     'driver-app',
+  'tenant-admin': 'tenant-admin',
+  'driver-app': 'driver-app',
 }
 
 export function RouteGuard({
@@ -34,7 +34,10 @@ export function RouteGuard({
   }
 
   const requiredModule = portal ? PORTAL_MODULES[portal] : (module as ERPModule | undefined)
-  if (requiredModule && !hasModuleAccess(requiredModule)) {
+  const canBridgePlatformToTenant = requiredModule === 'tenant-admin' && hasModuleAccess('platform-admin')
+  const canBridgePlatformToTms = requiredModule === 'tms' && hasModuleAccess('platform-admin')
+
+  if (requiredModule && !hasModuleAccess(requiredModule) && !canBridgePlatformToTenant && !canBridgePlatformToTms) {
     return <Navigate to="/modules" replace />
   }
 
@@ -42,3 +45,4 @@ export function RouteGuard({
 }
 
 export const ProtectedRoute = RouteGuard
+

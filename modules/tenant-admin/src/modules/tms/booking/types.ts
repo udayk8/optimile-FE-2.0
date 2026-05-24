@@ -17,6 +17,7 @@ export type BookingStatus =
   | "DELAYED"
   | "EXCEPTION"
   | "DELIVERED"
+  | "COMPLETED"
   | "INVOICED"
   | "PAID"
   | "DISPUTED"
@@ -321,6 +322,7 @@ export const bookingStatuses: BookingStatus[] = [
   "DELAYED",
   "EXCEPTION",
   "DELIVERED",
+  "COMPLETED",
   "INVOICED",
   "PAID",
   "DISPUTED",

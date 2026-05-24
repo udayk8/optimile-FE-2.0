@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+﻿/// <reference types="vite/client" />
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { User, ERPModule, Tenant, SystemRole } from '../types'
 import { authApi, AuthTenantDto, AuthUserDto } from '../services/authApi'
@@ -14,74 +14,67 @@ import {
   type Portal,
 } from '../utils/authStorage'
 
-// ── Mock users for demo mode ─────────────────────────────────
+// â”€â”€ Mock users for demo mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface MockUser { name: string; role: SystemRole; modules: ERPModule[]; permissions: string[] }
 
 export const DEMO_CREDENTIALS: Record<string, MockUser> = {
-  // CEO — sees all 5 modules → goes to /modules dashboard
+  // CEO â€” sees all 5 modules â†’ goes to /modules dashboard
   'ceo@uday.ts.com': {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
     modules: ['ams', 'fleet', 'vendor', 'customer'],
   },
-  // Fleet Manager — only fleet → goes directly to /fleet
+  // Fleet Manager â€” only fleet â†’ goes directly to /fleet
   'fleet@uday.ts.com': {
     name: 'Rahul Mehta',
     role: 'Fleet Manager',
     permissions: ['fleet:read', 'fleet:write'],
     modules: ['fleet'],
   },
-  // Auction Head — only auction → goes directly to /auction/dashboard
+  // Auction Head â€” only auction â†’ goes directly to /auction/dashboard
   'auction@pranay.ts.com': {
     name: 'Pranay Sharma',
     role: 'Auction Head',
     permissions: ['ams:read', 'ams:write'],
     modules: ['ams'],
   },
-  // Customer Booking Dashboard — only customer → goes directly to /customer
+  // Customer Booking Dashboard â€” only customer â†’ goes directly to /customer
   'cbd@optimile.com': {
     name: 'Customer Booking Desk',
     role: 'CBD',
     permissions: ['customer:read', 'customer:write'],
     modules: ['customer'],
   },
-  // Vendor Manager — only vendor → goes directly to /vendor
+  // Vendor Manager â€” only vendor â†’ goes directly to /vendor
   'vendor@pranay.ts.com': {
     name: 'Pranay Verma',
     role: 'Vendor',
     permissions: ['vendor:read', 'vendor:write'],
     modules: ['vendor'],
   },
-  // Platform Admin — platform administration console
+  // Platform Admin â€” platform administration console
   'platform-admin@optimile.com': {
     name: 'Platform Administrator',
     role: 'Platform Admin',
     permissions: ['platform-admin:read', 'platform-admin:write'],
     modules: ['platform-admin'],
   },
-  // Tenant Admin — tenant administration console
-  'tenant-admin@optimile.com': {
-    name: 'Tenant Administrator',
-    role: 'Tenant Admin',
-    permissions: ['tenant-admin:read', 'tenant-admin:write'],
-    modules: ['tenant-admin'],
-  },
-  // Track and Trace — standalone visibility module
+  // Track and Trace â€” standalone visibility module
   'tracking@optimile.com': {
     name: 'Track and Trace User',
     role: 'Track and Trace',
     permissions: ['tracking:read'],
     modules: ['tracking'],
   },
-  // TMS Booking — standalone booking module
+  // TMS Booking â€” standalone booking module
   'tms@optimile.com': {
     name: 'TMS User',
     role: 'TMS',
     permissions: ['tms:read', 'tms:write'],
     modules: ['tms'],
   },
-  // Driver — driver app
+  // Driver â€” driver app
   'driver@optimile.com': {
     name: 'Driver User',
     role: 'Driver',
@@ -92,7 +85,7 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
 
 export const DEMO_PASSWORD = 'testing'
 
-// ── Context type ─────────────────────────────────────────────
+// â”€â”€ Context type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface AuthContextType {
   user: User | null
   tenant: Tenant | null
@@ -203,7 +196,7 @@ function buildDemoUser(emailKey: string, mock: MockUser): User {
   }
 }
 
-// ── Provider ─────────────────────────────────────────────────
+// â”€â”€ Provider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser]                     = useState<User | null>(null)
   const [tenant, setTenant]                 = useState<Tenant | null>(null)
@@ -249,7 +242,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true)
     setError(null)
 
-    // Demo mode — match against mock credentials
+    // Demo mode â€” match against mock credentials
     const emailKey = email.trim().toLowerCase()
     const mock = DEMO_CREDENTIALS[emailKey]
     if (mock && (password === DEMO_PASSWORD || backendAvailable === false)) {
@@ -334,3 +327,6 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
+
+
+

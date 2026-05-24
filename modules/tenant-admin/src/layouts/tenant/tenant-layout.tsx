@@ -75,12 +75,12 @@ export function TenantLayout() {
     {
       label: "TMS (Booking)", icon: Truck,
       children: [
-        { to: `${BASE}/tenant/${tenant.id}/bookings/create`, label: "Create Booking", icon: CirclePlus, matchMode: "exact" as const },
-        { to: `${BASE}/tenant/${tenant.id}/bookings`, label: "Booking List", icon: ClipboardList, matchMode: "exact" as const },
-        { to: `${BASE}/tenant/${tenant.id}/bookings/rate-approval`, label: "Rate Approval Queue", icon: FileDigit, matchMode: "exact" as const },
-        { to: `${BASE}/tenant/${tenant.id}/bookings/assignment`, label: "Assignment Queue", icon: Truck, matchMode: "exact" as const },
-        { to: `${BASE}/tenant/${tenant.id}/bookings/live-tracking`, label: "In Transit / Control Tower", icon: Waypoints, matchMode: "exact" as const },
-        { to: `${BASE}/tenant/${tenant.id}/bookings/completed`, label: "Completed / POD", icon: ClipboardList, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings/create`, label: "Create Booking", icon: CirclePlus, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings`, label: "Booking List", icon: ClipboardList, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings/rate-approval`, label: "Rate Approval Queue", icon: FileDigit, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings/assignment`, label: "Assignment Queue", icon: Truck, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings/live-tracking`, label: "In Transit / Control Tower", icon: Waypoints, matchMode: "exact" as const },
+        { to: `${BASE}/tms/booking/tenant/${tenant.id}/bookings/completed`, label: "Completed / POD", icon: ClipboardList, matchMode: "exact" as const },
       ],
     },
     {
@@ -119,3 +119,4 @@ export function TenantLayout() {
     </WorkspaceShell>
   );
 }
+

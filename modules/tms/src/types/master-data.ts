@@ -91,12 +91,74 @@ export type LRPoolOwnershipType = "TENANT" | "CUSTOMER" | "VENDOR";
 export type LRAllocationFlowMode = "FLAT" | "HIERARCHY";
 export type LRAllocationRequestFlow = "CHILD_TO_PARENT";
 export type LRAllocationApprovalFlow = "PARENT_APPROVES";
-export type LRConsumptionLevel = "TENANT" | "DISPATCH" | "OPS_MANAGER" | "CUSTOM";
+export type LRConsumptionLevel = "TENANT" | "REGION" | "BRANCH" | "DISPATCH_UNIT" | "USER" | "CUSTOM";
+export type LRCustomerAllocationScope = "ALL" | "SELECTED";
+export type ManualLRNumberingPolicy = "STRICT_FORMAT" | "FLEXIBLE_PHYSICAL_BOOK";
+export type ManualLRCustomerPolicy =
+  | "NOT_CUSTOMER_SPECIFIC"
+  | "OPTIONAL_CUSTOMER_TAGGING"
+  | "STRICT_CUSTOMER_SPECIFIC_CONSUMPTION";
+export type ManualLRDistributionStrategy = "CENTRALIZED" | "DISTRIBUTED" | "HYBRID";
+export type ManualLRWorkflowMode = "DIRECT_USAGE" | "CONTROLLED_ALLOCATION" | "APPROVAL_BASED";
+export type ManualLRChildFormatMode =
+  | "GLOBAL_PARENT_FORMAT"
+  | "PARENT_PREFIX_CHILD_SUFFIX"
+  | "FULL_CHILD_FORMAT";
+export type ManualLRWorkflowAction =
+  | "UPLOAD_LR"
+  | "ALLOCATE_LR"
+  | "REQUEST_LR"
+  | "APPROVE_LR"
+  | "TRANSFER_LR"
+  | "CONSUME_LR"
+  | "VOID_LR"
+  | "VIEW_AUDIT";
+
+export type ManualLRWorkflowPermissions = Record<ManualLRWorkflowAction, string[]>;
+
+export interface ManualLRWorkflowPermissionScope {
+  scopeLevelId?: string | null;
+  scopeOrgUnitId?: string | null;
+  managedLevelId?: string | null;
+  permissions: Partial<ManualLRWorkflowPermissions>;
+}
+
+export interface ManualLRChildGovernanceRule {
+  childLevelId: string;
+  canConsumeParentLr: boolean;
+  childCanRequestLr?: boolean;
+  childCanConsumeLr?: boolean;
+  canMaintainOwnSequence: boolean;
+  canDefineChildFormat: boolean;
+  parentCanGenerateLr?: boolean;
+  parentCanAllocateLrToChild?: boolean;
+  canAllocateChildLr?: boolean;
+  canApproveChildRequests?: boolean;
+  canConfigureChildWorkflow?: boolean;
+  canDelegateChildGovernance?: boolean;
+  inheritParentFormat: boolean;
+  formatMode?: ManualLRChildFormatMode;
+  allocationRequired: boolean;
+  approvalRequired: boolean;
+  canTransferLr: boolean;
+}
+
+export interface ManualLRPlaceFormatOverride {
+  orgUnitId: string;
+  prefix: string;
+  yearFormat?: LRYearFormat;
+  numberSeparator?: string;
+  zeroPaddingLength?: number;
+  numberingPolicy?: ManualLRNumberingPolicy;
+}
 
 export interface LRAllocationFlowLevel {
   levelId: string;
   canAllocateQuota: boolean;
   allocateToLevelIds: string[];
+  canAllocateToCustomer?: boolean;
+  customerScope?: LRCustomerAllocationScope;
+  customerIds?: string[];
   canRequestQuota: boolean;
   canApproveRequests: boolean;
   canConsumeLR: boolean;
@@ -122,9 +184,21 @@ export interface TenantLRConfig {
   lrType: LRType;
   allocationStrategy?: LRAllocationStrategy;
   prefix: string;
+  numberSeparator?: string;
   yearFormat?: LRYearFormat;
   zeroPaddingLength?: number;
+  customerOwnershipEnabled?: boolean;
   poolSource?: LRPoolSource;
+  ownershipLevelId?: string | null;
+  distributionStrategy?: ManualLRDistributionStrategy;
+  workflowMode?: ManualLRWorkflowMode;
+  numberingPolicy?: ManualLRNumberingPolicy;
+  customerLrPolicy?: ManualLRCustomerPolicy;
+  allowCustomerFallback?: boolean;
+  workflowPermissions?: Partial<ManualLRWorkflowPermissions>;
+  workflowPermissionScopes?: ManualLRWorkflowPermissionScope[];
+  childGovernanceRules?: ManualLRChildGovernanceRule[];
+  placeFormatOverrides?: ManualLRPlaceFormatOverride[];
   poolRangeStart?: string;
   poolRangeEnd?: string;
   poolEntries?: string;
@@ -147,9 +221,21 @@ export interface TenantLRConfigInput {
   lrType: LRType;
   allocationStrategy: LRAllocationStrategy;
   prefix: string;
+  numberSeparator: string;
   yearFormat: LRYearFormat;
   zeroPaddingLength: number;
+  customerOwnershipEnabled: boolean;
   poolSource: LRPoolSource;
+  ownershipLevelId?: string | null;
+  distributionStrategy?: ManualLRDistributionStrategy;
+  workflowMode?: ManualLRWorkflowMode;
+  numberingPolicy?: ManualLRNumberingPolicy;
+  customerLrPolicy?: ManualLRCustomerPolicy;
+  allowCustomerFallback?: boolean;
+  workflowPermissions?: Partial<ManualLRWorkflowPermissions>;
+  workflowPermissionScopes?: ManualLRWorkflowPermissionScope[];
+  childGovernanceRules?: ManualLRChildGovernanceRule[];
+  placeFormatOverrides?: ManualLRPlaceFormatOverride[];
   poolRangeStart: string;
   poolRangeEnd: string;
   poolEntries: string;

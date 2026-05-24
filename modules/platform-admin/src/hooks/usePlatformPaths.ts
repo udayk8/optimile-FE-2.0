@@ -12,6 +12,8 @@ export function usePlatformPaths() {
     plans: `${base}/plans`,
     auditLogs: `${base}/audit-logs`,
     settings: `${base}/settings`,
-    tenantWorkspace: (id: string) => `/tenant-admin/tenant/${id}/dashboard`,
+    tenantWorkspace: (id: string) => `${base}/tenant/${id}/dashboard`,
   };
 }
+
+

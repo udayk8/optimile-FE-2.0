@@ -4,8 +4,8 @@ import type {
   PlatformSettings,
   TenantPlan,
   TenantRecord,
-} from "../types/platform";
-import type { AuditLogRecord, Capability } from "../types/abac";
+} from "@/types/platform";
+import type { AuditLogRecord, Capability } from "@/types/abac";
 import type {
   HierarchyLevel,
   OrgUnit,
@@ -13,25 +13,25 @@ import type {
   RolePermission,
   TenantSummary,
   UserRecord,
-} from "../types/access";
+} from "@/types/access";
 import type {
   TenantCustomer,
   TenantCustomerAddress,
   TenantCustomerRateCard,
-} from "../types/customer";
-import type { BookingRecord } from "../modules/tms/booking/types";
+} from "@/types/customer";
+import type { BookingRecord } from "@/modules/tms/booking/types";
 import type {
   TenantLRConfig,
   TenantMaterial,
   TenantUOMDefinition,
   TenantUOMMapping,
   TenantVehicleType,
-} from "../types/master-data";
-import type { TenantDriver, TenantVehicle } from "../types/fleet";
+} from "@/types/master-data";
+import type { TenantDriver, TenantVehicle } from "@/types/fleet";
 import type {
   TenantVendor,
   TenantVendorRateCard,
-} from "../types/vendor";
+} from "@/types/vendor";
 
 export const mockPlans: TenantPlan[] = [
   {
@@ -61,7 +61,7 @@ export const mockPlans: TenantPlan[] = [
 ];
 
 export const mockModules: PlatformModule[] = [
-  { id: "mod-tms", code: "TMS", name: "TMS", category: "Operations", description: "Transport operations, dispatch, bookings, and control tower workflows.", status: "active" },
+  { id: "mod-tms", code: "TMS", name: "Booking", category: "Operations", description: "Booking, dispatch, and shipment workflows.", status: "active" },
   { id: "mod-fleet", code: "FLEET", name: "Fleet", category: "Fleet", description: "Vehicle, driver, maintenance, fuel, and tyre operations.", status: "active" },
   { id: "mod-procurement", code: "PROCUREMENT", name: "Procurement", category: "Procurement", description: "Vendor sourcing, RFQ/RFI, auctions, contracts, and disputes.", status: "active" },
   { id: "mod-finance", code: "FINANCE", name: "Finance", category: "Finance", description: "Invoicing, payables, reconciliation, and finance reporting.", status: "active" },
@@ -78,6 +78,8 @@ export const mockPlatformTenants: TenantRecord[] = [
     status: "active",
     tenantType: "LOGISTICS_PROVIDER_3PL",
     customerPortalEnabled: true,
+    assignmentMode: "CONTROLLED_3PL_FLOW",
+    commercialMode: "BUY_SELL_MARGIN",
     enabledModuleCodes: ["TMS", "FLEET", "FINANCE"],
     initialHierarchyTemplate: "region-zone-branch-subbranch",
     primaryAdminUserId: "user-1",
@@ -97,8 +99,10 @@ export const mockPlatformTenants: TenantRecord[] = [
     industry: "Cold Chain",
     planId: "plan-scale",
     status: "trial",
-    tenantType: "LOGISTICS_PROVIDER_3PL",
+    tenantType: "DIRECT_CUSTOMER",
     customerPortalEnabled: false,
+    assignmentMode: "AUTO_VENDOR_FLOW",
+    commercialMode: "SIMPLE",
     enabledModuleCodes: ["TMS", "FLEET"],
     initialHierarchyTemplate: "region-branch",
     primaryAdminUserId: "user-3",
@@ -172,6 +176,7 @@ export const mockOrgUnits: OrgUnit[] = [
 export const mockRoles: RoleDefinition[] = [
   { id: "role-tenant-admin-nsl", tenantId: "tenant-northstar", name: "Tenant Admin", description: "Bootstrap tenant administrator.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["TMS", "FLEET", "FINANCE"], active: true },
   { id: "role-ceo-nsl", tenantId: "tenant-northstar", name: "CEO", description: "Full tenant oversight.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["TMS", "FLEET", "FINANCE"], active: true },
+  { id: "role-finance-user-nsl", tenantId: "tenant-northstar", name: "FINANCE_USER", description: "Finance-only tenant user for customer invoicing.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["FINANCE"], active: true },
   { id: "role-region-manager-nsl", tenantId: "tenant-northstar", name: "Region Manager", description: "Manage a region and all child org units.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["TMS"], active: true },
   { id: "role-branch-manager-nsl", tenantId: "tenant-northstar", name: "Branch Manager", description: "Manage one branch and child nodes.", hierarchyLevelId: "level-branch-nsl", moduleCodes: ["TMS"], active: true },
   { id: "role-dispatcher-nsl", tenantId: "tenant-northstar", name: "Dispatcher", description: "Operate shipment execution for depot operations.", hierarchyLevelId: "level-subbranch-nsl", moduleCodes: ["TMS"], active: true },
@@ -188,6 +193,7 @@ export const mockRolePermissions: RolePermission[] = [
   { id: "perm-1", tenantId: "tenant-northstar", roleId: "role-ceo-nsl", moduleCode: "TMS", featureCode: "control_tower", canView: true, canCreate: false, canEdit: true, canDelete: false, canApprove: true },
   { id: "perm-2", tenantId: "tenant-northstar", roleId: "role-ceo-nsl", moduleCode: "FLEET", featureCode: "maintenance", canView: true, canCreate: true, canEdit: true, canDelete: false, canApprove: true },
   { id: "perm-3", tenantId: "tenant-northstar", roleId: "role-ceo-nsl", moduleCode: "FINANCE", featureCode: "reports", canView: true, canCreate: false, canEdit: false, canDelete: false, canApprove: true },
+  { id: "perm-finance-nsl", tenantId: "tenant-northstar", roleId: "role-finance-user-nsl", moduleCode: "FINANCE", featureCode: "invoices", canView: true, canCreate: true, canEdit: true, canDelete: false, canApprove: false },
   { id: "perm-4", tenantId: "tenant-northstar", roleId: "role-region-manager-nsl", moduleCode: "TMS", featureCode: "bookings", canView: true, canCreate: true, canEdit: true, canDelete: false, canApprove: false },
   { id: "perm-5", tenantId: "tenant-northstar", roleId: "role-region-manager-nsl", moduleCode: "TMS", featureCode: "exceptions", canView: true, canCreate: false, canEdit: true, canDelete: false, canApprove: false },
   { id: "perm-6", tenantId: "tenant-northstar", roleId: "role-branch-manager-nsl", moduleCode: "TMS", featureCode: "dispatch", canView: true, canCreate: true, canEdit: true, canDelete: false, canApprove: false },
@@ -221,6 +227,17 @@ export const mockUsers: UserRecord[] = [
     driverCode: "DRV-204",
     status: "active",
     lastActive: "2026-03-10T03:05:00Z",
+  },
+  {
+    id: "user-finance-kartik-nsl",
+    tenantId: "tenant-northstar",
+    name: "Kartik",
+    email: "kartik@northstarlogistics.com",
+    userType: "INTERNAL",
+    roleId: "role-finance-user-nsl",
+    orgUnitIds: ["ou-1"],
+    status: "active",
+    lastActive: "2026-05-03T09:00:00Z",
   },
   {
     id: "user-3",
@@ -587,7 +604,7 @@ export const mockTenantBookings: BookingRecord[] = [
     uom: "MT",
     vehicleTypeId: "vehicle-type-1",
     lrType: "AUTO",
-    status: "DELIVERED",
+    status: "COMPLETED",
     opsRemark: "Customer requested POD same day.",
     assignment: {
       vendorName: "Own Fleet",
@@ -618,7 +635,7 @@ export const mockTenantBookings: BookingRecord[] = [
       { id: "booking-3-status-3", status: "ASSIGNED", timestamp: "2026-04-18T06:30:00Z", actor: "Aditi Narang" },
       { id: "booking-3-status-4", status: "DISPATCHED", timestamp: "2026-04-18T08:00:00Z", actor: "Aditi Narang" },
       { id: "booking-3-status-5", status: "IN_TRANSIT", timestamp: "2026-04-18T15:00:00Z", actor: "System" },
-      { id: "booking-3-status-6", status: "DELIVERED", timestamp: "2026-04-19T10:45:00Z", actor: "Rohit Sen" },
+      { id: "booking-3-status-6", status: "COMPLETED", timestamp: "2026-04-19T10:45:00Z", actor: "Rohit Sen" },
     ],
     createdAt: "2026-04-18T05:55:00Z",
     updatedAt: "2026-04-19T10:45:00Z",
@@ -1029,27 +1046,4 @@ export const mockTenantUOMMappings: TenantUOMMapping[] = [
   },
 ];
 
-export const mockTenantLRConfigs: TenantLRConfig[] = [
-  {
-    id: "lr-config-1",
-    tenantId: "tenant-northstar",
-    locationOrgUnitId: "ou-3",
-    lrType: "AUTO",
-    prefix: "DLH",
-    locationCounter: 1240,
-    status: "active",
-    createdAt: "2026-02-18T06:45:00Z",
-    updatedAt: "2026-03-02T11:10:00Z",
-  },
-  {
-    id: "lr-config-2",
-    tenantId: "tenant-polar",
-    locationOrgUnitId: "ou-6",
-    lrType: "MANUAL",
-    prefix: "DXB",
-    locationCounter: 220,
-    status: "active",
-    createdAt: "2026-02-23T07:20:00Z",
-    updatedAt: "2026-02-23T07:20:00Z",
-  },
-];
+export const mockTenantLRConfigs: TenantLRConfig[] = [];

@@ -9,14 +9,17 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@/shared/components/common': path.resolve(rootDir, 'modules/platform-admin/src/components/common'),
-      '@/shared/components/ui': path.resolve(rootDir, 'modules/platform-admin/src/components/ui'),
+      '@/shared/components/common': path.resolve(rootDir, 'modules/platform-admin/src/shared/components/common'),
+      '@/shared/components/ui': path.resolve(rootDir, 'modules/platform-admin/src/shared/components/ui'),
+      '@/shared/components/layout': path.resolve(rootDir, 'modules/platform-admin/src/shared/components/layout'),
       '@/shared/auth': path.resolve(rootDir, 'modules/platform-admin/src/shared/auth'),
-      '@/shared/lib': path.resolve(rootDir, 'modules/platform-admin/src/lib'),
-      '@/shared/store': path.resolve(rootDir, 'modules/platform-admin/src/store'),
+      '@/shared/lib': path.resolve(rootDir, 'modules/platform-admin/src/shared/lib'),
+      '@/shared/store': path.resolve(rootDir, 'modules/platform-admin/src/shared/store'),
+      '@/shared/mocks': path.resolve(rootDir, 'modules/platform-admin/src/shared/mocks'),
+      '@/constants': path.resolve(rootDir, 'modules/platform-admin/src/constants'),
       '@/types': path.resolve(rootDir, 'modules/platform-admin/src/types'),
       '@/modules/platform-admin': path.resolve(rootDir, 'modules/platform-admin/src/modules/platform-admin'),
-      '@/modules/tenant-admin': path.resolve(rootDir, 'modules/tenant-admin/src/modules/tenant-admin'),
+      '@/modules/tenant-admin': path.resolve(rootDir, 'modules/platform-admin/src/modules/tenant-admin'),
       '@/modules/tms': path.resolve(rootDir, 'modules/tms/src/modules/tms'),
       '@auction': path.resolve(rootDir, 'modules/auction-web/src'),
       '@vendor': path.resolve(rootDir, 'modules/vendor-web/src'),
@@ -27,6 +30,8 @@ export default defineConfig({
       '@platform-admin': path.resolve(rootDir, 'modules/platform-admin/src'),
       '@tenant-admin': path.resolve(rootDir, 'modules/tenant-admin/src'),
       '@tms-booking': path.resolve(rootDir, 'modules/tms/src'),
+      '@constants': path.resolve(rootDir, 'modules/platform-admin/src/constants'),
+      '@layouts': path.resolve(rootDir, 'modules/platform-admin/src/layouts'),
       '@tms-driver-app': path.resolve(rootDir, 'modules/tms-driver-app-web/src'),
       '@': path.resolve(rootDir, 'modules/tms-driver-app-web/src'),
       '@shared-api': path.resolve(rootDir, 'packages/shared-api/src'),
@@ -40,3 +45,4 @@ export default defineConfig({
     open: false,
   },
 })
+

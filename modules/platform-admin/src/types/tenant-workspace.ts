@@ -35,8 +35,13 @@ export interface CreateTenantInput {
   code: string;
   status: "active" | "trial" | "paused";
   planId: string;
+  tenantType: "DIRECT_CUSTOMER" | "LOGISTICS_PROVIDER_3PL";
+  customerPortalEnabled: boolean;
   primaryContactName: string;
   primaryContactEmail: string;
+  primaryContactPhone?: string;
+  // Demo only: plaintext password stored in mock/localStorage. Remove when backend auth is integrated.
+  primaryContactPassword?: string;
   starterRole: "tenant_admin" | "ceo";
   enabledModuleCodes: string[];
   defaultHierarchyTemplate: HierarchyTemplateCode;

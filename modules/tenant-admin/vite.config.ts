@@ -12,6 +12,7 @@ export default defineConfig({
       '@/shared/lib': path.resolve(__dirname, './src/lib'),
       '@/shared/store': path.resolve(__dirname, './src/store'),
       '@/types': path.resolve(__dirname, './src/types'),
+      '@/modules/tms': path.resolve(__dirname, './src/modules/tms'),
       '@/modules/tenant-admin': path.resolve(__dirname, './src/modules/tenant-admin'),
       '@tenant-admin': path.resolve(__dirname, './src'),
       '@shared-api': path.resolve(__dirname, '../../packages/shared-api/src'),

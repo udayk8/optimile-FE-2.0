@@ -1,6 +1,6 @@
 import React, { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@shared-auth/context/AuthContext'
 import { LoginShell } from '@shared-auth/components/LoginShell'
 import { ForgotPassword } from '@shared-auth/components/ForgotPassword'
@@ -15,13 +15,12 @@ const FleetApp = lazy(() => import('@fleet/app/FleetApp'))
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
 const TrackTraceApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
-const TenantAdminApp = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
 const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
 const TmsDriverAppApp = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))
 
 const Fallback = (
   <div style={{ alignItems: 'center', color: '#64748b', display: 'flex', fontSize: 14, justifyContent: 'center', minHeight: '100vh' }}>
-    Loading…
+    Loading...
   </div>
 )
 
@@ -77,38 +76,46 @@ function EntryRoute() {
   return <Navigate to={getPostLoginRoute()} replace />
 }
 
+function LegacyTenantRedirect() {
+  const location = useLocation()
+  const nextPath = location.pathname.replace(/^\/tenant\//, '/platform-admin/tenant/')
+  return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
+}
+
+function TenantAdminLoginRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/platform-admin/tenant-login${location.search}${location.hash}`} replace />
+}
+
 function HostRouter() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Suspense fallback={Fallback}>
           <Routes>
-            {/* Auth pages */}
             <Route path="/login" element={<LoginShell />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Post-login dashboard / module selector */}
             <Route path="/modules" element={
               <ProtectedRoute>
                 <PostLoginDashboard />
               </ProtectedRoute>
             } />
 
-            {/* Module apps — all protected */}
             <Route path="/auction/*" element={<ProtectedRoute portal="auction"><AuctionApp /></ProtectedRoute>} />
             <Route path="/vendor/*" element={<ProtectedRoute portal="vendor"><VendorApp /></ProtectedRoute>} />
             <Route path="/fleet/*" element={<ProtectedRoute portal="fleet"><FleetApp /></ProtectedRoute>} />
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
             <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackTraceApp /></ProtectedRoute>} />
 
-            {/* Extracted console modules */}
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
-            <Route path="/tenant-admin/*" element={<ProtectedRoute portal="tenant-admin"><TenantAdminApp /></ProtectedRoute>} />
+            <Route path="/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTenantRedirect /></ProtectedRoute>} />
+            <Route path="/tenant-admin/login" element={<TenantAdminLoginRedirect />} />
+            <Route path="/tenant-admin/*" element={<Navigate to="/platform-admin/dashboard" replace />} />
             <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms"><TmsBookingApp /></ProtectedRoute>} />
             <Route path="/driver-app/*" element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
 
-            {/* Default */}
             <Route path="/" element={<EntryRoute />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -1,25 +1,54 @@
-import type { TenantCustomerRateCard } from "../../../../types/customer";
-import type { BookingApprovalLevel, BookingCommercialType, BookingRecord, BookingStatus } from "../types";
+import type { TenantCustomerRateCard } from "@/types/customer";
+import type { BookingApprovalLevel, BookingCommercialType, BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
+
+export const primaryBookingStatuses = [
+  "DRAFT",
+  "PENDING_RATE_APPROVAL",
+  "PENDING_ASSIGNMENT",
+  "IN_TRANSIT",
+  "POD_PENDING",
+  "COMPLETED",
+  "INVOICED",
+  "EXCEPTION",
+  "CANCELLED",
+] as const;
+
+export const pendingAssignmentInternalStatuses = [
+  "PENDING_ASSIGNMENT",
+  "ACCEPTED",
+  "VEHICLE_ASSIGNED",
+  "LOADING_STARTED",
+  "LOADING_COMPLETED",
+  "DOCUMENT_PENDING",
+  "DOCUMENT_COMPLETED",
+  "ASSIGNED",
+  "LOADING",
+  "LOADED",
+  "READY_FOR_DISPATCH",
+  "DISPATCHED",
+] as const;
 
 export const bookingStatusTransitions: Record<BookingStatus, BookingStatus[]> = {
   DRAFT: ["PENDING_RATE_APPROVAL", "PENDING_ASSIGNMENT", "CANCELLED"],
   PENDING_RATE_APPROVAL: ["PENDING_ASSIGNMENT", "CANCELLED"],
-  PENDING_ASSIGNMENT: ["VEHICLE_ASSIGNED", "ASSIGNED", "CANCELLED"],
-  VEHICLE_ASSIGNED: ["LOADING_STARTED", "LOADING_COMPLETED", "CANCELLED"],
-  LOADING_STARTED: ["LOADING_COMPLETED", "CANCELLED"],
-  LOADING_COMPLETED: ["DOCUMENT_PENDING", "CANCELLED"],
-  DOCUMENT_PENDING: ["DOCUMENT_COMPLETED", "CANCELLED"],
-  DOCUMENT_COMPLETED: ["IN_TRANSIT", "READY_FOR_DISPATCH", "CANCELLED"],
-  ASSIGNED: ["LOADING", "LOADING_STARTED", "LOADING_COMPLETED", "CANCELLED"],
-  LOADING: ["LOADED", "LOADING_COMPLETED", "CANCELLED"],
-  LOADED: ["DOCUMENT_PENDING", "CANCELLED"],
-  READY_FOR_DISPATCH: ["IN_TRANSIT"],
-  DISPATCHED: ["IN_TRANSIT"],
-  IN_TRANSIT: ["ARRIVED", "DELIVERED", "EXCEPTION", "DELAYED"],
-  ARRIVED: ["DELIVERED", "EXCEPTION", "DELAYED", "IN_TRANSIT"],
-  DELAYED: ["IN_TRANSIT", "EXCEPTION", "DELIVERED"],
-  EXCEPTION: ["IN_TRANSIT", "DELIVERED", "CANCELLED"],
-  DELIVERED: ["INVOICED"],
+  PENDING_ASSIGNMENT: ["ACCEPTED", "VEHICLE_ASSIGNED", "ASSIGNED", "EXCEPTION", "CANCELLED"],
+  ACCEPTED: ["VEHICLE_ASSIGNED", "ASSIGNED", "EXCEPTION", "CANCELLED"],
+  VEHICLE_ASSIGNED: ["LOADING_STARTED", "LOADING_COMPLETED", "EXCEPTION", "CANCELLED"],
+  LOADING_STARTED: ["LOADING_COMPLETED", "EXCEPTION"],
+  LOADING_COMPLETED: ["DOCUMENT_PENDING", "EXCEPTION"],
+  DOCUMENT_PENDING: ["DOCUMENT_COMPLETED", "EXCEPTION"],
+  DOCUMENT_COMPLETED: ["READY_FOR_DISPATCH", "DISPATCHED", "IN_TRANSIT", "EXCEPTION"],
+  ASSIGNED: ["LOADING", "LOADING_STARTED", "LOADING_COMPLETED", "EXCEPTION", "CANCELLED"],
+  LOADING: ["LOADED", "LOADING_COMPLETED", "EXCEPTION"],
+  LOADED: ["DOCUMENT_PENDING", "EXCEPTION"],
+  READY_FOR_DISPATCH: ["DISPATCHED", "IN_TRANSIT", "EXCEPTION"],
+  DISPATCHED: ["IN_TRANSIT", "EXCEPTION"],
+  IN_TRANSIT: ["ARRIVED", "POD_PENDING", "EXCEPTION", "DELAYED"],
+  POD_PENDING: ["COMPLETED", "EXCEPTION"],
+  ARRIVED: ["POD_PENDING", "EXCEPTION", "DELAYED", "IN_TRANSIT"],
+  DELAYED: ["IN_TRANSIT", "EXCEPTION", "POD_PENDING"],
+  EXCEPTION: ["IN_TRANSIT", "POD_PENDING", "COMPLETED"],
+  COMPLETED: ["INVOICED"],
   INVOICED: ["PAID", "DISPUTED"],
   PAID: [],
   DISPUTED: ["PAID"],
@@ -27,7 +56,40 @@ export const bookingStatusTransitions: Record<BookingStatus, BookingStatus[]> = 
 };
 
 export function canTransitionBooking(current: BookingStatus, next: BookingStatus) {
+  if (current === next) {
+    return true;
+  }
   return bookingStatusTransitions[current].includes(next);
+}
+
+export function getPrimaryBookingStatus(status: BookingStatus) {
+  if ((pendingAssignmentInternalStatuses as readonly BookingStatus[]).includes(status)) {
+    return "PENDING_ASSIGNMENT" as const;
+  }
+  if (["IN_TRANSIT", "ARRIVED", "DELAYED"].includes(status)) {
+    return "IN_TRANSIT" as const;
+  }
+  if (["PAID", "DISPUTED"].includes(status)) {
+    return "INVOICED" as const;
+  }
+  return status;
+}
+
+export function getVisibleBookingTimeline(events: Pick<BookingRecord["statusTimeline"][number], "status">[]) {
+  const visible: BookingStatus[] = [];
+
+  for (const event of events) {
+    const primaryStatus = getPrimaryBookingStatus(event.status);
+    if (visible.at(-1) !== primaryStatus) {
+      visible.push(primaryStatus);
+    }
+  }
+
+  return visible;
+}
+
+export function canCancelBooking(status: BookingStatus) {
+  return ["DRAFT", "PENDING_RATE_APPROVAL", "PENDING_ASSIGNMENT", "ACCEPTED", "VEHICLE_ASSIGNED", "ASSIGNED"].includes(status);
 }
 
 export function normalizeBookingId(value: string | null | undefined) {
@@ -114,7 +176,7 @@ export function isBookingDelayCandidate(
 }
 
 export function getBookingEditability(status: BookingStatus) {
-  return ["DRAFT", "PENDING_RATE_APPROVAL", "PENDING_ASSIGNMENT"].includes(status);
+  return ["DRAFT", "PENDING_RATE_APPROVAL", "PENDING_ASSIGNMENT", "ACCEPTED", "VEHICLE_ASSIGNED", "ASSIGNED"].includes(status);
 }
 
 export function getRateCardRateType(rateCard?: TenantCustomerRateCard | null) {
@@ -153,14 +215,33 @@ export function calculateMarginPercent(customerFreight: number, vendorFreight: n
   return Number((((customerFreight - vendorFreight) / customerFreight) * 100).toFixed(2));
 }
 
+export function calculateMarginAmount(customerFreight: number, vendorFreight: number) {
+  if (!Number.isFinite(customerFreight) || !Number.isFinite(vendorFreight)) {
+    return 0;
+  }
+  return Number((customerFreight - vendorFreight).toFixed(2));
+}
+
 export function getBookingStatusCategory(status: BookingStatus) {
-  if (["PAID", "DELIVERED", "INVOICED"].includes(status)) {
+  const primaryStatus = getPrimaryBookingStatus(status);
+
+  if (["COMPLETED", "INVOICED"].includes(primaryStatus)) {
     return "completed" as const;
   }
-  if (["DELAYED", "EXCEPTION", "DISPUTED", "CANCELLED"].includes(status)) {
+  if (["EXCEPTION", "CANCELLED"].includes(primaryStatus)) {
     return "exception" as const;
   }
   return "pending" as const;
+}
+
+export function areAllDeliveriesPhysicallyCompleted(deliveries?: BookingRecord["deliveries"]) {
+  const deliveryList = deliveries ?? [];
+  return deliveryList.length > 0 && deliveryList.every((delivery) => delivery.status === "COMPLETED");
+}
+
+export function areAllDeliveryPodsCaptured(deliveries?: BookingRecord["deliveries"]) {
+  const deliveryList = deliveries ?? [];
+  return deliveryList.length > 0 && deliveryList.every((delivery) => Boolean(delivery.pod?.podUploaded));
 }
 
 export function buildMockLRNumber(existingBookings: BookingRecord[], sourceCode = "BLR") {

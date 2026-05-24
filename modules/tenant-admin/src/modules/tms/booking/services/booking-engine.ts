@@ -20,6 +20,7 @@ export const bookingStatusTransitions: Record<BookingStatus, BookingStatus[]> = 
   DELAYED: ["IN_TRANSIT", "EXCEPTION", "DELIVERED"],
   EXCEPTION: ["IN_TRANSIT", "DELIVERED", "CANCELLED"],
   DELIVERED: ["INVOICED"],
+  COMPLETED: ["INVOICED"],
   INVOICED: ["PAID", "DISPUTED"],
   PAID: [],
   DISPUTED: ["PAID"],
@@ -154,7 +155,7 @@ export function calculateMarginPercent(customerFreight: number, vendorFreight: n
 }
 
 export function getBookingStatusCategory(status: BookingStatus) {
-  if (["PAID", "DELIVERED", "INVOICED"].includes(status)) {
+  if (["PAID", "DELIVERED", "COMPLETED", "INVOICED"].includes(status)) {
     return "completed" as const;
   }
   if (["DELAYED", "EXCEPTION", "DISPUTED", "CANCELLED"].includes(status)) {
