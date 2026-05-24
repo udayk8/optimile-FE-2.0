@@ -13,6 +13,7 @@ import {
   getRolePageActions,
   getTenantPageCatalog,
   groupTenantPagesByModule,
+  type TenantPageDefinition,
   type TenantPageModuleCode,
 } from "@/shared/lib/tenant-page-access";
 import {
@@ -107,7 +108,9 @@ export function RoleAccessWorkspace({
   const featureCount = allowedPages.length;
 
   function saveModules() {
-    onSaveRole({ moduleCodes: moduleDraft });
+    const sanitizedRoleAccess = pruneRoleAccessForModules(roleAccessDraft, moduleDraft, pageCatalog, tenant.customerPortalEnabled);
+    setRoleAccessDraft(sanitizedRoleAccess);
+    onSaveRole({ moduleCodes: moduleDraft, roleAccess: sanitizedRoleAccess });
     setMessage("Module access saved successfully.");
     setMessageTone("success");
   }
@@ -637,6 +640,41 @@ function ensurePageDraft(
 
 function canView(roleAccess: RoleAccessModule[], pageCode: string) {
   return roleAccess.some((moduleAccess) => moduleAccess.pages.some((page) => page.pageCode === pageCode && page.canView));
+}
+
+function pruneRoleAccessForModules(
+  roleAccess: RoleAccessModule[],
+  moduleCodes: string[],
+  pageCatalog: TenantPageDefinition[],
+  customerPortalEnabled: boolean,
+) {
+  const selectedModules = new Set(moduleCodes);
+  const pageByCode = new Map(pageCatalog.map((page) => [page.pageCode, page]));
+
+  return roleAccess
+    .map((moduleAccess) => ({
+      ...moduleAccess,
+      pages: moduleAccess.pages.filter((page) => {
+        const definition = pageByCode.get(page.pageCode);
+        if (!definition) {
+          return false;
+        }
+        if (page.pageCode === "TENANT_DASHBOARD") {
+          return true;
+        }
+        if (definition.requiresCustomerPortal && !customerPortalEnabled) {
+          return false;
+        }
+        if (definition.requiredPlatformModules?.length) {
+          return definition.requiredPlatformModules.every((moduleCode) => selectedModules.has(moduleCode));
+        }
+        if (definition.moduleCode === "ADMINISTRATION") {
+          return selectedModules.has("ADMIN");
+        }
+        return true;
+      }),
+    }))
+    .filter((moduleAccess) => moduleAccess.pages.length > 0);
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

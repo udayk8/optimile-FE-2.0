@@ -3,6 +3,7 @@ import type { SessionContext, TenantRecord } from "@/types/platform";
 import type { RoleDefinition, UserRecord, UserType } from "@/types/access";
 import type { RoleAccessModule, RolePageAction } from "@/types/access";
 import {
+  buildDefaultRoleAccess,
   canRoleViewPage,
   getRoleAccessModules,
   getRolePageActions,
@@ -54,6 +55,15 @@ function mergeRoleAccess(
   }));
 }
 
+function appendMissingRoleAccessModules(
+  defaultAccess: ReturnType<typeof getRoleAccessModules>,
+  storedAccess: ReturnType<typeof getRoleAccessModules>,
+): RoleAccessModule[] {
+  const existingModuleCodes = new Set(storedAccess.map((moduleAccess) => moduleAccess.moduleCode));
+  const missingModules = defaultAccess.filter((moduleAccess) => !existingModuleCodes.has(moduleAccess.moduleCode));
+  return [...storedAccess, ...missingModules];
+}
+
 function resolveEffectiveRoleAccess(params: {
   role: RoleDefinition | null;
   tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled">;
@@ -65,15 +75,41 @@ function resolveEffectiveRoleAccess(params: {
     return storedAccess;
   }
   const template = buildBrdDefaultRoleTemplate(tenant, role);
+  const defaultAccess = buildDefaultRoleAccess(role, tenant, rolePermissions);
+  const enrichedStoredAccess = appendMissingRoleAccessModules(defaultAccess, storedAccess);
   if (!template) {
-    return storedAccess;
+    return enrichedStoredAccess;
   }
   const requiresDashboardRepair = !canRoleViewPage(storedAccess, "TENANT_DASHBOARD");
   const hasAnyConfiguredPages = storedAccess.some((moduleAccess) => moduleAccess.pages.some((page) => page.canView));
   if (!hasAnyConfiguredPages || requiresDashboardRepair) {
     return mergeRoleAccess(template.roleAccess, storedAccess);
   }
-  return storedAccess;
+  return enrichedStoredAccess;
+}
+
+function hasActiveModuleAccess(
+  pageCode: string,
+  tenant: Pick<TenantRecord, "customerPortalEnabled" | "enabledModuleCodes">,
+  role: Pick<RoleDefinition, "moduleCodes"> | null,
+) {
+  const tenantModules = new Set(tenant.enabledModuleCodes ?? []);
+  const roleModules = new Set(role?.moduleCodes ?? []);
+
+  switch (pageCode) {
+    case "FLEET_DASHBOARD":
+      return tenantModules.has("FLEET") && roleModules.has("FLEET");
+    case "AUCTION_DASHBOARD":
+      return tenantModules.has("AUCTION") && roleModules.has("AUCTION");
+    case "VENDOR_DASHBOARD":
+      return tenantModules.has("VENDOR") && roleModules.has("VENDOR");
+    case "CUSTOMER_DASHBOARD":
+      return tenant.customerPortalEnabled && tenantModules.has("CUSTOMER") && roleModules.has("CUSTOMER");
+    case "TRACKING_DASHBOARD":
+      return tenantModules.has("TRACKING") && roleModules.has("TRACKING");
+    default:
+      return true;
+  }
 }
 
 export function resolveSessionRoleContext(params: {
@@ -109,7 +145,7 @@ export function resolveSessionRoleContext(params: {
 }
 
 export function canAccessTenantPath(params: {
-  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled">;
+  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled" | "enabledModuleCodes">;
   pathname: string;
   role: RoleDefinition | null;
   rolePermissions: RolePermission[];
@@ -117,6 +153,9 @@ export function canAccessTenantPath(params: {
   const matchedPage = matchTenantPageForPath(params.tenant, params.pathname);
   if (!matchedPage) {
     return { allowed: true, matchedPage: null };
+  }
+  if (!hasActiveModuleAccess(matchedPage.pageCode, params.tenant, params.role)) {
+    return { allowed: false, matchedPage };
   }
   const roleAccess = resolveEffectiveRoleAccess({
     role: params.role,
@@ -160,13 +199,16 @@ export function getRoleSuggestionLabel(role: RoleDefinition, userType: UserType)
 }
 
 export function getAllowedActionsForPath(params: {
-  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled">;
+  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled" | "enabledModuleCodes">;
   pathname: string;
   role: RoleDefinition | null;
   rolePermissions: RolePermission[];
 }) {
   const matchedPage = matchTenantPageForPath(params.tenant, params.pathname);
   if (!matchedPage) {
+    return [];
+  }
+  if (!hasActiveModuleAccess(matchedPage.pageCode, params.tenant, params.role)) {
     return [];
   }
   const roleAccess = resolveEffectiveRoleAccess({

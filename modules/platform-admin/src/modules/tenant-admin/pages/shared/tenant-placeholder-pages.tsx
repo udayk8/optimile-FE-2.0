@@ -1631,7 +1631,7 @@ const ACTION_COLORS: Record<TenantPermissionAction, { header: string; chip: stri
 interface PermissionGroupRow {
   label: string;
   helper: string;
-  moduleCode: "TMS" | "ADMIN";
+  moduleCode: string;
   featureCodes: string[];
 }
 
@@ -1675,6 +1675,46 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
       { label: "LR Management", helper: "LR inventory and runtime operations", moduleCode: "TMS", featureCodes: ["LR_MANAGEMENT"] },
       { label: "POD", helper: "Proof of delivery capture", moduleCode: "TMS", featureCodes: ["POD"] },
       { label: "Reports", helper: "Booking analytics and exports", moduleCode: "TMS", featureCodes: ["BOOKING_REPORTS"] },
+    ],
+  },
+  {
+    key: "FLEET",
+    title: "Fleet Management",
+    badge: "Fleet module",
+    rows: [
+      { label: "Fleet Dashboard", helper: "Fleet dashboard access", moduleCode: "FLEET", featureCodes: ["FLEET_DASHBOARD"] },
+    ],
+  },
+  {
+    key: "AUCTION",
+    title: "Auction",
+    badge: "Auction module",
+    rows: [
+      { label: "Auction Dashboard", helper: "Auction dashboard and sourcing access", moduleCode: "AUCTION", featureCodes: ["AUCTION_DASHBOARD"] },
+    ],
+  },
+  {
+    key: "CUSTOMER",
+    title: "Customer Dashboard",
+    badge: "Customer module",
+    rows: [
+      { label: "Customer Dashboard", helper: "Customer dashboard visibility", moduleCode: "CUSTOMER", featureCodes: ["CUSTOMER_DASHBOARD"] },
+    ],
+  },
+  {
+    key: "VENDOR",
+    title: "Vendor App",
+    badge: "Vendor module",
+    rows: [
+      { label: "Vendor Dashboard", helper: "Vendor app dashboard visibility", moduleCode: "VENDOR", featureCodes: ["VENDOR_DASHBOARD"] },
+    ],
+  },
+  {
+    key: "TRACKING",
+    title: "Track and Trace",
+    badge: "Tracking module",
+    rows: [
+      { label: "Track and Trace Dashboard", helper: "Tracking dashboard visibility", moduleCode: "TRACKING", featureCodes: ["TRACKING_DASHBOARD"] },
     ],
   },
 ];
@@ -1750,7 +1790,13 @@ export function TenantRolePermissionsPage() {
     const codes = new Set(selectedRole.moduleCodes ?? []);
     return PERMISSION_GROUPS.filter((group) => {
       if (group.key === "ADMIN") return codes.has("ADMIN");
-      return codes.has("TMS");
+      if (group.key === "BOOKING_SETUP" || group.key === "BOOKING_OPS") return codes.has("TMS");
+      if (group.key === "FLEET") return codes.has("FLEET");
+      if (group.key === "AUCTION") return codes.has("AUCTION") || codes.has("PROCUREMENT");
+      if (group.key === "CUSTOMER") return codes.has("CUSTOMER");
+      if (group.key === "VENDOR") return codes.has("VENDOR") || codes.has("PROCUREMENT");
+      if (group.key === "TRACKING") return codes.has("TRACKING");
+      return false;
     });
   }, [selectedRole]);
 

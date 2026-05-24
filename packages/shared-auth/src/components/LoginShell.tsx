@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, AlertCircle, WifiOff } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
 import { useAuth, DEMO_CREDENTIALS, DEMO_PASSWORD } from '../context/AuthContext'
 import { OptimileLogo } from './OptimileLogo'
 
 export function LoginShell() {
-  const [email, setEmail]               = useState('')
-  const [password, setPassword]         = useState('')
+  const adminDemoEmail = 'platform-admin@optimile.com'
+  const adminDemoInfo = DEMO_CREDENTIALS[adminDemoEmail]
+  const [email, setEmail]               = useState(adminDemoEmail)
+  const [password, setPassword]         = useState(DEMO_PASSWORD)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
   const [showDemoAccounts, setShowDemoAccounts] = useState(false)
 
-  const { login, loading, error, backendAvailable } = useAuth()
+  const { login, loading, error } = useAuth()
   const navigate = useNavigate()
   const demoEntries = Object.entries(DEMO_CREDENTIALS).filter(([, info]) => info.role !== 'Driver')
 
@@ -41,6 +43,8 @@ export function LoginShell() {
     return role
   }
 
+  const showErrorBanner = Boolean(error && error.trim() !== 'Request failed (404)')
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-2xl">
@@ -55,21 +59,25 @@ export function LoginShell() {
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm space-y-5">
-          <div>
-            <h1 className="text-2xl font-extrabold text-text">Welcome back</h1>
-            <p className="text-sm text-gray-500 mt-1">Sign in to your Optimile account</p>
-          </div>
-
-          {/* Offline warning */}
-          {backendAvailable === false && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-warning">
-              <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Backend unavailable right now. Use the demo accounts below if you need temporary access.</span>
+          {adminDemoInfo && (
+            <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-4 py-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700">Administration</p>
+                <p className="mt-1 text-xs text-slate-500">Default login is prefilled for faster access.</p>
+              </div>
+                <button
+                  type="button"
+                  onClick={() => handleDemoAutofill(adminDemoEmail)}
+                  disabled={loading}
+                  className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl border border-sky-600 bg-sky-600 px-4 text-sm font-semibold text-white transition hover:bg-sky-700 hover:border-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Autofill Admin Login
+                </button>
             </div>
           )}
 
           {/* Error */}
-          {error && (
+          {showErrorBanner && (
             <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm font-semibold text-danger">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{error}</span>
@@ -151,24 +159,27 @@ export function LoginShell() {
             <button
               type="button"
               onClick={() => setShowDemoAccounts((current) => !current)}
-              className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition hover:bg-gray-50"
+              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/20 hover:bg-white"
             >
               <div>
                 <p className="text-xs font-extrabold uppercase tracking-wider text-gray-400">
-                  Quick Demo Login
+                  Other Demo Logins
                 </p>
                 <p className="mt-1 text-xs text-gray-500">
-                  Password: <span className="font-mono">{DEMO_PASSWORD}</span>
+                  Click to view the remaining accounts. Password: <span className="font-mono">{DEMO_PASSWORD}</span>
                 </p>
               </div>
-              <span className="text-sm font-semibold text-primary">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
                 {showDemoAccounts ? 'Hide' : 'Show'}
+                <ChevronDown className={`h-4 w-4 transition ${showDemoAccounts ? 'rotate-180' : ''}`} />
               </span>
             </button>
 
             {showDemoAccounts && (
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {demoEntries.map(([demoEmail, info]) => (
+                {demoEntries
+                  .filter(([demoEmail]) => demoEmail !== adminDemoEmail)
+                  .map(([demoEmail, info]) => (
                   <button
                     key={demoEmail}
                     type="button"

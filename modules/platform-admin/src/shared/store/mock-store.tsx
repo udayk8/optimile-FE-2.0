@@ -43,6 +43,7 @@ import {
   normalizeModuleKey,
   normalizeModuleKeys,
 } from "@/shared/lib/tenant-admin";
+import { getTenantPageCatalog } from "@/shared/lib/tenant-page-access";
 import { buildBrdDefaultRoleTemplate } from "@/shared/lib/tenant-role-templates";
 import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { getDefaultAssignmentMode, getDefaultCommercialMode } from "@/shared/lib/tenant-config";
@@ -596,6 +597,45 @@ function normalizeStoredPlatformTenants(storedTenants: TenantRecord[]) {
   }));
 }
 
+function sanitizeStoredRoleAccessForTenant(
+  role: RoleDefinition,
+  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled" | "enabledModuleCodes">,
+) {
+  if (!role.roleAccess?.length) {
+    return role;
+  }
+
+  const selectedModules = new Set(normalizeModuleKeys(role.moduleCodes));
+  const pageByCode = new Map(getTenantPageCatalog(tenant).map((page) => [page.pageCode, page]));
+
+  const roleAccess = role.roleAccess
+    .map((moduleAccess) => ({
+      ...moduleAccess,
+      pages: moduleAccess.pages.filter((page) => {
+        const definition = pageByCode.get(page.pageCode);
+        if (!definition) {
+          return false;
+        }
+        if (page.pageCode === "TENANT_DASHBOARD") {
+          return true;
+        }
+        if (definition.requiresCustomerPortal && !tenant.customerPortalEnabled) {
+          return false;
+        }
+        if (definition.requiredPlatformModules?.length) {
+          return definition.requiredPlatformModules.every((moduleCode) => selectedModules.has(moduleCode));
+        }
+        if (definition.moduleCode === "ADMINISTRATION") {
+          return selectedModules.has("ADMIN");
+        }
+        return true;
+      }),
+    }))
+    .filter((moduleAccess) => moduleAccess.pages.length > 0);
+
+  return { ...role, roleAccess };
+}
+
 function normalizeStoredRoles(
   storedRoles: RoleDefinition[],
   workspaces: Record<string, TenantWorkspaceState>,
@@ -603,10 +643,6 @@ function normalizeStoredRoles(
   rolePermissions: RolePermission[],
 ) {
   return storedRoles.map((role) => {
-    if (role.hierarchyLevelId && Array.isArray(role.moduleCodes)) {
-      return role;
-    }
-
     const tenantLevels = [...(workspaces[role.tenantId]?.hierarchy.levels ?? [])].sort(
       (a, b) => a.order - b.order,
     );
@@ -615,8 +651,8 @@ function normalizeStoredRoles(
       tenantLevels.find((level) => level.name.toLowerCase().includes("branch"))?.id ?? rootLevelId;
     const deepestLevelId = tenantLevels[tenantLevels.length - 1]?.id ?? rootLevelId;
     const normalizedName = role.name.toLowerCase();
-    const tenantEnabledModules =
-      platformTenants.find((tenant) => tenant.id === role.tenantId)?.enabledModuleCodes ?? [];
+    const tenant = platformTenants.find((item) => item.id === role.tenantId);
+    const tenantEnabledModules = tenant?.enabledModuleCodes ?? [];
 
     const inferredFromPermissions = inferRoleModulesFromPermissions(
       role.id,
@@ -634,17 +670,20 @@ function normalizeStoredRoles(
               ? ["FINANCE"]
               : normalizedName.includes("procurement")
                 ? ["PROCUREMENT"]
-                : tenantEnabledModules[0]
+              : tenantEnabledModules[0]
                   ? [normalizeModuleKey(tenantEnabledModules[0])]
                   : ["TMS"];
 
-    if (normalizedName.includes("branch")) {
-      return { ...role, hierarchyLevelId: branchLevelId, moduleCodes: inferredModules };
-    }
-    if (normalizedName.includes("dispatcher") || normalizedName.includes("operator")) {
-      return { ...role, hierarchyLevelId: deepestLevelId, moduleCodes: inferredModules };
-    }
-    return { ...role, hierarchyLevelId: rootLevelId, moduleCodes: inferredModules };
+    const normalizedRole =
+      role.hierarchyLevelId && Array.isArray(role.moduleCodes)
+        ? role
+        : normalizedName.includes("branch")
+          ? { ...role, hierarchyLevelId: branchLevelId, moduleCodes: inferredModules }
+          : normalizedName.includes("dispatcher") || normalizedName.includes("operator")
+            ? { ...role, hierarchyLevelId: deepestLevelId, moduleCodes: inferredModules }
+            : { ...role, hierarchyLevelId: rootLevelId, moduleCodes: inferredModules };
+
+    return tenant ? sanitizeStoredRoleAccessForTenant(normalizedRole, tenant) : normalizedRole;
   });
 }
 
@@ -2015,6 +2054,28 @@ function inferRoleModulesFromPermissions(
   return moduleCodes.length ? moduleCodes : normalizeModuleKeys(tenantEnabledModules).slice(0, 1);
 }
 
+function ensureRequiredPlatformModules(modules: PlatformModule[]) {
+  const requiredByCode = new Map(mockModules.map((module) => [module.code, module]));
+  const merged = [...modules];
+
+  requiredByCode.forEach((requiredModule, code) => {
+    const existingIndex = merged.findIndex((module) => module.code === code);
+    if (existingIndex === -1) {
+      merged.push(requiredModule);
+      return;
+    }
+
+    merged[existingIndex] = {
+      ...requiredModule,
+      ...merged[existingIndex],
+      id: merged[existingIndex].id,
+      status: merged[existingIndex].status,
+    };
+  });
+
+  return merged;
+}
+
 type LegacyGlobalCustomer = {
   id: string;
   name: string;
@@ -3198,7 +3259,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
     enterpriseTenantEl001.platformTenants,
   );
   const [modules, setModules] = useState<PlatformModule[]>(() =>
-    loadSeededState(storageKeys.platformModules, mockModules),
+    ensureRequiredPlatformModules(loadSeededState(storageKeys.platformModules, mockModules)),
   );
   const [platformAuditLogs, setPlatformAuditLogs] = useState<PlatformAuditEvent[]>(() =>
     loadSeededState(storageKeys.platformAuditLogs, mockPlatformAuditLogs),
@@ -6521,7 +6582,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         if (!currentRole) {
           return;
         }
-        const nextRole = { ...currentRole, ...updates };
+        const tenant = platformTenants.find((item) => item.id === currentRole.tenantId);
+        const nextRole = tenant
+          ? sanitizeRoleModuleAccess({ ...currentRole, ...updates }, tenant)
+          : { ...currentRole, ...updates };
         validateRoleModules(nextRole, platformTenants, modules);
         if (
           updates.hierarchyLevelId &&
@@ -6541,7 +6605,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           }
         }
         setRoles((current) =>
-          current.map((role) => (role.id === roleId ? { ...role, ...updates } : role)),
+          current.map((role) => (role.id === roleId ? nextRole : role)),
         );
       },
       listTenantRolePermissions: (tenantId) =>
@@ -6764,6 +6828,45 @@ function validateRoleModules(
   }
 }
 
+function sanitizeRoleModuleAccess<T extends Omit<RoleDefinition, "id"> | RoleDefinition>(
+  role: T,
+  tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled" | "enabledModuleCodes">,
+): T {
+  if (!role.roleAccess?.length) {
+    return role;
+  }
+
+  const selectedModules = new Set(normalizeModuleKeys(role.moduleCodes));
+  const pageByCode = new Map(getTenantPageCatalog(tenant).map((page) => [page.pageCode, page]));
+
+  const roleAccess = role.roleAccess
+    .map((moduleAccess) => ({
+      ...moduleAccess,
+      pages: moduleAccess.pages.filter((page) => {
+        const definition = pageByCode.get(page.pageCode);
+        if (!definition) {
+          return false;
+        }
+        if (page.pageCode === "TENANT_DASHBOARD") {
+          return true;
+        }
+        if (definition.requiresCustomerPortal && !tenant.customerPortalEnabled) {
+          return false;
+        }
+        if (definition.requiredPlatformModules?.length) {
+          return definition.requiredPlatformModules.every((moduleCode) => selectedModules.has(moduleCode));
+        }
+        if (definition.moduleCode === "ADMINISTRATION") {
+          return selectedModules.has("ADMIN");
+        }
+        return true;
+      }),
+    }))
+    .filter((moduleAccess) => moduleAccess.pages.length > 0);
+
+  return { ...role, roleAccess };
+}
+
 function validateRolePermissions(
   role: RoleDefinition,
   permissions: RolePermission[],
@@ -6829,5 +6932,3 @@ export function useMockStore() {
   }
   return context;
 }
-
-

@@ -10,8 +10,11 @@ import type {
 export type TenantPageModuleCode =
   | "ADMINISTRATION"
   | "BOOKING"
+  | "AUCTION"
+  | "FLEET_APP"
   | "FINANCE"
   | "LR"
+  | "TRACK_TRACE"
   | "DRIVER_APP"
   | "VENDOR_APP"
   | "CUSTOMER_PORTAL";
@@ -303,6 +306,24 @@ const allPageDefinitions: TenantPageDefinition[] = [
     requiredPlatformModules: ["TMS", "FINANCE"],
   },
   {
+    pageCode: "AUCTION_DASHBOARD",
+    label: "Auction Dashboard",
+    moduleCode: "AUCTION",
+    description: "Auction workspace dashboard in the live auction module.",
+    routePatterns: ["/auction/dashboard"],
+    availableActions: ["VIEW"],
+    requiredPlatformModules: ["AUCTION"],
+  },
+  {
+    pageCode: "FLEET_DASHBOARD",
+    label: "Fleet Dashboard",
+    moduleCode: "FLEET_APP",
+    description: "Fleet management dashboard in the live fleet module.",
+    routePatterns: ["/fleet/dashboard"],
+    availableActions: ["VIEW"],
+    requiredPlatformModules: ["FLEET"],
+  },
+  {
     pageCode: "SHIPMENT_DOCUMENTS",
     label: "Shipment Documents",
     moduleCode: "BOOKING",
@@ -504,10 +525,10 @@ const allPageDefinitions: TenantPageDefinition[] = [
     pageCode: "VENDOR_DASHBOARD",
     label: "Vendor Dashboard",
     moduleCode: "VENDOR_APP",
-    description: "Vendor portal dashboard for future integration.",
-    routePatterns: [],
+    description: "Vendor portal dashboard in the live vendor module.",
+    routePatterns: ["/vendor"],
     availableActions: ["VIEW"],
-    requiredPlatformModules: ["PROCUREMENT", "TMS"],
+    requiredPlatformModules: ["VENDOR"],
   },
   {
     pageCode: "ASSIGNED_TRIPS",
@@ -549,10 +570,20 @@ const allPageDefinitions: TenantPageDefinition[] = [
     pageCode: "CUSTOMER_DASHBOARD",
     label: "Customer Dashboard",
     moduleCode: "CUSTOMER_PORTAL",
-    description: "Customer portal dashboard for future integration.",
-    routePatterns: [],
+    description: "Customer dashboard in the live customer module.",
+    routePatterns: ["/customer"],
     availableActions: ["VIEW"],
+    requiredPlatformModules: ["CUSTOMER"],
     requiresCustomerPortal: true,
+  },
+  {
+    pageCode: "TRACKING_DASHBOARD",
+    label: "Track and Trace Dashboard",
+    moduleCode: "TRACK_TRACE",
+    description: "Track and trace dashboard in the live tracking module.",
+    routePatterns: ["/tracking"],
+    availableActions: ["VIEW"],
+    requiredPlatformModules: ["TRACKING"],
   },
   {
     pageCode: "MY_BOOKINGS",
@@ -711,7 +742,7 @@ function normalizeRoleAccess(
     .filter((moduleAccess) => moduleAccess.pages.length > 0);
 }
 
-function buildDefaultRoleAccess(
+export function buildDefaultRoleAccess(
   role: RoleDefinition,
   tenant: Pick<TenantRecord, "tenantType" | "customerPortalEnabled">,
   rolePermissions: RolePermission[],
@@ -832,6 +863,14 @@ function inferDefaultPageVisibility(
     return isFinanceLike || hasModule("FINANCE");
   }
 
+  if (page.moduleCode === "AUCTION") {
+    return hasModule("AUCTION") || hasModule("PROCUREMENT");
+  }
+
+  if (page.moduleCode === "FLEET_APP") {
+    return hasModule("FLEET");
+  }
+
   if (page.moduleCode === "BOOKING") {
     if (page.pageCode === "BOOKING_INVOICING" && isFinanceLike) {
       return true;
@@ -848,11 +887,15 @@ function inferDefaultPageVisibility(
   }
 
   if (page.moduleCode === "VENDOR_APP") {
-    return isVendorLike || hasModule("PROCUREMENT") || isAdminLike;
+    return isVendorLike || hasModule("VENDOR") || hasModule("PROCUREMENT");
   }
 
   if (page.moduleCode === "CUSTOMER_PORTAL") {
-    return isCustomerLike || isAdminLike;
+    return isCustomerLike || hasModule("CUSTOMER");
+  }
+
+  if (page.moduleCode === "TRACK_TRACE") {
+    return hasModule("TRACKING");
   }
 
   if (page.pageCode === "USERS" || page.pageCode === "ROLES" || page.pageCode === "ROLE_PERMISSIONS") {

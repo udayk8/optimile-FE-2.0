@@ -3,12 +3,16 @@ import { motion } from "framer-motion";
 import {
   Boxes,
   Building2,
+  Gavel,
   LayoutDashboard,
+  MapPin,
   ShieldCheck,
   Truck,
+  UserCog,
   Users,
 } from "lucide-react";
 import { WorkspaceShell } from "@layouts/shared/workspace-shell";
+import type { ExplorerNavItem } from "@/shared/components/layout/sidebar-explorer";
 import { TenantEmptyState } from "@/modules/tenant-admin/components/tenant-primitives";
 import { useTenantRolePermissions } from "@/modules/tenant-admin/hooks/useTenantRolePermissions";
 import { useTenantRoles } from "@/modules/tenant-admin/hooks/useTenantRoles";
@@ -87,7 +91,7 @@ export function TenantLayout() {
       ];
       const hasAnySetup = SETUP_FEATURE_CODES.some((code) => hasPermission(activeRole, "TMS", code, "view"));
 
-      const bookingSetupChildren = [
+      const bookingSetupChildren: Array<ExplorerNavItem & { featureCode?: string }> = [
         ...(hasAnySetup
           ? [{ to: paths.bookingSetup, label: "Setup Overview", icon: Boxes, pageCode: "BOOKING_SETUP" }]
           : []),
@@ -101,9 +105,9 @@ export function TenantLayout() {
         { to: paths.assignmentRules, label: "Assignment Rules", icon: ShieldCheck, pageCode: "ASSIGNMENT_RULES", featureCode: "ASSIGNMENT_RULES" },
         { to: paths.documentRules, label: "Document Rules", icon: ShieldCheck, pageCode: "DOCUMENT_RULES", featureCode: "DOCUMENT_RULES" },
         { to: paths.podRules, label: "POD Rules", icon: ShieldCheck, pageCode: "POD_RULES", featureCode: "POD_RULES" },
-      ].filter((item) => !("featureCode" in item) || hasPermission(activeRole, "TMS", item.featureCode, "view"));
+      ].filter((item) => !item.featureCode || hasPermission(activeRole, "TMS", item.featureCode, "view"));
 
-      const bookingOpsChildren = [
+      const bookingOpsChildren: Array<ExplorerNavItem & { featureCode: string }> = [
         { to: paths.bookings, label: "Booking Dashboard", icon: Truck, pageCode: "BOOKING_LIST", featureCode: "BOOKING_DASHBOARD" },
         { to: paths.assignment, label: "Booking Assignment", icon: Truck, pageCode: "ASSIGNMENT_QUEUE", featureCode: "BOOKING_ASSIGNMENT" },
         { to: paths.completed, label: "Shipment Documents", icon: Truck, pageCode: "COMPLETED_BOOKINGS", featureCode: "SHIPMENT_DOCUMENTS" },
@@ -112,9 +116,89 @@ export function TenantLayout() {
         { to: paths.bookings, label: "Reports", icon: ShieldCheck, pageCode: "BOOKING_LIST", featureCode: "BOOKING_REPORTS" },
       ].filter((item) => hasPermission(activeRole, "TMS", item.featureCode, "view"));
 
-      const groups: typeof tenantNav = [];
+      const groups: ExplorerNavItem[] = [];
       if (bookingSetupChildren.length > 0) groups.push({ label: "Booking Setup", icon: Boxes, children: bookingSetupChildren });
       if (bookingOpsChildren.length > 0) groups.push({ label: "Booking Operations", icon: Truck, children: bookingOpsChildren });
+      return groups;
+    })(),
+    ...(() => {
+      const groups: ExplorerNavItem[] = [];
+
+      if (activeRole && canAccessTenantPath({
+        tenant,
+        pathname: "/fleet/dashboard",
+        role: activeRole,
+        rolePermissions,
+      }).allowed) {
+        groups.push({
+          label: "Fleet Management",
+          icon: Truck,
+          children: [
+            { to: "/fleet/dashboard", label: "Fleet Dashboard", icon: Truck, pageCode: "FLEET_DASHBOARD" },
+          ],
+        });
+      }
+
+      if (activeRole && canAccessTenantPath({
+        tenant,
+        pathname: "/auction/dashboard",
+        role: activeRole,
+        rolePermissions,
+      }).allowed) {
+        groups.push({
+          label: "Auction",
+          icon: Gavel,
+          children: [
+            { to: "/auction/dashboard", label: "Auction Dashboard", icon: Gavel, pageCode: "AUCTION_DASHBOARD" },
+          ],
+        });
+      }
+
+      if (activeRole && canAccessTenantPath({
+        tenant,
+        pathname: "/vendor",
+        role: activeRole,
+        rolePermissions,
+      }).allowed) {
+        groups.push({
+          label: "Vendor App",
+          icon: Users,
+          children: [
+            { to: "/vendor", label: "Vendor Dashboard", icon: Users, pageCode: "VENDOR_DASHBOARD" },
+          ],
+        });
+      }
+
+      if (currentTenantUser?.userType === "CUSTOMER" && activeRole && canAccessTenantPath({
+        tenant,
+        pathname: "/customer",
+        role: activeRole,
+        rolePermissions,
+      }).allowed) {
+        groups.push({
+          label: "Customer Dashboard",
+          icon: UserCog,
+          children: [
+            { to: "/customer", label: "Customer Dashboard", icon: UserCog, pageCode: "CUSTOMER_DASHBOARD" },
+          ],
+        });
+      }
+
+      if (activeRole && canAccessTenantPath({
+        tenant,
+        pathname: "/tracking",
+        role: activeRole,
+        rolePermissions,
+      }).allowed) {
+        groups.push({
+          label: "Track and Trace",
+          icon: MapPin,
+          children: [
+            { to: "/tracking", label: "Tracking Dashboard", icon: MapPin, pageCode: "TRACKING_DASHBOARD" },
+          ],
+        });
+      }
+
       return groups;
     })(),
   ];
@@ -230,6 +314,16 @@ function pageCodeToPath(pageCode: string, paths: ReturnType<typeof useTenantPath
       return `${paths.root}/finance`;
     case "LR_DASHBOARD":
       return `${paths.root}/lr`;
+    case "FLEET_DASHBOARD":
+      return "/fleet/dashboard";
+    case "AUCTION_DASHBOARD":
+      return "/auction/dashboard";
+    case "VENDOR_DASHBOARD":
+      return "/vendor";
+    case "CUSTOMER_DASHBOARD":
+      return "/customer";
+    case "TRACKING_DASHBOARD":
+      return "/tracking";
     case "DRIVER_LOGIN":
       return paths.driverLogin;
     case "DRIVER_DASHBOARD":

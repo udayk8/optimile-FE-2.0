@@ -31,6 +31,7 @@ import { resolveSessionRoleContext } from "@/shared/lib/tenant-rbac";
 import { StatusDot } from "@/modules/tenant-admin/components/admin-ui";
 import { isTenantAdminRole, TENANT_ADMIN_MODULE_CODE } from "@/modules/tenant-admin/lib/tenant-modules";
 import { hasPermission } from "@/modules/tenant-admin/lib/tenant-permissions";
+import { canRoleViewPage } from "@/shared/lib/tenant-page-access";
 
 const BOOKING_SETUP_STORAGE_KEY = "optimile.tenant.bookingSetup";
 
@@ -82,7 +83,7 @@ export function TenantDashboardPage() {
   const { data: vendors } = useTenantVendors(tenant.id);
   const { data: hierarchyState } = useTenantHierarchy(tenant.id);
 
-  const { activeRole, currentTenantUser } = resolveSessionRoleContext({
+  const { activeRole, currentTenantUser, roleAccess } = resolveSessionRoleContext({
     tenant,
     session,
     users,
@@ -95,6 +96,7 @@ export function TenantDashboardPage() {
     (isTenantAdminRole(activeRole) ||
       (activeRole.moduleCodes ?? []).includes(TENANT_ADMIN_MODULE_CODE));
   const can = (featureCode: string) => hasPermission(activeRole, "TMS", featureCode, "view");
+  const canViewPage = (pageCode: string) => canRoleViewPage(roleAccess, pageCode);
 
   const activeUsers = users.filter((user) => user.status === "active").length;
   const editableRoles = useMemo(() => roles.filter((role) => !isTenantAdminRole(role)), [roles]);
@@ -113,7 +115,7 @@ export function TenantDashboardPage() {
     [customers.length, vendors.length, bookingSetup.addressCount]
       .reduce((accumulator, value) => accumulator + (value > 0 ? 33 : 0), 0),
   );
-  const lrPercent = bookingSetup.hasAssignmentRules ? 50 : 0; // proxy: rules present
+  const lrPercent = bookingSetup.hasAssignmentRules ? 100 : 0;
 
   const checklist: Array<{
     id: string;
@@ -249,6 +251,11 @@ export function TenantDashboardPage() {
     ...(can("BOOKING_ASSIGNMENT") ? [{ label: "Booking Assignment", icon: Truck, to: paths.assignment }] : []),
     ...(can("SHIPMENT_DOCUMENTS") ? [{ label: "Shipment Documents", icon: ScrollText, to: paths.completed }] : []),
     ...(can("POD") ? [{ label: "POD", icon: ShieldCheck, to: paths.liveTracking }] : []),
+    ...(canViewPage("FLEET_DASHBOARD") ? [{ label: "Fleet Dashboard", icon: Truck, to: "/fleet/dashboard" }] : []),
+    ...(canViewPage("AUCTION_DASHBOARD") ? [{ label: "Auction Dashboard", icon: Layers, to: "/auction/dashboard" }] : []),
+    ...(canViewPage("VENDOR_DASHBOARD") ? [{ label: "Vendor App", icon: Users, to: "/vendor" }] : []),
+    ...(canViewPage("CUSTOMER_DASHBOARD") ? [{ label: "Customer Dashboard", icon: UserCog, to: "/customer" }] : []),
+    ...(canViewPage("TRACKING_DASHBOARD") ? [{ label: "Track and Trace", icon: MapPin, to: "/tracking" }] : []),
   ];
 
   // ──────────────────────────────────────────────────────────────────────────

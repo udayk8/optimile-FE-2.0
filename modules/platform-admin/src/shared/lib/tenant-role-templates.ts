@@ -318,13 +318,20 @@ export function getRolePreviewStartPath(
   if (!role) {
     return `/tenant/${tenant.id}/dashboard`;
   }
+  const configuredPageCode = role.roleAccess?.flatMap((module) => module.pages ?? []).find((page) => page.canView)?.pageCode;
   const template = buildBrdDefaultRoleTemplate(tenant, role);
-  const fallbackPageCode = template?.previewPageCode ?? "TENANT_DASHBOARD";
+  const fallbackPageCode = configuredPageCode ?? template?.previewPageCode ?? "TENANT_DASHBOARD";
   switch (fallbackPageCode) {
+    case "AUCTION_DASHBOARD":
+      return "/auction/dashboard";
+    case "FLEET_DASHBOARD":
+      return "/fleet/dashboard";
     case "CUSTOMER_DASHBOARD":
-      return `/tenant/${tenant.id}/dashboard`;
+      return "/customer";
+    case "TRACKING_DASHBOARD":
+      return "/tracking";
     case "VENDOR_DASHBOARD":
-      return `/tenant/${tenant.id}/dashboard`;
+      return "/vendor";
     case "DRIVER_DASHBOARD":
       return `/tenant/${tenant.id}/driver-app/dashboard`;
     case "FINANCE_WORKSPACE":

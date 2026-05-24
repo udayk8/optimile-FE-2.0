@@ -59,8 +59,33 @@ const BOOKING_FEATURES: TenantModuleFeature[] = [
   { code: "BOOKING_REPORTS", name: "Booking Reports" },
 ];
 
+const FLEET_FEATURES: TenantModuleFeature[] = [
+  { code: "FLEET_DASHBOARD", name: "Fleet Dashboard" },
+];
+
+const AUCTION_FEATURES: TenantModuleFeature[] = [
+  { code: "AUCTION_DASHBOARD", name: "Auction Dashboard" },
+];
+
+const CUSTOMER_FEATURES: TenantModuleFeature[] = [
+  { code: "CUSTOMER_DASHBOARD", name: "Customer Dashboard" },
+];
+
+const VENDOR_FEATURES: TenantModuleFeature[] = [
+  { code: "VENDOR_DASHBOARD", name: "Vendor Dashboard" },
+];
+
+const TRACKING_FEATURES: TenantModuleFeature[] = [
+  { code: "TRACKING_DASHBOARD", name: "Track and Trace Dashboard" },
+];
+
 const PLATFORM_MODULE_FEATURES: Record<string, TenantModuleFeature[]> = {
   TMS: BOOKING_FEATURES,
+  FLEET: FLEET_FEATURES,
+  AUCTION: AUCTION_FEATURES,
+  CUSTOMER: CUSTOMER_FEATURES,
+  VENDOR: VENDOR_FEATURES,
+  TRACKING: TRACKING_FEATURES,
 };
 
 export function getTenantAdminModule(): TenantModuleEntry {
