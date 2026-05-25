@@ -15,8 +15,8 @@ import { resolveManualLrScopedOrgUnits } from "@/shared/lib/manual-lr-scope";
 import { getAssignmentModeLabel, getCommercialModeLabel } from "@/shared/lib/tenant-config";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import { calculateMarginAmount, calculateMarginPercent } from "@/modules/tms/booking/services/booking-engine";
 import {
   buildCustomerLookup,

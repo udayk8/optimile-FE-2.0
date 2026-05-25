@@ -18,10 +18,10 @@ function LegacyRedirect({ to }: { to: string }) {
   return <Navigate to={scopedPath(to)} replace />
 }
 
-export function TrackingRoutes() {
+export function TrackingRoutes({ embedded = false }: { embedded?: boolean } = {}) {
   return (
     <Routes>
-      <Route element={<TrackTraceLayout />}>
+      <Route element={<TrackTraceLayout embedded={embedded} />}>
         <Route index element={<TrackTraceDashboard />} />
         <Route path="dashboard" element={<TrackTraceDashboard />} />
         <Route path="trips" element={<ActiveTripsPage />} />

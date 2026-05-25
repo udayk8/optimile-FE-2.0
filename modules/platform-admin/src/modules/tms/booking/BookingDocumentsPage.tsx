@@ -8,8 +8,8 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import { normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
 import { formatCurrency } from "@/shared/lib/format-currency";
 import {

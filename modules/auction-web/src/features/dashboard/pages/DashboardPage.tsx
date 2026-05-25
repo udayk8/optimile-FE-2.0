@@ -8,9 +8,11 @@ import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { SLACountdown } from '@auction/components/shared/SLACountdown'
 import { MOCK_DASHBOARD } from '@auction/lib/mock-data'
 import { useAppStore } from '@auction/stores/app.store'
+import { useAuctionPath } from '@auction/lib/auctionPath'
 
 export default function DashboardPage() {
   const { auctions, contracts } = useAppStore()
+  const ap = useAuctionPath()
 
   const liveAuctions = auctions.filter((item) => item.status === 'LIVE')
   const pendingAwards = auctions.filter((item) => item.status === 'COMPLETED')
@@ -25,7 +27,7 @@ export default function DashboardPage() {
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
           <Button asChild variant="outline">
-            <Link to="/auction/auctions">Review Auctions</Link>
+            <Link to={ap('/auctions')}>Review Auctions</Link>
           </Button>
         }
       />
@@ -56,14 +58,14 @@ export default function DashboardPage() {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Priority Auctions</CardTitle>
             <Button asChild size="sm" variant="outline">
-              <Link to="/auction/auctions">View all</Link>
+              <Link to={ap('/auctions')}>View all</Link>
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {auctions.slice(0, 4).map((auction) => (
               <Link
                 key={auction.id}
-                to={`/auction/auctions/${auction.id}`}
+                to={ap(`/auctions/${auction.id}`)}
                 className="flex items-start justify-between rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]"
               >
                 <div>
@@ -91,7 +93,7 @@ export default function DashboardPage() {
             {expiringContracts.map((contract) => (
               <Link
                 key={contract.id}
-                to={`/auction/contracts/${contract.id}`}
+                to={ap(`/contracts/${contract.id}`)}
                 className="block rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]"
               >
                 <div className="flex items-center justify-between">

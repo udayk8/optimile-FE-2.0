@@ -12,6 +12,7 @@ import { SLACountdown } from '@auction/components/shared/SLACountdown'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { formatDateTime } from '@auction/lib/date-utils'
 import { useAppStore } from '@auction/stores/app.store'
+import { useAuctionPath } from '@auction/lib/auctionPath'
 
 const TABS = ['overview', 'lanes', 'ranking', 'award'] as const
 
@@ -21,6 +22,7 @@ type AwardModalState =
 
 export default function AuctionDetailPage() {
   const { id } = useParams()
+  const ap = useAuctionPath()
   const { auctions, contracts, launchAuction, cancelAuction, awardSpotAuction, finalizeLaneAward } = useAppStore()
   const { auctionUser } = useAuctionAuth()
   const auction = auctions.find((item) => item.id === id)
@@ -197,7 +199,7 @@ export default function AuctionDetailPage() {
                 </p>
               )}
               {linkedContracts.map((contract) => (
-                <Link key={contract.id} to={`/auction/contracts/${contract.id}`} className="block rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]">
+                <Link key={contract.id} to={ap(`/contracts/${contract.id}`)} className="block rounded-xl border border-[#E5E7EB] p-4 transition hover:bg-[#F8FAFC]">
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-semibold">{contract.id}</span>
                     <StatusBadge status={contract.status} />

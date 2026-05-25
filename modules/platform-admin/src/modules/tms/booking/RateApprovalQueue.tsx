@@ -9,8 +9,8 @@ import { Button } from "@/shared/components/ui/button";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import { buildCustomerLookup } from "@/modules/tms/booking/services/booking-selectors";
 
 export function RateApprovalQueuePage() {

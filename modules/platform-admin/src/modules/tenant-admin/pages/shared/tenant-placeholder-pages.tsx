@@ -1642,22 +1642,29 @@ interface PermissionGroupCard {
   rows: PermissionGroupRow[];
 }
 
+// Permission dependencies — granting `trigger` automatically grants every
+// entry in `grant`; revoking any entry in `grant` revokes the trigger.
+// Used to enforce real-world workflow prerequisites (e.g. you can't create
+// a booking without being able to see the booking list).
+const GRANT_DEPENDENCIES: Array<{
+  trigger: { moduleCode: string; featureCode: string; action: TenantPermissionAction };
+  grant: Array<{ moduleCode: string; featureCode: string; action: TenantPermissionAction }>;
+}> = [
+  {
+    trigger: { moduleCode: "TMS", featureCode: "CREATE_BOOKING", action: "create" },
+    grant: [{ moduleCode: "TMS", featureCode: "BOOKING_DASHBOARD", action: "view" }],
+  },
+];
+
 const PERMISSION_GROUPS: PermissionGroupCard[] = [
   {
     key: "ADMIN",
     title: "Administration",
-    badge: "Tenant governance",
+    badge: "Tenant governance & setup",
     rows: [
       { label: "Org Units", helper: "Hierarchy Setup, Org Units", moduleCode: "ADMIN", featureCodes: ["ORG_UNITS"] },
       { label: "Users", helper: "Tenant user management", moduleCode: "ADMIN", featureCodes: ["USERS"] },
       { label: "Roles & Permissions", helper: "Roles and Role Permissions", moduleCode: "ADMIN", featureCodes: ["ROLES", "PERMISSIONS"] },
-    ],
-  },
-  {
-    key: "BOOKING_SETUP",
-    title: "Booking Setup",
-    badge: "Master data & rules",
-    rows: [
       { label: "Master Data", helper: "Customers, vendors, vehicle types, materials, UOM, address book", moduleCode: "TMS", featureCodes: ["CUSTOMERS", "VENDORS", "VEHICLE_TYPES", "MATERIALS", "UOM", "ADDRESS_BOOK"] },
       { label: "Rules Configuration", helper: "Assignment, document, and POD rules", moduleCode: "TMS", featureCodes: ["ASSIGNMENT_RULES", "DOCUMENT_RULES", "POD_RULES"] },
       { label: "LR Configuration", helper: "LR ownership, numbering, governance", moduleCode: "TMS", featureCodes: ["LR_CONFIGURATION"] },
@@ -1665,7 +1672,7 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
   },
   {
     key: "BOOKING_OPS",
-    title: "Booking Operations",
+    title: "Booking",
     badge: "Day-to-day workflows",
     rows: [
       { label: "Booking Dashboard", helper: "Booking lists and overview", moduleCode: "TMS", featureCodes: ["BOOKING_DASHBOARD"] },
@@ -1678,43 +1685,86 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
     ],
   },
   {
-    key: "FLEET",
-    title: "Fleet Management",
-    badge: "Fleet module",
+    key: "DRIVER_APP",
+    title: "Driver App",
+    badge: "modules/tms-driver-app-web — /driver-app/*",
     rows: [
-      { label: "Fleet Dashboard", helper: "Fleet dashboard access", moduleCode: "FLEET", featureCodes: ["FLEET_DASHBOARD"] },
-    ],
-  },
-  {
-    key: "AUCTION",
-    title: "Auction",
-    badge: "Auction module",
-    rows: [
-      { label: "Auction Dashboard", helper: "Auction dashboard and sourcing access", moduleCode: "AUCTION", featureCodes: ["AUCTION_DASHBOARD"] },
-    ],
-  },
-  {
-    key: "CUSTOMER",
-    title: "Customer Dashboard",
-    badge: "Customer module",
-    rows: [
-      { label: "Customer Dashboard", helper: "Customer dashboard visibility", moduleCode: "CUSTOMER", featureCodes: ["CUSTOMER_DASHBOARD"] },
-    ],
-  },
-  {
-    key: "VENDOR",
-    title: "Vendor App",
-    badge: "Vendor module",
-    rows: [
-      { label: "Vendor Dashboard", helper: "Vendor app dashboard visibility", moduleCode: "VENDOR", featureCodes: ["VENDOR_DASHBOARD"] },
+      { label: "Driver Dashboard", helper: "Driver workspace home", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_DASHBOARD"] },
+      { label: "My Trips", helper: "Trip list + detail + delivery flow", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_TRIPS"] },
+      { label: "Capture POD", helper: "POD upload for completed deliveries", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_POD"] },
+      { label: "Documents", helper: "Driver-side document repository", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_DOCUMENTS"] },
+      { label: "POI", helper: "Points of Interest", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_POI"] },
+      { label: "Fuel & Expenses", helper: "Driver expense submission", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_FUEL_EXPENSES"] },
+      { label: "Incidents", helper: "Incident reporting and timeline", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_INCIDENTS"] },
+      { label: "Driver Profile", helper: "Driver profile and support", moduleCode: "DRIVER_APP", featureCodes: ["DRIVER_PROFILE"] },
     ],
   },
   {
     key: "TRACKING",
     title: "Track and Trace",
-    badge: "Tracking module",
+    badge: "modules/track-trace-web — /tracking/*",
     rows: [
-      { label: "Track and Trace Dashboard", helper: "Tracking dashboard visibility", moduleCode: "TRACKING", featureCodes: ["TRACKING_DASHBOARD"] },
+      { label: "Tracking Dashboard", helper: "Tracking home", moduleCode: "TRACKING", featureCodes: ["TRACKING_DASHBOARD"] },
+      { label: "Active Trips", helper: "Trip list with live status", moduleCode: "TRACKING", featureCodes: ["TRACKING_TRIPS"] },
+      { label: "Live Map", helper: "Real-time fleet map", moduleCode: "TRACKING", featureCodes: ["TRACKING_LIVE_MAP"] },
+      { label: "Alerts", helper: "Tracking alerts and exceptions", moduleCode: "TRACKING", featureCodes: ["TRACKING_ALERTS"] },
+      { label: "Geofences", helper: "Geofence management", moduleCode: "TRACKING", featureCodes: ["TRACKING_GEOFENCES"] },
+      { label: "Analytics", helper: "Route, driver behaviour, performance analytics", moduleCode: "TRACKING", featureCodes: ["TRACKING_ANALYTICS"] },
+    ],
+  },
+  {
+    key: "CUSTOMER",
+    title: "Customer Portal",
+    badge: "modules/customer-web — /customer/*",
+    rows: [
+      { label: "Customer Dashboard", helper: "Customer-facing dashboard", moduleCode: "CUSTOMER", featureCodes: ["CUSTOMER_DASHBOARD"] },
+    ],
+  },
+  {
+    key: "VENDOR",
+    title: "Vendor Portal",
+    badge: "modules/vendor-web — /vendor/*",
+    rows: [
+      { label: "Vendor Dashboard", helper: "Vendor workspace home", moduleCode: "VENDOR", featureCodes: ["VENDOR_DASHBOARD"] },
+      { label: "Vendor Trips", helper: "Assigned trips, acceptance, status", moduleCode: "VENDOR", featureCodes: ["VENDOR_TRIPS"] },
+      { label: "Sourcing", helper: "Bid on auctions / RFQs", moduleCode: "VENDOR", featureCodes: ["VENDOR_SOURCING"] },
+      { label: "Vendor Contracts", helper: "Active vendor contracts", moduleCode: "VENDOR", featureCodes: ["VENDOR_CONTRACTS"] },
+      { label: "Invoices", helper: "Vendor invoices", moduleCode: "VENDOR", featureCodes: ["VENDOR_INVOICES"] },
+      { label: "Ledger", helper: "Vendor ledger", moduleCode: "VENDOR", featureCodes: ["VENDOR_LEDGER"] },
+      { label: "Payments", helper: "Payment records and reconciliation", moduleCode: "VENDOR", featureCodes: ["VENDOR_PAYMENTS"] },
+      { label: "Vendor Fleet", helper: "Vehicles and drivers", moduleCode: "VENDOR", featureCodes: ["VENDOR_FLEET"] },
+      { label: "Vendor Support", helper: "Disputes and queries", moduleCode: "VENDOR", featureCodes: ["VENDOR_SUPPORT"] },
+    ],
+  },
+  {
+    key: "FLEET",
+    title: "Fleet Management",
+    badge: "modules/fleet-web — /fleet/*",
+    rows: [
+      { label: "Fleet Dashboard", helper: "Fleet home", moduleCode: "FLEET", featureCodes: ["FLEET_DASHBOARD"] },
+      { label: "Ops Intelligence", helper: "Ops summary & KPIs", moduleCode: "FLEET", featureCodes: ["FLEET_OPS_INTEL"] },
+      { label: "Exception Center", helper: "Fleet exceptions", moduleCode: "FLEET", featureCodes: ["FLEET_EXCEPTIONS"] },
+      { label: "Live Map", helper: "Fleet live map", moduleCode: "FLEET", featureCodes: ["FLEET_LIVE_MAP"] },
+      { label: "Dispatch", helper: "Dispatch workspace", moduleCode: "FLEET", featureCodes: ["FLEET_DISPATCH"] },
+      { label: "Vehicles", helper: "Vehicles and availability", moduleCode: "FLEET", featureCodes: ["FLEET_VEHICLES"] },
+      { label: "Drivers", helper: "Drivers and behaviour", moduleCode: "FLEET", featureCodes: ["FLEET_DRIVERS"] },
+      { label: "Compliance", helper: "Fleet compliance", moduleCode: "FLEET", featureCodes: ["FLEET_COMPLIANCE"] },
+      { label: "Maintenance", helper: "Vehicle maintenance", moduleCode: "FLEET", featureCodes: ["FLEET_MAINTENANCE"] },
+      { label: "Garage", helper: "Garage operations", moduleCode: "FLEET", featureCodes: ["FLEET_GARAGE"] },
+      { label: "Tyres", helper: "Tyre inventory and tracking", moduleCode: "FLEET", featureCodes: ["FLEET_TYRES"] },
+      { label: "Fuel", helper: "Fuel records", moduleCode: "FLEET", featureCodes: ["FLEET_FUEL"] },
+      { label: "Cost Health", helper: "Cost health workspace", moduleCode: "FLEET", featureCodes: ["FLEET_COST"] },
+      { label: "Fleet Settings", helper: "Fleet configuration", moduleCode: "FLEET", featureCodes: ["FLEET_SETTINGS"] },
+    ],
+  },
+  {
+    key: "AUCTION",
+    title: "Auction / AMS",
+    badge: "modules/auction-web — /auction/*",
+    rows: [
+      { label: "Auction Dashboard", helper: "Auction home", moduleCode: "AUCTION", featureCodes: ["AUCTION_DASHBOARD"] },
+      { label: "Auctions", helper: "RFI/RFQ and auction list", moduleCode: "AUCTION", featureCodes: ["AUCTION_AUCTIONS"] },
+      { label: "Contracts", helper: "Auction contracts", moduleCode: "AUCTION", featureCodes: ["AUCTION_CONTRACTS"] },
     ],
   },
 ];
@@ -1736,6 +1786,7 @@ function loadPermissionStore(): StoreMatrix {
 function writePermissionStore(store: StoreMatrix) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem("optimile.tenant.rolePermissionMatrix", JSON.stringify(store));
+  window.dispatchEvent(new Event("optimile-permission-matrix-changed"));
 }
 
 function cloneActions(map: Partial<Record<TenantPermissionAction, boolean>> | undefined): Record<TenantPermissionAction, boolean> {
@@ -1789,8 +1840,9 @@ export function TenantRolePermissionsPage() {
     if (!selectedRole) return [] as PermissionGroupCard[];
     const codes = new Set(selectedRole.moduleCodes ?? []);
     return PERMISSION_GROUPS.filter((group) => {
-      if (group.key === "ADMIN") return codes.has("ADMIN");
-      if (group.key === "BOOKING_SETUP" || group.key === "BOOKING_OPS") return codes.has("TMS");
+      if (group.key === "ADMIN") return codes.has("ADMIN") || codes.has("TMS");
+      if (group.key === "BOOKING_OPS") return codes.has("TMS");
+      if (group.key === "DRIVER_APP") return codes.has("DRIVER_APP");
       if (group.key === "FLEET") return codes.has("FLEET");
       if (group.key === "AUCTION") return codes.has("AUCTION") || codes.has("PROCUREMENT");
       if (group.key === "CUSTOMER") return codes.has("CUSTOMER");
@@ -1799,6 +1851,56 @@ export function TenantRolePermissionsPage() {
       return false;
     });
   }, [selectedRole]);
+
+  function applyPermissionDependencies(
+    matrix: RoleMatrix,
+    moduleCode: string,
+    featureCode: string,
+    action: TenantPermissionAction,
+    value: boolean,
+  ): RoleMatrix {
+    // Grant cascade: ticking a row implies its prerequisite rows.
+    // (e.g. Create Booking requires Booking Dashboard view — you cannot
+    // create without seeing the list.)
+    if (value) {
+      const grants = GRANT_DEPENDENCIES.filter(
+        (dep) =>
+          dep.trigger.moduleCode === moduleCode &&
+          dep.trigger.featureCode === featureCode &&
+          dep.trigger.action === action,
+      );
+      grants.forEach((dep) => {
+        dep.grant.forEach((target) => {
+          const modulePerm: PermissionMatrix = { ...(matrix[target.moduleCode] ?? {}) };
+          const featurePerm = cloneActions(modulePerm[target.featureCode]);
+          featurePerm[target.action] = true;
+          modulePerm[target.featureCode] = featurePerm;
+          matrix[target.moduleCode] = modulePerm;
+        });
+      });
+    } else {
+      // Revoke cascade: unticking a prerequisite revokes everything that
+      // depended on it.
+      const revokes = GRANT_DEPENDENCIES.filter((dep) =>
+        dep.grant.some(
+          (target) =>
+            target.moduleCode === moduleCode &&
+            target.featureCode === featureCode &&
+            target.action === action,
+        ),
+      );
+      revokes.forEach((dep) => {
+        const modulePerm: PermissionMatrix = { ...(matrix[dep.trigger.moduleCode] ?? {}) };
+        const featurePerm = cloneActions(modulePerm[dep.trigger.featureCode]);
+        TENANT_PERMISSION_ACTIONS.forEach((act) => {
+          featurePerm[act] = false;
+        });
+        modulePerm[dep.trigger.featureCode] = featurePerm;
+        matrix[dep.trigger.moduleCode] = modulePerm;
+      });
+    }
+    return matrix;
+  }
 
   function setActionForFeatures(moduleCode: string, featureCodes: string[], action: TenantPermissionAction, value: boolean) {
     setWorking((current) => {
@@ -1810,6 +1912,9 @@ export function TenantRolePermissionsPage() {
         modulePerm[code] = featurePerm;
       });
       next[moduleCode] = modulePerm;
+      featureCodes.forEach((code) => {
+        applyPermissionDependencies(next, moduleCode, code, action, value);
+      });
       return next;
     });
   }

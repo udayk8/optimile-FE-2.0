@@ -6,6 +6,7 @@ import {
   Gavel,
   LayoutDashboard,
   MapPin,
+  Plus,
   ShieldCheck,
   Truck,
   UserCog,
@@ -25,7 +26,7 @@ import {
   resolveSessionRoleContext,
 } from "@/shared/lib/tenant-rbac";
 import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
-import { hasPermission } from "@/modules/tenant-admin/lib/tenant-permissions";
+import { hasPermission, usePermissionMatrixVersion, type PermissionAction } from "@/modules/tenant-admin/lib/tenant-permissions";
 import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-profile-menu";
 
 export function TenantLayout() {
@@ -36,6 +37,7 @@ export function TenantLayout() {
   const { data: users } = useTenantUsers(tenant.id);
   const { data: roles } = useTenantRoles(tenant.id);
   const { data: rolePermissions } = useTenantRolePermissions(tenant.id);
+  usePermissionMatrixVersion();
   const bookingFocused = location.pathname.includes("/bookings");
   // No preview mode anymore. The active role is the logged-in user's role,
   // resolved by matching session.actorName against tenant users.
@@ -49,155 +51,165 @@ export function TenantLayout() {
 
   const tenantNav = [
     { to: paths.dashboard, label: "Dashboard", icon: LayoutDashboard, pageCode: "TENANT_DASHBOARD" },
-    // Administration is the tenant governance module. Visible only when the
-    // active role explicitly has the ADMIN module (or is the system Tenant
-    // Admin role, which bypasses all RBAC).
-    ...(activeRole && ((activeRole.moduleCodes ?? []).includes("ADMIN") || activeRole.id.endsWith("-tenant-admin") || activeRole.name.toLowerCase() === "tenant admin")
-      ? [
-          {
-            label: "Administration",
-            icon: Boxes,
-            children: [
+    // Administration covers tenant governance (hierarchy, users, roles) AND
+    // all booking onboarding/setup data (master data, rules, LR config).
+    // The group is shown when the role has ANY administration child granted
+    // — either the ADMIN module or any TMS setup feature.
+    ...(() => {
+      const adminModuleChildren: Array<ExplorerNavItem & { featureCode?: string }> =
+        activeRole && ((activeRole.moduleCodes ?? []).includes("ADMIN") || activeRole.id.endsWith("-tenant-admin") || activeRole.name.toLowerCase() === "tenant admin")
+          ? [
               { to: paths.hierarchy, label: "Hierarchy Setup", icon: Building2, pageCode: "HIERARCHY" },
               { to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" },
               { to: paths.users, label: "Users", icon: Users, pageCode: "USERS" },
               { to: paths.roles, label: "Roles", icon: ShieldCheck, pageCode: "ROLES" },
               { to: paths.rolePermissions, label: "Role Permissions", icon: ShieldCheck, pageCode: "ROLE_PERMISSIONS" },
-            ],
-          },
-        ]
-      : []),
-    // Booking sidebar groups respect role permissions at the feature level.
-    // A user with only Booking Dashboard view permission MUST NOT see
-    // Customers / Vendors / LR Config / etc. — module-level access is not
-    // sufficient.
+            ]
+          : [];
+
+      const setupChildren: Array<ExplorerNavItem & { featureCode?: string }> = tenant.enabledModuleCodes.includes("TMS")
+        ? [
+            { to: paths.customers, label: "Customers", icon: Users, pageCode: "CUSTOMERS", featureCode: "CUSTOMERS" },
+            { to: paths.vendors, label: "Vendors", icon: Truck, pageCode: "VENDORS", featureCode: "VENDORS" },
+            { to: paths.vehicleTypes, label: "Vehicle Types", icon: Truck, pageCode: "VEHICLE_TYPES", featureCode: "VEHICLE_TYPES" },
+            { to: paths.materials, label: "Materials", icon: Boxes, pageCode: "MATERIALS", featureCode: "MATERIALS" },
+            { to: paths.uomConfig, label: "UOM", icon: Boxes, pageCode: "UOM_CONFIG", featureCode: "UOM" },
+            { to: paths.addressBook, label: "Address Book", icon: Building2, pageCode: "ADDRESS_BOOK", featureCode: "ADDRESS_BOOK" },
+            { to: paths.lrConfig, label: "LR Configuration", icon: ShieldCheck, pageCode: "LR_CONFIG", featureCode: "LR_CONFIGURATION" },
+            { to: paths.assignmentRules, label: "Assignment Rules", icon: ShieldCheck, pageCode: "ASSIGNMENT_RULES", featureCode: "ASSIGNMENT_RULES" },
+            { to: paths.documentRules, label: "Document Rules", icon: ShieldCheck, pageCode: "DOCUMENT_RULES", featureCode: "DOCUMENT_RULES" },
+            { to: paths.podRules, label: "POD Rules", icon: ShieldCheck, pageCode: "POD_RULES", featureCode: "POD_RULES" },
+          ].filter((item) => !item.featureCode || hasPermission(activeRole, "TMS", item.featureCode, "view"))
+        : [];
+
+      const administrationChildren = [...adminModuleChildren, ...setupChildren];
+      if (administrationChildren.length === 0) return [];
+      return [{ label: "Administration", icon: Boxes, children: administrationChildren }];
+    })(),
+    // Booking group contains operational workflows only. Setup/master data
+    // lives under Administration above.
     ...(() => {
-      // Tenant must have Booking (TMS) module enabled. Cheap pre-filter.
       if (!tenant.enabledModuleCodes.includes("TMS")) return [];
 
-      // Setup-only feature codes (Setup Overview itself doesn't have its own
-      // permission — it shows when any of these is granted).
-      const SETUP_FEATURE_CODES = [
-        "CUSTOMERS",
-        "VENDORS",
-        "VEHICLE_TYPES",
-        "MATERIALS",
-        "UOM",
-        "ADDRESS_BOOK",
-        "LR_CONFIGURATION",
-        "ASSIGNMENT_RULES",
-        "DOCUMENT_RULES",
-        "POD_RULES",
-      ];
-      const hasAnySetup = SETUP_FEATURE_CODES.some((code) => hasPermission(activeRole, "TMS", code, "view"));
-
-      const bookingSetupChildren: Array<ExplorerNavItem & { featureCode?: string }> = [
-        ...(hasAnySetup
-          ? [{ to: paths.bookingSetup, label: "Setup Overview", icon: Boxes, pageCode: "BOOKING_SETUP" }]
-          : []),
-        { to: paths.customers, label: "Customers", icon: Users, pageCode: "CUSTOMERS", featureCode: "CUSTOMERS" },
-        { to: paths.vendors, label: "Vendors", icon: Truck, pageCode: "VENDORS", featureCode: "VENDORS" },
-        { to: paths.vehicleTypes, label: "Vehicle Types", icon: Truck, pageCode: "VEHICLE_TYPES", featureCode: "VEHICLE_TYPES" },
-        { to: paths.materials, label: "Materials", icon: Boxes, pageCode: "MATERIALS", featureCode: "MATERIALS" },
-        { to: paths.uomConfig, label: "UOM", icon: Boxes, pageCode: "UOM_CONFIG", featureCode: "UOM" },
-        { to: paths.addressBook, label: "Address Book", icon: Building2, pageCode: "ADDRESS_BOOK", featureCode: "ADDRESS_BOOK" },
-        { to: paths.lrConfig, label: "LR Configuration", icon: ShieldCheck, pageCode: "LR_CONFIG", featureCode: "LR_CONFIGURATION" },
-        { to: paths.assignmentRules, label: "Assignment Rules", icon: ShieldCheck, pageCode: "ASSIGNMENT_RULES", featureCode: "ASSIGNMENT_RULES" },
-        { to: paths.documentRules, label: "Document Rules", icon: ShieldCheck, pageCode: "DOCUMENT_RULES", featureCode: "DOCUMENT_RULES" },
-        { to: paths.podRules, label: "POD Rules", icon: ShieldCheck, pageCode: "POD_RULES", featureCode: "POD_RULES" },
-      ].filter((item) => !item.featureCode || hasPermission(activeRole, "TMS", item.featureCode, "view"));
-
-      const bookingOpsChildren: Array<ExplorerNavItem & { featureCode: string }> = [
+      const bookingOpsChildren: Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }> = ([
         { to: paths.bookings, label: "Booking Dashboard", icon: Truck, pageCode: "BOOKING_LIST", featureCode: "BOOKING_DASHBOARD" },
+        { to: paths.createBooking, label: "Create Booking", icon: Plus, pageCode: "CREATE_BOOKING", featureCode: "CREATE_BOOKING", action: "create" as PermissionAction },
         { to: paths.assignment, label: "Booking Assignment", icon: Truck, pageCode: "ASSIGNMENT_QUEUE", featureCode: "BOOKING_ASSIGNMENT" },
-        { to: paths.completed, label: "Shipment Documents", icon: Truck, pageCode: "COMPLETED_BOOKINGS", featureCode: "SHIPMENT_DOCUMENTS" },
-        { to: `${paths.root}/lr`, label: "LR Management", icon: ShieldCheck, pageCode: "LR_DASHBOARD", featureCode: "LR_MANAGEMENT" },
-        { to: paths.liveTracking, label: "POD", icon: ShieldCheck, pageCode: "LIVE_TRACKING", featureCode: "POD" },
-        { to: paths.bookings, label: "Reports", icon: ShieldCheck, pageCode: "BOOKING_LIST", featureCode: "BOOKING_REPORTS" },
-      ].filter((item) => hasPermission(activeRole, "TMS", item.featureCode, "view"));
+        { to: `${paths.root}/shipment-documents`, label: "Shipment Documents", icon: Truck, pageCode: "SHIPMENT_DOCUMENTS", featureCode: "SHIPMENT_DOCUMENTS" },
+        { to: paths.completed, label: "POD", icon: ShieldCheck, pageCode: "COMPLETED_BOOKINGS", featureCode: "POD" },
+      ] as Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }>).filter((item) => hasPermission(activeRole, "TMS", item.featureCode, item.action ?? "view"));
 
-      const groups: ExplorerNavItem[] = [];
-      if (bookingSetupChildren.length > 0) groups.push({ label: "Booking Setup", icon: Boxes, children: bookingSetupChildren });
-      if (bookingOpsChildren.length > 0) groups.push({ label: "Booking Operations", icon: Truck, children: bookingOpsChildren });
-      return groups;
+      if (bookingOpsChildren.length === 0) return [];
+      return [{ label: "Booking", icon: Truck, children: bookingOpsChildren }];
     })(),
+    // External module portals — exposed as sidebar entries when the tenant
+    // has the module enabled AND the role has view permission for at least
+    // one feature inside it.
+    //
+    // Two modes:
+    //   - `external` portals (Driver App, Track and Trace, Customer Portal)
+    //     navigate into their standalone app at its own URL prefix.
+    //   - `embedded` portals (Vendor, Fleet, Auction) stay inside the
+    //     platform-admin tenant workspace via /platform-admin/tenant/.../<path>
+    //     so the tenant sidebar/header remain visible.
     ...(() => {
       const groups: ExplorerNavItem[] = [];
+      const enabled = new Set(tenant.enabledModuleCodes);
 
-      if (activeRole && canAccessTenantPath({
-        tenant,
-        pathname: "/fleet/dashboard",
-        role: activeRole,
-        rolePermissions,
-      }).allowed) {
-        groups.push({
-          label: "Fleet Management",
-          icon: Truck,
-          children: [
-            { to: "/fleet/dashboard", label: "Fleet Dashboard", icon: Truck, pageCode: "FLEET_DASHBOARD" },
-          ],
-        });
-      }
+      type ExternalPortal = {
+        mode: "external";
+        moduleCode: string;
+        label: string;
+        icon: typeof Truck;
+        children: Array<{ label: string; featureCode: string; to: string; icon: typeof Truck }>;
+      };
+      type EmbeddedPortal = {
+        mode: "embedded";
+        moduleCode: string;
+        label: string;
+        icon: typeof Truck;
+        gateFeatureCode: string;
+        tenantPath: string;
+      };
 
-      if (activeRole && canAccessTenantPath({
-        tenant,
-        pathname: "/auction/dashboard",
-        role: activeRole,
-        rolePermissions,
-      }).allowed) {
-        groups.push({
-          label: "Auction",
+      // Order matches the business-flow sequence the tenant should see:
+      // Auction → Tracking → Vendor → Fleet → Customer.
+      // (Driver App is intentionally not surfaced on the tenant sidebar
+      // because it's a driver-facing app, not a tenant-admin workspace.
+      // Its routes, permissions, and module catalog entry stay intact.)
+      const portals: Array<ExternalPortal | EmbeddedPortal> = [
+        {
+          mode: "embedded",
+          moduleCode: "AUCTION",
+          label: "Auction / AMS",
           icon: Gavel,
-          children: [
-            { to: "/auction/dashboard", label: "Auction Dashboard", icon: Gavel, pageCode: "AUCTION_DASHBOARD" },
-          ],
-        });
-      }
-
-      if (activeRole && canAccessTenantPath({
-        tenant,
-        pathname: "/vendor",
-        role: activeRole,
-        rolePermissions,
-      }).allowed) {
-        groups.push({
-          label: "Vendor App",
-          icon: Users,
-          children: [
-            { to: "/vendor", label: "Vendor Dashboard", icon: Users, pageCode: "VENDOR_DASHBOARD" },
-          ],
-        });
-      }
-
-      if (currentTenantUser?.userType === "CUSTOMER" && activeRole && canAccessTenantPath({
-        tenant,
-        pathname: "/customer",
-        role: activeRole,
-        rolePermissions,
-      }).allowed) {
-        groups.push({
-          label: "Customer Dashboard",
-          icon: UserCog,
-          children: [
-            { to: "/customer", label: "Customer Dashboard", icon: UserCog, pageCode: "CUSTOMER_DASHBOARD" },
-          ],
-        });
-      }
-
-      if (activeRole && canAccessTenantPath({
-        tenant,
-        pathname: "/tracking",
-        role: activeRole,
-        rolePermissions,
-      }).allowed) {
-        groups.push({
+          gateFeatureCode: "AUCTION_DASHBOARD",
+          tenantPath: paths.auctionAms,
+        },
+        {
+          mode: "external",
+          moduleCode: "TRACKING",
           label: "Track and Trace",
           icon: MapPin,
           children: [
-            { to: "/tracking", label: "Tracking Dashboard", icon: MapPin, pageCode: "TRACKING_DASHBOARD" },
+            { label: "Tracking Dashboard", featureCode: "TRACKING_DASHBOARD", to: `${paths.trackAndTrace}/dashboard`, icon: MapPin },
+            { label: "Active Trips", featureCode: "TRACKING_TRIPS", to: `${paths.trackAndTrace}/trips`, icon: Truck },
+            { label: "Live Map", featureCode: "TRACKING_LIVE_MAP", to: `${paths.trackAndTrace}/live-map`, icon: MapPin },
+            { label: "Alerts", featureCode: "TRACKING_ALERTS", to: `${paths.trackAndTrace}/alerts`, icon: ShieldCheck },
+            { label: "Geofences", featureCode: "TRACKING_GEOFENCES", to: `${paths.trackAndTrace}/geofences`, icon: MapPin },
+            { label: "Analytics", featureCode: "TRACKING_ANALYTICS", to: `${paths.trackAndTrace}/analytics`, icon: ShieldCheck },
           ],
+        },
+        {
+          mode: "embedded",
+          moduleCode: "VENDOR",
+          label: "Vendor Portal",
+          icon: Users,
+          gateFeatureCode: "VENDOR_DASHBOARD",
+          tenantPath: paths.vendorPortal,
+        },
+        {
+          mode: "embedded",
+          moduleCode: "FLEET",
+          label: "Fleet Management",
+          icon: Truck,
+          gateFeatureCode: "FLEET_DASHBOARD",
+          tenantPath: paths.fleetManagement,
+        },
+        {
+          mode: "embedded",
+          moduleCode: "CUSTOMER",
+          label: "Customer Portal",
+          icon: UserCog,
+          gateFeatureCode: "CUSTOMER_DASHBOARD",
+          tenantPath: paths.customerPortal,
+        },
+      ];
+
+      portals.forEach((portal) => {
+        if (!enabled.has(portal.moduleCode)) return;
+        if (portal.mode === "external") {
+          const allowedChildren = portal.children.filter((child) =>
+            hasPermission(activeRole, portal.moduleCode, child.featureCode, "view"),
+          );
+          if (allowedChildren.length === 0) return;
+          groups.push({
+            label: portal.label,
+            icon: portal.icon,
+            children: allowedChildren,
+          });
+          return;
+        }
+        // embedded — single tenant-route leaf, gated by the module's
+        // dashboard view permission so it never escapes the tenant shell.
+        if (!hasPermission(activeRole, portal.moduleCode, portal.gateFeatureCode, "view")) return;
+        groups.push({
+          to: portal.tenantPath,
+          label: portal.label,
+          icon: portal.icon,
+          pageCode: `${portal.moduleCode}_EMBEDDED`,
         });
-      }
+      });
 
       return groups;
     })(),

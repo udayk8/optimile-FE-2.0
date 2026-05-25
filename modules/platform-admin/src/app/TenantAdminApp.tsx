@@ -25,6 +25,20 @@ import {
   TenantPodRulesPage,
 } from '../modules/tenant-admin/pages/booking-setup/booking-setup-pages'
 import { PermissionGate } from '../modules/tenant-admin/components/permission-gate'
+import { BookingListPage } from '../modules/tms/booking/BookingList'
+import { CreateBookingPage } from '../modules/tms/booking/CreateBooking'
+import { BookingDetailsPage } from '../modules/tms/booking/BookingDetails'
+import { BookingDocumentsPage } from '../modules/tms/booking/BookingDocumentsPage'
+import { BookingLRViewPage } from '../modules/tms/booking/BookingLRView'
+import { AssignmentQueuePage } from '../modules/tms/booking/AssignmentQueue'
+import { RateApprovalQueuePage } from '../modules/tms/booking/RateApprovalQueue'
+import { LiveTrackingPlaceholderPage, PODCompletedPage } from '../modules/tms/booking/BookingSupportPages'
+import { ShipmentDocumentsListPage, BookingReportsPage } from '../modules/tenant-admin/pages/booking-stubs/booking-stub-pages'
+import { FleetManagementLandingPage } from '../modules/tenant-admin/pages/embedded-modules/embedded-module-pages'
+import { VendorEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/vendor-embedded'
+import { AuctionEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/auction-embedded'
+import { CustomerEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/customer-embedded'
+import { TrackingEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/tracking-embedded'
 
 type RouteMode = 'tenant-admin' | 'root-tenant'
 
@@ -128,16 +142,23 @@ function TenantAdminRoutes({
           <Route path="uom-config" element={<PermissionGate moduleCode="TMS" featureCode="UOM"><TenantUOMConfigurationPage /></PermissionGate>} />
           <Route path="lr-config" element={<PermissionGate moduleCode="TMS" featureCode="LR_CONFIGURATION"><TenantLRConfigPage /></PermissionGate>} />
           <Route path="lr" element={<PermissionGate moduleCode="TMS" featureCode="LR_MANAGEMENT"><TenantLrOperationsPage /></PermissionGate>} />
-          <Route path="bookings" element={<TenantBookingRedirect />} />
-          <Route path="bookings/create" element={<TenantBookingRedirect suffix="/create" />} />
-          <Route path="bookings/rate-approval" element={<TenantBookingRedirect suffix="/rate-approval" />} />
-          <Route path="bookings/assignment" element={<TenantBookingRedirect suffix="/assignment" />} />
-          <Route path="bookings/live-tracking" element={<TenantBookingRedirect suffix="/live-tracking" />} />
-          <Route path="bookings/completed" element={<TenantBookingRedirect suffix="/completed" />} />
-          <Route path="bookings/:bookingId/edit" element={<TenantBookingRedirect suffix="/edit" />} />
-          <Route path="bookings/:bookingId/documents" element={<TenantBookingRedirect suffix="/documents" />} />
-          <Route path="bookings/:bookingId/lr" element={<TenantBookingRedirect suffix="/lr" />} />
-          <Route path="bookings/:bookingId" element={<TenantBookingRedirect />} />
+          <Route path="bookings" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingListPage /></PermissionGate>} />
+          <Route path="bookings/create" element={<PermissionGate moduleCode="TMS" featureCode="CREATE_BOOKING" action="create"><CreateBookingPage /></PermissionGate>} />
+          <Route path="bookings/rate-approval" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_ASSIGNMENT"><RateApprovalQueuePage /></PermissionGate>} />
+          <Route path="bookings/assignment" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_ASSIGNMENT"><AssignmentQueuePage /></PermissionGate>} />
+          <Route path="bookings/live-tracking" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><LiveTrackingPlaceholderPage /></PermissionGate>} />
+          <Route path="bookings/completed" element={<PermissionGate moduleCode="TMS" featureCode="POD"><PODCompletedPage /></PermissionGate>} />
+          <Route path="bookings/:bookingId/edit" element={<PermissionGate moduleCode="TMS" featureCode="CREATE_BOOKING" action="edit"><CreateBookingPage /></PermissionGate>} />
+          <Route path="bookings/:bookingId/documents" element={<PermissionGate moduleCode="TMS" featureCode="SHIPMENT_DOCUMENTS"><BookingDocumentsPage /></PermissionGate>} />
+          <Route path="bookings/:bookingId/lr" element={<PermissionGate moduleCode="TMS" featureCode="LR_MANAGEMENT"><BookingLRViewPage /></PermissionGate>} />
+          <Route path="bookings/:bookingId" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingDetailsPage /></PermissionGate>} />
+          <Route path="shipment-documents" element={<PermissionGate moduleCode="TMS" featureCode="SHIPMENT_DOCUMENTS"><ShipmentDocumentsListPage /></PermissionGate>} />
+          <Route path="booking-reports" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_REPORTS"><BookingReportsPage /></PermissionGate>} />
+          <Route path="vendor-portal/*" element={<PermissionGate moduleCode="VENDOR" featureCode="VENDOR_DASHBOARD"><VendorEmbeddedApp /></PermissionGate>} />
+          <Route path="fleet-management" element={<PermissionGate moduleCode="FLEET" featureCode="FLEET_DASHBOARD"><FleetManagementLandingPage /></PermissionGate>} />
+          <Route path="auction-ams/*" element={<PermissionGate moduleCode="AUCTION" featureCode="AUCTION_DASHBOARD"><AuctionEmbeddedApp /></PermissionGate>} />
+          <Route path="customer-portal" element={<PermissionGate moduleCode="CUSTOMER" featureCode="CUSTOMER_DASHBOARD"><CustomerEmbeddedApp /></PermissionGate>} />
+          <Route path="track-and-trace/*" element={<PermissionGate moduleCode="TRACKING" featureCode="TRACKING_DASHBOARD"><TrackingEmbeddedApp /></PermissionGate>} />
           <Route path="modules" element={<TenantModulesPage />} />
           <Route path="booking-setup" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingSetupOverviewPage /></PermissionGate>} />
           <Route path="address-book" element={<PermissionGate moduleCode="TMS" featureCode="ADDRESS_BOOK"><TenantAddressBookPage /></PermissionGate>} />

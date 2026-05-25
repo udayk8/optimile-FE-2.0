@@ -148,7 +148,7 @@ const pageMeta: Record<TrackTracePageKey, { label: string; description: string }
   geofences: { label: 'Geofences', description: 'Create and manage active geofence coverage for operational route controls.' },
 }
 
-export function TrackTraceLayout() {
+export function TrackTraceLayout({ embedded = false }: { embedded?: boolean } = {}) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [sidebarExpanded, setSidebarExpanded] = useState(true)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
@@ -158,6 +158,18 @@ export function TrackTraceLayout() {
   const { logout, user } = useAuth()
   const sidebarWidth = sidebarExpanded ? 'lg:w-80' : 'lg:w-20'
   const mainOffset = sidebarExpanded ? 'lg:pl-80' : 'lg:pl-20'
+
+  if (embedded) {
+    return (
+      <div className="bg-background text-text">
+        <main className="space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+          <TrackTraceAccessBoundary page={currentPage}>
+            <Outlet />
+          </TrackTraceAccessBoundary>
+        </main>
+      </div>
+    )
+  }
 
   const visibleSections = useMemo(
     () =>

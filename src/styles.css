@@ -46,6 +46,11 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Bump the root font size so every rem-based Tailwind text/spacing
+       class scales up uniformly across admin + booking + every shell.
+       16px (Tailwind default) -> 17.5px feels noticeably larger without
+       wrecking dense grids/tables. */
+    font-size: 17.5px;
   }
 
   body {

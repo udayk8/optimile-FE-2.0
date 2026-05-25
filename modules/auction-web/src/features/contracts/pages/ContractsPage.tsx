@@ -6,9 +6,11 @@ import { Input } from '@auction/components/ui/input'
 import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { useAppStore } from '@auction/stores/app.store'
+import { useAuctionPath } from '@auction/lib/auctionPath'
 
 export default function ContractsPage() {
   const { id } = useParams()
+  const ap = useAuctionPath()
   const { contracts } = useAppStore()
   const [search, setSearch] = useState('')
   const selectedContract = contracts.find((item) => item.id === id) ?? contracts[0]
@@ -43,7 +45,7 @@ export default function ContractsPage() {
             {filteredContracts.map((contract) => (
               <Link
                 key={contract.id}
-                to={`/auction/contracts/${contract.id}`}
+                to={ap(`/contracts/${contract.id}`)}
                 className={`block rounded-xl border p-4 transition hover:bg-[#F8FAFC] ${
                   contract.id === selectedContract?.id ? 'border-[#93C5FD] bg-[#EFF6FF]' : 'border-[#E5E7EB]'
                 }`}

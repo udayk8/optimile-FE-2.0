@@ -249,7 +249,7 @@ export function TenantAutoLRConfigPage() {
                   }))}
                   disabled={!canEdit}
                 >
-                  <option value="TENANT">{currentLevelLabel} only</option>
+                  <option value="TENANT">{currentLevelLabel}</option>
                   {availableTargetLevels.map((level) => <option key={level.id} value={level.id}>Up to {level.name}</option>)}
                 </Select>
               </Field>

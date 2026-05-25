@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAppStore } from '@auction/stores/app.store'
+import { useAuctionPath } from '@auction/lib/auctionPath'
 import type { AuctionType } from '@auction/types'
 
 type DraftLane = {
@@ -98,6 +99,7 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
 export default function AuctionCreatePage() {
   const { type } = useParams()
   const navigate = useNavigate()
+  const ap = useAuctionPath()
   const auctionType = ((type?.toUpperCase() ?? '') || '') as AuctionType
   const effectiveType: AuctionType | '' = ['SPOT', 'BULK', 'LOT'].includes(auctionType) ? auctionType : ''
   const { createAuction, bookings, vendors } = useAppStore()
@@ -204,7 +206,7 @@ export default function AuctionCreatePage() {
     })
 
     toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
-    navigate(`/auction/auctions/${newAuctionId}`)
+    navigate(ap(`/auctions/${newAuctionId}`))
   }
 
   return (
@@ -229,7 +231,7 @@ export default function AuctionCreatePage() {
                     key={item}
                     type="button"
                     variant={effectiveType === item ? 'default' : 'outline'}
-                    onClick={() => navigate(`/auction/auctions/new/${item.toLowerCase()}`)}
+                    onClick={() => navigate(ap(`/auctions/new/${item.toLowerCase()}`))}
                   >
                     {item}
                   </Button>

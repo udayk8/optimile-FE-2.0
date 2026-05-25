@@ -127,6 +127,7 @@ export function CreateBookingPage() {
   const paths = useBookingPaths();
   const access = useTenantAccess();
   const isEditMode = Boolean(bookingId);
+  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
   const { getBookingById, createBooking, updateBooking } = useTenantBookings(tenant.id);
   const { createAddress } = useTenantCustomers(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
@@ -698,6 +699,19 @@ export function CreateBookingPage() {
       statusTimeline: audit.statusTimeline,
     });
     navigate(paths.booking(created.id));
+  }
+
+  if (!isEditMode && !canCreateBooking) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow="TMS" title="Access Denied" description="You do not have permission to create bookings." />
+        <TenantPanel title="Create Booking is disabled for your role">
+          <Button asChild>
+            <Link to={paths.bookings}>Back to Booking Dashboard</Link>
+          </Button>
+        </TenantPanel>
+      </div>
+    );
   }
 
   if (isEditMode && editingBooking && !getBookingEditability(editingBooking.status)) {

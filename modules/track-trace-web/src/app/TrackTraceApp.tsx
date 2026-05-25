@@ -5,11 +5,11 @@ import { TrackingRoutes } from '@track-trace/routes/trackingRoutes'
 import { TrackingStoreProvider } from '@track-trace/store/trackingStore'
 import '../styles/global.css'
 
-export default function TrackTraceApp({ standalone = false }: { standalone?: boolean }) {
+export default function TrackTraceApp({ standalone = false, embedded = false }: { standalone?: boolean; embedded?: boolean }) {
   const routes = (
     <TrackTraceAccessProvider>
       <TrackingStoreProvider>
-        <TrackingRoutes />
+        <TrackingRoutes embedded={embedded} />
       </TrackingStoreProvider>
     </TrackTraceAccessProvider>
   )

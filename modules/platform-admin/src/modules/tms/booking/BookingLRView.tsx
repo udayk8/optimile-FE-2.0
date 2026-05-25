@@ -5,9 +5,9 @@ import { PageHeader } from "@/shared/components/common/page-header";
 import { TenantEmptyState, TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
 import { Button } from "@/shared/components/ui/button";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantLrs } from "@/modules/tms/booking/hooks/useTenantLrs";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantLrs } from "./hooks/useTenantLrs";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import { normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
 import {
   ensureShipmentDocuments,

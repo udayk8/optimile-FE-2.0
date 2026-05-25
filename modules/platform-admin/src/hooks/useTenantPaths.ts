@@ -53,6 +53,11 @@ export function useTenantPaths() {
     driverTrip: (id: string) => `${root}/driver-app/trips/${id}`,
     driverIncidents: `${root}/driver-app/incidents`,
     driverProfile: `${root}/driver-app/profile`,
+    vendorPortal: `${root}/vendor-portal`,
+    fleetManagement: `${root}/fleet-management`,
+    auctionAms: `${root}/auction-ams`,
+    customerPortal: `${root}/customer-portal`,
+    trackAndTrace: `${root}/track-and-trace`,
   };
 }
 

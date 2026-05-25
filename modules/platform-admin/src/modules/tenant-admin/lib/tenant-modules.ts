@@ -59,12 +59,33 @@ const BOOKING_FEATURES: TenantModuleFeature[] = [
   { code: "BOOKING_REPORTS", name: "Booking Reports" },
 ];
 
+// Feature lists below are derived from each module's real folder pages.
+// See modules/<module-folder>/src/router or src/app/manifest for the
+// canonical route list. Adding a new feature code here only makes it
+// available in Role Permissions — wiring the actual page is the owning
+// module's responsibility.
+
 const FLEET_FEATURES: TenantModuleFeature[] = [
   { code: "FLEET_DASHBOARD", name: "Fleet Dashboard" },
+  { code: "FLEET_OPS_INTEL", name: "Ops Intelligence" },
+  { code: "FLEET_EXCEPTIONS", name: "Exception Center" },
+  { code: "FLEET_LIVE_MAP", name: "Live Map" },
+  { code: "FLEET_DISPATCH", name: "Dispatch" },
+  { code: "FLEET_VEHICLES", name: "Vehicles" },
+  { code: "FLEET_DRIVERS", name: "Drivers" },
+  { code: "FLEET_COMPLIANCE", name: "Compliance" },
+  { code: "FLEET_MAINTENANCE", name: "Maintenance" },
+  { code: "FLEET_GARAGE", name: "Garage" },
+  { code: "FLEET_TYRES", name: "Tyres" },
+  { code: "FLEET_FUEL", name: "Fuel" },
+  { code: "FLEET_COST", name: "Cost Health" },
+  { code: "FLEET_SETTINGS", name: "Fleet Settings" },
 ];
 
 const AUCTION_FEATURES: TenantModuleFeature[] = [
   { code: "AUCTION_DASHBOARD", name: "Auction Dashboard" },
+  { code: "AUCTION_AUCTIONS", name: "Auctions" },
+  { code: "AUCTION_CONTRACTS", name: "Contracts" },
 ];
 
 const CUSTOMER_FEATURES: TenantModuleFeature[] = [
@@ -73,10 +94,34 @@ const CUSTOMER_FEATURES: TenantModuleFeature[] = [
 
 const VENDOR_FEATURES: TenantModuleFeature[] = [
   { code: "VENDOR_DASHBOARD", name: "Vendor Dashboard" },
+  { code: "VENDOR_TRIPS", name: "Vendor Trips" },
+  { code: "VENDOR_SOURCING", name: "Sourcing" },
+  { code: "VENDOR_CONTRACTS", name: "Vendor Contracts" },
+  { code: "VENDOR_INVOICES", name: "Invoices" },
+  { code: "VENDOR_LEDGER", name: "Ledger" },
+  { code: "VENDOR_PAYMENTS", name: "Payments" },
+  { code: "VENDOR_FLEET", name: "Vendor Fleet" },
+  { code: "VENDOR_SUPPORT", name: "Vendor Support" },
 ];
 
 const TRACKING_FEATURES: TenantModuleFeature[] = [
-  { code: "TRACKING_DASHBOARD", name: "Track and Trace Dashboard" },
+  { code: "TRACKING_DASHBOARD", name: "Tracking Dashboard" },
+  { code: "TRACKING_TRIPS", name: "Active Trips" },
+  { code: "TRACKING_LIVE_MAP", name: "Live Map" },
+  { code: "TRACKING_ALERTS", name: "Alerts" },
+  { code: "TRACKING_GEOFENCES", name: "Geofences" },
+  { code: "TRACKING_ANALYTICS", name: "Analytics" },
+];
+
+const DRIVER_APP_FEATURES: TenantModuleFeature[] = [
+  { code: "DRIVER_DASHBOARD", name: "Driver Dashboard" },
+  { code: "DRIVER_TRIPS", name: "My Trips" },
+  { code: "DRIVER_POD", name: "Capture POD" },
+  { code: "DRIVER_DOCUMENTS", name: "Driver Documents" },
+  { code: "DRIVER_POI", name: "Points of Interest" },
+  { code: "DRIVER_FUEL_EXPENSES", name: "Fuel & Expenses" },
+  { code: "DRIVER_INCIDENTS", name: "Incidents" },
+  { code: "DRIVER_PROFILE", name: "Driver Profile" },
 ];
 
 const PLATFORM_MODULE_FEATURES: Record<string, TenantModuleFeature[]> = {
@@ -86,6 +131,7 @@ const PLATFORM_MODULE_FEATURES: Record<string, TenantModuleFeature[]> = {
   CUSTOMER: CUSTOMER_FEATURES,
   VENDOR: VENDOR_FEATURES,
   TRACKING: TRACKING_FEATURES,
+  DRIVER_APP: DRIVER_APP_FEATURES,
 };
 
 export function getTenantAdminModule(): TenantModuleEntry {

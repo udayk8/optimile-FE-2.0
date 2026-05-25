@@ -8,9 +8,10 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
+import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import { formatCurrency } from "@/shared/lib/format-currency";
 import {
   buildAddressLookup,
@@ -42,6 +43,8 @@ export function BookingListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant } = useTenantRouteContext();
+  const access = useTenantAccess();
+  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
   const { data: bookings } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
   const [search, setSearch] = useState("");
@@ -156,12 +159,14 @@ export function BookingListPage() {
         title="Booking Dashboard"
         description="Compact state-first workspace with short previews and a bounded full list."
         action={
-          <Button asChild>
-            <Link to={`/tenant/${tenant.id}/bookings/create`}>
-              <Plus className="size-4" />
-              Create Booking
-            </Link>
-          </Button>
+          canCreateBooking ? (
+            <Button asChild>
+              <Link to={`/tenant/${tenant.id}/bookings/create`}>
+                <Plus className="size-4" />
+                Create Booking
+              </Link>
+            </Button>
+          ) : null
         }
       />
 

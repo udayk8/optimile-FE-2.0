@@ -8,6 +8,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { useTenantRouteContext } from "@tms-booking/modules/tenant-admin/hooks/useTenantRouteContext";
+import { useTenantAccess } from "@tms-booking/modules/tenant-admin/hooks/useTenantAccess";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
 import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
 import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
@@ -43,6 +44,8 @@ export function BookingListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { tenant } = useTenantRouteContext();
+  const access = useTenantAccess();
+  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
   const paths = useBookingPaths();
   const { data: bookings } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
@@ -158,12 +161,14 @@ export function BookingListPage() {
         title="Booking Dashboard"
         description="Compact state-first workspace with short previews and a bounded full list."
         action={
-          <Button asChild>
-            <Link to={paths.createBooking}>
-              <Plus className="size-4" />
-              Create Booking
-            </Link>
-          </Button>
+          canCreateBooking ? (
+            <Button asChild>
+              <Link to={paths.createBooking}>
+                <Plus className="size-4" />
+                Create Booking
+              </Link>
+            </Button>
+          ) : null
         }
       />
 

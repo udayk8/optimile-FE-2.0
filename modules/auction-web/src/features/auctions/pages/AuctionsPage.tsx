@@ -9,12 +9,14 @@ import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { SLACountdown } from '@auction/components/shared/SLACountdown'
 import { formatDateTime } from '@auction/lib/date-utils'
 import { useAppStore } from '@auction/stores/app.store'
+import { useAuctionPath } from '@auction/lib/auctionPath'
 
 const STATUS_FILTERS = ['ALL', 'DRAFT', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
 const TYPE_FILTERS = ['ALL', 'SPOT', 'BULK', 'LOT'] as const
 
 export default function AuctionsPage() {
   const navigate = useNavigate()
+  const ap = useAuctionPath()
   const { auctions } = useAppStore()
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('ALL')
   const [typeFilter, setTypeFilter] = useState<(typeof TYPE_FILTERS)[number]>('ALL')
@@ -44,7 +46,7 @@ export default function AuctionsPage() {
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
           <Button asChild>
-            <Link to="/auction/auctions/new"><PlusCircle className="h-4 w-4" /> New Auction</Link>
+            <Link to={ap('/auctions/new')}><PlusCircle className="h-4 w-4" /> New Auction</Link>
           </Button>
         }
       />
@@ -95,7 +97,7 @@ export default function AuctionsPage() {
           {filteredAuctions.map((auction) => (
             <button
               key={auction.id}
-              onClick={() => navigate(`/auction/auctions/${auction.id}`)}
+              onClick={() => navigate(ap(`/auctions/${auction.id}`))}
               className="grid w-full gap-3 rounded-xl border border-[#E5E7EB] p-4 text-left transition hover:bg-[#F8FAFC] lg:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr_0.6fr_auto]"
             >
               <div>

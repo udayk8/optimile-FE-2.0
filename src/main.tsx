@@ -91,6 +91,12 @@ function LegacyTenantRedirect() {
   return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
 }
 
+function LegacyTmsBookingRedirect() {
+  const location = useLocation()
+  const nextPath = location.pathname.replace(/^\/tms\/booking\/tenant\//, '/platform-admin/tenant/')
+  return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
+}
+
 function TenantAdminLoginRedirect() {
   const location = useLocation()
   return <Navigate to={`/platform-admin/tenant-login${location.search}${location.hash}`} replace />
@@ -126,6 +132,7 @@ function HostRouter() {
             <Route path="/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTenantRedirect /></ProtectedRoute>} />
             <Route path="/tenant-admin/login" element={<TenantAdminLoginRedirect />} />
             <Route path="/tenant-admin/*" element={<Navigate to="/platform-admin/dashboard" replace />} />
+            <Route path="/tms/booking/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTmsBookingRedirect /></ProtectedRoute>} />
             <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms"><TmsBookingApp /></ProtectedRoute>} />
             <Route path="/driver-app/*" element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
 

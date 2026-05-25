@@ -3,14 +3,19 @@ import { CirclePlus, ClipboardList, FileDigit, Truck, Waypoints } from "lucide-r
 import { WorkspaceShell } from "../shared/workspace-shell";
 import { useTenantRouteContext } from "../../hooks/useTenantRouteContext";
 import { useBookingPaths } from "../../hooks/useBookingPaths";
+import { useTenantAccess } from "@tms-booking/modules/tenant-admin/hooks/useTenantAccess";
 
 export function BookingLayout() {
   const location = useLocation();
   const { tenant } = useTenantRouteContext();
   const paths = useBookingPaths();
+  const access = useTenantAccess();
+  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
 
   const bookingNav = [
-    { to: paths.createBooking, label: "Create Booking", icon: CirclePlus, matchMode: "exact" as const },
+    ...(canCreateBooking
+      ? [{ to: paths.createBooking, label: "Create Booking", icon: CirclePlus, matchMode: "exact" as const }]
+      : []),
     { to: paths.bookings, label: "Booking List", icon: ClipboardList, matchMode: "exact" as const },
     { to: paths.rateApproval, label: "Rate Approval Queue", icon: FileDigit, matchMode: "exact" as const },
     { to: paths.assignment, label: "Assignment Queue", icon: Truck, matchMode: "exact" as const },

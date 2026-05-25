@@ -27,7 +27,8 @@
       "Bash(node scripts/verify-role-perms.mjs)",
       "Bash(node scripts/verify-lr-root.mjs)",
       "Bash(npx --offline tsc -p tsconfig.json --noEmit)",
-      "Bash(grep -E \"lr-config|lr\\\\\\\\\\\\\\\\config\")"
+      "Bash(grep -E \"lr-config|lr\\\\\\\\\\\\\\\\config\")",
+      "WebFetch(domain:erp.optimile.co)"
     ]
   }
 }

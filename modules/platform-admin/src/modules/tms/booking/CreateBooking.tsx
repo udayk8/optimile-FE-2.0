@@ -13,8 +13,8 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { formatCurrency } from "@/shared/lib/format-currency";
 import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
-import { useBookingAdminSources } from "@/modules/tms/booking/hooks/useBookingAdminSources";
-import { useTenantBookings } from "@/modules/tms/booking/hooks/useTenantBookings";
+import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { useTenantBookings } from "./hooks/useTenantBookings";
 import {
   evaluateInitialBookingStatus,
   getBookingEditability,
@@ -125,6 +125,7 @@ export function CreateBookingPage() {
   const { tenant } = useTenantRouteContext();
   const access = useTenantAccess();
   const isEditMode = Boolean(bookingId);
+  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
   const { getBookingById, createBooking, updateBooking } = useTenantBookings(tenant.id);
   const { createAddress } = useTenantCustomers(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
@@ -698,6 +699,19 @@ export function CreateBookingPage() {
     navigate(`/tenant/${tenant.id}/bookings/${created.id}`);
   }
 
+  if (!isEditMode && !canCreateBooking) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow="TMS" title="Access Denied" description="You do not have permission to create bookings." />
+        <TenantPanel title="Create Booking is disabled for your role">
+          <Button asChild>
+            <Link to={`/tenant/${tenant.id}/bookings`}>Back to Booking Dashboard</Link>
+          </Button>
+        </TenantPanel>
+      </div>
+    );
+  }
+
   if (isEditMode && editingBooking && !getBookingEditability(editingBooking.status)) {
     return (
       <div className="space-y-6">
@@ -712,38 +726,35 @@ export function CreateBookingPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-4 px-4 py-5 xl:px-6">
-      <PageHeader
-        eyebrow="TMS"
-        title={isEditMode ? "Edit Booking" : "Create Booking"}
-        description="Delivery-first booking flow with clearer pricing and sticky control summary."
-      />
+    <div className="-mx-4 -my-6 min-h-full bg-slate-50/70 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:py-7">
+      <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-3 text-slate-700">
+      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div> : null}
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div> : null}
-
-      <div className="sticky top-3 z-20 rounded-[28px] border border-white/80 bg-white/85 px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="sticky top-3 z-20 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700">TMS</p>
+            <h1 className="mt-0.5 text-lg font-semibold tracking-[-0.02em] text-slate-800">
+              {isEditMode ? "Edit Booking" : "Create Booking"}
+            </h1>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <Summary label="Customer" value={selectedCustomer?.name ?? "Select customer"} />
           <Summary label="Booking Type" value={draft.commercialType === "CONTRACT" ? "Contract" : "Spot"} />
-          <Summary label="Total Freight" value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"} />
-          <Summary label="No. of Deliveries" value={String(deliveryCount)} />
-        </div>
-      </div>
-
-      <div className="workspace-hero fancy-grid grid gap-4 px-5 py-5 xl:grid-cols-[1.1fr,0.9fr,0.8fr]">
-        <QuickStat label="Customer" value={selectedCustomer?.name ?? "Select customer"} tone="blue" />
-        <QuickStat label="Commercial Type" value={draft.commercialType === "CONTRACT" ? "Contract Pricing" : "Spot Pricing"} tone="indigo" />
-        <QuickStat
-          label="Pricing State"
-          value={
-            draft.commercialType === "SPOT"
-              ? "Ready to price"
-              : laneFound
+          <Summary
+            label="Pricing State"
+            value={
+              draft.commercialType === "SPOT"
                 ? "Ready to price"
-                : "Lane not mapped"
-          }
-          tone={draft.commercialType === "SPOT" || laneFound ? "emerald" : "amber"}
-        />
+                : laneFound
+                  ? "Ready to price"
+                  : "Lane not mapped"
+            }
+          />
+          <Summary label="Deliveries" value={String(deliveryCount)} />
+          <Summary label="Total Freight" value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"} />
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.45fr_0.55fr]">
@@ -754,7 +765,7 @@ export function CreateBookingPage() {
             </div>
           ) : null}
           <SectionCard title="Booking Basics">
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <Field label="Customer">
                 <Select value={draft.customerId} onChange={(event) => resetForCustomer(event.target.value)}>
                   <option value="">Select customer</option>
@@ -811,10 +822,7 @@ export function CreateBookingPage() {
 
           <SectionCard title="Deliveries">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold">Delivery Planner</p>
-                <p className="text-xs text-muted-foreground">Delivery 1 is ready. Route is captured only inside each delivery.</p>
-              </div>
+              <p className="text-sm text-muted-foreground">{deliveries.length} {deliveries.length === 1 ? "delivery" : "deliveries"} planned.</p>
               <Button type="button" size="sm" onClick={addDelivery}>+ Add Delivery</Button>
             </div>
             <div className="mt-3 space-y-3">
@@ -852,10 +860,10 @@ export function CreateBookingPage() {
                   !selectedDestinationAddress;
 
                 return (
-                  <div key={delivery.id} className="rounded-[26px] border border-white/80 bg-white/90 p-4 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
+                  <div key={delivery.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-950">Delivery {index + 1}</p>
+                        <p className="text-sm font-semibold text-slate-800">Delivery {index + 1}</p>
                         <p className="mt-1 text-sm text-slate-600">{originName} â†’ {destinationName}</p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant={deliveryRateCards[index] ? "success" : "warning"}>{deliveryRateCards[index] ? "Rate matched" : "Rate open"}</Badge>
@@ -867,149 +875,146 @@ export function CreateBookingPage() {
                       ) : null}
                     </div>
 
-                    <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                      <Field label="Origin City">
-                        <Select value={delivery.originCity} onChange={(event) => handleDeliveryCityChange(index, "originCity", event.target.value)}>
-                          <option value="">Select city</option>
-                          {getUniqueAddressCities(
-                            customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                          ).map((city) => (
-                            <option key={city} value={city}>{city}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label="Origin Address">
-                        <Select
-                          value={delivery.originAddressId}
-                          onChange={(event) => handleAddressSelect(index, "originAddressId", event.target.value)}
-                          disabled={!delivery.originCity}
-                        >
-                          <option value="">
-                            {!delivery.originCity
-                              ? "Select city first"
-                              : getAddressesForCity(
-                                    customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                                    delivery.originCity,
-                                  ).length
-                                ? "Select origin address"
-                                : "No addresses found for this city"}
-                          </option>
-                          {getAddressesForCity(
-                            customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                            delivery.originCity,
-                          ).map((address) => (
-                            <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                    </div>
-
-                    <div className="mt-3 grid gap-3 xl:grid-cols-2">
-                      <Field label="Destination City">
-                        <Select value={delivery.destinationCity} onChange={(event) => handleDeliveryCityChange(index, "destinationCity", event.target.value)}>
-                          <option value="">Select city</option>
-                          {getUniqueAddressCities(
-                            customerAddresses
-                              .filter((address) => address.id !== delivery.originAddressId)
-                              .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                          ).map((city) => (
-                            <option key={city} value={city}>{city}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field
-                        label="Destination Address"
-                        helper={
-                          isRateBasisFallbackActive
-                            ? "Optional for now. Pricing uses city-to-city until the final consignee address is confirmed."
-                            : "Optional. Pick an existing customer address now, or confirm the exact consignee from invoice later."
-                        }
-                      >
-                        <Select
-                          value={delivery.destinationAddressId}
-                          onChange={(event) => handleAddressSelect(index, "destinationAddressId", event.target.value)}
-                          disabled={!delivery.destinationCity}
-                        >
-                          <option value="">
-                            {!delivery.destinationCity
-                              ? "Select city first"
-                              : getAddressesForCity(
-                                    customerAddresses
-                                      .filter((address) => address.id !== delivery.originAddressId)
-                                      .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                                    delivery.destinationCity,
-                                  ).length
-                                ? "Optional: select saved destination address"
-                                : "No addresses found for this city"}
-                          </option>
-                          {getAddressesForCity(
-                            customerAddresses
-                              .filter((address) => address.id !== delivery.originAddressId)
-                              .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                            delivery.destinationCity,
-                          ).map((address) => (
-                            <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
-                          ))}
-                        </Select>
-                        <div className="flex items-center justify-between gap-3">
-                          {!draft.customerId ? <p className="text-xs text-amber-700">Please select customer before adding address.</p> : <span />}
+                    <div className="mt-4 space-y-3">
+                      <SubBlock title="Route" tone="blue">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <Field label="Origin City">
+                            <Select value={delivery.originCity} onChange={(event) => handleDeliveryCityChange(index, "originCity", event.target.value)}>
+                              <option value="">Select city</option>
+                              {getUniqueAddressCities(
+                                customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                              ).map((city) => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                          <Field label="Origin Address">
+                            <Select
+                              value={delivery.originAddressId}
+                              onChange={(event) => handleAddressSelect(index, "originAddressId", event.target.value)}
+                              disabled={!delivery.originCity}
+                            >
+                              <option value="">
+                                {!delivery.originCity
+                                  ? "Select city first"
+                                  : getAddressesForCity(
+                                        customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                                        delivery.originCity,
+                                      ).length
+                                    ? "Select origin address"
+                                    : "No addresses found for this city"}
+                              </option>
+                              {getAddressesForCity(
+                                customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                                delivery.originCity,
+                              ).map((address) => (
+                                <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                          <Field label="Destination City">
+                            <Select value={delivery.destinationCity} onChange={(event) => handleDeliveryCityChange(index, "destinationCity", event.target.value)}>
+                              <option value="">Select city</option>
+                              {getUniqueAddressCities(
+                                customerAddresses
+                                  .filter((address) => address.id !== delivery.originAddressId)
+                                  .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                              ).map((city) => (
+                                <option key={city} value={city}>{city}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                          <Field
+                            label="Destination Address"
+                            helper={
+                              isRateBasisFallbackActive
+                                ? "Pricing uses city-to-city until the consignee is confirmed."
+                                : "Optional now; confirm from invoice later."
+                            }
+                          >
+                            <Select
+                              value={delivery.destinationAddressId}
+                              onChange={(event) => handleAddressSelect(index, "destinationAddressId", event.target.value)}
+                              disabled={!delivery.destinationCity}
+                            >
+                              <option value="">
+                                {!delivery.destinationCity
+                                  ? "Select city first"
+                                  : getAddressesForCity(
+                                        customerAddresses
+                                          .filter((address) => address.id !== delivery.originAddressId)
+                                          .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                                        delivery.destinationCity,
+                                      ).length
+                                    ? "Optional: select saved destination address"
+                                    : "No addresses found for this city"}
+                              </option>
+                              {getAddressesForCity(
+                                customerAddresses
+                                  .filter((address) => address.id !== delivery.originAddressId)
+                                  .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                                delivery.destinationCity,
+                              ).map((address) => (
+                                <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          {!draft.customerId ? (
+                            <p className="text-xs text-amber-700">Select customer before adding address.</p>
+                          ) : (
+                            <span className="text-xs text-slate-500">Lane: {laneLabel}</span>
+                          )}
                           <Button type="button" size="sm" variant="outline" onClick={() => openAddressDialog(index, "destinationAddressId")} disabled={!draft.customerId}>
                             + Add Address
                           </Button>
                         </div>
-                        {!delivery.destinationAddressId ? (
-                          <p className="text-xs text-muted-foreground">
-                            Exact consignee address can be finalized from invoice during document upload.
-                          </p>
-                        ) : null}
-                      </Field>
-                    </div>
+                      </SubBlock>
 
-                    <div className="mt-3 grid gap-3 xl:grid-cols-[1.2fr,0.9fr,1.1fr]">
-                      <Field label="Material">
-                        <Select value={delivery.materialId} onChange={(event) => updateDelivery(index, "materialId", event.target.value)}>
-                          <option value="">Select material</option>
-                          {customerMaterials.map((material) => (
-                            <option key={material.id} value={material.id}>{material.materialCode}</option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label="Quantity">
-                        <div className="grid grid-cols-[1fr_110px] gap-2">
-                          <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
-                          <div className="flex items-center justify-center rounded-2xl border border-border/70 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
-                            {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
-                          </div>
+                      <SubBlock title="Cargo">
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          <Field label="Material">
+                            <Select value={delivery.materialId} onChange={(event) => updateDelivery(index, "materialId", event.target.value)}>
+                              <option value="">Select material</option>
+                              {customerMaterials.map((material) => (
+                                <option key={material.id} value={material.id}>{material.materialCode}</option>
+                              ))}
+                            </Select>
+                          </Field>
+                          <Field label="Quantity">
+                            <div className="grid grid-cols-[1fr_100px] gap-2">
+                              <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
+                              <div className="flex items-center justify-center rounded-md border border-border bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                                {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
+                              </div>
+                            </div>
+                          </Field>
+                          <Field
+                            label="Weight"
+                            helper={
+                              mapping
+                                ? `Auto from 1 ${mapping.quantityUOM} = ${mapping.conversionValue} ${mapping.weightUOM}. Still editable.`
+                                : "No mapping found. Enter manually or pick a mapped material."
+                            }
+                          >
+                            <div className="grid grid-cols-[1fr_110px] gap-2">
+                              <Input value={delivery.weight} onChange={(event) => updateDelivery(index, "weight", event.target.value)} />
+                              <Select value={delivery.weightUom} onChange={(event) => updateDelivery(index, "weightUom", event.target.value)}>
+                                <option value="">Weight UOM</option>
+                                {weightUOMOptions.map((uom) => (
+                                  <option key={uom} value={uom}>{uom}</option>
+                                ))}
+                              </Select>
+                            </div>
+                          </Field>
+                          {rateType === "PER_KM" ? (
+                            <Field label="Distance (KM)">
+                              <Input value={delivery.distanceKm} onChange={(event) => updateDelivery(index, "distanceKm", event.target.value)} placeholder="Distance in KM" />
+                            </Field>
+                          ) : null}
                         </div>
-                      </Field>
-                      <Field label="Weight">
-                        <div className="grid grid-cols-[1fr_120px] gap-2">
-                          <Input value={delivery.weight} onChange={(event) => updateDelivery(index, "weight", event.target.value)} />
-                          <Select value={delivery.weightUom} onChange={(event) => updateDelivery(index, "weightUom", event.target.value)}>
-                            <option value="">Weight UOM</option>
-                            {weightUOMOptions.map((uom) => (
-                              <option key={uom} value={uom}>{uom}</option>
-                            ))}
-                          </Select>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {mapping
-                            ? `Auto from 1 ${mapping.quantityUOM} = ${mapping.conversionValue} ${mapping.weightUOM}. Weight still editable.`
-                            : "No mapping found. Enter weight manually or pick a mapped material."}
-                        </p>
-                      </Field>
-                    </div>
-
-                    <div className={`mt-3 grid gap-3 ${rateType === "PER_KM" ? "xl:grid-cols-[220px_1fr]" : ""}`}>
-                      {rateType === "PER_KM" ? (
-                        <Field label="Distance">
-                          <Input value={delivery.distanceKm} onChange={(event) => updateDelivery(index, "distanceKm", event.target.value)} placeholder="Distance in KM" />
-                        </Field>
-                      ) : null}
-                      <div className="rounded-2xl border border-dashed border-border/80 bg-slate-50/70 px-4 py-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Lane</p>
-                        <p className="mt-1 text-sm text-slate-700">{laneLabel}</p>
-                      </div>
+                      </SubBlock>
                     </div>
                   </div>
                 );
@@ -1018,120 +1023,88 @@ export function CreateBookingPage() {
           </SectionCard>
 
           <SectionCard title="Pricing">
-            <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
-              <div className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {draft.commercialType === "SPOT" ? (
-                    <Field label="Spot Rate (Manual)">
-                      <Input value={draft.enteredRate} onChange={(event) => setDraft((current) => ({ ...current, enteredRate: event.target.value }))} />
-                    </Field>
-                  ) : (
-                    <Field label="Live Rate Display">
-                      <Input
-                        value={baseRate != null ? String(baseRate) : ""}
-                        placeholder="No rate found"
-                        disabled
-                      />
-                    </Field>
-                  )}
-                  <Field label="Rate Type">
-                    <Input value={rateType} disabled />
+            <div className="grid gap-4 xl:grid-cols-[1fr,1fr]">
+              {/* Left — actionable inputs only */}
+              <div className="space-y-3">
+                <Field label={rateType === "PER_MT" ? "Vehicle Type Preference" : "Vehicle Type"}>
+                  <Select value={draft.vehicleTypeId} onChange={(event) => setDraft((current) => ({ ...current, vehicleTypeId: event.target.value }))}>
+                    <option value="">{rateType === "PER_MT" ? "Optional vehicle type" : "Select vehicle type"}</option>
+                    {adminSources.vehicleTypes.filter((vehicleType) => vehicleType.status === "active").map((vehicleType) => (
+                      <option key={vehicleType.id} value={vehicleType.id}>
+                        {vehicleType.typeCode}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Pickup Date & Time">
+                  <Input type="datetime-local" value={draft.pickupDateTime} onChange={(event) => setDraft((current) => ({ ...current, pickupDateTime: event.target.value }))} />
+                </Field>
+                {draft.commercialType === "SPOT" ? (
+                  <Field label="Spot Rate (Manual)" helper="No rate card is used for spot bookings.">
+                    <Input value={draft.enteredRate} onChange={(event) => setDraft((current) => ({ ...current, enteredRate: event.target.value }))} placeholder="Enter rate" />
                   </Field>
-                  <Field label="Matched Rate">
-                    <Input
-                      value={baseRate != null ? String(baseRate) : ""}
-                      placeholder="Not configured"
-                      disabled
-                    />
-                  </Field>
-                  <Field label={rateType === "PER_MT" ? "Vehicle Type Preference" : "Vehicle Type"}>
-                    <Select value={draft.vehicleTypeId} onChange={(event) => setDraft((current) => ({ ...current, vehicleTypeId: event.target.value }))}>
-                      <option value="">{rateType === "PER_MT" ? "Optional vehicle type" : "Select vehicle type"}</option>
-                      {adminSources.vehicleTypes.filter((vehicleType) => vehicleType.status === "active").map((vehicleType) => (
-                        <option key={vehicleType.id} value={vehicleType.id}>
-                          {vehicleType.typeCode}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Pickup Date & Time">
-                    <Input type="datetime-local" value={draft.pickupDateTime} onChange={(event) => setDraft((current) => ({ ...current, pickupDateTime: event.target.value }))} />
-                  </Field>
-                  <div className="rounded-[24px] border border-white/80 bg-white/85 px-4 py-3 shadow-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Calculated Freight</p>
-                    <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{calculatedFreight ? formatCurrency(calculatedFreight) : "-"}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {draft.commercialType === "SPOT"
-                        ? "Manual freight entered by ops."
-                        : rateType === "PER_KM"
-                          ? "PER_KM pricing is a placeholder in the frontend for now."
-                          : `Based on ${rateType.toLowerCase()} pricing.`}
-                    </p>
-                    {draft.commercialType === "CONTRACT" && !rateLookupPending && !laneFound ? (
-                      <p className="mt-2 text-xs font-medium text-amber-700">No rate found for selected configuration</p>
-                    ) : null}
-                    {rateLookupPending ? <p className="mt-2 text-xs text-muted-foreground">Refreshing rateâ€¦</p> : null}
-                  </div>
-                </div>
+                ) : null}
               </div>
 
-              <div className="space-y-4">
-                {draft.commercialType === "SPOT" ? (
-                  <div className="rounded-[28px] border border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-sky-50 p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Manual Freight</p>
-                    <p className="mt-2 text-sm font-medium text-slate-700">Spot Rate (Manual)</p>
-                    <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{numericRate ? formatCurrency(numericRate) : formatCurrency(0)}</p>
-                    <p className="mt-2 text-sm text-slate-600">No rate card is used for spot bookings.</p>
+              {/* Right — single rate display panel */}
+              <div className="rounded-xl border border-sky-200/70 bg-sky-50/50 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    {draft.commercialType === "SPOT" ? "Manual Freight" : "Contract Pricing"}
+                  </p>
+                  {draft.commercialType === "CONTRACT" ? (
+                    rateLookupPending ? (
+                      <Badge variant="outline">Validating</Badge>
+                    ) : laneFound ? (
+                      <Badge variant="success">Rate Card Matched</Badge>
+                    ) : (
+                      <Badge variant="warning">No Rate Card</Badge>
+                    )
+                  ) : null}
+                </div>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-800">
+                  {draft.commercialType === "SPOT"
+                    ? numericRate
+                      ? formatCurrency(numericRate)
+                      : formatCurrency(0)
+                    : calculatedFreight
+                      ? formatCurrency(calculatedFreight)
+                      : "—"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {draft.commercialType === "SPOT"
+                    ? "Manual freight entered by ops."
+                    : rateType === "PER_KM"
+                      ? "PER_KM pricing is a placeholder in the frontend for now."
+                      : `Based on ${rateType.toLowerCase()} pricing.`}
+                </p>
+                {draft.commercialType === "CONTRACT" ? (
+                  <div className="mt-4 grid gap-2">
+                    <Summary label="Rate Type" value={rateType} />
+                    <Summary
+                      label="Rate Matching Basis"
+                      value={
+                        selectedCustomer
+                          ? effectiveRateBasisLabel(
+                              selectedCustomer.rateMatchingBasis ?? "LANE_TO_LANE",
+                              deliveries[deliveries.length - 1],
+                              customerAddresses,
+                            )
+                          : "LANE_TO_LANE"
+                      }
+                    />
+                    <Summary
+                      label="Matched Rate"
+                      value={baseRate != null ? formatCurrency(baseRate) : "Not configured"}
+                    />
                   </div>
-                ) : (
-                  <div className="rounded-[28px] border border-white/80 bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 p-5 shadow-sm">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Contract Pricing</p>
-                    <div className="mt-4 space-y-3">
-                      <Summary label="Rate Type" value={rateType} />
-                      <Summary
-                        label="Rate Matching Basis"
-                        value={
-                          selectedCustomer
-                            ? effectiveRateBasisLabel(
-                                selectedCustomer.rateMatchingBasis ?? "LANE_TO_LANE",
-                                deliveries[deliveries.length - 1],
-                                customerAddresses,
-                              )
-                            : "LANE_TO_LANE"
-                        }
-                      />
-                      <Summary
-                        label="Matched Rate"
-                        value={baseRate != null ? formatCurrency(baseRate) : "Not configured"}
-                      />
-                      <Summary
-                        label="Calculated Freight"
-                        value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"}
-                      />
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      {rateLookupPending ? (
-                        <>
-                          <Badge variant="outline">Validating</Badge>
-                          <span>Refreshing contract rate for the latest delivery.</span>
-                        </>
-                      ) : laneFound ? (
-                        <>
-                          <Badge variant="success">Rate Card Matched</Badge>
-                          <span>{matchedRateCard?.lanes ?? "Latest delivery destination used for pricing."}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Badge variant="warning">No Rate Card</Badge>
-                          <span>No rate found for selected configuration</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
+                ) : null}
+                {draft.commercialType === "CONTRACT" && !rateLookupPending && !laneFound ? (
+                  <p className="mt-3 text-xs font-medium text-amber-700">No rate found for selected configuration.</p>
+                ) : null}
+                {laneFound && matchedRateCard?.lanes ? (
+                  <p className="mt-3 text-xs text-muted-foreground">{matchedRateCard.lanes}</p>
+                ) : null}
               </div>
             </div>
           </SectionCard>
@@ -1139,8 +1112,8 @@ export function CreateBookingPage() {
 
         <TenantPanel title="Commercial Summary" description="Live booking totals and pricing output.">
           <div className="space-y-3">
-            <div className="rounded-[24px] border border-white/80 bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 p-4 text-white shadow-[0_24px_56px_rgba(79,70,229,0.34)]">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Pricing Breakdown</p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pricing Breakdown</p>
               <div className="mt-3 grid gap-2 text-sm">
                 <SignalRow label="Rate" value={numericRate ? formatCurrency(numericRate) : "-"} />
                 <SignalRow
@@ -1259,6 +1232,7 @@ export function CreateBookingPage() {
           </div>
         </div>
       </Dialog>
+      </div>
     </div>
   );
 }
@@ -1503,7 +1477,31 @@ function formatUOMWeight(value: number) {
 }
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
-  return <TenantPanel title={title}>{children}</TenantPanel>;
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <header className="rounded-t-2xl border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{title}</h2>
+      </header>
+      <div className="space-y-4 px-5 py-4 text-slate-700">{children}</div>
+    </section>
+  );
+}
+
+function SubBlock({ title, tone = "default", children }: { title?: string; tone?: "default" | "blue" | "amber"; children: ReactNode }) {
+  const toneClass =
+    tone === "blue"
+      ? "border-sky-200/70 bg-sky-50/50"
+      : tone === "amber"
+        ? "border-amber-200/60 bg-amber-50/50"
+        : "border-slate-200 bg-slate-50/60";
+  return (
+    <div className={`rounded-xl border ${toneClass} px-4 py-3`}>
+      {title ? (
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</p>
+      ) : null}
+      {children}
+    </div>
+  );
 }
 
 function Field({ label, helper, children }: { label: string; helper?: string; children: ReactNode }) {
@@ -1511,25 +1509,25 @@ function Field({ label, helper, children }: { label: string; helper?: string; ch
     <div className="space-y-1.5">
       <label className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-600">{label}</label>
       {children}
-      {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+      {helper ? <p className="text-xs text-slate-500">{helper}</p> : null}
     </div>
   );
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border/55 bg-white/80 px-3 py-3 last:border-b">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-sm font-semibold">{value}</span>
+    <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+      <p className="mt-1 truncate text-sm font-semibold text-slate-800">{value}</p>
     </div>
   );
 }
 
 function SignalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur-sm">
-      <span className="text-white/75">{label}</span>
-      <span className="font-medium text-white">{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-medium text-slate-800">{value}</span>
     </div>
   );
 }

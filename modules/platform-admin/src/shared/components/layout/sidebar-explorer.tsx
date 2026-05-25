@@ -106,7 +106,7 @@ function ExplorerNode({
           title={item.title ?? (collapsed ? item.label : undefined)}
           onClick={() => onToggle(itemId)}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] font-medium transition",
+            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[15px] font-medium transition",
             isParentActive
               ? "bg-slate-100 text-slate-900"
               : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
@@ -144,7 +144,7 @@ function ExplorerNode({
   }
 
   const className = cn(
-    "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium transition",
+    "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[15px] font-medium transition",
     isActive
       ? "bg-slate-900 text-white"
       : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
@@ -290,11 +290,11 @@ export function SidebarExplorer({
         <div className="flex items-start justify-between gap-3">
           {!isCollapsed ? (
             <div>
-              <div className="inline-flex rounded-full border border-primary/10 bg-primary/[0.08] px-2 py-1 text-[10px] uppercase tracking-[0.24em] text-primary">
+              <div className="inline-flex rounded-full border border-primary/10 bg-primary/[0.08] px-2 py-1 text-[11px] uppercase tracking-[0.24em] text-primary">
                 {actorLabel}
               </div>
-              <h2 className="mt-2 text-[15px] font-semibold leading-tight tracking-[-0.01em]">{title}</h2>
-              <p className="mt-1 max-w-[26ch] whitespace-pre-line text-[11px] leading-5 text-muted-foreground">{subtitle}</p>
+              <h2 className="mt-2 text-[19px] font-semibold leading-tight tracking-[-0.01em]">{title}</h2>
+              <p className="mt-1 max-w-[26ch] whitespace-pre-line text-[14px] leading-5 text-muted-foreground">{subtitle}</p>
             </div>
           ) : (
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/10 bg-primary/[0.08] text-primary">
@@ -317,7 +317,7 @@ export function SidebarExplorer({
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="h-10 rounded-2xl border-border/80 bg-card/80 pl-9"
+              className="h-11 rounded-2xl border-border/80 bg-card/80 pl-9 text-[15px]"
               placeholder="Search navigation"
             />
           </div>

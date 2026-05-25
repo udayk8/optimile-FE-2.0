@@ -50,7 +50,7 @@ const NOTIFICATIONS = [
   { id: 'n3', title: 'Contract coverage updated for South lane', tone: 'default' as const, time: '45m ago' },
 ]
 
-function CustomerDashboardShell() {
+function CustomerDashboardShell({ embedded = false }: { embedded?: boolean }) {
   const { logout, user } = useAuth()
   const [activeSection, setActiveSection] = useState<CustomerSection>('overview')
   const [query, setQuery] = useState('')
@@ -70,9 +70,9 @@ function CustomerDashboardShell() {
   }
 
   return (
-    <div className="optimile-customer-root min-h-screen bg-background text-text">
-      <div className="flex min-h-screen">
-        <aside className="hidden w-80 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
+    <div className={embedded ? "optimile-customer-root" : "optimile-customer-root min-h-screen bg-background text-text"}>
+      <div className={embedded ? "flex" : "flex min-h-screen"}>
+        <aside className={embedded ? "hidden" : "hidden w-80 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col"}>
           <div className="flex items-center gap-3 border-b border-gray-200 px-5 py-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-lg font-extrabold text-white">
               O
@@ -156,7 +156,7 @@ function CustomerDashboardShell() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
+          {embedded ? null : <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
             <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wide text-secondary">Optimile</p>
@@ -214,7 +214,7 @@ function CustomerDashboardShell() {
                 </button>
               </div>
             </div>
-          </header>
+          </header>}
 
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-7xl space-y-6">
@@ -361,4 +361,11 @@ export default function CustomerApp() {
       <CustomerDashboardShell />
     </ProtectedRoute>
   )
+}
+
+// Embeddable variant — used by platform-admin tenant workspace.
+// Renders the customer dashboard content without its own sidebar/header
+// so the surrounding shell owns navigation.
+export function CustomerDashboardEmbedded() {
+  return <CustomerDashboardShell embedded />
 }

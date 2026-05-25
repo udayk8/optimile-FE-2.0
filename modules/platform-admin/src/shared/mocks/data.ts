@@ -60,15 +60,22 @@ export const mockPlans: TenantPlan[] = [
   },
 ];
 
+// Module catalog — kept in sync with the actual folders under /modules.
+// Modules without a real implementation are marked inactive so they are
+// hidden from Tenant Module Settings, but their codes are preserved for
+// backward compatibility with existing tenant permission data.
 export const mockModules: PlatformModule[] = [
-  { id: "mod-tms", code: "TMS", name: "TMS", category: "Operations", description: "Transport operations, dispatch, bookings, and control tower workflows.", status: "active" },
-  { id: "mod-fleet", code: "FLEET", name: "Fleet Management", category: "Fleet", description: "Vehicle, driver, maintenance, fuel, tyre, and fleet dashboard operations.", status: "active" },
-  { id: "mod-auction", code: "AUCTION", name: "Auction", category: "Procurement", description: "Auction dashboard, sourcing, and commercial bidding workflows.", status: "active" },
-  { id: "mod-customer", code: "CUSTOMER", name: "Customer Dashboard", category: "Operations", description: "Customer-facing dashboard, booking visibility, and service experience.", status: "active" },
-  { id: "mod-vendor", code: "VENDOR", name: "Vendor App", category: "Operations", description: "Vendor dashboard, trip visibility, documents, and payable visibility.", status: "active" },
-  { id: "mod-tracking", code: "TRACKING", name: "Track and Trace", category: "Operations", description: "Track and trace dashboard, shipment visibility, and operational monitoring.", status: "active" },
-  { id: "mod-procurement", code: "PROCUREMENT", name: "Procurement", category: "Procurement", description: "Vendor sourcing, RFQ/RFI, auctions, contracts, and disputes.", status: "active" },
-  { id: "mod-finance", code: "FINANCE", name: "Finance", category: "Finance", description: "Invoicing, payables, reconciliation, and finance reporting.", status: "active" },
+  { id: "mod-tms", code: "TMS", name: "TMS", category: "Operations", description: "Transport operations, dispatch, bookings, and control tower workflows. Folder: modules/tms/. URL: /tms/booking/*.", status: "active" },
+  { id: "mod-driver-app", code: "DRIVER_APP", name: "Driver App", category: "Operations", description: "Driver mobile workspace — trips, deliveries, POD, fuel/expenses, incidents. Folder: modules/tms-driver-app-web/. URL: /driver-app/*.", status: "active" },
+  { id: "mod-tracking", code: "TRACKING", name: "Track and Trace", category: "Operations", description: "Live map, geofences, alerts, trip replay, route performance analytics. Folder: modules/track-trace-web/. URL: /tracking/*.", status: "active" },
+  { id: "mod-customer", code: "CUSTOMER", name: "Customer Portal", category: "Operations", description: "Customer-facing booking visibility and dashboard. Folder: modules/customer-web/. URL: /customer/*.", status: "active" },
+  { id: "mod-vendor", code: "VENDOR", name: "Vendor Portal", category: "Operations", description: "Vendor app — trip acceptance, invoices, ledger, payments, vendor fleet. Folder: modules/vendor-web/. URL: /vendor/*.", status: "active" },
+  { id: "mod-fleet", code: "FLEET", name: "Fleet Management", category: "Fleet", description: "Vehicles, drivers, maintenance, garage, tyres, fuel, compliance, dispatch. Folder: modules/fleet-web/. URL: /fleet/*.", status: "active" },
+  { id: "mod-auction", code: "AUCTION", name: "Auction / AMS", category: "Procurement", description: "Auction dashboard, RFI/RFQ, contracts, sourcing. Folder: modules/auction-web/. URL: /auction/*.", status: "active" },
+  // Hidden from settings — no real implementation folder yet. Code retained
+  // so existing tenant permission data and references stay intact.
+  { id: "mod-procurement", code: "PROCUREMENT", name: "Procurement", category: "Procurement", description: "(No active folder — hidden from Module Settings.)", status: "inactive" },
+  { id: "mod-finance", code: "FINANCE", name: "Finance", category: "Finance", description: "(No active folder — hidden from Module Settings.)", status: "inactive" },
 ];
 
 export const mockPlatformTenants: TenantRecord[] = [

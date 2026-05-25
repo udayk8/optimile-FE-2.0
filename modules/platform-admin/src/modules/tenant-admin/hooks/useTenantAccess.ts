@@ -5,6 +5,7 @@ import { useTenantRolePermissions } from "@/modules/tenant-admin/hooks/useTenant
 import { useTenantRoles } from "@/modules/tenant-admin/hooks/useTenantRoles";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
+import { hasPermission, usePermissionMatrixVersion } from "@/modules/tenant-admin/lib/tenant-permissions";
 import {
   findTenantPageByCode,
   getRolePageActions,
@@ -83,6 +84,16 @@ export function useTenantAccess(pathnameOverride?: string) {
     return findTenantPageByCode(tenant, pageCode);
   }
 
+  const matrixVersion = usePermissionMatrixVersion();
+  function hasFeaturePermission(
+    moduleCode: string,
+    featureCode: string,
+    action: "view" | "create" | "edit" | "delete" | "approve" | "export" = "view",
+  ): boolean {
+    void matrixVersion;
+    return hasPermission(roleContext.activeRole, moduleCode, featureCode, action);
+  }
+
   return {
     ...roleContext,
     matchedPage,
@@ -93,5 +104,6 @@ export function useTenantAccess(pathnameOverride?: string) {
     dataScope: roleContext.activeRole?.dataScope ?? "OWN_RECORDS",
     getActionsForPage,
     getMatchedPage,
+    hasFeaturePermission,
   };
 }
