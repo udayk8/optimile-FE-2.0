@@ -74,6 +74,20 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['vendor:read', 'vendor:write'],
     modules: ['vendor'],
   },
+  // Track and Trace — standalone track-trace-web module
+  'track-trace@optimile.com': {
+    name: 'Track and Trace User',
+    role: 'Track and Trace',
+    permissions: ['tracking:read', 'tracking:write'],
+    modules: ['tracking'],
+  },
+  // CBD — standalone customer-web module
+  'cbd@optimile.com': {
+    name: 'CBD User',
+    role: 'CBD',
+    permissions: ['customer:read', 'customer:write'],
+    modules: ['customer'],
+  },
 }
 
 export const DEMO_PASSWORD = 'testing'
