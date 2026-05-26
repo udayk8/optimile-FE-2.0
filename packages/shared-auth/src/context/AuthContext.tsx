@@ -1,4 +1,4 @@
-/// <reference types="vite/client" />
+﻿/// <reference types="vite/client" />
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { User, ERPModule, Tenant, SystemRole } from '../types'
 import { authApi, AuthTenantDto, AuthUserDto } from '../services/authApi'
@@ -8,91 +8,126 @@ import { canUserAccessModule, getPostLoginRouteForUser } from '../moduleRoutes'
 import {
   clearAuthState,
   clearDemoSession,
+  getStoredDemoSessionEmail,
   storeDemoLogin,
   storeDemoSession,
   storeTokenLogin,
   type Portal,
 } from '../utils/authStorage'
 
-// ── Mock users for demo mode ─────────────────────────────────
+// â”€â”€ Mock users for demo mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface MockUser { name: string; role: SystemRole; modules: ERPModule[]; permissions: string[] }
 
 export const DEMO_CREDENTIALS: Record<string, MockUser> = {
-  // CEO — full access to all in-scope modules → goes into unified shell
+  // CEO demo user.
   'ceo@uday.ts.com': {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
-    modules: ['fleet', 'ams', 'vendor'],
+    modules: ['ams', 'fleet', 'vendor', 'customer'],
   },
-  // Platform Admin — platform administration console
+  // Fleet-only demo user.
+  'fleet@uday.ts.com': {
+    name: 'Rahul Mehta',
+    role: 'Fleet Manager',
+    permissions: ['fleet:read', 'fleet:write'],
+    modules: ['fleet'],
+  },
+  // Auction-only demo user.
+  'auction@pranay.ts.com': {
+    name: 'Pranay Sharma',
+    role: 'Auction Head',
+    permissions: ['ams:read', 'ams:write'],
+    modules: ['ams'],
+  },
+  // Customer-only demo user.
+  'cbd@optimile.com': {
+    name: 'Customer Booking Desk',
+    role: 'CBD',
+    permissions: ['customer:read', 'customer:write'],
+    modules: ['customer'],
+  },
+  // Vendor-only demo user.
+  'vendor@pranay.ts.com': {
+    name: 'Pranay Verma',
+    role: 'Vendor',
+    permissions: ['vendor:read', 'vendor:write'],
+    modules: ['vendor'],
+  },
+  // Platform Admin â€” platform administration console
   'platform-admin@optimile.com': {
     name: 'Platform Administrator',
     role: 'Platform Admin',
     permissions: ['platform-admin:read', 'platform-admin:write'],
     modules: ['platform-admin'],
   },
-  // Tenant Admin — tenant administration console
+  // Tenant Admin demo user.
   'tenant-admin@optimile.com': {
     name: 'Tenant Administrator',
     role: 'Tenant Admin',
     permissions: ['tenant-admin:read', 'tenant-admin:write'],
     modules: ['tenant-admin'],
   },
-  // TMS Booking — standalone booking module
+  // Track and Trace demo user.
+  'tracking@optimile.com': {
+    name: 'Track and Trace User',
+    role: 'Track and Trace',
+    permissions: ['tracking:read'],
+    modules: ['tracking'],
+  },
+  // TMS Booking demo user.
+  'tms@optimile.com': {
+    name: 'TMS User',
+    role: 'TMS',
+    permissions: ['tms:read', 'tms:write'],
+    modules: ['tms'],
+  },
   'tms-booking@optimile.com': {
     name: 'TMS Booking User',
     role: 'TMS',
-    permissions: ['tms-booking:read', 'tms-booking:write'],
-    modules: ['tms-booking'],
+    permissions: ['tms:read', 'tms:write'],
+    modules: ['tms'],
   },
-  // Vendor + Fleet combined — no auction
+  // Driver app demo user.
+  'driver@optimile.com': {
+    name: 'Driver User',
+    role: 'Driver',
+    permissions: ['driver-app:read'],
+    modules: ['driver-app'],
+  },
+  // Vendor and Fleet combined demo user.
   'vendor-fleet@optimile.com': {
     name: 'Vendor Fleet User',
     role: 'Vendor Fleet',
     permissions: ['vendor:read', 'vendor:write', 'fleet:read', 'fleet:write'],
     modules: ['fleet', 'vendor'],
   },
-  // Auction only
+  // Alternate auction-only demo user.
   'auction@optimile.com': {
     name: 'Auction User',
     role: 'Auction Only',
     permissions: ['ams:read', 'ams:write'],
     modules: ['ams'],
   },
-  // Fleet only
+  // Alternate fleet-only demo user.
   'fleet@optimile.com': {
     name: 'Fleet User',
     role: 'Fleet Only',
     permissions: ['fleet:read', 'fleet:write'],
     modules: ['fleet'],
   },
-  // Vendor only
+  // Alternate vendor-only demo user.
   'vendor@optimile.com': {
     name: 'Vendor User',
     role: 'Vendor Only',
     permissions: ['vendor:read', 'vendor:write'],
     modules: ['vendor'],
   },
-  // Track and Trace — standalone track-trace-web module
-  'track-trace@optimile.com': {
-    name: 'Track and Trace User',
-    role: 'Track and Trace',
-    permissions: ['tracking:read', 'tracking:write'],
-    modules: ['tracking'],
-  },
-  // CBD — standalone customer-web module
-  'cbd@optimile.com': {
-    name: 'CBD User',
-    role: 'CBD',
-    permissions: ['customer:read', 'customer:write'],
-    modules: ['customer'],
-  },
 }
 
 export const DEMO_PASSWORD = 'testing'
 
-// ── Context type ─────────────────────────────────────────────
+// â”€â”€ Context type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface AuthContextType {
   user: User | null
   tenant: Tenant | null
@@ -113,12 +148,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ENV_TENANT_HINT = (import.meta.env.VITE_AUTH_TENANT_ID as string | undefined)?.trim() ?? ''
-const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl', 'platform-admin', 'tenant-admin', 'tms-booking', 'driver-app']
+const ALL_ERP_MODULES: ERPModule[] = ['admin', 'ams', 'fleet', 'vendor', 'customer', 'tms', 'tracking', 'finance', 'reporting', 'ptl', 'platform-admin', 'tenant-admin', 'driver-app']
 const TENANT_STATUSES: Tenant['status'][] = ['active', 'suspended', 'trial']
 const USER_STATUSES: User['status'][] = ['active', 'inactive']
+const LEGACY_ERP_MODULE_ALIASES: Record<string, ERPModule> = {
+  'tms-booking': 'tms',
+}
 
 function isERPModule(value: string): value is ERPModule {
   return ALL_ERP_MODULES.includes(value as ERPModule)
+}
+
+function normalizeERPModule(value: string): ERPModule | null {
+  const normalizedValue = LEGACY_ERP_MODULE_ALIASES[value] ?? value
+  return isERPModule(normalizedValue) ? normalizedValue : null
 }
 
 function mapTenant(apiTenant: AuthTenantDto): Tenant {
@@ -126,7 +169,9 @@ function mapTenant(apiTenant: AuthTenantDto): Tenant {
     ? (apiTenant.status as Tenant['status']) : 'active'
   return {
     id: apiTenant.id, name: apiTenant.name, slug: apiTenant.slug,
-    modules: (apiTenant.modules ?? []).filter(isERPModule), status, createdAt: apiTenant.createdAt,
+    modules: Array.from(new Set((apiTenant.modules ?? []).map(normalizeERPModule).filter((module): module is ERPModule => module !== null))),
+    status,
+    createdAt: apiTenant.createdAt,
   }
 }
 
@@ -139,7 +184,8 @@ function mapUser(apiUser: AuthUserDto): User {
     department: (apiUser.department || 'IT Admin') as User['department'],
     region: apiUser.region || undefined,
     permissions: apiUser.permissions ?? [],
-    modules: (apiUser.modules ?? []).filter(isERPModule), status,
+    modules: Array.from(new Set((apiUser.modules ?? []).map(normalizeERPModule).filter((module): module is ERPModule => module !== null))),
+    status,
   }
 }
 
@@ -169,7 +215,6 @@ function getPrimaryPortal(modules: ERPModule[]): Portal {
   if (modules.includes('admin')) return 'admin'
   if (modules.includes('platform-admin')) return 'platform-admin'
   if (modules.includes('tenant-admin')) return 'tenant-admin'
-  if (modules.includes('tms-booking')) return 'tms-booking'
   if (modules.includes('driver-app')) return 'driver-app'
   if (modules.includes('tracking')) return 'tracking'
   if (modules.includes('tms')) return 'tms'
@@ -193,7 +238,7 @@ function buildDemoUser(emailKey: string, mock: MockUser): User {
   }
 }
 
-// ── Provider ─────────────────────────────────────────────────
+// â”€â”€ Provider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser]                     = useState<User | null>(null)
   const [tenant, setTenant]                 = useState<Tenant | null>(null)
@@ -208,7 +253,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const restore = async () => {
       const storedSession = getStoredAuthSession()
       if (!storedSession) {
-        clearDemoSession()
+        const storedDemoEmail = getStoredDemoSessionEmail()?.trim().toLowerCase() ?? ''
+        const storedDemoUser = DEMO_CREDENTIALS[storedDemoEmail]
+        if (storedDemoUser && mounted) {
+          setUser(buildDemoUser(storedDemoEmail, storedDemoUser))
+          setTenant(DEMO_TENANT)
+        }
         if (mounted) setLoading(false)
         return
       }
@@ -234,7 +284,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true)
     setError(null)
 
-    // Demo mode — match against mock credentials
+    // Demo mode â€” match against mock credentials
     const emailKey = email.trim().toLowerCase()
     const mock = DEMO_CREDENTIALS[emailKey]
     if (mock && (password === DEMO_PASSWORD || backendAvailable === false)) {
@@ -256,7 +306,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshToken: res.refreshToken,
         tokenType: res.tokenType || 'Bearer',
         expiresAt: Date.now() + Math.max(0, res.expiresInSeconds) * 1000,
-      }, rememberMe, res.tenant.id)
+      }, rememberMe, res.tenant.internalId)
       clearLegacyKeys()
       const nextUser = mapUser(res.user)
       setUser(nextUser)
@@ -320,3 +370,6 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
+
+
+
