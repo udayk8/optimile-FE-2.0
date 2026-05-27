@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Building2, ChevronRight, LogIn, ShieldCheck, UserRound } from "lucide-react";
-import { useAuth } from "@shared-auth";
+import { OptimileLogo, useAuth } from "@shared-auth";
 import { MockStoreProvider, useMockStore } from "@/shared/store/mock-store";
 import { SessionProvider, useSessionContext } from "@/shared/auth/session-context";
 import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
@@ -195,63 +195,84 @@ function UnifiedLoginInner() {
   const selectedUser = loginUsers.find((user) => user.id === selectedUserId) ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col justify-center gap-6 px-4 py-10">
-        <div className="text-center">
-          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-slate-900">Optimile</h1>
-          <p className="mt-1 text-[13px] text-slate-500">Choose how you want to sign in</p>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950">
+      {/* Premium dark backdrop: layered gradient + colored glow */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
+      <div className="pointer-events-none absolute -right-32 -top-40 size-[28rem] rounded-full bg-sky-500/20 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-48 -left-32 size-[30rem] rounded-full bg-indigo-500/20 blur-[120px]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/3 size-[24rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-[120px]" />
+
+      <div className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-9 px-4 py-12">
+        {/* Brand */}
+        <div className="flex flex-col items-center text-center">
+          <OptimileLogo className="text-white" style={{ height: 48, width: "auto", display: "block" }} />
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">
+            Logistics ERP
+          </p>
+          <h1 className="mt-5 text-[22px] font-semibold tracking-[-0.01em] text-white">
+            Welcome back
+          </h1>
+          <p className="mt-1.5 text-[13px] text-slate-400">Choose how you want to sign in</p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           {/* SECTION 1 — Optimile Admin */}
-          <section className="flex flex-col rounded-2xl border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-sky-100 text-sky-700">
-                <ShieldCheck className="size-5" />
+          <section className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-sky-400/40 hover:bg-white/[0.06]">
+            <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-cyan-400" />
+            <div className="flex items-center gap-3.5">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg shadow-sky-500/25 ring-1 ring-white/20">
+                <ShieldCheck className="size-6" />
               </div>
               <div>
-                <h2 className="text-[15px] font-semibold text-slate-900">Optimile Admin</h2>
-                <p className="text-[12px] text-slate-500">Platform administration</p>
+                <h2 className="text-[16px] font-semibold text-white">Optimile Admin</h2>
+                <p className="text-[12px] text-slate-400">Platform administration</p>
               </div>
             </div>
 
-            <p className="mt-4 text-[13px] leading-relaxed text-slate-600">
+            <p className="mt-5 text-[13px] leading-relaxed text-slate-300">
               Manage tenant onboarding, the module registry, plans and platform settings.
             </p>
 
-            <ul className="mt-3 space-y-1.5 text-[12px] text-slate-500">
-              <li>· Onboard and configure tenants</li>
-              <li>· Enable / disable modules per tenant</li>
-              <li>· Plans &amp; platform-wide settings</li>
+            <ul className="mt-4 space-y-2 text-[12.5px] text-slate-300">
+              <li className="flex items-center gap-2.5"><span className="size-1.5 shrink-0 rounded-full bg-sky-400" />Onboard and configure tenants</li>
+              <li className="flex items-center gap-2.5"><span className="size-1.5 shrink-0 rounded-full bg-sky-400" />Enable / disable modules per tenant</li>
+              <li className="flex items-center gap-2.5"><span className="size-1.5 shrink-0 rounded-full bg-sky-400" />Plans &amp; platform-wide settings</li>
             </ul>
 
-            <div className="mt-auto pt-6">
-              <Button type="button" className="w-full" disabled={busy} onClick={enterPlatformAdmin}>
+            <div className="mt-auto pt-7">
+              <Button
+                type="button"
+                className="h-11 w-full border-0 bg-gradient-to-r from-sky-500 to-cyan-500 text-[13px] font-semibold text-white shadow-lg shadow-sky-500/25 hover:from-sky-400 hover:to-cyan-400"
+                disabled={busy}
+                onClick={enterPlatformAdmin}
+              >
                 <ShieldCheck className="size-4" />
                 Enter Optimile Admin
+                <ChevronRight className="size-4" />
               </Button>
             </div>
           </section>
 
           {/* SECTION 2 — Tenant Admin */}
-          <section className="flex flex-col rounded-2xl border bg-card p-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
-                <Building2 className="size-5" />
+          <section className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-indigo-400/40 hover:bg-white/[0.06]">
+            <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+            <div className="flex items-center gap-3.5">
+              <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25 ring-1 ring-white/20">
+                <Building2 className="size-6" />
               </div>
               <div>
-                <h2 className="text-[15px] font-semibold text-slate-900">Tenant Admin</h2>
-                <p className="text-[12px] text-slate-500">Tenant workspace</p>
+                <h2 className="text-[16px] font-semibold text-white">Tenant Admin</h2>
+                <p className="text-[12px] text-slate-400">Sign in to a tenant workspace</p>
               </div>
             </div>
 
-            <form className="mt-4 flex flex-1 flex-col gap-4" onSubmit={enterTenant}>
+            <form className="mt-5 flex flex-1 flex-col gap-4" onSubmit={enterTenant}>
               <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-700">Select Tenant</label>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Select Tenant</label>
                 <select
                   value={selectedTenantId}
                   onChange={(event) => setSelectedTenantId(event.target.value)}
-                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 text-[13px] text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 [&_option]:bg-slate-900 [&_option]:text-slate-100"
                 >
                   <option value="">— Choose a tenant —</option>
                   {tenants.map((tenant) => (
@@ -263,12 +284,12 @@ function UnifiedLoginInner() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[12px] font-medium text-slate-700">Select User</label>
+                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Select User</label>
                 <select
                   value={selectedUserId}
                   onChange={(event) => setSelectedUserId(event.target.value)}
                   disabled={!selectedTenant || loginUsers.length === 0}
-                  className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
+                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 text-[13px] text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/30 disabled:text-slate-500 [&_option]:bg-slate-900 [&_option]:text-slate-100"
                 >
                   {!selectedTenant ? (
                     <option value="">Select a tenant first</option>
@@ -285,13 +306,13 @@ function UnifiedLoginInner() {
               </div>
 
               {selectedUser ? (
-                <div className="flex items-center gap-2.5 rounded-lg border bg-slate-50/70 px-3 py-2">
-                  <div className="flex size-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
-                    <UserRound className="size-3.5" />
+                <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white ring-1 ring-white/20">
+                    <UserRound className="size-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-[12px] font-medium text-slate-900">{selectedUser.email}</p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="truncate text-[12.5px] font-medium text-slate-100">{selectedUser.email}</p>
+                    <p className="text-[11px] text-slate-400">
                       {selectedUser.isOwner ? "Tenant Admin" : selectedUser.roleName}
                     </p>
                   </div>
@@ -299,7 +320,11 @@ function UnifiedLoginInner() {
               ) : null}
 
               <div className="mt-auto">
-                <Button type="submit" className="w-full" disabled={busy || !selectedTenant || !selectedUserId}>
+                <Button
+                  type="submit"
+                  className="h-11 w-full border-0 bg-gradient-to-r from-indigo-500 to-violet-500 text-[13px] font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-50"
+                  disabled={busy || !selectedTenant || !selectedUserId}
+                >
                   <LogIn className="size-4" />
                   Continue
                   <ChevronRight className="size-4" />
@@ -310,13 +335,13 @@ function UnifiedLoginInner() {
         </div>
 
         {error ? (
-          <div className="mx-auto w-full max-w-md rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-center text-[12px] text-rose-700">
+          <div className="mx-auto w-full max-w-md rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-center text-[12px] font-medium text-rose-300">
             {error}
           </div>
         ) : null}
 
-        <p className="mx-auto w-full max-w-md rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-center text-[11px] text-amber-800">
-          Demo login. Tenants and users come from the shared store — anything created in Optimile Admin appears here automatically.
+        <p className="mx-auto max-w-md text-center text-[11px] leading-relaxed text-slate-500">
+          Demo login · tenants &amp; users come from the shared store — anything created in Optimile Admin appears here automatically.
         </p>
       </div>
     </div>

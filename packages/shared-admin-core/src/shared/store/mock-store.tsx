@@ -2179,9 +2179,13 @@ function inferRoleModulesFromPermissions(
   return moduleCodes.length ? moduleCodes : normalizeModuleKeys(tenantEnabledModules).slice(0, 1);
 }
 
+// Modules with no live folder anymore — pruned from the registry on load so
+// they vanish from the UI even if they linger in localStorage from an old seed.
+const RETIRED_MODULE_CODES = new Set(["PROCUREMENT", "FINANCE", "DRIVER_APP"]);
+
 function ensureRequiredPlatformModules(modules: PlatformModule[]) {
   const requiredByCode = new Map(mockModules.map((module) => [module.code, module]));
-  const merged = [...modules];
+  const merged = modules.filter((module) => !RETIRED_MODULE_CODES.has(module.code));
 
   requiredByCode.forEach((requiredModule, code) => {
     const existingIndex = merged.findIndex((module) => module.code === code);

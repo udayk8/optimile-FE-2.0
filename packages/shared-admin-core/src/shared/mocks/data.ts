@@ -64,24 +64,19 @@ export const mockPlans: TenantPlan[] = [
 // Modules without a real implementation are marked inactive so they are
 // hidden from Tenant Module Settings, but their codes are preserved for
 // backward compatibility with existing tenant permission data.
-// Active business-module registry — one entry per real module folder.
-// folderPath = source under /modules; startRoute = the module's landing
-// page (matches each module-only demo login). Host/shell folders
-// (platform-admin-web, tenant-admin-web, tms-booking-web) and legacy
-// folders (platform-admin_old, tms_old, console-web) are intentionally
-// NOT registered as business modules.
+// Active business-module registry — one entry per real, live module folder.
+// folderPath = the live source folder under /modules; startRoute = the
+// module's landing page. Only modules backed by a real folder are listed.
+// "Administration" is the tenant governance module and maps to the live
+// tenant-admin-new module. There is no separate "Platform Admin" module.
 export const mockModules: PlatformModule[] = [
-  { id: "mod-admin", code: "ADMIN", name: "Administration", category: "Administration", description: "Tenant governance — hierarchy, org units, users, roles, permissions, master data, LR configuration.", status: "active", folderPath: "modules/platform-admin", startRoute: "/platform-admin/dashboard" },
+  { id: "mod-admin", code: "ADMIN", name: "Administration", category: "Administration", description: "Tenant governance — hierarchy, org units, users, roles, permissions, master data, LR configuration.", status: "active", folderPath: "modules/tenant-admin-new", startRoute: "/tenant-admin" },
   { id: "mod-tms", code: "TMS", name: "Booking", category: "Operations", description: "Booking, dispatch, assignment, LR, documents, POD, and control tower workflows.", status: "active", folderPath: "modules/tms", startRoute: "/tms/booking" },
   { id: "mod-auction", code: "AUCTION", name: "Auction / AMS", category: "Procurement", description: "Auction dashboard, RFI/RFQ, contracts, sourcing.", status: "active", folderPath: "modules/auction-web", startRoute: "/auction/dashboard" },
   { id: "mod-vendor", code: "VENDOR", name: "Vendor Portal", category: "Operations", description: "Vendor app — trip acceptance, invoices, ledger, payments, vendor fleet.", status: "active", folderPath: "modules/vendor-web", startRoute: "/vendor" },
   { id: "mod-fleet", code: "FLEET", name: "Fleet Management", category: "Fleet", description: "Vehicles, drivers, maintenance, garage, tyres, fuel, compliance, dispatch.", status: "active", folderPath: "modules/fleet-web", startRoute: "/fleet/dashboard" },
   { id: "mod-tracking", code: "TRACKING", name: "Track and Trace", category: "Operations", description: "Live map, geofences, alerts, trip replay, route performance analytics.", status: "active", folderPath: "modules/track-trace-web", startRoute: "/tracking" },
   { id: "mod-customer", code: "CUSTOMER", name: "Customer Portal", category: "Operations", description: "Customer-facing booking visibility and dashboard.", status: "active", folderPath: "modules/customer-web", startRoute: "/customer" },
-  // Hidden from settings — no real implementation folder yet. Codes retained
-  // so any existing tenant permission data / references stay intact.
-  { id: "mod-procurement", code: "PROCUREMENT", name: "Procurement", category: "Procurement", description: "(No active folder — hidden from Module Settings.)", status: "inactive" },
-  { id: "mod-finance", code: "FINANCE", name: "Finance", category: "Finance", description: "(No active folder — hidden from Module Settings.)", status: "inactive" },
 ];
 
 export const mockPlatformTenants: TenantRecord[] = [
