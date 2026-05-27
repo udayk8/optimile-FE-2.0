@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, DataTable, PageHero } from '@shared-ui'
+import { Card, DataTable } from '@shared-ui'
 import { MetricGrid } from '../components/analytics/MetricGrid'
 import { TrackingAlertSeverityCard } from '../components/TrackingAlertSeverityCard'
 import { TrackingDelayTrendCard } from '../components/TrackingDelayTrendCard'
@@ -108,12 +108,6 @@ export function TrackingAnalyticsPage() {
   return (
     <TrackTraceAccessBoundary page="analytics">
       <div className="space-y-6">
-        <PageHero
-          eyebrow="Analytics"
-          title="Tracking analytics dashboard"
-          subtitle="Historical visibility into reliability, delay pressure, exceptions, and predicted risk."
-        />
-
         <Card className={trackTraceV2StickyPanelClassName}>
             <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
               <div>

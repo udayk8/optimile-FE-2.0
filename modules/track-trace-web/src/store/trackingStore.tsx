@@ -302,6 +302,7 @@ export function TrackingStoreProvider({ children }: PropsWithChildren) {
                   ...alert,
                   status: alert.status === 'Resolved' ? 'Resolved' : 'Acknowledged',
                   acknowledgedBy: payload.acknowledgedBy,
+                  acknowledgedAt: payload.updatedAt,
                   remarks: remarks ? [...(alert.remarks ?? []), remarks] : alert.remarks,
                   updatedAt: payload.updatedAt,
                 }

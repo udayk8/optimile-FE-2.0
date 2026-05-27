@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Filter, Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ArrowRight, Filter, Search, Send, X } from 'lucide-react';
 import { Trip, TripStatus, Vehicle, Driver, VehicleStatus, DriverStatus } from '../types/fleet.types';
 import { TripAPI, VehicleAPI, DriverAPI, ConfidenceAPI } from '../services/mockDatabase';
 import { TyreAPI } from '../services/tyreDatabase';
@@ -20,6 +20,8 @@ export const DispatchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -175,13 +177,20 @@ export const DispatchPage: React.FC = () => {
     fetchData();
   };
 
-  const filteredTrips = trips.filter(t => {
-    const matchesSearch = t.booking_reference.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          t.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.destination.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = filterStatus ? t.status === filterStatus : true;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredTrips = useMemo(() => {
+    setPage(1)
+    return trips.filter(t => {
+      const matchesSearch = t.booking_reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            t.destination.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesStatus = filterStatus ? t.status === filterStatus : true
+      return matchesSearch && matchesStatus
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trips, searchTerm, filterStatus])
+
+  const totalPages = Math.max(1, Math.ceil(filteredTrips.length / PAGE_SIZE))
+  const pagedTrips = filteredTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const getStatusColor = (status: TripStatus) => {
     switch(status) {
@@ -198,14 +207,47 @@ export const DispatchPage: React.FC = () => {
       return list.find(i => i[key === 'vehicle' ? 'vehicle_id' : 'driver_id'] === id)?.[key === 'vehicle' ? 'registration_number' : 'name'] || 'Unknown';
   };
 
+  const stats = useMemo(() => {
+    const unassigned = trips.filter(t => t.status === TripStatus.PLANNED && (!t.vehicle_id || !t.driver_id)).length
+    const enRoute = trips.filter(t => t.status === TripStatus.IN_TRANSIT || t.status === TripStatus.DISPATCHED).length
+    const delayed = trips.filter(t =>
+      (t.status === TripStatus.IN_TRANSIT || t.status === TripStatus.DISPATCHED) &&
+      new Date(t.scheduled_start_time) < new Date()
+    ).length
+    const completed = trips.filter(t => t.status === TripStatus.COMPLETED).length
+    return { unassigned, enRoute, delayed, completed }
+  }, [trips])
+
   if (selectedTripId) {
       return <TripDetailsPage tripId={selectedTripId} onBack={() => setSelectedTripId(null)} />;
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dispatch Console</h1>
+    <div className="min-w-0">
+
+      {/* ── Status strip ───────────────────────────────────────── */}
+      <div className="mb-6 flex items-stretch overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        {/* Total Active — no dot, larger label */}
+        <div className="flex min-w-0 flex-1 flex-col justify-center px-6 py-4">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-500">Total Active</p>
+          <p className="mt-1 text-3xl font-extrabold text-gray-900">{stats.enRoute + stats.unassigned}</p>
+        </div>
+
+        {[
+          { label: 'In Transit',  value: stats.enRoute,    dot: 'bg-blue-600'   },
+          { label: 'Delayed',     value: stats.delayed,    dot: 'bg-amber-400'  },
+          { label: 'Idle',        value: stats.unassigned, dot: 'bg-gray-400'   },
+          { label: 'Offline',     value: 0,                dot: 'bg-red-500'    },
+          { label: 'Completed',   value: stats.completed,  dot: 'bg-blue-400'   },
+        ].map(({ label, value, dot }) => (
+          <div key={label} className="flex min-w-0 flex-1 flex-col justify-center border-l border-gray-200 px-6 py-4">
+            <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-gray-500">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+              {label}
+            </p>
+            <p className="mt-1 text-3xl font-extrabold text-gray-900">{value}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mb-6">
@@ -266,81 +308,147 @@ export const DispatchPage: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white shadow overflow-hidden rounded-lg border border-gray-200">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
         {isLoading ? (
           <div className="p-12 text-center text-gray-500">Loading dispatch data...</div>
         ) : filteredTrips.length === 0 ? (
           <div className="p-12 text-center text-gray-500">No trips found.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Schedule</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicle / Driver</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          <table className="w-full table-fixed divide-y divide-gray-200">
+            <colgroup>
+              <col className="w-[130px]" />
+              <col className="w-auto" />
+              <col className="w-[130px]" />
+              <col className="w-[160px]" />
+              <col className="w-[110px]" />
+              <col className="w-[120px]" />
+            </colgroup>
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reference</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Route</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Schedule</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vehicle / Driver</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {pagedTrips.map((trip) => (
+                <tr key={trip.trip_id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <span className="text-sm font-medium text-gray-900">{trip.booking_reference}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="truncate text-sm text-gray-900">{trip.origin}</div>
+                    <div className="flex items-center truncate text-xs text-gray-500">
+                      <IconArrowRight className="mr-1 h-3 w-3 shrink-0" />
+                      <span className="truncate">{trip.destination}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {new Date(trip.scheduled_start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    <div className="truncate">{getName(trip.vehicle_id, vehicles, 'vehicle')}</div>
+                    <div className="truncate text-xs text-gray-400">{getName(trip.driver_id, drivers, 'driver')}</div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Badge color={getStatusColor(trip.status)}>{trip.status}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {/* Dispatch */}
+                      {trip.status === TripStatus.PLANNED && (
+                        <button
+                          type="button"
+                          title="Dispatch"
+                          onClick={() => handleDispatch(trip)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary transition hover:bg-primary hover:text-white"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+
+                      {/* Cancel / confirm */}
+                      {(trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED) && (
+                        cancelConfirmId === trip.trip_id ? (
+                          <span className="flex items-center gap-1 text-xs">
+                            <span className="text-gray-400">Sure?</span>
+                            <button
+                              type="button"
+                              onClick={async () => { await TripAPI.update(trip.trip_id, { status: TripStatus.CANCELLED }); setCancelConfirmId(null); fetchData(); }}
+                              className="font-semibold text-red-600 hover:text-red-800"
+                            >Yes</button>
+                            <button type="button" onClick={() => setCancelConfirmId(null)} className="text-gray-400 hover:text-gray-600">No</button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Cancel trip"
+                            onClick={() => setCancelConfirmId(trip.trip_id)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-500"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )
+                      )}
+
+                      {/* Edit */}
+                      <button
+                        title="Edit"
+                        onClick={() => handleOpenModal(trip)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <IconEdit className="h-4 w-4" />
+                      </button>
+
+                      {/* View */}
+                      <button
+                        title="View details"
+                        onClick={() => setSelectedTripId(trip.trip_id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-primary"
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTrips.map((trip) => (
-                  <tr key={trip.trip_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-gray-900">{trip.booking_reference}</span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{trip.origin}</div>
-                        <div className="text-xs text-gray-500 flex items-center">
-                            <IconArrowRight className="w-3 h-3 mr-1" />
-                            {trip.destination}
-                        </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(trip.scheduled_start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex flex-col">
-                            <span>{getName(trip.vehicle_id, vehicles, 'vehicle')}</span>
-                            <span className="text-xs text-gray-400">{getName(trip.driver_id, drivers, 'driver')}</span>
-                        </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge color={getStatusColor(trip.status)}>{trip.status}</Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
-                            {trip.status === TripStatus.PLANNED && (
-                                <Button size="sm" variant="secondary" onClick={() => handleDispatch(trip)}>Dispatch</Button>
-                            )}
-                            {(trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED) && (
-                                cancelConfirmId === trip.trip_id ? (
-                                    <span className="flex items-center gap-1 text-xs">
-                                        <span className="text-gray-500">Sure?</span>
-                                        <button type="button" onClick={async () => { await TripAPI.update(trip.trip_id, { status: TripStatus.CANCELLED }); setCancelConfirmId(null); fetchData(); }} className="text-red-600 font-semibold hover:text-red-800">Yes</button>
-                                        <button type="button" onClick={() => setCancelConfirmId(null)} className="text-gray-400 hover:text-gray-600">No</button>
-                                    </span>
-                                ) : (
-                                    <button type="button" onClick={() => setCancelConfirmId(trip.trip_id)} className="text-xs text-red-500 hover:text-red-700">Cancel</button>
-                                )
-                            )}
-                            <button onClick={() => handleOpenModal(trip)} className="text-gray-400 hover:text-gray-600">
-                                <IconEdit className="w-4 h-4" />
-                            </button>
-                             <button onClick={() => setSelectedTripId(trip.trip_id)} className="text-primary hover:text-secondary bg-primary/10 px-2 py-1 rounded text-xs flex items-center">
-                                View
-                                <IconArrowRight className="w-3 h-3 ml-1" />
-                            </button>
-                        </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
+
+      {/* ── Pagination ─────────────────────────────────────────── */}
+      {!isLoading && (
+        <div className="mt-4 flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+          <p className="text-sm text-gray-500">
+            Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredTrips.length)}–{Math.min(page * PAGE_SIZE, filteredTrips.length)} of {filteredTrips.length} trips
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage(p => p - 1)}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              ← Prev
+            </button>
+            <span className="min-w-[80px] text-center text-sm font-medium text-gray-600">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage(p => p + 1)}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Assign Vehicle & Driver">
         <form onSubmit={handleSubmit}>

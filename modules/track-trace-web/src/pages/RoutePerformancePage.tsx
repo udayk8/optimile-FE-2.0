@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, DataTable, PageHero } from '@shared-ui'
+import { Card, DataTable } from '@shared-ui'
 import { MetricGrid } from '../components/analytics/MetricGrid'
 import { TrackTraceAccessBoundary } from '../components/TrackTraceAccessBoundary'
 import { EmptyPlaceholder } from '../components/EmptyPlaceholder'
@@ -85,12 +85,6 @@ export function RoutePerformancePage() {
   return (
     <TrackTraceAccessBoundary page="route-performance">
       <div className="space-y-6">
-        <PageHero
-          eyebrow="Route Performance"
-          title="Route performance insights"
-          subtitle="Corridor performance workspace for delay pressure, route efficiency, and lane-level exception focus."
-        />
-
         <Card className={trackTraceV2StickyPanelClassName}>
           <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr]">
             <div>

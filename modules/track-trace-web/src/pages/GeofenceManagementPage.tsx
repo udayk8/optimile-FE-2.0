@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Card, PageHero } from '@shared-ui'
+import { Button, Card } from '@shared-ui'
 import { EmptyPlaceholder } from '../components/EmptyPlaceholder'
 import { GeofenceForm } from '../components/GeofenceForm'
 import { GeofenceList } from '../components/GeofenceList'
@@ -163,12 +163,6 @@ export function GeofenceManagementPage() {
             {deleteError}
           </div>
         )}
-
-        <PageHero
-          eyebrow="Geofences"
-          title="Geofence management"
-          subtitle="Operational control surface for pickup, drop, checkpoints, yards, customer sites, and restricted zones with validation, search, and clearer spatial intent."
-        />
 
         <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
             <Card className="border-gray-300 p-5 sm:p-6">

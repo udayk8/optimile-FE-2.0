@@ -286,7 +286,7 @@ function createTrip(seed: {
 
 export const trackingTrips: TrackingTrip[] = [
   createTrip({
-    id: 'TRIP-1001',
+    id: 'trip-001',
     bookingId: 'BK-2401',
     vehicleId: 'veh-001',
     customerName: 'Asian Paints North',
@@ -315,7 +315,7 @@ export const trackingTrips: TrackingTrip[] = [
     trackingDeviceId: 'trk-veh-001-gps',
   }),
   createTrip({
-    id: 'TRIP-1002',
+    id: 'trip-002',
     bookingId: 'BK-2417',
     vehicleId: 'veh-002',
     customerName: 'ITC South Distribution',
@@ -346,7 +346,7 @@ export const trackingTrips: TrackingTrip[] = [
     trackingDeviceId: 'trk-veh-002-fastag',
   }),
   createTrip({
-    id: 'TRIP-1003',
+    id: 'trip-003',
     bookingId: 'BK-2409',
     vehicleId: 'veh-003',
     customerName: 'Tata Consumer Hub',
@@ -377,7 +377,7 @@ export const trackingTrips: TrackingTrip[] = [
     trackingDeviceId: 'trk-veh-003-app',
   }),
   createTrip({
-    id: 'TRIP-1004',
+    id: 'trip-004',
     bookingId: 'BK-2450',
     customerName: 'Reliance Retail West',
     vehicleNumber: 'GJ 01 VV 6312',
@@ -401,7 +401,7 @@ export const trackingTrips: TrackingTrip[] = [
     customerSafeStatus: 'Vehicle at pickup gate and loading slot confirmed',
   }),
   createTrip({
-    id: 'TRIP-1005',
+    id: 'trip-005',
     bookingId: 'BK-2458',
     customerName: 'Dabur Wellness North',
     vehicleNumber: 'RJ 14 QD 9910',
@@ -426,7 +426,7 @@ export const trackingTrips: TrackingTrip[] = [
     actualRouteCities: ['Jaipur', 'Kanpur', 'Lucknow'],
   }),
   createTrip({
-    id: 'TRIP-1006',
+    id: 'trip-006',
     bookingId: 'BK-2461',
     customerName: 'HUL East Distribution',
     vehicleNumber: 'WB 23 AA 7002',
@@ -452,7 +452,7 @@ export const trackingTrips: TrackingTrip[] = [
     source: 'FASTAG',
   }),
   createTrip({
-    id: 'TRIP-1007',
+    id: 'trip-007',
     bookingId: 'BK-2465',
     customerName: 'Adani Cement Central',
     vehicleNumber: 'MP 09 KH 4461',
@@ -478,7 +478,7 @@ export const trackingTrips: TrackingTrip[] = [
     actualRouteCities: ['Indore', 'Nagda', 'Nagpur'],
   }),
   createTrip({
-    id: 'TRIP-1008',
+    id: 'trip-008',
     bookingId: 'BK-2472',
     customerName: 'Britannia South Foods',
     vehicleNumber: 'KA 51 LH 1880',
@@ -503,7 +503,7 @@ export const trackingTrips: TrackingTrip[] = [
     customerSafeStatus: 'Vehicle paused at linehaul stop',
   }),
   createTrip({
-    id: 'TRIP-1009',
+    id: 'trip-009',
     bookingId: 'BK-2479',
     customerName: 'Marico North Hub',
     vehicleNumber: 'PB 10 UX 6501',
@@ -526,7 +526,7 @@ export const trackingTrips: TrackingTrip[] = [
     customerSafeStatus: 'Loading in progress at origin hub',
   }),
   createTrip({
-    id: 'TRIP-1010',
+    id: 'trip-010',
     bookingId: 'BK-2484',
     customerName: 'Nestle North East',
     vehicleNumber: 'WB 74 ZP 2301',
@@ -550,7 +550,7 @@ export const trackingTrips: TrackingTrip[] = [
     customerSafeStatus: 'Final linehaul leg in progress',
   }),
   createTrip({
-    id: 'TRIP-1011',
+    id: 'trip-011',
     bookingId: 'BK-2490',
     customerName: 'Pidilite West Region',
     vehicleNumber: 'GJ 15 HT 8900',
@@ -576,7 +576,7 @@ export const trackingTrips: TrackingTrip[] = [
     source: 'FASTAG',
   }),
   createTrip({
-    id: 'TRIP-1012',
+    id: 'trip-012',
     bookingId: 'BK-2494',
     customerName: 'Tata Steel East',
     vehicleNumber: 'JH 05 CE 1180',
@@ -601,7 +601,7 @@ export const trackingTrips: TrackingTrip[] = [
     customerSafeStatus: 'Vehicle stationary at transit point',
   }),
   createTrip({
-    id: 'TRIP-1013',
+    id: 'trip-013',
     bookingId: 'BK-2498',
     customerName: 'Godrej Appliances NCR',
     vehicleNumber: 'UP 16 BF 7711',
@@ -629,34 +629,34 @@ export const trackingTrips: TrackingTrip[] = [
 ]
 
 export const trackingEvents: TrackingEvent[] = [
-  { id: 'EV-1', tripId: 'TRIP-1001', type: 'GPS Ping', title: 'Vehicle crossed Nagpur checkpoint', description: 'Vehicle reported healthy movement on the planned Delhi to Bengaluru corridor.', eventTime: '2026-05-06T10:20:00+05:30', location: 'Nagpur' },
-  { id: 'EV-2', tripId: 'TRIP-1001', type: 'Delay Update', title: 'ETA revised by 180 minutes', description: 'Highway congestion increased downstream ETA for the delivery window.', eventTime: '2026-05-06T10:10:00+05:30', location: 'Nagpur' },
-  { id: 'EV-3', tripId: 'TRIP-1002', type: 'Route Deviation', title: 'Vehicle moved off planned lane', description: 'The truck diverted from the approved route near Nellore and was flagged by control tower.', eventTime: '2026-05-06T09:02:00+05:30', location: 'Nellore' },
-  { id: 'EV-4', tripId: 'TRIP-1002', type: 'Alert Raised', title: 'Critical delay alert opened', description: 'Delivery ETA exceeded the exception threshold and customer risk classification turned red.', eventTime: '2026-05-06T09:08:00+05:30', location: 'Nellore' },
-  { id: 'EV-5', tripId: 'TRIP-1003', type: 'Delivery', title: 'Trip completed at customer gate', description: 'Mobile POD was captured and the consignee signed off on the delivery.', eventTime: '2026-05-06T07:10:00+05:30', location: 'Pune' },
-  { id: 'EV-6', tripId: 'TRIP-1004', type: 'Pickup', title: 'Vehicle reported at pickup dock', description: 'Dispatch confirmed loading slot readiness at Ahmedabad pickup gate.', eventTime: '2026-05-06T08:18:00+05:30', location: 'Ahmedabad' },
-  { id: 'EV-7', tripId: 'TRIP-1005', type: 'ETA Update', title: 'Near-destination ETA refined', description: 'Vehicle is approaching Lucknow and unloading slot is being prepared.', eventTime: '2026-05-06T11:15:00+05:30', location: 'Lucknow' },
-  { id: 'EV-8', tripId: 'TRIP-1006', type: 'Offline', title: 'Telemetry heartbeat missed', description: 'GPS feed stopped updating after Kharagpur and fallback data source is now FASTAG.', eventTime: '2026-05-06T07:10:00+05:30', location: 'Kharagpur' },
-  { id: 'EV-9', tripId: 'TRIP-1007', type: 'Deviation', title: 'Route deviation exceeded threshold', description: 'Vehicle diverged 22 km from the approved path and requires dispatcher follow-up.', eventTime: '2026-05-06T10:35:00+05:30', location: 'Nagda' },
-  { id: 'EV-10', tripId: 'TRIP-1008', type: 'Idle', title: 'Long idle stop detected', description: 'Vehicle remained stationary at Salem for more than 45 minutes.', eventTime: '2026-05-06T09:52:00+05:30', location: 'Salem' },
-  { id: 'EV-11', tripId: 'TRIP-1009', type: 'Loading', title: 'Loading activity started', description: 'Warehouse started pallet loading for the Delhi run.', eventTime: '2026-05-06T09:18:00+05:30', location: 'Ludhiana' },
-  { id: 'EV-12', tripId: 'TRIP-1010', type: 'Transit', title: 'Final leg underway', description: 'Vehicle cleared the last linehaul checkpoint toward Guwahati.', eventTime: '2026-05-06T05:55:00+05:30', location: 'Guwahati' },
-  { id: 'EV-13', tripId: 'TRIP-1011', type: 'Offline', title: 'Vapi to Nashik feed interrupted', description: 'Operations switched to alternate vehicle visibility source due to GPS outage.', eventTime: '2026-05-06T06:35:00+05:30', location: 'Nashik' },
-  { id: 'EV-14', tripId: 'TRIP-1012', type: 'Stop Alert', title: 'Vehicle stopped at transit point', description: 'Driver confirmed a tyre inspection halt during the Patna lane movement.', eventTime: '2026-05-06T08:45:00+05:30', location: 'Raipur' },
-  { id: 'EV-15', tripId: 'TRIP-1013', type: 'Offline', title: 'Noida trip lost network coverage', description: 'Network loss detected after dispatch and live tracking is pending reconnection.', eventTime: '2026-05-06T10:05:00+05:30', location: 'Noida' },
+  { id: 'EV-1', tripId: 'trip-001', type: 'GPS Ping', title: 'Vehicle crossed Nagpur checkpoint', description: 'Vehicle reported healthy movement on the planned Delhi to Bengaluru corridor.', eventTime: '2026-05-06T10:20:00+05:30', location: 'Nagpur' },
+  { id: 'EV-2', tripId: 'trip-001', type: 'Delay Update', title: 'ETA revised by 180 minutes', description: 'Highway congestion increased downstream ETA for the delivery window.', eventTime: '2026-05-06T10:10:00+05:30', location: 'Nagpur' },
+  { id: 'EV-3', tripId: 'trip-002', type: 'Route Deviation', title: 'Vehicle moved off planned lane', description: 'The truck diverted from the approved route near Nellore and was flagged by control tower.', eventTime: '2026-05-06T09:02:00+05:30', location: 'Nellore' },
+  { id: 'EV-4', tripId: 'trip-002', type: 'Alert Raised', title: 'Critical delay alert opened', description: 'Delivery ETA exceeded the exception threshold and customer risk classification turned red.', eventTime: '2026-05-06T09:08:00+05:30', location: 'Nellore' },
+  { id: 'EV-5', tripId: 'trip-003', type: 'Delivery', title: 'Trip completed at customer gate', description: 'Mobile POD was captured and the consignee signed off on the delivery.', eventTime: '2026-05-06T07:10:00+05:30', location: 'Pune' },
+  { id: 'EV-6', tripId: 'trip-004', type: 'Pickup', title: 'Vehicle reported at pickup dock', description: 'Dispatch confirmed loading slot readiness at Ahmedabad pickup gate.', eventTime: '2026-05-06T08:18:00+05:30', location: 'Ahmedabad' },
+  { id: 'EV-7', tripId: 'trip-005', type: 'ETA Update', title: 'Near-destination ETA refined', description: 'Vehicle is approaching Lucknow and unloading slot is being prepared.', eventTime: '2026-05-06T11:15:00+05:30', location: 'Lucknow' },
+  { id: 'EV-8', tripId: 'trip-006', type: 'Offline', title: 'Telemetry heartbeat missed', description: 'GPS feed stopped updating after Kharagpur and fallback data source is now FASTAG.', eventTime: '2026-05-06T07:10:00+05:30', location: 'Kharagpur' },
+  { id: 'EV-9', tripId: 'trip-007', type: 'Deviation', title: 'Route deviation exceeded threshold', description: 'Vehicle diverged 22 km from the approved path and requires dispatcher follow-up.', eventTime: '2026-05-06T10:35:00+05:30', location: 'Nagda' },
+  { id: 'EV-10', tripId: 'trip-008', type: 'Idle', title: 'Long idle stop detected', description: 'Vehicle remained stationary at Salem for more than 45 minutes.', eventTime: '2026-05-06T09:52:00+05:30', location: 'Salem' },
+  { id: 'EV-11', tripId: 'trip-009', type: 'Loading', title: 'Loading activity started', description: 'Warehouse started pallet loading for the Delhi run.', eventTime: '2026-05-06T09:18:00+05:30', location: 'Ludhiana' },
+  { id: 'EV-12', tripId: 'trip-010', type: 'Transit', title: 'Final leg underway', description: 'Vehicle cleared the last linehaul checkpoint toward Guwahati.', eventTime: '2026-05-06T05:55:00+05:30', location: 'Guwahati' },
+  { id: 'EV-13', tripId: 'trip-011', type: 'Offline', title: 'Vapi to Nashik feed interrupted', description: 'Operations switched to alternate vehicle visibility source due to GPS outage.', eventTime: '2026-05-06T06:35:00+05:30', location: 'Nashik' },
+  { id: 'EV-14', tripId: 'trip-012', type: 'Stop Alert', title: 'Vehicle stopped at transit point', description: 'Driver confirmed a tyre inspection halt during the Patna lane movement.', eventTime: '2026-05-06T08:45:00+05:30', location: 'Raipur' },
+  { id: 'EV-15', tripId: 'trip-013', type: 'Offline', title: 'Noida trip lost network coverage', description: 'Network loss detected after dispatch and live tracking is pending reconnection.', eventTime: '2026-05-06T10:05:00+05:30', location: 'Noida' },
 ]
 
 export const trackingAlerts: TrackingAlert[] = [
-  { id: 'AL-1', tripId: 'TRIP-1002', vehicleNumber: 'TN 18 BX 4410', type: 'Trip Delayed', severity: 'Critical', status: 'Open', message: 'Delivery ETA missed the committed slot by more than 4 hours.', location: 'Nellore', createdAt: '2026-05-06T09:08:00+05:30', assignedTo: 'South Control Tower' },
-  { id: 'AL-2', tripId: 'TRIP-1006', vehicleNumber: 'WB 23 AA 7002', type: 'Vehicle Offline', severity: 'High', status: 'Open', message: 'Vehicle heartbeat has not updated for 65 minutes.', location: 'Kharagpur', createdAt: '2026-05-06T07:15:00+05:30', assignedTo: 'East Dispatch' },
-  { id: 'AL-3', tripId: 'TRIP-1007', vehicleNumber: 'MP 09 KH 4461', type: 'Route Deviation', severity: 'Critical', status: 'Acknowledged', message: 'Truck deviated 22 km from approved route path.', location: 'Nagda', createdAt: '2026-05-06T10:36:00+05:30', assignedTo: 'Fleet Supervisor' },
-  { id: 'AL-4', tripId: 'TRIP-1008', vehicleNumber: 'KA 51 LH 1880', type: 'Long Idle', severity: 'Medium', status: 'Open', message: 'Vehicle remained idle for 48 minutes at linehaul stop.', location: 'Salem', createdAt: '2026-05-06T09:53:00+05:30', assignedTo: 'South Ops Desk' },
-  { id: 'AL-5', tripId: 'TRIP-1012', vehicleNumber: 'JH 05 CE 1180', type: 'Unplanned Stop', severity: 'High', status: 'Acknowledged', message: 'Vehicle has stopped longer than the configured threshold.', location: 'Raipur', createdAt: '2026-05-06T08:47:00+05:30', assignedTo: 'Central Ops' },
-  { id: 'AL-6', tripId: 'TRIP-1013', vehicleNumber: 'UP 16 BF 7711', type: 'GPS Not Updating', severity: 'High', status: 'Open', message: 'No new GPS ping received after dispatch from origin.', location: 'Noida', createdAt: '2026-05-06T10:06:00+05:30', assignedTo: 'NCR Dispatch' },
-  { id: 'AL-7', tripId: 'TRIP-1001', vehicleNumber: 'MH 04 KU 7812', type: 'Checkpoint Missed', severity: 'Medium', status: 'Resolved', message: 'Vehicle crossed the checkpoint later than planned but recovered lane health.', location: 'Nagpur', createdAt: '2026-05-06T09:45:00+05:30', assignedTo: 'Control Tower West' },
-  { id: 'AL-8', tripId: 'TRIP-1005', vehicleNumber: 'RJ 14 QD 9910', type: 'Trip Delayed', severity: 'Low', status: 'Resolved', message: 'Last-mile gate congestion caused a minor ETA shift.', location: 'Lucknow', createdAt: '2026-05-06T10:40:00+05:30', assignedTo: 'North Delivery Desk' },
-  { id: 'AL-9', tripId: 'TRIP-1010', vehicleNumber: 'WB 74 ZP 2301', type: 'Overspeed', severity: 'Medium', status: 'Acknowledged', message: 'Overspeed event detected on the final Assam corridor.', location: 'Guwahati', createdAt: '2026-05-06T05:20:00+05:30', assignedTo: 'North East Control Tower' },
-  { id: 'AL-10', tripId: 'TRIP-1009', vehicleNumber: 'PB 10 UX 6501', type: 'Driver SOS', severity: 'Critical', status: 'Resolved', message: 'Driver raised an SOS during loading and later marked it false alarm.', location: 'Ludhiana', createdAt: '2026-05-06T09:25:00+05:30', assignedTo: 'Security Desk' },
+  { id: 'AL-1', tripId: 'trip-002', vehicleNumber: 'TN 18 BX 4410', type: 'Trip Delayed', severity: 'Critical', status: 'Open', message: 'Delivery ETA missed the committed slot by more than 4 hours.', location: 'Nellore', createdAt: '2026-05-06T09:08:00+05:30', assignedTo: 'South Control Tower' },
+  { id: 'AL-2', tripId: 'trip-006', vehicleNumber: 'WB 23 AA 7002', type: 'Vehicle Offline', severity: 'High', status: 'Open', message: 'Vehicle heartbeat has not updated for 65 minutes.', location: 'Kharagpur', createdAt: '2026-05-06T07:15:00+05:30', assignedTo: 'East Dispatch' },
+  { id: 'AL-3', tripId: 'trip-007', vehicleNumber: 'MP 09 KH 4461', type: 'Route Deviation', severity: 'Critical', status: 'Acknowledged', message: 'Truck deviated 22 km from approved route path.', location: 'Nagda', createdAt: '2026-05-06T10:36:00+05:30', assignedTo: 'Fleet Supervisor' },
+  { id: 'AL-4', tripId: 'trip-008', vehicleNumber: 'KA 51 LH 1880', type: 'Long Idle', severity: 'Medium', status: 'Open', message: 'Vehicle remained idle for 48 minutes at linehaul stop.', location: 'Salem', createdAt: '2026-05-06T09:53:00+05:30', assignedTo: 'South Ops Desk' },
+  { id: 'AL-5', tripId: 'trip-012', vehicleNumber: 'JH 05 CE 1180', type: 'Unplanned Stop', severity: 'High', status: 'Acknowledged', message: 'Vehicle has stopped longer than the configured threshold.', location: 'Raipur', createdAt: '2026-05-06T08:47:00+05:30', assignedTo: 'Central Ops' },
+  { id: 'AL-6', tripId: 'trip-013', vehicleNumber: 'UP 16 BF 7711', type: 'GPS Not Updating', severity: 'High', status: 'Open', message: 'No new GPS ping received after dispatch from origin.', location: 'Noida', createdAt: '2026-05-06T10:06:00+05:30', assignedTo: 'NCR Dispatch' },
+  { id: 'AL-7', tripId: 'trip-001', vehicleNumber: 'MH 04 KU 7812', type: 'Checkpoint Missed', severity: 'Medium', status: 'Resolved', message: 'Vehicle crossed the checkpoint later than planned but recovered lane health.', location: 'Nagpur', createdAt: '2026-05-06T09:45:00+05:30', assignedTo: 'Control Tower West' },
+  { id: 'AL-8', tripId: 'trip-005', vehicleNumber: 'RJ 14 QD 9910', type: 'Trip Delayed', severity: 'Low', status: 'Resolved', message: 'Last-mile gate congestion caused a minor ETA shift.', location: 'Lucknow', createdAt: '2026-05-06T10:40:00+05:30', assignedTo: 'North Delivery Desk' },
+  { id: 'AL-9', tripId: 'trip-010', vehicleNumber: 'WB 74 ZP 2301', type: 'Overspeed', severity: 'Medium', status: 'Acknowledged', message: 'Overspeed event detected on the final Assam corridor.', location: 'Guwahati', createdAt: '2026-05-06T05:20:00+05:30', assignedTo: 'North East Control Tower' },
+  { id: 'AL-10', tripId: 'trip-009', vehicleNumber: 'PB 10 UX 6501', type: 'Driver SOS', severity: 'Critical', status: 'Resolved', message: 'Driver raised an SOS during loading and later marked it false alarm.', location: 'Ludhiana', createdAt: '2026-05-06T09:25:00+05:30', assignedTo: 'Security Desk' },
 ]
 
 export function buildTrackingDashboardSummary(trips: TrackingTrip[], alerts: TrackingAlert[]): TrackingDashboardSummary {

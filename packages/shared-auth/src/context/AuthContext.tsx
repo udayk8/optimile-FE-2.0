@@ -109,13 +109,6 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     permissions: ['ams:read', 'ams:write'],
     modules: ['ams'],
   },
-  // Alternate fleet-only demo user.
-  'fleet@optimile.com': {
-    name: 'Fleet User',
-    role: 'Fleet Only',
-    permissions: ['fleet:read', 'fleet:write'],
-    modules: ['fleet'],
-  },
   // Alternate vendor-only demo user.
   'vendor@optimile.com': {
     name: 'Vendor User',

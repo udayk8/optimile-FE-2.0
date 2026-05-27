@@ -14,7 +14,7 @@ import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './she
 import './styles.css'
 
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
-const TrackingApp = lazy(() => import('./tracking/TrackingApp'))
+const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
 const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
 const TmsDriverAppApp = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))

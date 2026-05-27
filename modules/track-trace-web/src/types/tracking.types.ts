@@ -166,6 +166,7 @@ export interface TrackingAlert {
   assignedTo?: string
   remarks?: string[]
   acknowledgedBy?: string
+  acknowledgedAt?: string
   resolvedBy?: string
   resolutionNote?: string
   updatedAt?: string
