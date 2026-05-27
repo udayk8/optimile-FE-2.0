@@ -4,7 +4,6 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import {
   AuthProvider,
   ForgotPassword,
-  LoginShell,
   PostLoginDashboard,
   ProtectedRoute,
   ResetPassword,
@@ -16,8 +15,9 @@ import './styles.css'
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
 const TrackingApp = lazy(() => import('./tracking/TrackingApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
+const TenantAdminApp = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
 const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
-const TmsDriverAppApp = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))
+const UnifiedLoginPage = lazy(() => import('@shared-admin-core/auth/unified-login-page'))
 
 const Fallback = (
   <div style={{ alignItems: 'center', color: '#64748b', display: 'flex', fontSize: 14, justifyContent: 'center', minHeight: '100vh' }}>
@@ -71,7 +71,7 @@ function EntryRoute() {
   if (loading) return Fallback
 
   if (!isAuthenticated) {
-    return <LoginShell />
+    return <Navigate to="/login" replace />
   }
 
   return <Navigate to={getPostLoginRoute() || getDefaultLandingPath()} replace />
@@ -87,19 +87,19 @@ function DefaultRedirect() {
 
 function LegacyTenantRedirect() {
   const location = useLocation()
-  const nextPath = location.pathname.replace(/^\/tenant\//, '/platform-admin/tenant/')
+  const nextPath = location.pathname.replace(/^\/tenant\//, '/tenant-admin/tenant/')
   return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
 }
 
 function LegacyTmsBookingRedirect() {
   const location = useLocation()
-  const nextPath = location.pathname.replace(/^\/tms\/booking\/tenant\//, '/platform-admin/tenant/')
+  const nextPath = location.pathname.replace(/^\/tms\/booking\/tenant\//, '/tenant-admin/tenant/')
   return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
 }
 
 function TenantAdminLoginRedirect() {
   const location = useLocation()
-  return <Navigate to={`/platform-admin/tenant-login${location.search}${location.hash}`} replace />
+  return <Navigate to={`/login${location.search}${location.hash}`} replace />
 }
 
 function HostRouter() {
@@ -108,7 +108,7 @@ function HostRouter() {
       <AuthProvider>
         <Suspense fallback={Fallback}>
           <Routes>
-            <Route path="/login" element={<LoginShell />} />
+            <Route path="/login" element={<UnifiedLoginPage />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -131,10 +131,9 @@ function HostRouter() {
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTenantRedirect /></ProtectedRoute>} />
             <Route path="/tenant-admin/login" element={<TenantAdminLoginRedirect />} />
-            <Route path="/tenant-admin/*" element={<Navigate to="/platform-admin/dashboard" replace />} />
+            <Route path="/tenant-admin/*" element={<ProtectedRoute portal="platform-admin"><TenantAdminApp /></ProtectedRoute>} />
             <Route path="/tms/booking/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTmsBookingRedirect /></ProtectedRoute>} />
             <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms"><TmsBookingApp /></ProtectedRoute>} />
-            <Route path="/driver-app/*" element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
 
             <Route path="/" element={<EntryRoute />} />
             <Route path="*" element={<DefaultRedirect />} />
