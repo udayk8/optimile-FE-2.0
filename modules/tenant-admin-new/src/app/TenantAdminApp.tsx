@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, useEffect, useState } from 'react'
 import { AuthProvider } from '@shared-auth'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from 'react-router-dom'
 import { MockStoreProvider, useMockStore } from '@/shared/store/mock-store'
@@ -7,38 +7,56 @@ import { ThemeProvider } from '@/shared/components/layout/theme-provider'
 import { TenantLayout } from '../layouts/tenant/tenant-layout'
 import { storageKeys, writeStoredValue } from '@/shared/lib/storage/browser-storage'
 import { TenantDashboardPage } from '../modules/tenant-admin/pages/dashboard/tenant-dashboard-page'
-import { TenantCustomersPage, TenantCustomerDetailPage } from '../modules/tenant-admin/pages/customers/tenant-customers-pages'
-import { TenantVendorsPage, TenantVendorDetailPage } from '../modules/tenant-admin/pages/vendors/tenant-vendors-pages'
-import { TenantDriversPage, TenantVehiclesPage } from '../modules/tenant-admin/pages/fleet/tenant-fleet-pages'
-// Master-data pages live in the legacy file; the LR config / operations
-// pages have an active, governance-aware implementation under pages/lr.
-import { TenantVehicleTypesPage, TenantMaterialsPage, TenantUOMConfigurationPage } from '../modules/tenant-admin/pages/master-data/tenant-master-data-pages'
-import { TenantLRConfigPage } from '../modules/tenant-admin/pages/lr/lr-config-page'
-import { TenantLrOperationsPage } from '../modules/tenant-admin/pages/lr/lr-operations-page'
-import { TenantRoleDetailPage, TenantUserDetailPage } from '../modules/tenant-admin/pages/access/tenant-access-detail-pages'
-import { TenantAuditLogsPage, TenantHierarchyPage, TenantModulesPage, TenantOrgUnitsPage, TenantRolePermissionsPage, TenantRolesPage, TenantSettingsPage, TenantUsersPage } from '../modules/tenant-admin/pages/shared/tenant-placeholder-pages'
-import {
-  BookingSetupOverviewPage,
-  TenantAddressBookPage,
-  TenantAssignmentRulesPage,
-  TenantDocumentRulesPage,
-  TenantPodRulesPage,
-} from '../modules/tenant-admin/pages/booking-setup/booking-setup-pages'
+// Tenant pages (everything except the dashboard) are code-split so the
+// dashboard renders without pulling the whole tenant workspace bundle.
+const TenantCustomersPage = lazy(() => import('../modules/tenant-admin/pages/customers/tenant-customers-pages').then((m) => ({ default: m.TenantCustomersPage })))
+const TenantCustomerDetailPage = lazy(() => import('../modules/tenant-admin/pages/customers/tenant-customers-pages').then((m) => ({ default: m.TenantCustomerDetailPage })))
+const TenantVendorsPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorsPage })))
+const TenantVendorDetailPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorDetailPage })))
+const TenantDriversPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantDriversPage })))
+const TenantVehiclesPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantVehiclesPage })))
+const TenantVehicleTypesPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantVehicleTypesPage })))
+const TenantMaterialsPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantMaterialsPage })))
+const TenantUOMConfigurationPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantUOMConfigurationPage })))
+const TenantLRConfigPage = lazy(() => import('../modules/tenant-admin/pages/lr/lr-config-page').then((m) => ({ default: m.TenantLRConfigPage })))
+const TenantLrOperationsPage = lazy(() => import('../modules/tenant-admin/pages/lr/lr-operations-page').then((m) => ({ default: m.TenantLrOperationsPage })))
+const TenantRoleDetailPage = lazy(() => import('../modules/tenant-admin/pages/access/tenant-access-detail-pages').then((m) => ({ default: m.TenantRoleDetailPage })))
+const TenantUserDetailPage = lazy(() => import('../modules/tenant-admin/pages/access/tenant-access-detail-pages').then((m) => ({ default: m.TenantUserDetailPage })))
+const TenantAuditLogsPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantAuditLogsPage })))
+const TenantHierarchyPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantHierarchyPage })))
+const TenantModulesPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantModulesPage })))
+const TenantOrgUnitsPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantOrgUnitsPage })))
+const TenantRolePermissionsPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantRolePermissionsPage })))
+const TenantRolesPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantRolesPage })))
+const TenantSettingsPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantSettingsPage })))
+const TenantUsersPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantUsersPage })))
+const BookingSetupOverviewPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.BookingSetupOverviewPage })))
+const TenantAddressBookPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantAddressBookPage })))
+const TenantAssignmentRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantAssignmentRulesPage })))
+const TenantDocumentRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantDocumentRulesPage })))
+const TenantPodRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantPodRulesPage })))
 import { PermissionGate } from '@/modules/tenant-admin/components/permission-gate'
-import { BookingListPage } from '../modules/tms/booking/BookingList'
-import { CreateBookingPage } from '../modules/tms/booking/CreateBooking'
-import { BookingDetailsPage } from '../modules/tms/booking/BookingDetails'
-import { BookingDocumentsPage } from '../modules/tms/booking/BookingDocumentsPage'
-import { BookingLRViewPage } from '../modules/tms/booking/BookingLRView'
-import { AssignmentQueuePage } from '../modules/tms/booking/AssignmentQueue'
-import { RateApprovalQueuePage } from '../modules/tms/booking/RateApprovalQueue'
-import { LiveTrackingPlaceholderPage, PODCompletedPage } from '../modules/tms/booking/BookingSupportPages'
-import { ShipmentDocumentsListPage, BookingReportsPage } from '../modules/tenant-admin/pages/booking-stubs/booking-stub-pages'
-import { VendorEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/vendor-embedded'
-import { FleetEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/fleet-embedded'
-import { AuctionEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/auction-embedded'
-import { CustomerEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/customer-embedded'
-import { TrackingEmbeddedApp } from '../modules/tenant-admin/pages/embedded-modules/tracking-embedded'
+const ShipmentDocumentsListPage = lazy(() => import('../modules/tenant-admin/pages/booking-stubs/booking-stub-pages').then((m) => ({ default: m.ShipmentDocumentsListPage })))
+const BookingReportsPage = lazy(() => import('../modules/tenant-admin/pages/booking-stubs/booking-stub-pages').then((m) => ({ default: m.BookingReportsPage })))
+
+// Code-split the heavy booking pages (TMS booking engine) and the embedded
+// module apps (auction/vendor/fleet/track-trace/customer) so the tenant
+// dashboard loads fast — these chunks are fetched only when their route is
+// visited. The Suspense boundary lives in TenantLayout (keeps the shell up).
+const BookingListPage = lazy(() => import('../modules/tms/booking/BookingList').then((m) => ({ default: m.BookingListPage })))
+const CreateBookingPage = lazy(() => import('../modules/tms/booking/CreateBooking').then((m) => ({ default: m.CreateBookingPage })))
+const BookingDetailsPage = lazy(() => import('../modules/tms/booking/BookingDetails').then((m) => ({ default: m.BookingDetailsPage })))
+const BookingDocumentsPage = lazy(() => import('../modules/tms/booking/BookingDocumentsPage').then((m) => ({ default: m.BookingDocumentsPage })))
+const BookingLRViewPage = lazy(() => import('../modules/tms/booking/BookingLRView').then((m) => ({ default: m.BookingLRViewPage })))
+const AssignmentQueuePage = lazy(() => import('../modules/tms/booking/AssignmentQueue').then((m) => ({ default: m.AssignmentQueuePage })))
+const RateApprovalQueuePage = lazy(() => import('../modules/tms/booking/RateApprovalQueue').then((m) => ({ default: m.RateApprovalQueuePage })))
+const LiveTrackingPlaceholderPage = lazy(() => import('../modules/tms/booking/BookingSupportPages').then((m) => ({ default: m.LiveTrackingPlaceholderPage })))
+const PODCompletedPage = lazy(() => import('../modules/tms/booking/BookingSupportPages').then((m) => ({ default: m.PODCompletedPage })))
+const VendorEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/vendor-embedded').then((m) => ({ default: m.VendorEmbeddedApp })))
+const FleetEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/fleet-embedded').then((m) => ({ default: m.FleetEmbeddedApp })))
+const AuctionEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/auction-embedded').then((m) => ({ default: m.AuctionEmbeddedApp })))
+const CustomerEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/customer-embedded').then((m) => ({ default: m.CustomerEmbeddedApp })))
+const TrackingEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/tracking-embedded').then((m) => ({ default: m.TrackingEmbeddedApp })))
 
 type RouteMode = 'tenant-admin' | 'root-tenant'
 

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -275,7 +276,15 @@ export function TenantLayout() {
             description="You do not have permission to access this page."
           />
         ) : (
-          <Outlet />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-24 text-[13px] text-muted-foreground">
+                Loading…
+              </div>
+            }
+          >
+            <Outlet />
+          </Suspense>
         )}
       </motion.main>
     </WorkspaceShell>

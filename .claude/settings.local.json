@@ -60,7 +60,10 @@
       "Bash(sed -n '78,90p' modules/tenant-admin-new/src/modules/tenant-admin/components/tenant-profile-menu.tsx)",
       "Bash(grep -rn \"tenant-admin-login-page\\\\|TenantAdminLoginPage\" modules packages src)",
       "Bash(rm -rf modules/platform-admin-new/src/modules/platform-admin/pages/tenant-login)",
-      "Bash(grep -rn \"platform-admin/tenant-login\" modules packages src)"
+      "Bash(grep -rn \"platform-admin/tenant-login\" modules packages src)",
+      "Bash(awk '{print $5, $9}')",
+      "Bash(awk '{print int\\($5/1024\\)\"KB\", $9}')",
+      "Bash(curl -s -o /dev/null -w \"dev: %{http_code}\\\\n\" http://localhost:3000/)"
     ]
   }
 }
