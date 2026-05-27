@@ -7,14 +7,27 @@ import { ShellAppShell, type ModuleManifest } from '@shared-ui'
 import { vendorManifest } from '@vendor/app/manifest'
 import { auctionManifest } from '@auction/app/manifest'
 import { fleetManifest } from '@fleet/app/manifest'
+import { platformAdminManifest } from '@platform-admin/app/manifest'
+import { tenantAdminManifest } from '@tenant-admin/app/manifest'
+import { tmsBookingManifest } from '@tms-booking/app/manifest'
 
-export const MODULES: ModuleManifest[] = [fleetManifest, auctionManifest, vendorManifest]
+export const MODULES: ModuleManifest[] = [
+  platformAdminManifest,
+  tenantAdminManifest,
+  tmsBookingManifest,
+  vendorManifest,
+  auctionManifest,
+  fleetManifest,
+]
 
 /** manifest.key → ERPModule code on user.modules */
 const MODULE_KEY_TO_ERP: Record<string, string> = {
   fleet: 'fleet',
   auction: 'ams',
   vendor: 'vendor',
+  'platform-admin': 'platform-admin',
+  'tenant-admin': 'tenant-admin',
+  'tms-booking': 'tms',
 }
 
 function filterModulesForUser(
@@ -29,7 +42,7 @@ function filterModulesForUser(
   })
 }
 
-const LANDING_PATH = '/fleet/dashboard'
+const LANDING_PATH = '/platform-admin/dashboard'
 
 const queryClient = new QueryClient({
   defaultOptions: {

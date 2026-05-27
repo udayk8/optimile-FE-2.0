@@ -44,7 +44,12 @@ export function useTenantAccess(pathnameOverride?: string) {
     [matchedPage, roleContext.roleAccess],
   );
 
+  const isUnrestrictedContext = !roleContext.activeRole;
+
   function canViewPage(pageCode?: string | null) {
+    if (isUnrestrictedContext) {
+      return true;
+    }
     if (!pageCode) {
       return true;
     }
@@ -54,6 +59,9 @@ export function useTenantAccess(pathnameOverride?: string) {
   }
 
   function can(pathOrAction: RolePageAction | string, maybeAction?: RolePageAction) {
+    if (isUnrestrictedContext) {
+      return true;
+    }
     if (maybeAction) {
       return getActionsForPage(pathOrAction).includes(maybeAction);
     }
@@ -61,6 +69,9 @@ export function useTenantAccess(pathnameOverride?: string) {
   }
 
   function getActionsForPage(pageCodeOrPath?: string | null) {
+    if (isUnrestrictedContext) {
+      return ["view", "create", "edit", "delete", "approve", "export"] as RolePageAction[];
+    }
     if (!pageCodeOrPath) {
       return allowedActions;
     }
@@ -129,6 +140,9 @@ export function useTenantAccess(pathnameOverride?: string) {
     featureCode: string,
     action: PermAction = "view",
   ): boolean {
+    if (isUnrestrictedContext) {
+      return true;
+    }
     void matrixVersion;
     const role = roleContext.activeRole;
     if (!role) return false;
@@ -162,5 +176,4 @@ export function useTenantAccess(pathnameOverride?: string) {
     hasFeaturePermission,
   };
 }
-
 

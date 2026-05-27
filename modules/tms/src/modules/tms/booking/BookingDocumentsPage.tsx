@@ -578,7 +578,7 @@ export function BookingDocumentsPage() {
             console.log("[BookingDocuments] aggregated totals", { deliveryId: delivery.id, totals });
             const isOpen = expandedDeliveryId === delivery.id;
             return (
-              <div key={delivery.id} className="rounded-[24px] border border-white/75 bg-gradient-to-r from-white to-sky-50/75 p-4 shadow-sm">
+              <div key={delivery.id} className="rounded-xl border bg-card p-4 shadow-sm">
                 <button
                   type="button"
                   className="flex w-full items-center justify-between gap-3 text-left"
@@ -633,7 +633,7 @@ export function BookingDocumentsPage() {
                       <div className="mt-3 space-y-3">
                         {deliveryDocuments.invoices.length ? (
                           deliveryDocuments.invoices.map((invoice, index) => (
-                            <div key={invoice.id} className="rounded-2xl border border-white/70 bg-white/80 p-3">
+                            <div key={invoice.id} className="rounded-xl border bg-background p-3">
                               <div className="mb-3 flex items-center justify-between">
                                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Invoice {index + 1}</p>
                                 <Button size="sm" variant="ghost" onClick={() => removeInvoice(delivery.id, invoice.id)}>Remove</Button>
@@ -659,7 +659,7 @@ export function BookingDocumentsPage() {
 
                     {(delivery.destinationAddressSource === "FROM_INVOICE_LATER" || extractedConsignee || comparison) ? (
                       <SectionCard title="Consignee Confirmation">
-                        <div className="mb-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-xs text-slate-600">
+                        <div className="mb-3 rounded-xl border bg-muted/20 px-4 py-3 text-xs text-slate-600">
                           <p>Delivery Address Source: {delivery.destinationAddressSource === "FROM_INVOICE_LATER" ? "From Invoice Later" : "Saved Customer Address"}</p>
                           <p className="mt-1">Finalization Status: {delivery.consigneeFinalizationStatus ?? "PENDING"}</p>
                         </div>
@@ -810,7 +810,7 @@ export function BookingDocumentsPage() {
         </div>
       </TenantPanel>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/70 bg-gradient-to-br from-slate-50 to-sky-50/70 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <div>
           <p className="text-sm font-semibold">Updated Freight</p>
           <p className="mt-1 text-lg font-semibold text-slate-900">
@@ -843,7 +843,7 @@ function StepTimeline({ currentStatus }: { currentStatus: string }) {
 
 function SectionCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
+    <div className="rounded-xl border bg-background p-3">
       <p className="text-sm font-semibold">{title}</p>
       <div className="mt-3">{children}</div>
     </div>
@@ -978,5 +978,4 @@ function buildCustomerAddressFromInvoice(extracted: BookingConsigneeSnapshot): T
     status: "active" as const,
   };
 }
-
 

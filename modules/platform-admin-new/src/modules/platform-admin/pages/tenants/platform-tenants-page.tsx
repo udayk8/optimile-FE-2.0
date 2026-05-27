@@ -25,6 +25,7 @@ import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { usePlatformPaths } from "@platform-admin/hooks/usePlatformPaths";
 import { displayModule, getModuleNameByCode } from "@/modules/platform-admin/lib/module-display";
 import type { CreateTenantInput } from "@/types/tenant-workspace";
+import { PageHeader } from "@/shared/components/common/page-header";
 
 type BusinessType = "DIRECT_ENTERPRISE" | "THREE_PL" | "FLEET_MANAGEMENT";
 type UiStatus = "active" | "onboarding";
@@ -232,16 +233,17 @@ export function PlatformTenantsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Tenants</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Manage tenants and module enablement.</p>
-        </div>
-        <Button size="sm" onClick={openWizard}>
-          <Plus className="size-4" />
-          Add Tenant
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Platform"
+        title="Tenants"
+        description="Manage tenants and module enablement."
+        action={
+          <Button size="sm" onClick={openWizard}>
+            <Plus className="size-4" />
+            Add Tenant
+          </Button>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Total" value={stats.total} />

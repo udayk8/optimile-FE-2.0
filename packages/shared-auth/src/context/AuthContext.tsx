@@ -24,7 +24,7 @@ export const DEMO_CREDENTIALS: Record<string, MockUser> = {
     name: 'Uday Yaduwanshi',
     role: 'CEO',
     permissions: ['all'],
-    modules: ['ams', 'fleet', 'vendor', 'customer'],
+    modules: ['ams', 'fleet', 'vendor', 'tms', 'platform-admin', 'tenant-admin'],
   },
   // Fleet-only demo user.
   'fleet@uday.ts.com': {
@@ -363,6 +363,5 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider')
   return ctx
 }
-
 
 

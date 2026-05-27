@@ -6,16 +6,50 @@ import { OptimileLogo } from './OptimileLogo'
 
 export function LoginShell() {
   const adminDemoEmail = 'platform-admin@optimile.com'
-  const adminDemoInfo = DEMO_CREDENTIALS[adminDemoEmail]
-  const [email, setEmail]               = useState(adminDemoEmail)
-  const [password, setPassword]         = useState(DEMO_PASSWORD)
+  const [email, setEmail]               = useState('')
+  const [password, setPassword]         = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
   const [showDemoAccounts, setShowDemoAccounts] = useState(false)
 
   const { login, loading, error } = useAuth()
   const navigate = useNavigate()
-  const demoEntries = Object.entries(DEMO_CREDENTIALS).filter(([, info]) => info.role !== 'Driver')
+  const roleOrder = [
+    'CEO',
+    'Platform Admin',
+    'Tenant Admin',
+    'TMS',
+    'Vendor',
+    'Auction Head',
+    'Fleet Manager',
+    'Track and Trace',
+    'CBD',
+  ] as const
+
+  const roleRank = new Map<string, number>(roleOrder.map((role, idx) => [role, idx]))
+
+  const canonicalEmailByRole: Partial<Record<(typeof roleOrder)[number], string>> = {
+    CEO: 'ceo@uday.ts.com',
+    'Platform Admin': 'platform-admin@optimile.com',
+    'Tenant Admin': 'tenant-admin@optimile.com',
+    TMS: 'tms@optimile.com',
+    Vendor: 'vendor@pranay.ts.com',
+    'Auction Head': 'auction@pranay.ts.com',
+    'Fleet Manager': 'fleet@uday.ts.com',
+    'Track and Trace': 'tracking@optimile.com',
+    CBD: 'cbd@optimile.com',
+  }
+
+  const orderedEmails = roleOrder
+    .map((role) => canonicalEmailByRole[role])
+    .filter((email): email is string => Boolean(email))
+
+  const demoEntries = orderedEmails
+    .flatMap((email) => {
+      const info = DEMO_CREDENTIALS[email]
+      return info ? [[email, info] as const] : []
+    })
+    .sort((a, b) => (roleRank.get(a[1].role) ?? 99) - (roleRank.get(b[1].role) ?? 99))
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault()
@@ -45,6 +79,24 @@ export function LoginShell() {
 
   const showErrorBanner = Boolean(error && error.trim() !== 'Request failed (404)')
 
+  const moduleLabelMap: Record<string, string> = {
+    ams: 'Auction',
+    fleet: 'Fleet',
+    vendor: 'Vendor',
+    customer: 'Customer',
+    tms: 'TMS Booking',
+    tracking: 'Track & Trace',
+    'platform-admin': 'Platform Admin',
+    'tenant-admin': 'Tenant Admin',
+    'driver-app': 'Driver App',
+    admin: 'Administration',
+    finance: 'Finance',
+    reporting: 'Reporting',
+    ptl: 'PTL',
+  }
+
+  const formatModules = (modules: string[]) => modules.map((m) => moduleLabelMap[m] ?? m).join(', ')
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-2xl">
@@ -59,23 +111,6 @@ export function LoginShell() {
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm space-y-5">
-          {adminDemoInfo && (
-            <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-4 py-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Administration</p>
-                <p className="mt-1 text-sm text-slate-500">Default login is prefilled for faster access.</p>
-              </div>
-                <button
-                  type="button"
-                  onClick={() => handleDemoAutofill(adminDemoEmail)}
-                  disabled={loading}
-                  className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl border border-sky-600 bg-sky-600 px-4 text-base font-semibold text-white transition hover:bg-sky-700 hover:border-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Autofill Admin Login
-                </button>
-            </div>
-          )}
-
           {/* Error */}
           {showErrorBanner && (
             <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/10 p-3 text-base font-semibold text-danger">
@@ -166,7 +201,7 @@ export function LoginShell() {
                   Other Demo Logins
                 </p>
                 <p className="mt-1 text-sm text-gray-500">
-                  Click to view the remaining accounts. Password: <span className="font-mono">{DEMO_PASSWORD}</span>
+                  Click to view accounts and modules served. Password: <span className="font-mono">{DEMO_PASSWORD}</span>
                 </p>
               </div>
               <span className="inline-flex items-center gap-2 text-base font-semibold text-primary">
@@ -178,7 +213,6 @@ export function LoginShell() {
             {showDemoAccounts && (
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {demoEntries
-                  .filter(([demoEmail]) => demoEmail !== adminDemoEmail)
                   .map(([demoEmail, info]) => (
                   <button
                     key={demoEmail}
@@ -198,6 +232,7 @@ export function LoginShell() {
                           )}
                         </div>
                         <p className="mt-1 truncate font-mono text-xs text-gray-400">{demoEmail}</p>
+                        <p className="mt-1 text-xs text-gray-500">Modules: {formatModules(info.modules)}</p>
                       </div>
                       <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-500">
                         {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}

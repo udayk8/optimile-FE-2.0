@@ -121,9 +121,9 @@ function ApprovalGuideCard({
   description: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-border/80 bg-gradient-to-br from-white to-slate-50/90 p-4 shadow-sm">
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="rounded-2xl bg-primary/[0.08] p-2 text-primary">
+        <div className="rounded-lg bg-primary/[0.08] p-2 text-primary">
           <Icon className="size-4" />
         </div>
         <p className="font-semibold">{title}</p>
@@ -132,5 +132,4 @@ function ApprovalGuideCard({
     </div>
   );
 }
-
 

@@ -728,16 +728,16 @@ export function CreateBookingPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-4 px-4 py-5 xl:px-6">
+    <div className="flex min-w-0 flex-col gap-5">
       <PageHeader
         eyebrow="TMS"
         title={isEditMode ? "Edit Booking" : "Create Booking"}
         description="Delivery-first booking flow with clearer pricing and sticky control summary."
       />
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-rose-50 px-4 py-3 text-sm text-red-700 shadow-sm">{error}</div> : null}
+      {error ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</div> : null}
 
-      <div className="sticky top-3 z-20 rounded-[28px] border border-white/80 bg-white/85 px-4 py-3 shadow-[0_18px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+      <div className="sticky top-3 z-20 rounded-xl border bg-card px-4 py-3 shadow-sm">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Summary label="Customer" value={selectedCustomer?.name ?? "Select customer"} />
           <Summary label="Booking Type" value={draft.commercialType === "CONTRACT" ? "Contract" : "Spot"} />
@@ -746,7 +746,7 @@ export function CreateBookingPage() {
         </div>
       </div>
 
-      <div className="workspace-hero fancy-grid grid gap-4 px-5 py-5 xl:grid-cols-[1.1fr,0.9fr,0.8fr]">
+      <div className="grid gap-4 xl:grid-cols-[1.1fr,0.9fr,0.8fr]">
         <QuickStat label="Customer" value={selectedCustomer?.name ?? "Select customer"} tone="blue" />
         <QuickStat label="Commercial Type" value={draft.commercialType === "CONTRACT" ? "Contract Pricing" : "Spot Pricing"} tone="indigo" />
         <QuickStat
@@ -868,7 +868,7 @@ export function CreateBookingPage() {
                   !selectedDestinationAddress;
 
                 return (
-                  <div key={delivery.id} className="rounded-[26px] border border-white/80 bg-white/90 p-4 shadow-[0_16px_42px_rgba(15,23,42,0.06)]">
+                  <div key={delivery.id} className="rounded-xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-950">Delivery {index + 1}</p>
@@ -993,7 +993,7 @@ export function CreateBookingPage() {
                       <Field label="Quantity">
                         <div className="grid grid-cols-[1fr_110px] gap-2">
                           <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
-                          <div className="flex items-center justify-center rounded-2xl border border-border/70 bg-slate-50 px-3 text-sm font-semibold text-slate-700">
+                          <div className="flex items-center justify-center rounded-xl border border-border/70 bg-muted/30 px-3 text-sm font-semibold text-foreground">
                             {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
                           </div>
                         </div>
@@ -1022,7 +1022,7 @@ export function CreateBookingPage() {
                           <Input value={delivery.distanceKm} onChange={(event) => updateDelivery(index, "distanceKm", event.target.value)} placeholder="Distance in KM" />
                         </Field>
                       ) : null}
-                      <div className="rounded-2xl border border-dashed border-border/80 bg-slate-50/70 px-4 py-3">
+                      <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-3">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Lane</p>
                         <p className="mt-1 text-sm text-slate-700">{laneLabel}</p>
                       </div>
@@ -1076,7 +1076,7 @@ export function CreateBookingPage() {
                   <Field label="Pickup Date & Time">
                     <Input type="datetime-local" value={draft.pickupDateTime} onChange={(event) => setDraft((current) => ({ ...current, pickupDateTime: event.target.value }))} />
                   </Field>
-                  <div className="rounded-[24px] border border-white/80 bg-white/85 px-4 py-3 shadow-sm">
+                  <div className="rounded-xl border bg-card px-4 py-3 shadow-sm">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Calculated Freight</p>
                     <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">{calculatedFreight ? formatCurrency(calculatedFreight) : "-"}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -1096,14 +1096,14 @@ export function CreateBookingPage() {
 
               <div className="space-y-4">
                 {draft.commercialType === "SPOT" ? (
-                  <div className="rounded-[28px] border border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-sky-50 p-5 shadow-sm">
+                  <div className="rounded-xl border bg-card p-5 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Manual Freight</p>
                     <p className="mt-2 text-sm font-medium text-slate-700">Spot Rate (Manual)</p>
                     <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{numericRate ? formatCurrency(numericRate) : formatCurrency(0)}</p>
                     <p className="mt-2 text-sm text-slate-600">No rate card is used for spot bookings.</p>
                   </div>
                 ) : (
-                  <div className="rounded-[28px] border border-white/80 bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 p-5 shadow-sm">
+                  <div className="rounded-xl border bg-card p-5 shadow-sm">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Contract Pricing</p>
                     <div className="mt-4 space-y-3">
                       <Summary label="Rate Type" value={rateType} />
@@ -1155,7 +1155,7 @@ export function CreateBookingPage() {
 
         <TenantPanel title="Commercial Summary" description="Live booking totals and pricing output.">
           <div className="space-y-3">
-            <div className="rounded-[24px] border border-white/80 bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 p-4 text-white shadow-[0_24px_56px_rgba(79,70,229,0.34)]">
+            <div className="rounded-xl border bg-card p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Pricing Breakdown</p>
               <div className="mt-3 grid gap-2 text-sm">
                 <SignalRow label="Rate" value={numericRate ? formatCurrency(numericRate) : "-"} />
@@ -1534,7 +1534,7 @@ function Field({ label, helper, children }: { label: string; helper?: string; ch
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border/55 bg-white/80 px-3 py-3 last:border-b">
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-border/60 bg-background px-3 py-3 last:border-b">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-right text-sm font-semibold">{value}</span>
     </div>
@@ -1543,9 +1543,9 @@ function Summary({ label, value }: { label: string; value: string }) {
 
 function SignalRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur-sm">
-      <span className="text-white/75">{label}</span>
-      <span className="font-medium text-white">{value}</span>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   );
 }
@@ -1561,19 +1561,17 @@ function QuickStat({
 }) {
   const toneClass =
     tone === "blue"
-      ? "from-blue-100 via-sky-100 to-cyan-100 text-blue-700"
+      ? "border-sky-200 bg-sky-50"
       : tone === "indigo"
-        ? "from-indigo-100 via-violet-100 to-fuchsia-100 text-indigo-700"
+        ? "border-violet-200 bg-violet-50"
         : tone === "emerald"
-          ? "from-emerald-100 via-green-100 to-lime-100 text-emerald-700"
-          : "from-amber-100 via-orange-100 to-yellow-100 text-amber-700";
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-amber-200 bg-amber-50";
 
   return (
-    <div className={`rounded-[24px] border border-white/80 bg-gradient-to-br ${toneClass} p-4 shadow-sm`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-current/70">{label}</p>
+    <div className={`rounded-xl border ${toneClass} p-4 shadow-sm`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
       <p className="mt-2 text-base font-semibold tracking-[-0.02em] text-slate-950">{value}</p>
     </div>
   );
 }
-
-

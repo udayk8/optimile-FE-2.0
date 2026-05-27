@@ -156,16 +156,17 @@ export function TenantHierarchyPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Hierarchy Setup</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Define tenant business structure.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={resetToDefault}>Reset to Default</Button>
-          <Button size="sm" onClick={save}>Save Hierarchy</Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title="Hierarchy Setup"
+        description="Define tenant business structure."
+        action={
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={resetToDefault}>Reset to Default</Button>
+            <Button size="sm" onClick={save}>Save Hierarchy</Button>
+          </div>
+        }
+      />
 
       {feedback ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
@@ -372,16 +373,17 @@ export function TenantOrgUnitsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Org Units</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Manage business locations and reporting structure.</p>
-        </div>
-        <Button size="sm" onClick={() => openCreate()}>
-          <Plus className="size-4" />
-          Add Org Unit
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title="Org Units"
+        description="Manage business locations and reporting structure."
+        action={
+          <Button size="sm" onClick={() => openCreate()}>
+            <Plus className="size-4" />
+            Add Org Unit
+          </Button>
+        }
+      />
 
       {feedback ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
@@ -766,16 +768,17 @@ export function TenantUsersPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Users</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Manage tenant users and access.</p>
-        </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          Add User
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title="Users"
+        description="Manage tenant users and access."
+        action={
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add User
+          </Button>
+        }
+      />
 
       {feedback ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
@@ -1181,16 +1184,17 @@ export function TenantRolesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Roles</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Manage tenant roles, module access, and permissions.</p>
-        </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          Add Role
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title="Roles"
+        description="Manage tenant roles, module access, and permissions."
+        action={
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add Role
+          </Button>
+        }
+      />
 
       {feedback ? (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-800">
@@ -1999,10 +2003,11 @@ export function TenantRolePermissionsPage() {
   if (editableRoles.length === 0) {
     return (
       <div className="space-y-5">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Role Permissions</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Configure feature access for each role.</p>
-        </div>
+        <PageHeader
+          eyebrow="Tenant Admin"
+          title="Role Permissions"
+          description="Configure feature access for each role."
+        />
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
           <p className="text-[14px] font-medium text-slate-900">Create a role first</p>
           <p className="mt-1 text-[13px] text-slate-500">Roles must exist before permissions can be assigned.</p>
@@ -2026,6 +2031,12 @@ export function TenantRolePermissionsPage() {
 
   return (
     <div className="space-y-5">
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title="Role Permissions"
+        description="Configure feature access for each role."
+      />
+
       {/* Role selector header */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">

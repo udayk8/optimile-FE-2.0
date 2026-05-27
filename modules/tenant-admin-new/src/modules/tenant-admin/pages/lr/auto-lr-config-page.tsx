@@ -280,7 +280,7 @@ export function TenantAutoLRConfigPage() {
                     <label key={card.mode} className={`rounded-xl border px-3 py-3 ${managedChildRule.formatMode === card.mode ? "border-sky-300 bg-sky-50" : "bg-white"}`}>
                       <div className="text-sm font-medium text-slate-950">{card.title}</div>
                       <div className="mt-1 text-xs text-muted-foreground">{card.description}</div>
-                      <div className="mt-2 rounded-lg border bg-white/80 px-2.5 py-1.5 font-mono text-[11px]">{card.example}</div>
+                      <div className="mt-2 rounded-lg border bg-muted/20 px-2.5 py-1.5 font-mono text-[11px]">{card.example}</div>
                       <div className="mt-2">
                         <input
                           type="radio"

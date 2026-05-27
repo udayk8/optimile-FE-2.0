@@ -1787,16 +1787,16 @@ export function BookingDetailsPage() {
 
   return (
     <div className="space-y-3">
-      <Card className="glass-panel overflow-hidden">
+      <Card className="overflow-hidden border bg-card shadow-sm">
         <CardContent className="p-3 sm:p-4">
-          <div className={`rounded-[22px] border px-4 py-3 shadow-[0_20px_50px_rgba(15,23,42,0.24)] ${bookingOperationalAlert ? "border-amber-300 bg-gradient-to-br from-amber-900 via-orange-900 to-slate-950 text-white" : "border-white/80 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 text-white"}`}>
+          <div className={`rounded-xl border px-4 py-3 shadow-sm ${bookingOperationalAlert ? "border-amber-200 bg-amber-50 text-foreground" : "bg-card text-foreground"}`}>
             <div className="grid gap-2 xl:grid-cols-[1.15fr_0.95fr_1.15fr]">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/90">TMS • Live Booking</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">TMS • Live Booking</p>
                     <p className="mt-1 text-xl font-semibold tracking-[-0.03em]">{bookingRecord.bookingId}</p>
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-muted-foreground">
                       {customer?.name ?? "-"} • {sourceAddress?.city ?? "-"} to {destinationAddress?.city ?? "-"}
                     </p>
                   </div>
@@ -1815,7 +1815,7 @@ export function BookingDetailsPage() {
                   <MiniStat label="Deliveries" value={String(bookingRecord.numberOfDeliveries ?? bookingRecord.deliveries?.length ?? 1)} inverse />
                 </div>
                 {bookingOperationalAlert ? (
-                  <div className="rounded-2xl border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-xs text-amber-100">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     {bookingRevisionEnabled ? "Destination change pending review. Booking is revision-enabled." : "Destination revised. Historical delivery audit retained."}
                   </div>
                 ) : null}
@@ -1899,7 +1899,7 @@ export function BookingDetailsPage() {
           </CardContent>
         </Card>
 
-      <Card className="glass-panel overflow-hidden">
+      <Card className="overflow-hidden border bg-card shadow-sm">
         <CardContent className="p-3 sm:p-4">
           <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2067,7 +2067,7 @@ export function BookingDetailsPage() {
                     <DetailRow label="Current Status" value={visibleBreakdownEvent.repairStatus.replace(/_/g, " ")} tone="amber" />
                   </div>
                   {breakdownEvents.length > 1 ? (
-                    <div className="mt-3 rounded-2xl border border-rose-200 bg-white/80 p-3">
+                    <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/40 p-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.08em] text-rose-700">Breakdown Incidents</p>
                       <div className="mt-3 space-y-2">
                         {breakdownEvents.map((event, index) => (
@@ -2087,7 +2087,7 @@ export function BookingDetailsPage() {
                 </div>
               ) : null}
               {destinationChangeRequests.length || bookingRevisionEnabled || bookingRevised ? (
-              <div className="rounded-[22px] border border-white/75 bg-white/80 p-3 shadow-sm">
+              <div className="rounded-xl border bg-card p-3 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-slate-950">Destination Change Workspace</p>
@@ -2158,10 +2158,10 @@ export function BookingDetailsPage() {
                       key={`selector-${delivery.id}`}
                       type="button"
                       onClick={() => setActiveDeliveryWorkspaceId(delivery.id)}
-                      className={`rounded-[20px] border px-3 py-2.5 text-left transition ${
+                        className={`rounded-xl border px-3 py-2.5 text-left transition ${
                         isActive
-                          ? "border-cyan-300 bg-gradient-to-br from-cyan-500 via-blue-500 to-slate-900 text-white shadow-[0_12px_28px_rgba(14,116,144,0.20)]"
-                          : "border-white/70 bg-gradient-to-br from-white to-slate-50 hover:border-cyan-200 hover:bg-slate-50"
+                          ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                          : "bg-background hover:border-cyan-200 hover:bg-muted/20"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -2244,7 +2244,7 @@ export function BookingDetailsPage() {
                 const visibleDeliveryLrNumber = getVisibleDeliveryLrNumber(delivery);
 
                 return (
-                  <div key={delivery.id} className="max-h-[68vh] overflow-y-auto rounded-[24px] border border-white/75 bg-gradient-to-br from-white via-white to-sky-50/80 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
+                  <div key={delivery.id} className="max-h-[68vh] overflow-y-auto rounded-xl border bg-card p-4 shadow-sm">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-base font-semibold tracking-[-0.02em] text-slate-950">Delivery {delivery.deliveryNo}</p>
@@ -2287,13 +2287,13 @@ export function BookingDetailsPage() {
                           <DetailRow label="Average Speed" value={trackingSummary.averageSpeed} />
                           <DetailRow label="Distance" value={trackingSummary.distance} />
                         </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
+                        <div className="rounded-xl border bg-background p-3">
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold text-slate-900">{trackingSummary.progressLabel}</p>
                             <span className="text-sm font-medium text-slate-600">{trackingSummary.progressPercent}%</span>
                           </div>
                           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600" style={{ width: `${trackingSummary.progressPercent}%` }} />
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${trackingSummary.progressPercent}%` }} />
                           </div>
                           <p className="mt-3 text-sm text-slate-700">Last updated location & time: {trackingSummary.lastKnownLocation}</p>
                         </div>
@@ -2303,7 +2303,7 @@ export function BookingDetailsPage() {
                     {deliveryTab === "Recent Action" ? (
                       <div className="mt-3 grid gap-3 xl:grid-cols-2">
                         {recentActions.map((action) => (
-                          <div key={`${delivery.id}-${action.label}`} className="rounded-2xl border border-white/70 bg-white/80 p-3">
+                          <div key={`${delivery.id}-${action.label}`} className="rounded-xl border bg-background p-3">
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="text-sm font-semibold text-slate-900">{action.label}</p>
                               <span className="text-xs text-muted-foreground">{action.timestamp}</span>
@@ -2355,7 +2355,7 @@ export function BookingDetailsPage() {
                           <DetailRow label="Approx Trip Distance" value={trackingSummary.distance} tone="slate" />
                           <DetailRow label="Notes" value={bookingRecord.opsRemark?.trim() || "--"} tone="slate" />
                         </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
+                        <div className="rounded-xl border bg-background p-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Trip Documents</p>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {invoiceFiles.map((invoice) => (
@@ -2457,7 +2457,7 @@ export function BookingDetailsPage() {
             <div className="space-y-3">
               {(bookingRecord.expenses ?? []).length ? (
                 (bookingRecord.expenses ?? []).map((expense) => (
-                  <div key={expense.id} className="flex items-center justify-between rounded-2xl border border-white/70 bg-gradient-to-r from-white to-slate-50/80 px-3 py-3 text-sm shadow-sm">
+                  <div key={expense.id} className="flex items-center justify-between rounded-xl border bg-background px-3 py-3 text-sm shadow-sm">
                     <span>{expense.label}</span>
                     <span className="font-medium">Rs {expense.amount.toLocaleString()}</span>
                   </div>
@@ -2466,7 +2466,7 @@ export function BookingDetailsPage() {
                 <div className="rounded-xl border border-dashed px-3 py-4 text-xs text-muted-foreground">No expenses</div>
               )}
               {bookingRecord.status === "IN_TRANSIT" ? (
-                <div className="grid gap-3 rounded-[24px] border border-white/70 bg-gradient-to-br from-slate-50 to-sky-50/70 p-4 shadow-sm md:grid-cols-[1fr_180px_auto]">
+                <div className="grid gap-3 rounded-xl border bg-card p-4 shadow-sm md:grid-cols-[1fr_180px_auto]">
                   <CompactField label="Expense Type">
                     <Input value={expenseLabel} onChange={(event) => setExpenseLabel(event.target.value)} placeholder="Toll / unloading / detention" />
                   </CompactField>
@@ -3139,7 +3139,7 @@ export function BookingDetailsPage() {
                 <p className="mt-3 text-sm text-slate-500">Open a submitted destination change request first.</p>
               )}
             </div>
-            <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-4">
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-4">
               <p className="text-sm font-semibold text-slate-900">Revised To</p>
               <p className="mt-1 text-xs text-slate-500">Choose the temporary address already added under the same consignee.</p>
               <div className="mt-3 grid gap-3">
@@ -3158,7 +3158,7 @@ export function BookingDetailsPage() {
                 </CompactField>
                 {destinationChangePreview ? (
                   <div className="grid gap-3">
-                    <div className="rounded-2xl border border-cyan-200 bg-white/80 px-4 py-4">
+                    <div className="rounded-xl border border-cyan-200 bg-background px-4 py-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">Revised Address</p>
                       <p className="mt-2 text-sm font-medium text-slate-900">{destinationChangePreview.proposedSnapshot.addressLabel}</p>
                       <p className="mt-2 text-xs text-slate-500">
@@ -3382,14 +3382,14 @@ function DetailRow({
 function HeroStat({ label, value, tone }: { label: string; value: string; tone: "blue" | "indigo" | "emerald" | "amber" }) {
   const toneClass =
     tone === "blue"
-      ? "from-blue-100 via-sky-100 to-cyan-100"
+      ? "border-sky-200 bg-sky-50"
       : tone === "indigo"
-        ? "from-indigo-100 via-violet-100 to-fuchsia-100"
+        ? "border-violet-200 bg-violet-50"
         : tone === "emerald"
-          ? "from-emerald-100 via-green-100 to-lime-100"
-          : "from-amber-100 via-orange-100 to-yellow-100";
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-amber-200 bg-amber-50";
   return (
-    <div className={`rounded-[24px] border border-white/80 bg-gradient-to-br ${toneClass} p-4 shadow-sm`}>
+    <div className={`rounded-xl border ${toneClass} p-4 shadow-sm`}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
       <p className="mt-2 text-base font-semibold tracking-[-0.02em] text-slate-950">{value}</p>
     </div>
@@ -3398,9 +3398,9 @@ function HeroStat({ label, value, tone }: { label: string; value: string; tone: 
 
 function MiniStat({ label, value, inverse = false }: { label: string; value: string; inverse?: boolean }) {
   return (
-    <div className={`rounded-2xl border px-4 py-3 shadow-sm ${inverse ? "border-white/15 bg-white/10 backdrop-blur" : "border-white/70 bg-white/85"}`}>
-      <p className={`text-[10px] font-semibold uppercase tracking-[0.08em] ${inverse ? "text-slate-300" : "text-slate-500"}`}>{label}</p>
-      <p className={`mt-1 text-sm font-semibold ${inverse ? "text-white" : "text-slate-950"}`}>{value}</p>
+    <div className={`rounded-xl border px-4 py-3 shadow-sm ${inverse ? "border-border/60 bg-muted/20" : "bg-background"}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-950">{value}</p>
     </div>
   );
 }
@@ -3421,7 +3421,7 @@ function StageFocusCard({
   onAction: () => void;
 }) {
   return (
-    <div className="rounded-[24px] border border-white/70 bg-gradient-to-br from-white via-slate-50 to-cyan-50/80 p-4 shadow-sm">
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
@@ -3454,7 +3454,7 @@ function CompactStagePill({
 
 function SlimInfoCard({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/85 px-4 py-3 shadow-sm">
+    <div className="rounded-xl border bg-background px-4 py-3 shadow-sm">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
       <p className={`mt-1 text-sm ${strong ? "font-semibold text-slate-950" : "font-medium text-slate-900"}`}>{value}</p>
     </div>
@@ -3463,16 +3463,16 @@ function SlimInfoCard({ label, value, strong = false }: { label: string; value: 
 
 function MiniInfoPill({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 backdrop-blur">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-300">{label}</p>
-      <p className={`mt-0.5 text-sm leading-5 ${strong ? "font-semibold text-white" : "font-medium text-slate-100"}`}>{value}</p>
+    <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className={`mt-0.5 text-sm leading-5 ${strong ? "font-semibold text-foreground" : "font-medium text-foreground"}`}>{value}</p>
     </div>
   );
 }
 
 function SectionStrip({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-[20px] border border-white/70 bg-white/80 p-3 shadow-sm">
+    <div className="rounded-xl border bg-background p-3 shadow-sm">
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{title}</p>
       {children}
     </div>
@@ -3500,7 +3500,7 @@ function DeliveryRemarkTimeline({ remarks }: { remarks: BookingRemark[] }) {
   return (
     <div className="space-y-2">
       {sortedRemarks.map((remark) => (
-        <div key={remark.id} className="rounded-2xl border border-white/70 bg-slate-50/80 px-3 py-3">
+        <div key={remark.id} className="rounded-xl border bg-muted/20 px-3 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Badge variant="accent">{getRemarkLabel(remark.type as (typeof DELIVERY_REMARK_TYPES)[number]["value"])}</Badge>
             <span className="text-xs text-muted-foreground">{new Date(remark.timestamp).toLocaleString()}</span>
@@ -3657,6 +3657,3 @@ function getCurrentExecutionStage(events: BookingStatusEvent[]) {
     label: stage[1],
   };
 }
-
-
-

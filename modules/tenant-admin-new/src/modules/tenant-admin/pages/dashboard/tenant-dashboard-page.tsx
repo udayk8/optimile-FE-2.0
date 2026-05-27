@@ -90,13 +90,17 @@ export function TenantDashboardPage() {
     roles,
     rolePermissions,
   });
+  const isUnrestrictedContext = !activeRole;
 
   const canAdmin =
-    !!activeRole &&
+    isUnrestrictedContext ||
+    (!!activeRole &&
     (isTenantAdminRole(activeRole) ||
-      (activeRole.moduleCodes ?? []).includes(TENANT_ADMIN_MODULE_CODE));
-  const can = (featureCode: string) => hasPermission(activeRole, "TMS", featureCode, "view");
-  const canViewPage = (pageCode: string) => canRoleViewPage(roleAccess, pageCode);
+      (activeRole.moduleCodes ?? []).includes(TENANT_ADMIN_MODULE_CODE)));
+  const can = (featureCode: string) =>
+    isUnrestrictedContext || hasPermission(activeRole, "TMS", featureCode, "view");
+  const canViewPage = (pageCode: string) =>
+    isUnrestrictedContext || canRoleViewPage(roleAccess, pageCode);
 
   const activeUsers = users.filter((user) => user.status === "active").length;
   const editableRoles = useMemo(() => roles.filter((role) => !isTenantAdminRole(role)), [roles]);

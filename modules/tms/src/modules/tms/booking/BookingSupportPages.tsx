@@ -393,7 +393,7 @@ export function FinanceWorkspacePage() {
       <PageHeader eyebrow="Finance" title="Finance" description="Customer invoicing workspace for completed bookings." />
 
       <div className="grid gap-4 xl:grid-cols-[280px_1fr]">
-        <div className="rounded-[24px] border border-border/70 bg-white p-4 shadow-sm">
+        <div className="rounded-xl border bg-card p-4 shadow-sm">
           <p className="text-sm font-semibold">Customers</p>
           <div className="mt-3 space-y-2">
             {financeCustomers.map((customer) => {
@@ -426,7 +426,7 @@ export function FinanceWorkspacePage() {
 
           {activeTab === "Invoice Workspace" ? (
             <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-              <div className="rounded-[24px] border border-border/70 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-sm font-semibold">Invoice Pending</p>
                 <div className="mt-3 max-h-[260px] overflow-y-auto">
                   <DataTable
@@ -448,12 +448,12 @@ export function FinanceWorkspacePage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-border/70 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-sm font-semibold">Invoice Document Preview</p>
                 <div className="mt-3 space-y-3">
                   {selectedBookings.length ? (
                     <>
-                      <div className="max-h-[720px] overflow-y-auto rounded-[24px] border border-border/70 bg-slate-50 p-3">
+                      <div className="max-h-[720px] overflow-y-auto rounded-xl border border-border/70 bg-muted/20 p-3">
                         <InvoiceDocumentCard
                           invoice={{
                             invoiceId: draftInvoiceId,
@@ -486,7 +486,7 @@ export function FinanceWorkspacePage() {
             </div>
           ) : (
             <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-              <div className="rounded-[24px] border border-border/70 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-sm font-semibold">Generated Invoices ({customerInvoices.length})</p>
                 <div className="mt-3 max-h-[380px] overflow-y-auto">
                   <DataTable
@@ -521,7 +521,7 @@ export function FinanceWorkspacePage() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-border/70 bg-white p-4 shadow-sm">
+              <div className="rounded-xl border bg-card p-4 shadow-sm">
                 <p className="text-sm font-semibold">Invoice View</p>
                 <div className="mt-3 space-y-3">
                   {selectedInvoice ? (
@@ -531,7 +531,7 @@ export function FinanceWorkspacePage() {
                         <p>Customer: {customerMap.get(selectedInvoice.customerId)?.name ?? "-"}</p>
                         <p>Created: {new Date(selectedInvoice.createdAt).toLocaleString()}</p>
                       </div>
-                      <div className="max-h-[540px] overflow-y-auto rounded-[24px] border border-border/70 bg-slate-50 p-3">
+                      <div className="max-h-[540px] overflow-y-auto rounded-xl border border-border/70 bg-muted/20 p-3">
                         <InvoiceDocumentCard
                           invoice={selectedInvoice}
                           bookings={(selectedInvoice.bookingIds ?? [])
@@ -843,7 +843,7 @@ function SignalCard({
   description: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-border/80 bg-gradient-to-br from-white to-slate-50/90 p-4 shadow-sm">
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <div className="rounded-2xl bg-primary/[0.08] p-2 text-primary">
           <Icon className="size-4" />
@@ -854,6 +854,5 @@ function SignalCard({
     </div>
   );
 }
-
 
 

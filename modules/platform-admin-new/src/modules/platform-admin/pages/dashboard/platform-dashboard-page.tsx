@@ -7,6 +7,7 @@ import { usePlatformModules } from "@/modules/platform-admin/hooks/usePlatformMo
 import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { usePlatformPaths } from "@platform-admin/hooks/usePlatformPaths";
 import { displayModule } from "@/modules/platform-admin/lib/module-display";
+import { PageHeader } from "@/shared/components/common/page-header";
 
 export function PlatformDashboardPage() {
   const { data: tenants, getTenantPrimaryAdminUser } = useTenants();
@@ -34,26 +35,27 @@ export function PlatformDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Dashboard</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Overview of tenants and modules.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild size="sm">
-            <Link to={paths.tenants}>
-              <Plus className="size-4" />
-              Add Tenant
-            </Link>
-          </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link to={paths.modules}>
-              <Settings className="size-4" />
-              Manage Modules
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Platform"
+        title="Dashboard"
+        description="Overview of tenants and modules."
+        action={
+          <div className="flex gap-2">
+            <Button asChild size="sm">
+              <Link to={paths.tenants}>
+                <Plus className="size-4" />
+                Add Tenant
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link to={paths.modules}>
+                <Settings className="size-4" />
+                Manage Modules
+              </Link>
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total Tenants" value={totalTenants} icon={Building2} tone="slate" />

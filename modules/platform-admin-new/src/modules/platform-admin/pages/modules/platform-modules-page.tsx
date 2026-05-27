@@ -11,6 +11,7 @@ import { usePlatformModules } from "@/modules/platform-admin/hooks/usePlatformMo
 import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { displayModule, getModuleDisplayName, getModuleDisplayCode } from "@/modules/platform-admin/lib/module-display";
 import type { PlatformModule } from "@/types/platform";
+import { PageHeader } from "@/shared/components/common/page-header";
 
 const moduleSchema = z.object({
   code: z.string().trim().min(2, "Module code is required"),
@@ -112,16 +113,17 @@ export function PlatformModulesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Modules</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Catalog of platform modules.</p>
-        </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          Add Module
-        </Button>
-      </div>
+      <PageHeader
+        eyebrow="Platform"
+        title="Modules"
+        description="Catalog of platform modules."
+        action={
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="size-4" />
+            Add Module
+          </Button>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Total Modules" value={totalModules} />

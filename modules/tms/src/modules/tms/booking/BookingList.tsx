@@ -176,14 +176,14 @@ export function BookingListPage() {
         }
       />
 
-      <div className="glass-panel overflow-x-auto p-3">
+      <div className="overflow-x-auto rounded-xl border bg-card p-3">
         <div className="flex min-w-max gap-3">
           {pipelineGroups.map((column) => {
             const isActive = selectedPipelineKey === column.key;
             return (
               <div
                 key={column.key}
-                className={`flex h-[290px] w-[220px] shrink-0 flex-col rounded-[24px] border p-3 transition lg:w-[230px] xl:w-[240px] ${getPipelineColumnClass(column.key)} ${isActive ? "border-primary/45 ring-2 ring-primary/20" : "border-white/80"}`}
+                className={`flex h-[290px] w-[220px] shrink-0 flex-col rounded-xl border p-3 transition lg:w-[230px] xl:w-[240px] ${getPipelineColumnClass(column.key)} ${isActive ? "border-primary/45 ring-2 ring-primary/20" : "border-border/70"}`}
               >
                 <button
                   type="button"
@@ -207,7 +207,7 @@ export function BookingListPage() {
                         <button
                           key={booking.id}
                           type="button"
-                          className="flex w-full items-center justify-between gap-2 rounded-2xl border border-white/80 bg-white/85 px-3 py-2 text-left transition hover:border-primary/25 hover:bg-white"
+                          className="flex w-full items-center justify-between gap-2 rounded-lg border border-border/70 bg-background px-3 py-2 text-left transition hover:border-primary/25 hover:bg-card"
                           onClick={() => openBooking(booking.id)}
                         >
                           <div className="min-w-0">
@@ -220,7 +220,7 @@ export function BookingListPage() {
                         </button>
                       ))
                     ) : (
-                      <div className="flex h-full min-h-[120px] items-center justify-center rounded-2xl border border-dashed border-border/60 bg-white/45 px-3 text-center text-xs text-muted-foreground">
+                      <div className="flex h-full min-h-[120px] items-center justify-center rounded-lg border border-dashed border-border/60 bg-muted/20 px-3 text-center text-xs text-muted-foreground">
                         No bookings
                       </div>
                     )}
@@ -271,7 +271,7 @@ export function BookingListPage() {
         }
       />
 
-      <div className="glass-panel p-4">
+      <div className="rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-4">
           <div>
             <p className="text-lg font-semibold">{activePipelineGroup?.label ?? "Bookings"}</p>
@@ -300,7 +300,7 @@ export function BookingListPage() {
               ))}
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center rounded-[28px] border border-dashed border-border/70 bg-white/45 px-6 text-center text-sm text-muted-foreground">
+            <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/20 px-6 text-center text-sm text-muted-foreground">
               No bookings match this state and filter combination.
             </div>
           )}
@@ -350,7 +350,7 @@ function CompactBookingRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`grid w-full gap-3 rounded-[22px] border px-4 py-3 text-left transition hover:border-primary/25 hover:bg-white lg:grid-cols-[140px_minmax(0,1fr)_170px_140px_90px_auto] ${hasRevisionPending || isRevised ? "border-amber-300 bg-amber-50/70" : "border-white/80 bg-white/85"}`}
+      className={`grid w-full gap-3 rounded-xl border px-4 py-3 text-left transition hover:border-primary/25 hover:bg-card lg:grid-cols-[140px_minmax(0,1fr)_170px_140px_90px_auto] ${hasRevisionPending || isRevised ? "border-amber-300 bg-amber-50/70" : "border-border/70 bg-background"}`}
     >
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{booking.bookingId}</p>
@@ -396,26 +396,24 @@ function getDeliveryProgressLabel(booking: BookingRecord) {
 function getPipelineColumnClass(columnKey: string) {
   switch (columnKey) {
     case "draft":
-      return "bg-gradient-to-b from-slate-100/95 to-blue-50/70";
+      return "bg-slate-50/80";
     case "approval":
-      return "bg-gradient-to-b from-amber-100/95 to-orange-50/75";
+      return "bg-amber-50/80";
     case "assignment":
-      return "bg-gradient-to-b from-sky-100/95 to-cyan-50/75";
+      return "bg-sky-50/80";
     case "transit":
-      return "bg-gradient-to-b from-cyan-100/95 to-blue-50/75";
+      return "bg-cyan-50/70";
     case "pod":
-      return "bg-gradient-to-b from-violet-100/95 to-fuchsia-50/75";
+      return "bg-violet-50/75";
     case "completed":
-      return "bg-gradient-to-b from-emerald-100/95 to-lime-50/75";
+      return "bg-emerald-50/75";
     case "invoiced":
-      return "bg-gradient-to-b from-green-100/95 to-emerald-50/75";
+      return "bg-green-50/75";
     case "exception":
-      return "bg-gradient-to-b from-rose-100/95 to-orange-50/75";
+      return "bg-rose-50/80";
     case "cancelled":
-      return "bg-gradient-to-b from-rose-100/95 to-pink-50/75";
+      return "bg-rose-50/70";
     default:
       return "bg-background/95";
   }
 }
-
-

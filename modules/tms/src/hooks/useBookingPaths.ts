@@ -4,11 +4,11 @@ export function useBookingPaths() {
   const { tenantId = "" } = useParams();
   const { pathname } = useLocation();
 
-  const marker = `/tenant/${tenantId}`;
-  const idx = pathname.indexOf(marker);
-  const base = idx > 0 ? pathname.slice(0, idx) : "";
-  const root = `${base}/tenant/${tenantId}`;
-  const tenantAdminRoot = `/platform-admin/tenant/${tenantId}`;
+  const cleanRoot = "/tms/booking";
+  const legacyMarker = tenantId ? `/tenant/${tenantId}` : "";
+  const legacyIndex = legacyMarker ? pathname.indexOf(legacyMarker) : -1;
+  const root = legacyIndex > 0 ? pathname.slice(0, legacyIndex) : cleanRoot;
+  const tenantAdminRoot = "/tenant-admin";
 
   return {
     root,
@@ -23,10 +23,9 @@ export function useBookingPaths() {
     assignment: `${root}/bookings/assignment`,
     liveTracking: `${root}/bookings/live-tracking`,
     completed: `${root}/bookings/completed`,
-    tenantCustomer: (id: string) => `${tenantAdminRoot}/customers/${id}`,
-    tenantFinance: `${tenantAdminRoot}/finance`,
-    tenantFinanceInvoice: (id: string) => `${tenantAdminRoot}/finance/invoice/${id}`,
-    tenantLrWorkspace: `${tenantAdminRoot}/lr`,
+    tenantCustomer: (_id: string) => `${tenantAdminRoot}/customers`,
+    tenantFinance: `${root}/bookings/completed`,
+    tenantFinanceInvoice: (_id: string) => `${root}/bookings/completed`,
+    tenantLrWorkspace: `${tenantAdminRoot}/lr-config`,
   };
 }
-

@@ -1149,7 +1149,7 @@ function FormatStrategyCard({
       <div>
         <div className="text-sm font-medium text-slate-950">{title}</div>
         <div className="mt-1 text-xs text-muted-foreground">{description}</div>
-        <div className="mt-2 rounded-lg border bg-white/80 px-2.5 py-1.5 font-mono text-[11px] text-slate-900">{example}</div>
+        <div className="mt-2 rounded-lg border bg-muted/20 px-2.5 py-1.5 font-mono text-[11px] text-slate-900">{example}</div>
       </div>
       <div className="mt-2">
         <input type="radio" checked={checked} onChange={onChange} disabled={disabled} />

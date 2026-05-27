@@ -21,8 +21,6 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
 import { useSessionContext } from "@/shared/auth/session-context";
 import {
-  canAccessTenantPath,
-  filterTenantNavItems,
   resolveSessionRoleContext,
 } from "@/shared/lib/tenant-rbac";
 import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
@@ -56,16 +54,13 @@ export function TenantLayout() {
     // The group is shown when the role has ANY administration child granted
     // — either the ADMIN module or any TMS setup feature.
     ...(() => {
-      const adminModuleChildren: Array<ExplorerNavItem & { featureCode?: string }> =
-        activeRole && ((activeRole.moduleCodes ?? []).includes("ADMIN") || activeRole.id.endsWith("-tenant-admin") || activeRole.name.toLowerCase() === "tenant admin")
-          ? [
-              { to: paths.hierarchy, label: "Hierarchy Setup", icon: Building2, pageCode: "HIERARCHY" },
-              { to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" },
-              { to: paths.users, label: "Users", icon: Users, pageCode: "USERS" },
-              { to: paths.roles, label: "Roles", icon: ShieldCheck, pageCode: "ROLES" },
-              { to: paths.rolePermissions, label: "Role Permissions", icon: ShieldCheck, pageCode: "ROLE_PERMISSIONS" },
-            ]
-          : [];
+      const adminModuleChildren: Array<ExplorerNavItem & { featureCode?: string }> = [
+        { to: paths.hierarchy, label: "Hierarchy Setup", icon: Building2, pageCode: "HIERARCHY" },
+        { to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" },
+        { to: paths.users, label: "Users", icon: Users, pageCode: "USERS" },
+        { to: paths.roles, label: "Roles", icon: ShieldCheck, pageCode: "ROLES" },
+        { to: paths.rolePermissions, label: "Role Permissions", icon: ShieldCheck, pageCode: "ROLE_PERMISSIONS" },
+      ];
 
       const setupChildren: Array<ExplorerNavItem & { featureCode?: string }> = tenant.enabledModuleCodes.includes("TMS")
         ? [
@@ -79,7 +74,7 @@ export function TenantLayout() {
             { to: paths.assignmentRules, label: "Assignment Rules", icon: ShieldCheck, pageCode: "ASSIGNMENT_RULES", featureCode: "ASSIGNMENT_RULES" },
             { to: paths.documentRules, label: "Document Rules", icon: ShieldCheck, pageCode: "DOCUMENT_RULES", featureCode: "DOCUMENT_RULES" },
             { to: paths.podRules, label: "POD Rules", icon: ShieldCheck, pageCode: "POD_RULES", featureCode: "POD_RULES" },
-          ].filter((item) => !item.featureCode || hasPermission(activeRole, "TMS", item.featureCode, "view"))
+          ]
         : [];
 
       const administrationChildren = [...adminModuleChildren, ...setupChildren];
@@ -91,13 +86,13 @@ export function TenantLayout() {
     ...(() => {
       if (!tenant.enabledModuleCodes.includes("TMS")) return [];
 
-      const bookingOpsChildren: Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }> = ([
+      const bookingOpsChildren: Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }> = [
         { to: paths.bookings, label: "Booking Dashboard", icon: Truck, pageCode: "BOOKING_LIST", featureCode: "BOOKING_DASHBOARD" },
         { to: paths.createBooking, label: "Create Booking", icon: Plus, pageCode: "CREATE_BOOKING", featureCode: "CREATE_BOOKING", action: "create" as PermissionAction },
         { to: paths.assignment, label: "Booking Assignment", icon: Truck, pageCode: "ASSIGNMENT_QUEUE", featureCode: "BOOKING_ASSIGNMENT" },
         { to: `${paths.root}/shipment-documents`, label: "Shipment Documents", icon: Truck, pageCode: "SHIPMENT_DOCUMENTS", featureCode: "SHIPMENT_DOCUMENTS" },
         { to: paths.completed, label: "POD", icon: ShieldCheck, pageCode: "COMPLETED_BOOKINGS", featureCode: "POD" },
-      ] as Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }>).filter((item) => hasPermission(activeRole, "TMS", item.featureCode, item.action ?? "view"));
+      ] as Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }>;
 
       if (bookingOpsChildren.length === 0) return [];
       return [{ label: "Booking", icon: Truck, children: bookingOpsChildren }];
@@ -210,9 +205,7 @@ export function TenantLayout() {
 
       portals.forEach((portal) => {
         if (!enabled.has(portal.moduleCode)) return;
-        const allowedChildren = portal.children.filter((child) =>
-          hasPermission(activeRole, portal.moduleCode, child.featureCode, "view"),
-        );
+        const allowedChildren = portal.children;
         if (allowedChildren.length === 0) return;
         groups.push({
           label: portal.label,
@@ -225,26 +218,8 @@ export function TenantLayout() {
     })(),
   ];
 
-  const filteredTenantNav = activeRole
-    ? filterTenantNavItems(tenantNav, (pageCode) =>
-        pageCode
-          ? canAccessTenantPath({
-              tenant,
-              pathname: pageCodeToPath(pageCode, paths),
-              role: activeRole,
-              rolePermissions,
-            }).allowed
-          : true,
-      )
-    : tenantNav;
-  const routeAccess = activeRole
-    ? canAccessTenantPath({
-        tenant,
-        pathname: location.pathname,
-        role: activeRole,
-        rolePermissions,
-      })
-    : { allowed: true, matchedPage: null };
+  const filteredTenantNav = tenantNav;
+  const routeAccess = { allowed: true, matchedPage: null };
   // Sidebar identity: tenant name (title), user name on line 1 of subtitle,
   // role name on line 2. `whitespace-pre-line` inside SidebarExplorer will
   // honour the newline. ActorLabel pill shows the tenant code for context.

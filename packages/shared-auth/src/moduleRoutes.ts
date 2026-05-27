@@ -6,13 +6,13 @@ export const MODULE_ROUTES: Record<ERPModule, string> = {
   vendor: '/vendor',
   customer: '/customer',
   admin: '/admin/dashboard',
-  tms: '/tms/booking/tenant/tenant-northstar/bookings',
+  tms: '/tms/booking/bookings',
   tracking: '/tracking',
   finance: '/finance',
   reporting: '/reporting',
   ptl: '/ptl',
   'platform-admin': '/platform-admin/dashboard',
-  'tenant-admin': '/tenant-admin/tenant/tenant-northstar/dashboard',
+  'tenant-admin': '/tenant-admin/dashboard',
   'driver-app': '/driver-app/tenant/tenant-northstar/driver-app/login',
 }
 
@@ -38,7 +38,7 @@ const SHELL_LANDING_BY_MODULE: Partial<Record<ERPModule, string>> = {
 export function getPostLoginRouteForUser(user: User | null): string {
   if (!user) return '/login'
 
-  if (user.permissions.includes('all')) return '/modules'
+  if (user.permissions.includes('all')) return '/platform-admin/dashboard'
 
   for (const module of ['platform-admin', 'tenant-admin', 'tracking', 'tms', 'driver-app', 'customer'] as const) {
     if (user.modules.includes(module)) {
