@@ -1,10 +1,9 @@
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import TrackingApp from "../../../../../../../src/tracking/TrackingApp";
+import TrackTraceApp from "@track-trace/app/TrackTraceApp";
 
-// Fallback to the local tracking app on dev-uday where the separate
-// track-trace module entry is not present.
+// Render the real track-trace module inside the tenant shell.
 
 export function TrackingEmbeddedApp() {
   return (
@@ -17,7 +16,7 @@ export function TrackingEmbeddedApp() {
           </Link>
         </Button>
       </div>
-      <TrackingApp />
+      <TrackTraceApp />
     </div>
   );
 }
