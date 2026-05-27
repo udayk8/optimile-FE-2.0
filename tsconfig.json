@@ -66,6 +66,8 @@
       "@shared-api/*": ["packages/shared-api/src/*"],
       "@shared-auth": ["packages/shared-auth/src"],
       "@shared-auth/*": ["packages/shared-auth/src/*"],
+      "@track-trace": ["modules/track-trace-web/src"],
+      "@track-trace/*": ["modules/track-trace-web/src/*"],
       "@shared-ui": ["packages/shared-ui/src"],
       "@shared-ui/*": ["packages/shared-ui/src/*"],
       "@shared-utils": ["packages/shared-utils/src"],
