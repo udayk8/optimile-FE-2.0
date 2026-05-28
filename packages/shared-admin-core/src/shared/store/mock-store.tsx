@@ -6933,6 +6933,17 @@ function validateUserAssignments(
     return;
   }
 
+  // Defer scope assignment when no org units exist at the role's level yet.
+  // Tenants often add users before the org-unit tree is fully built; the
+  // user can be saved unscoped and assigned later when units exist. We
+  // only enforce a selection when there's something to choose from.
+  const orgUnitsAtRoleLevel = orgUnits.filter(
+    (unit) => unit.hierarchyLevelId === role.hierarchyLevelId,
+  );
+  if (orgUnitsAtRoleLevel.length === 0) {
+    return;
+  }
+
   if (!user.orgUnitIds.length) {
     throw new Error("Assign at least one org unit for this internal user.");
   }

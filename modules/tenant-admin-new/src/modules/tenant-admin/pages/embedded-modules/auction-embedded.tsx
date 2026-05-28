@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -15,6 +16,8 @@ import RfqCreatePage from "@auction/features/sourcing/pages/RfqCreatePage";
 import RfqDetailPage from "@auction/features/sourcing/pages/RfqDetailPage";
 import RfqResponsesPage from "@auction/features/sourcing/pages/RfqResponsesPage";
 import { AuctionRouteWrapper } from "@auction/app/AuctionRouteWrapper";
+import { AuctionPermissionProvider } from "@auction/app/permission-context";
+import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 
 // Embedded mode renders the real Auction module pages inside the
 // platform-admin tenant shell. The standalone Auction app's chrome
@@ -44,29 +47,41 @@ function StandaloneLink() {
 }
 
 export function AuctionEmbeddedApp() {
+  const access = useTenantAccess();
+  const permissions = useMemo(
+    () => ({
+      canCreateAuction: access.hasFeaturePermission("AUCTION", "CREATE_AUCTION", "create"),
+      canCreateRfi: access.hasFeaturePermission("AUCTION", "CREATE_RFI", "create"),
+      canCreateRfq: access.hasFeaturePermission("AUCTION", "CREATE_RFQ", "create"),
+    }),
+    [access],
+  );
+
   return (
     <QueryClientProvider client={queryClient}>
-      <StandaloneLink />
-      <AuctionRouteWrapper>
-        <Routes>
-          <Route index element={<DashboardPage />} />
-          <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="sourcing" element={<SourcingPage />} />
-          <Route path="sourcing/rfi/new" element={<RfiCreatePage />} />
-          <Route path="sourcing/rfi/:id" element={<RfiDetailPage />} />
-          <Route path="sourcing/rfq/new" element={<RfqCreatePage />} />
-          <Route path="sourcing/rfq/:id" element={<RfqDetailPage />} />
-          <Route path="rfq-responses" element={<RfqResponsesPage />} />
-          <Route path="auctions" element={<AuctionsPage />} />
-          <Route path="auctions/new" element={<AuctionCreatePage />} />
-          <Route path="auctions/new/:type" element={<AuctionCreatePage />} />
-          <Route path="auctions/:id" element={<AuctionDetailPage />} />
-          <Route path="contracts" element={<ContractsPage />} />
-          <Route path="contracts/:id" element={<ContractsPage />} />
-          <Route path="*" element={<Navigate to="" replace />} />
-        </Routes>
-      </AuctionRouteWrapper>
-      <Toaster position="top-right" richColors closeButton />
+      <AuctionPermissionProvider value={permissions}>
+        <StandaloneLink />
+        <AuctionRouteWrapper>
+          <Routes>
+            <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="sourcing" element={<SourcingPage />} />
+            <Route path="sourcing/rfi/new" element={<RfiCreatePage />} />
+            <Route path="sourcing/rfi/:id" element={<RfiDetailPage />} />
+            <Route path="sourcing/rfq/new" element={<RfqCreatePage />} />
+            <Route path="sourcing/rfq/:id" element={<RfqDetailPage />} />
+            <Route path="rfq-responses" element={<RfqResponsesPage />} />
+            <Route path="auctions" element={<AuctionsPage />} />
+            <Route path="auctions/new" element={<AuctionCreatePage />} />
+            <Route path="auctions/new/:type" element={<AuctionCreatePage />} />
+            <Route path="auctions/:id" element={<AuctionDetailPage />} />
+            <Route path="contracts" element={<ContractsPage />} />
+            <Route path="contracts/:id" element={<ContractsPage />} />
+            <Route path="*" element={<Navigate to="" replace />} />
+          </Routes>
+        </AuctionRouteWrapper>
+        <Toaster position="top-right" richColors closeButton />
+      </AuctionPermissionProvider>
     </QueryClientProvider>
   );
 }

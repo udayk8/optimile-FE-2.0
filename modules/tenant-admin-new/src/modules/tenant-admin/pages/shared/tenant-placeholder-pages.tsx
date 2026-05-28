@@ -27,7 +27,6 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
 import { useTenantVendors } from "@/modules/tenant-admin/hooks/useTenantVendors";
 import {
-  TENANT_ADMIN_MODULE_CODE,
   TENANT_PERMISSION_ACTIONS,
   buildTenantModuleEntries,
   isBusinessHierarchyLevel,
@@ -944,7 +943,17 @@ export function TenantUsersPage() {
               {selectedRole ? <span className="ml-1 text-slate-500">(role level: {levelMap.get(selectedRole.hierarchyLevelId) ?? "—"})</span> : null}
             </label>
             {scopeOrgUnits.length === 0 ? (
-              <p className="text-[12px] text-slate-500">No org units exist at this role's level yet.</p>
+              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                No org units exist at this role's level yet. You can save the user now — they'll be unscoped until you add one. {selectedRole ? (
+                  <Link
+                    to={`/tenant/${tenantId}/org-units`}
+                    className="font-medium underline underline-offset-2 hover:text-amber-900"
+                    onClick={() => setOpen(false)}
+                  >
+                    Manage Org Units →
+                  </Link>
+                ) : null}
+              </div>
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2">
                 {scopeOrgUnits.map((unit) => {
@@ -1078,7 +1087,10 @@ export function TenantRolesPage() {
       description: "",
       active: true,
       hierarchyLevelId: levels[0]?.id ?? "",
-      moduleCodes: [TENANT_ADMIN_MODULE_CODE],
+      // Administration is opt-in. Only the system Tenant Admin role gets
+      // ADMIN by default; every other role must tick it explicitly in the
+      // module step.
+      moduleCodes: [],
       permissions: {},
     });
     setWizardOpen(true);
@@ -1096,7 +1108,9 @@ export function TenantRolesPage() {
       description: role.description,
       active: role.active,
       hierarchyLevelId: role.hierarchyLevelId,
-      moduleCodes: role.moduleCodes.length ? role.moduleCodes : [TENANT_ADMIN_MODULE_CODE],
+      // Respect whatever the role was saved with — don't backfill ADMIN.
+      // Admin is opt-in; an empty list means the user must pick modules.
+      moduleCodes: role.moduleCodes,
       permissions: matrix,
     });
     setWizardOpen(true);
@@ -1748,8 +1762,13 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
     badge: "modules/auction-web — /auction/*",
     rows: [
       { label: "Auction Dashboard", helper: "Auction home", moduleCode: "AUCTION", featureCodes: ["AUCTION_DASHBOARD"] },
+      { label: "Client Hub", helper: "Sourcing — RFI and RFQ campaigns", moduleCode: "AUCTION", featureCodes: ["AUCTION_CLIENT_HUB"] },
+      { label: "RFQ Responses", helper: "Vendor RFQ response aggregation", moduleCode: "AUCTION", featureCodes: ["AUCTION_RFQ_RESPONSES"] },
       { label: "Auctions", helper: "RFI/RFQ and auction list", moduleCode: "AUCTION", featureCodes: ["AUCTION_AUCTIONS"] },
       { label: "Contracts", helper: "Auction contracts", moduleCode: "AUCTION", featureCodes: ["AUCTION_CONTRACTS"] },
+      { label: "Create Auction", helper: "New Auction button + create page", moduleCode: "AUCTION", featureCodes: ["CREATE_AUCTION"] },
+      { label: "Create RFI", helper: "New RFI button + create page", moduleCode: "AUCTION", featureCodes: ["CREATE_RFI"] },
+      { label: "Create RFQ", helper: "New RFQ button + create page", moduleCode: "AUCTION", featureCodes: ["CREATE_RFQ"] },
     ],
   },
 ];
@@ -1825,7 +1844,11 @@ export function TenantRolePermissionsPage() {
     if (!selectedRole) return [] as PermissionGroupCard[];
     const codes = new Set(selectedRole.moduleCodes ?? []);
     return PERMISSION_GROUPS.filter((group) => {
-      if (group.key === "ADMIN") return codes.has("ADMIN") || codes.has("TMS");
+      // Administration governance is reserved for the system Tenant Admin
+      // role only. We deliberately ignore stray ADMIN codes in moduleCodes
+      // (legacy default-leftover from earlier wizard versions) — the saved
+      // data stays untouched, the matrix just doesn't surface the card.
+      if (group.key === "ADMIN") return isTenantAdminRole(selectedRole);
       if (group.key === "BOOKING_OPS") return codes.has("TMS");
       if (group.key === "FLEET") return codes.has("FLEET");
       if (group.key === "AUCTION") return codes.has("AUCTION") || codes.has("PROCUREMENT");

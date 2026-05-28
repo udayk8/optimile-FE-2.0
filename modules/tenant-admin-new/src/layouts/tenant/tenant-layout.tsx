@@ -28,6 +28,7 @@ import {
 } from "@/shared/lib/tenant-rbac";
 import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
 import { hasPermission, usePermissionMatrixVersion, type PermissionAction } from "@/modules/tenant-admin/lib/tenant-permissions";
+import { isTenantAdminRole } from "@/modules/tenant-admin/lib/tenant-modules";
 import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-profile-menu";
 
 export function TenantLayout() {
@@ -50,15 +51,26 @@ export function TenantLayout() {
     rolePermissions,
   });
 
+  const showGovernanceDashboard = !!activeRole && isTenantAdminRole(activeRole);
   const tenantNav = [
-    { to: paths.dashboard, label: "Dashboard", icon: LayoutDashboard, pageCode: "TENANT_DASHBOARD" },
+    // The tenant governance dashboard is only relevant for the Tenant Admin
+    // role — everyone else lands directly on their module dashboard and
+    // doesn't need this entry cluttering the sidebar.
+    ...(showGovernanceDashboard
+      ? [{ to: paths.dashboard, label: "Dashboard", icon: LayoutDashboard, pageCode: "TENANT_DASHBOARD" }]
+      : []),
     // Administration covers tenant governance (hierarchy, users, roles) AND
     // all booking onboarding/setup data (master data, rules, LR config).
     // The group is shown when the role has ANY administration child granted
     // — either the ADMIN module or any TMS setup feature.
     ...(() => {
+      // Administration governance (Hierarchy, Org Units, Users, Roles,
+      // Permissions) is reserved for the system Tenant Admin role only.
+      // We don't expand the gate based on `moduleCodes.includes("ADMIN")`
+      // anymore — legacy roles may have a stray ADMIN code from when the
+      // wizard default added it; we no longer treat that as a real grant.
       const adminModuleChildren: Array<ExplorerNavItem & { featureCode?: string }> =
-        activeRole && ((activeRole.moduleCodes ?? []).includes("ADMIN") || activeRole.id.endsWith("-tenant-admin") || activeRole.name.toLowerCase() === "tenant admin")
+        activeRole && isTenantAdminRole(activeRole)
           ? [
               { to: paths.hierarchy, label: "Hierarchy Setup", icon: Building2, pageCode: "HIERARCHY" },
               { to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" },
@@ -101,7 +113,11 @@ export function TenantLayout() {
       ] as Array<ExplorerNavItem & { featureCode: string; action?: PermissionAction }>).filter((item) => hasPermission(activeRole, "TMS", item.featureCode, item.action ?? "view"));
 
       if (bookingOpsChildren.length === 0) return [];
-      return [{ label: "Booking", icon: Truck, children: bookingOpsChildren }];
+      // Clicking the Booking group header lands on Booking Dashboard if
+      // permitted, else the first allowed sub-item.
+      const bookingHeaderTo = bookingOpsChildren.find((child) => child.to === paths.bookings)?.to
+        ?? bookingOpsChildren[0]?.to;
+      return [{ label: "Booking", icon: Truck, to: bookingHeaderTo, children: bookingOpsChildren }];
     })(),
     // External module portals — exposed as sidebar entries when the tenant
     // has the module enabled AND the role has view permission for at least
@@ -133,6 +149,9 @@ export function TenantLayout() {
         moduleCode: string;
         label: string;
         icon: typeof Truck;
+        // Optional `to` makes the group header itself navigable — clicking
+        // "Auction / AMS" jumps to its dashboard. Children stay visible.
+        to?: string;
         children: Array<{ label: string; featureCode: string; to: string; icon: typeof Truck }>;
       };
 
@@ -141,6 +160,7 @@ export function TenantLayout() {
           moduleCode: "AUCTION",
           label: "Auction / AMS",
           icon: Gavel,
+          to: `${paths.auctionAms}/dashboard`,
           children: [
             { label: "Auction Dashboard", featureCode: "AUCTION_DASHBOARD", to: `${paths.auctionAms}/dashboard`, icon: Gavel },
             { label: "Client Hub", featureCode: "AUCTION_CLIENT_HUB", to: `${paths.auctionAms}/sourcing`, icon: ShieldCheck },
@@ -153,6 +173,7 @@ export function TenantLayout() {
           moduleCode: "TRACKING",
           label: "Track and Trace",
           icon: MapPin,
+          to: `${paths.trackAndTrace}/dashboard`,
           children: [
             { label: "Tracking Dashboard", featureCode: "TRACKING_DASHBOARD", to: `${paths.trackAndTrace}/dashboard`, icon: MapPin },
             { label: "Active Trips", featureCode: "TRACKING_TRIPS", to: `${paths.trackAndTrace}/trips`, icon: Truck },
@@ -166,6 +187,7 @@ export function TenantLayout() {
           moduleCode: "VENDOR",
           label: "Vendor Portal",
           icon: Users,
+          to: `${paths.vendorPortal}/dashboard`,
           children: [
             { label: "Vendor Dashboard", featureCode: "VENDOR_DASHBOARD", to: `${paths.vendorPortal}/dashboard`, icon: Users },
             { label: "Assigned Trips", featureCode: "VENDOR_TRIPS", to: `${paths.vendorPortal}/assigned-trips`, icon: Truck },
@@ -182,6 +204,7 @@ export function TenantLayout() {
           moduleCode: "FLEET",
           label: "Fleet Management",
           icon: Truck,
+          to: `${paths.fleetManagement}/dashboard`,
           children: [
             { label: "Fleet Dashboard", featureCode: "FLEET_DASHBOARD", to: `${paths.fleetManagement}/dashboard`, icon: Truck },
             { label: "Ops Intelligence", featureCode: "FLEET_OPS_INTEL", to: `${paths.fleetManagement}/ops-intel`, icon: ShieldCheck },
@@ -203,6 +226,7 @@ export function TenantLayout() {
           moduleCode: "CUSTOMER",
           label: "Customer Portal",
           icon: UserCog,
+          to: paths.customerPortal,
           children: [
             { label: "Customer Dashboard", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: UserCog },
           ],
@@ -215,9 +239,16 @@ export function TenantLayout() {
           hasPermission(activeRole, portal.moduleCode, child.featureCode, "view"),
         );
         if (allowedChildren.length === 0) return;
+        // Only attach `to` if the dashboard target is actually permitted —
+        // otherwise clicking the group label would land on a route the user
+        // can't view. Falls back to the first permitted child's URL.
+        const headerTo = portal.to && allowedChildren.some((child) => child.to === portal.to)
+          ? portal.to
+          : allowedChildren[0]?.to;
         groups.push({
           label: portal.label,
           icon: portal.icon,
+          to: headerTo,
           children: allowedChildren,
         });
       });

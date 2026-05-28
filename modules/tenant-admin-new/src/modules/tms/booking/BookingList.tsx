@@ -170,7 +170,14 @@ export function BookingListPage() {
                 Create Booking
               </Link>
             </Button>
-          ) : null
+          ) : (
+            <span title="Permission not granted — ask your Tenant Admin to enable Create Booking" className="inline-block">
+              <Button disabled aria-disabled="true">
+                <Plus className="size-4" />
+                Create Booking
+              </Button>
+            </span>
+          )
         }
       />
 

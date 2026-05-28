@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   ArrowUpRight,
   Boxes,
@@ -30,6 +30,7 @@ import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
 import { resolveSessionRoleContext } from "@/shared/lib/tenant-rbac";
 import { StatusDot } from "@/modules/tenant-admin/components/admin-ui";
 import { isTenantAdminRole, TENANT_ADMIN_MODULE_CODE } from "@/modules/tenant-admin/lib/tenant-modules";
+import { pickTenantLandingPath } from "@/modules/tenant-admin/lib/tenant-landing";
 import { hasPermission } from "@/modules/tenant-admin/lib/tenant-permissions";
 import { canRoleViewPage } from "@/shared/lib/tenant-page-access";
 
@@ -90,6 +91,17 @@ export function TenantDashboardPage() {
     roles,
     rolePermissions,
   });
+
+  // The governance dashboard is a Tenant Admin view. Anyone else (Fleet
+  // Manager, Procurement, etc.) gets redirected to their first enabled
+  // module's dashboard. Covers refresh / direct-URL / already-in-session
+  // cases that miss the login-time redirect.
+  if (activeRole && !isTenantAdminRole(activeRole)) {
+    const landing = pickTenantLandingPath(tenant.id, activeRole, tenant.enabledModuleCodes ?? []);
+    if (landing !== `/tenant-admin/tenant/${tenant.id}/dashboard`) {
+      return <Navigate to={landing} replace />;
+    }
+  }
 
   const canAdmin =
     !!activeRole &&

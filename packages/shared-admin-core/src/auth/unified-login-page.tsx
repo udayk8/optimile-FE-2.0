@@ -6,6 +6,7 @@ import { MockStoreProvider, useMockStore } from "@/shared/store/mock-store";
 import { SessionProvider, useSessionContext } from "@/shared/auth/session-context";
 import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { isTenantAdminRole } from "@/modules/tenant-admin/lib/tenant-modules";
+import { pickTenantLandingPath } from "@/modules/tenant-admin/lib/tenant-landing";
 import { storageKeys, writeStoredValue } from "@/shared/lib/storage/browser-storage";
 import { Button } from "@/shared/components/ui/button";
 import type { UserRecord } from "@/types/access";
@@ -184,8 +185,11 @@ function UnifiedLoginInner() {
         permissions,
       });
 
+      // Land on the first enabled module's dashboard (in tenant onboarding
+      // order, e.g. Auction for a Procurement user on an Auction-only
+      // tenant). Tenant admins keep the governance overview.
       // Push (not replace) so the browser Back button returns to /login.
-      navigate(`/tenant-admin/tenant/${selectedTenant.id}/dashboard`);
+      navigate(pickTenantLandingPath(selectedTenant.id, role ?? null, selectedTenant.enabledModuleCodes ?? []));
     } catch {
       setError("Unable to sign in to the tenant workspace.");
       setBusy(false);

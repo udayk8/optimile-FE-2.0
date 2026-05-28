@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { ChevronDown, ChevronRight, FolderTree, PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
 
@@ -91,6 +91,7 @@ function ExplorerNode({
   expandedNodes: Set<string>;
   onToggle: (nodeId: string) => void;
 }) {
+  const navigate = useNavigate();
   const itemId = getItemId(item, parentId);
   const hasChildren = Boolean(item.children?.length);
   const isExpanded = expandedNodes.has(itemId);
@@ -99,12 +100,31 @@ function ExplorerNode({
   const Icon = item.icon ?? FolderTree;
 
   if (hasChildren) {
+    const Chevron = isExpanded ? ChevronDown : ChevronRight;
+
+    // Single-click toggle:
+    //   - collapsed  → expand AND navigate to the group's dashboard (`to`)
+    //   - expanded   → collapse (no navigation)
+    //   - collapsed  → expand AND navigate again
+    // Groups without a `to` (e.g. Administration) just toggle.
+    const handleHeaderClick = () => {
+      if (isExpanded) {
+        onToggle(itemId);
+        return;
+      }
+      onToggle(itemId);
+      if (item.to) {
+        navigate(item.to, item.state ? { state: item.state } : undefined);
+      }
+    };
+
     return (
       <div className="space-y-1">
         <button
           type="button"
           title={item.title ?? (collapsed ? item.label : undefined)}
-          onClick={() => onToggle(itemId)}
+          aria-expanded={isExpanded}
+          onClick={handleHeaderClick}
           className={cn(
             "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[15px] font-medium transition",
             isParentActive
@@ -118,7 +138,7 @@ function ExplorerNode({
           {!collapsed ? (
             <>
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              {isExpanded ? <ChevronDown className="size-4 shrink-0" /> : <ChevronRight className="size-4 shrink-0" />}
+              <Chevron className="size-4 shrink-0" />
             </>
           ) : null}
         </button>

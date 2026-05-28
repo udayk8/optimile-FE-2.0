@@ -88,6 +88,9 @@ const AUCTION_FEATURES: TenantModuleFeature[] = [
   { code: "AUCTION_RFQ_RESPONSES", name: "RFQ Responses" },
   { code: "AUCTION_AUCTIONS", name: "Auctions" },
   { code: "AUCTION_CONTRACTS", name: "Contracts" },
+  { code: "CREATE_AUCTION", name: "Create Auction" },
+  { code: "CREATE_RFI", name: "Create RFI" },
+  { code: "CREATE_RFQ", name: "Create RFQ" },
 ];
 
 const CUSTOMER_FEATURES: TenantModuleFeature[] = [
