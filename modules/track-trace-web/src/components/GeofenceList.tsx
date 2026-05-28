@@ -3,7 +3,7 @@ import type { TrackingGeofence } from '../types/geofence.types'
 
 function StatusBadge({ isActive }: { isActive: boolean }) {
   return (
-    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isActive ? 'bg-success/10 text-success' : 'bg-secondary/10 text-secondary'}`}>
+    <span className={`rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${isActive ? 'bg-success/10 text-success' : 'bg-secondary/10 text-secondary'}`}>
       {isActive ? 'Active' : 'Inactive'}
     </span>
   )
@@ -22,35 +22,35 @@ export function GeofenceList({
 }) {
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-gray-200 px-5 py-4">
-        <h3 className="text-lg font-bold text-text">Geofence list</h3>
-        <p className="mt-1 text-sm text-gray-600">Operational geofences linked to trips, checkpoints, customers, and restricted zones.</p>
+      <div className="border-b border-gray-200 px-4 py-3">
+        <h3 className="text-[14px] font-semibold text-text">Geofence list</h3>
+        <p className="text-[12px] text-gray-500">Operational geofences linked to trips, checkpoints, customers, and restricted zones.</p>
       </div>
 
       {/* Mobile cards */}
       <div className="space-y-3 p-4 md:hidden">
         {geofences.map((row) => (
-          <div key={row.id} className="rounded-2xl border border-gray-200 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div key={row.id} className="rounded-xl border border-gray-200 bg-white p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="text-base font-extrabold text-text">{row.name}</p>
-                <p className="mt-1 text-xs font-semibold text-gray-500">{row.type}</p>
+                <p className="text-[14px] font-semibold text-text">{row.name}</p>
+                <p className="text-[12px] text-gray-500">{row.type}</p>
               </div>
               <StatusBadge isActive={row.isActive} />
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl bg-gray-50 px-3 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Radius</p>
-                <p className="mt-1 text-sm font-semibold text-text">{row.radiusMeters} m</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Radius</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-text">{row.radiusMeters} m</p>
               </div>
-              <div className="rounded-xl bg-gray-50 px-3 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Coordinates</p>
-                <p className="mt-1 text-sm font-semibold text-text">{row.latitude.toFixed(4)}, {row.longitude.toFixed(4)}</p>
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Coordinates</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-text">{row.latitude.toFixed(4)}, {row.longitude.toFixed(4)}</p>
               </div>
-              <div className="rounded-xl bg-gray-50 px-3 py-3 sm:col-span-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Linked entity</p>
-                <p className="mt-1 text-sm font-semibold text-text">{row.linkedEntityId}</p>
-                <p className="text-xs text-gray-500">{row.linkedEntityType}</p>
+              <div className="rounded-lg bg-gray-50 px-3 py-2 sm:col-span-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Linked entity</p>
+                <p className="mt-0.5 text-[13px] font-semibold text-text">{row.linkedEntityId}</p>
+                <p className="text-[12px] text-gray-500">{row.linkedEntityType}</p>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">

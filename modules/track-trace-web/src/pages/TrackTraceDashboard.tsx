@@ -43,10 +43,10 @@ function etaLabel(delayMinutes: number, remainingKm: number) {
 
 function alertSeverityStyle(severity: TrackingAlert['severity']) {
   switch (severity) {
-    case 'Critical': return { bar: 'bg-red-600', label: 'text-red-600', badge: 'bg-red-50 text-red-700 border-red-200' }
-    case 'High':     return { bar: 'bg-orange-500', label: 'text-orange-600', badge: 'bg-orange-50 text-orange-700 border-orange-200' }
-    case 'Medium':   return { bar: 'bg-amber-400', label: 'text-amber-600', badge: 'bg-amber-50 text-amber-700 border-amber-200' }
-    default:         return { bar: 'bg-blue-400', label: 'text-blue-600', badge: 'bg-blue-50 text-blue-700 border-blue-200' }
+    case 'Critical': return { bar: 'bg-red-500',    label: 'text-red-600',    badge: 'bg-red-100 text-red-700'    }
+    case 'High':     return { bar: 'bg-orange-400', label: 'text-orange-500', badge: 'bg-orange-100 text-orange-700' }
+    case 'Medium':   return { bar: 'bg-amber-400',  label: 'text-amber-500',  badge: 'bg-amber-100 text-amber-700'  }
+    default:         return { bar: 'bg-blue-400',   label: 'text-blue-500',   badge: 'bg-blue-100 text-blue-700'   }
   }
 }
 
@@ -184,7 +184,7 @@ export function TrackTraceDashboard() {
           </div>
           <div className="mt-3 flex items-center gap-3 text-xs font-semibold">
             <span className="text-red-600">{alertSeverityCounts.Critical} critical</span>
-            <span className="text-amber-500">{alertSeverityCounts.High} high</span>
+            <span className="text-orange-500">{alertSeverityCounts.High} high</span>
             <span className="inline-flex items-center gap-1 text-gray-500">
               <WifiOff className="h-3 w-3" />{dashboardSummary.offlineVehicles} offline
             </span>
@@ -379,7 +379,7 @@ export function TrackTraceDashboard() {
                     <div className={`mt-1 h-full w-1 shrink-0 self-stretch rounded-full ${style.bar}`} style={{ minHeight: 32 }} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <span className={`rounded-sm border px-1.5 py-0.5 text-xs font-extrabold uppercase tracking-wide ${style.badge}`}>
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${style.badge}`}>
                           {alert.severity}
                         </span>
                         <span className="shrink-0 text-xs text-gray-400">

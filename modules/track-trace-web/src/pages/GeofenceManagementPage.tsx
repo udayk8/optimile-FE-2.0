@@ -5,7 +5,6 @@ import { GeofenceForm } from '../components/GeofenceForm'
 import { GeofenceList } from '../components/GeofenceList'
 import { TrackTraceAccessBoundary } from '../components/TrackTraceAccessBoundary'
 import { PaginationStrip } from '../components/shared/PaginationStrip'
-import { trackTraceV2EyebrowClassName, trackTraceV2StickyPanelClassName, trackTraceV2SummaryCardClassName } from '../components/shared/trackTraceV2Chrome'
 import { useTrackingStore } from '../store/trackingStore'
 import type { GeofencePayload, TrackingGeofence } from '../types/geofence.types'
 import { ListPageSkeleton } from '../components/shared/ListPageSkeleton'
@@ -130,14 +129,14 @@ export function GeofenceManagementPage() {
       {/* Delete confirmation modal */}
       {pendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-md rounded-3xl border border-gray-200 bg-white p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-text">Delete {pendingDelete.name}?</h3>
-            <p className="mt-2 text-sm leading-6 text-gray-600">
+          <div className="mx-4 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl">
+            <h3 className="text-[14px] font-semibold text-text">Delete {pendingDelete.name}?</h3>
+            <p className="mt-2 text-[13px] leading-5 text-gray-600">
               This will permanently remove the{' '}
               <span className="font-semibold">{pendingDelete.type.toLowerCase()}</span> zone and stop
               triggering events for any linked trips or vehicles. This action cannot be undone.
             </p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button>
               <Button
                 variant="destructive"
@@ -157,61 +156,45 @@ export function GeofenceManagementPage() {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-3">
         {deleteError && (
-          <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+          <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-2.5 text-[12px] font-medium text-danger">
             {deleteError}
           </div>
         )}
 
-        <section className="grid gap-4 xl:grid-cols-[1.05fr,0.95fr]">
-            <Card className="border-gray-300 p-5 sm:p-6">
-              <p className={trackTraceV2EyebrowClassName}>Control workspace</p>
-              <h2 className="mt-2 text-xl font-extrabold text-text">Manage geofences with safer review before save</h2>
-              <p className="mt-3 text-sm leading-6 text-gray-600">
-                Keep placement, validation, and linked-entity context visible while editing so operational trigger zones are easier to maintain accurately.
-              </p>
-            </Card>
-            <Card className="p-5 sm:p-6">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className={trackTraceV2SummaryCardClassName}>
-                  <p className="text-sm font-bold text-text">{filteredGeofences.length}</p>
-                  <p className="mt-1 text-sm text-gray-600">Geofences in scope</p>
-                </div>
-                <div className={trackTraceV2SummaryCardClassName}>
-                  <p className="text-sm font-bold text-text">{geofences.filter((item) => item.isActive).length}</p>
-                  <p className="mt-1 text-sm text-gray-600">Active zones</p>
-                </div>
-                <div className={trackTraceV2SummaryCardClassName}>
-                  <p className="text-sm font-bold text-text">
-                    {showForm ? (editing ? 'Editing' : 'Creating') : 'Browsing'}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {showForm && editing ? editing.name : showForm ? 'New zone draft' : 'List view'}
-                  </p>
-                </div>
-              </div>
-            </Card>
-        </section>
+        {/* KPI strip */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: 'Geofences in Scope', value: filteredGeofences.length },
+            { label: 'Active Zones', value: geofences.filter((g) => g.isActive).length },
+            { label: 'Disabled Zones', value: geofences.filter((g) => !g.isActive).length },
+          ].map((kpi) => (
+            <div key={kpi.label} className="rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">{kpi.label}</p>
+              <p className="mt-0.5 text-xl font-extrabold text-gray-900">{kpi.value}</p>
+            </div>
+          ))}
+        </div>
 
-        {/* Sticky filter bar — includes "New geofence" CTA */}
-        <Card className={trackTraceV2StickyPanelClassName}>
-          <div className="flex flex-wrap items-end gap-4">
+        {/* Filter bar */}
+        <Card className="sticky top-14 z-10 border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-0 flex-1 xl:max-w-xs">
-              <label className="text-xs font-bold uppercase tracking-wide text-gray-500" htmlFor="geofence-search">Search</label>
+              <label className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500" htmlFor="geofence-search">Search</label>
               <input
                 id="geofence-search"
-                className="mt-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="mt-1.5 h-8 w-full rounded-lg border border-gray-300 px-3 text-[13px] text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name, entity ID, or entity type"
+                placeholder="Search by name, entity ID, or type"
                 value={search}
               />
             </div>
-            <div className="w-40">
-              <label className="text-xs font-bold uppercase tracking-wide text-gray-500" htmlFor="geofence-type">Type</label>
+            <div className="w-36">
+              <label className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500" htmlFor="geofence-type">Type</label>
               <select
                 id="geofence-type"
-                className="mt-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="mt-1.5 h-8 w-full rounded-lg border border-gray-300 px-2.5 text-[13px] text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onChange={(event) => setTypeFilter(event.target.value as TrackingGeofence['type'] | 'All')}
                 value={typeFilter}
               >
@@ -220,11 +203,11 @@ export function GeofenceManagementPage() {
                 ))}
               </select>
             </div>
-            <div className="w-36">
-              <label className="text-xs font-bold uppercase tracking-wide text-gray-500" htmlFor="geofence-status">State</label>
+            <div className="w-32">
+              <label className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500" htmlFor="geofence-status">State</label>
               <select
                 id="geofence-status"
-                className="mt-2 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="mt-1.5 h-8 w-full rounded-lg border border-gray-300 px-2.5 text-[13px] text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onChange={(event) => setStatusFilter(event.target.value as 'All' | 'Active' | 'Disabled')}
                 value={statusFilter}
               >
@@ -232,7 +215,7 @@ export function GeofenceManagementPage() {
               </select>
             </div>
             <Button
-              className="h-11 shrink-0"
+              className="h-8 shrink-0 text-[13px]"
               onClick={showForm && !editing ? closeForm : openCreateForm}
               variant={showForm && !editing ? 'outline' : 'default'}
             >

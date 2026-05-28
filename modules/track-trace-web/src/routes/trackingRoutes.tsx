@@ -7,7 +7,6 @@ import { MapPageSkeleton } from '../components/shared/MapPageSkeleton'
 import { ListPageSkeleton } from '../components/shared/ListPageSkeleton'
 import { AnalyticsPageSkeleton } from '../components/shared/AnalyticsPageSkeleton'
 
-const ActiveTripsPage             = lazy(() => import('../pages/ActiveTripsPage').then(m => ({ default: m.ActiveTripsPage })))
 const CustomerTrackingPreviewPage = lazy(() => import('../pages/CustomerTrackingPreviewPage').then(m => ({ default: m.CustomerTrackingPreviewPage })))
 const GeofenceManagementPage      = lazy(() => import('../pages/GeofenceManagementPage').then(m => ({ default: m.GeofenceManagementPage })))
 const LiveMapPage                 = lazy(() => import('../pages/LiveMapPage').then(m => ({ default: m.LiveMapPage })))
@@ -46,7 +45,7 @@ export function TrackingRoutes() {
       <Route element={<TrackTraceLayout />}>
         <Route index element={<Suspense fallback={<DashboardSkeleton />}><TrackTraceDashboard /></Suspense>} />
         <Route path="dashboard" element={<Suspense fallback={<DashboardSkeleton />}><TrackTraceDashboard /></Suspense>} />
-        <Route path="trips" element={<Suspense fallback={<ListPageSkeleton />}><ActiveTripsPage /></Suspense>} />
+        <Route path="trips" element={<LegacyRedirect to="/dispatch" />} />
         <Route path="trips/:tripId" element={<TripDetailsRoute />} />
         <Route path="trips/:tripId/replay" element={<Suspense fallback={<MapPageSkeleton />}><TripReplayPage /></Suspense>} />
         <Route path="live-map" element={<Suspense fallback={<MapPageSkeleton />}><LiveMapPage /></Suspense>} />
@@ -57,8 +56,8 @@ export function TrackingRoutes() {
         <Route path="route-performance" element={<Suspense fallback={<AnalyticsPageSkeleton />}><RoutePerformancePage /></Suspense>} />
         <Route path="dispatch" element={<Suspense fallback={<ListPageSkeleton />}><DispatchPage /></Suspense>} />
 
-        <Route path="shipments" element={<LegacyRedirect to="/trips" />} />
-        <Route path="shipments/:shipmentId" element={<LegacyRedirect to="/trips" />} />
+        <Route path="shipments" element={<LegacyRedirect to="/dispatch" />} />
+        <Route path="shipments/:shipmentId" element={<LegacyRedirect to="/dispatch" />} />
         <Route path="vehicles" element={<LegacyRedirect to="/live-map" />} />
         <Route path="vehicles/:vehicleId" element={<LegacyRedirect to="/live-map" />} />
         <Route path="route-progress" element={<LegacyRedirect to="/live-map" />} />

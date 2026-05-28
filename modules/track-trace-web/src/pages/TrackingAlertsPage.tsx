@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   CheckCircle2,
-  Clock,
+  Eye,
   Info,
   MapPin,
   RefreshCw,
@@ -17,7 +17,7 @@ import { useAuth } from '@shared-auth'
 import { useTrackingStore } from '../store/trackingStore'
 import type { AlertSeverity, AlertStatus, TrackingAlert } from '../types/tracking.types'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 // ── severity config ───────────────────────────────────────────────────────────
 const SEV = {
@@ -103,119 +103,125 @@ function IncidentPanel({
   ]
 
   return (
-    <div className="flex h-full max-h-full flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+    <div
+      style={{ width: 'clamp(400px, 32vw, 480px)' }}
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+    >
+      {/* ── Fixed header ── */}
+      <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-4 py-3">
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Incident Details</p>
-          <p className="text-sm font-bold text-text">{alert.type}</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Incident Details</p>
+          <p className="text-[14px] font-semibold text-text">{alert.type}</p>
         </div>
         <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600">
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* ── Scrollable body — flex:1 + min-height:0 keeps it bounded ── */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+
         {/* Severity + status strip */}
-        <div className={`border-b px-5 py-3 ${sev.card}`}>
+        <div className={`border-b px-4 py-3 ${sev.card}`}>
           <div className="flex items-center gap-2">
-            <span className={`rounded px-2 py-0.5 text-xs font-extrabold uppercase tracking-wide ${sev.badge}`}>{alert.severity}</span>
-            <span className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-600">{alert.status}</span>
-            <span className="ml-auto text-xs text-gray-400">{timeAgo(alert.createdAt)}</span>
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${sev.badge}`}>{alert.severity}</span>
+            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">{alert.status}</span>
+            <span className="ml-auto text-[11px] text-gray-400">{timeAgo(alert.createdAt)}</span>
           </div>
-          <p className="mt-1.5 text-xs text-gray-600 leading-relaxed">{alert.message}</p>
+          <p className="mt-2 text-[12px] leading-relaxed text-gray-600">{alert.message}</p>
         </div>
 
         {/* Trip context */}
-        <div className="border-b border-gray-100 px-5 py-4">
-          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Trip Context</p>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Trip ID</span>
-              <span className="font-semibold text-text">{alert.tripId}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Vehicle</span>
-              <span className="font-semibold text-text">{alert.vehicleNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Location</span>
-              <span className="font-semibold text-text">{alert.location}</span>
-            </div>
-            {alert.assignedTo && (
-              <div className="flex justify-between">
-                <span className="text-gray-500">Assigned To</span>
-                <span className="font-semibold text-primary">{alert.assignedTo}</span>
+        <div className="border-b border-gray-100 px-4 py-3">
+          <p className="mb-2.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Trip Context</p>
+          <div className="space-y-2">
+            {[
+              { label: 'Trip ID',    value: alert.tripId },
+              { label: 'Vehicle',    value: alert.vehicleNumber },
+              { label: 'Location',   value: alert.location },
+              ...(alert.assignedTo ? [{ label: 'Assigned To', value: alert.assignedTo }] : []),
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-center justify-between gap-4">
+                <span className="text-[12px] text-gray-500">{label}</span>
+                <span className="text-right text-[12px] font-semibold text-text">{value}</span>
               </div>
-            )}
+            ))}
           </div>
         </div>
 
         {/* Incident timeline */}
-        <div className="border-b border-gray-100 px-5 py-4">
-          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Incident Timeline</p>
+        <div className="border-b border-gray-100 px-4 py-3">
+          <p className="mb-2.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Incident Timeline</p>
           <div className="space-y-3">
             {timeline.map((item, i) => (
               <div key={i} className="flex gap-3">
                 <div className="flex flex-col items-center">
-                  <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.dot}`} />
+                  <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${item.dot}`} />
                   {i < timeline.length - 1 && <div className="mt-1 w-px flex-1 bg-gray-200" />}
                 </div>
                 <div className="pb-2">
                   <div className="flex items-baseline gap-2">
-                    <p className="text-xs font-semibold text-text">{item.label}</p>
-                    {item.time && <span className="text-[10px] text-gray-400">{item.time}</span>}
+                    <p className="text-[12px] font-semibold text-text">{item.label}</p>
+                    {item.time && <span className="text-[11px] text-gray-400">{item.time}</span>}
                   </div>
-                  {item.desc && <p className="mt-0.5 text-[11px] text-gray-500 leading-relaxed">{item.desc}</p>}
+                  {item.desc && <p className="mt-0.5 text-[11px] leading-relaxed text-gray-500">{item.desc}</p>}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Operator remarks */}
-        <div className="px-5 py-4">
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Operator Remarks</p>
-          <textarea
-            rows={3}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none"
-            placeholder="Add a note or internal status update…"
-            value={remark}
-            onChange={(e) => setRemark(e.target.value)}
-          />
-          {remark.trim() && (
-            <button
-              type="button"
-              onClick={() => { onRemark(remark); setRemark('') }}
-              className="mt-2 text-xs font-semibold text-primary hover:underline"
-            >
-              Save note
-            </button>
-          )}
-        </div>
+        {/* Operator remarks — hidden when resolved */}
+        {alert.status !== 'Resolved' && (
+          <div className="px-4 py-3">
+            <p className="mb-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Operator Remarks</p>
+            <div className="relative">
+              <textarea
+                rows={3}
+                className="w-full resize-none rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-16 text-[12px] text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Add a note or internal status update…"
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+              />
+              {remark.trim() && (
+                <button
+                  type="button"
+                  onClick={() => { onRemark(remark); setRemark('') }}
+                  className="absolute bottom-2 right-2 rounded-md bg-primary px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-primary/90"
+                >
+                  Add remark
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Action footer */}
-      {alert.status !== 'Resolved' && (
-        <div className="flex gap-2 border-t border-gray-100 px-5 py-4">
-          {alert.status === 'Open' && (
+      {/* ── Sticky footer — always visible ── */}
+      <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+        {alert.status === 'Resolved' ? (
+          <p className="text-center text-[12px] text-gray-400">This alert has been resolved.</p>
+        ) : (
+          <div className="flex gap-2">
+            {alert.status === 'Open' && (
+              <button
+                type="button"
+                onClick={handleAcknowledge}
+                className="flex-1 rounded-lg border border-gray-300 bg-white py-2 text-[12px] font-semibold text-gray-700 transition hover:bg-gray-50"
+              >
+                Acknowledge
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleAcknowledge}
-              className="flex-1 rounded-xl border border-gray-300 bg-white py-2.5 text-xs font-bold text-gray-700 transition hover:bg-gray-50"
+              onClick={handleResolve}
+              className="flex-1 rounded-lg bg-primary py-2 text-[12px] font-bold text-white transition hover:bg-primary/90"
             >
-              Acknowledge
+              Resolve &amp; Close
             </button>
-          )}
-          <button
-            type="button"
-            onClick={handleResolve}
-            className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-bold text-white transition hover:bg-primary/90"
-          >
-            Resolve &amp; Close
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -236,7 +242,7 @@ export function TrackingAlertsPage() {
   const [severity, setSeverity] = useState<AlertSeverity | 'All'>(resolvedInitialSeverity)
   const [status, setStatus] = useState<AlertStatus | 'All'>('Open')
   const [sortBy, setSortBy] = useState<'Newest' | 'Severity' | 'Unassigned First'>('Newest')
-  const [selectedAlert, setSelectedAlert] = useState<TrackingAlert | null>(null)
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   useEffect(() => { setSeverity(resolvedInitialSeverity) }, [resolvedInitialSeverity])
@@ -244,6 +250,9 @@ export function TrackingAlertsPage() {
     const t = setTimeout(() => setSearch(searchInput), 300)
     return () => clearTimeout(t)
   }, [searchInput])
+
+  // Derive live selected alert directly from store — always up-to-date after mutations
+  const selectedAlert = useMemo(() => alerts.find(a => a.id === selectedAlertId) ?? null, [alerts, selectedAlertId])
 
   // Global severity counts (all open, no search filter)
   const globalCounts = useMemo(() =>
@@ -282,22 +291,18 @@ export function TrackingAlertsPage() {
   const paged = filteredAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const hasFilters = searchInput.trim().length > 0 || severity !== 'All' || status !== 'Open' || sortBy !== 'Newest'
 
-  // keep selectedAlert in sync after mutations
-  useEffect(() => {
-    if (!selectedAlert) return
-    const updated = alerts.find(a => a.id === selectedAlert.id)
-    if (updated) setSelectedAlert(updated)
-  }, [alerts, selectedAlert])
+
 
   if (loading) return <ListPageSkeleton />
   if (error) return <EmptyPlaceholder title="Alerts unavailable" description={error} />
 
   return (
     <TrackTraceAccessBoundary page="alerts">
-      <div className="space-y-4">
+      {/* Full-height shell — navbar 64px + main py-6 (48px) = 112px */}
+      <div className="flex h-[calc(100vh-112px)] flex-col gap-3 overflow-hidden">
 
-        {/* ── Severity stat cards ─────────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {/* ── Severity stat cards — shrink-0 ─────────────────── */}
+        <div className="shrink-0 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {(['Critical', 'High', 'Medium', 'Low'] as AlertSeverity[]).map((s) => {
             const cfg = SEV[s]
             return (
@@ -305,22 +310,17 @@ export function TrackingAlertsPage() {
                 key={s}
                 type="button"
                 onClick={() => setSeverity(severity === s ? 'All' : s)}
-                className={`flex items-center justify-between rounded-2xl border bg-white px-5 py-4 shadow-sm transition hover:shadow-md ${cfg.statBorder} ${severity === s ? 'ring-2 ring-primary/20' : ''}`}
+                className={`rounded-xl border bg-white px-5 py-3 text-left shadow-sm transition hover:shadow-md ${cfg.statBorder} ${severity === s ? 'ring-2 ring-primary/20' : ''}`}
               >
-                <div className="text-left">
-                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-400">{s}</p>
-                  <p className={`mt-1 text-2xl font-bold ${cfg.count}`}>{globalCounts[s]}</p>
-                </div>
-                <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${cfg.statIcon}`}>
-                  {cfg.icon}
-                </div>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">{s}</p>
+                <p className={`mt-0.5 text-xl font-extrabold ${cfg.count}`}>{globalCounts[s]}</p>
               </button>
             )
           })}
         </div>
 
-        {/* ── Filter bar ──────────────────────────────────────── */}
-        <div className="space-y-2.5 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        {/* ── Filter bar — shrink-0 ───────────────────────────── */}
+        <div className="shrink-0 space-y-2.5 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
           {/* Row 1: search + count + reset */}
           <div className="flex items-center gap-3">
             <label className="relative min-w-[200px] flex-1" htmlFor="alert-search">
@@ -398,131 +398,116 @@ export function TrackingAlertsPage() {
           </div>
         </div>
 
-        {/* ── Content: list + panel ───────────────────────────── */}
-        {filteredAlerts.length === 0 ? (
-          <EmptyPlaceholder
-            title={hasFilters ? 'No alerts match the current filters' : 'No open alerts'}
-            description={hasFilters ? 'Try broadening the severity or status filters.' : 'All alerts have been resolved or none have been raised yet.'}
-          />
-        ) : (
-          <div className={`grid gap-4 ${selectedAlert ? 'xl:grid-cols-[1fr,380px]' : ''}`}>
+        {/* ── Content: list + panel — flex-1 min-h-0 ─────────── */}
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {filteredAlerts.length === 0 ? (
+            <EmptyPlaceholder
+              title={hasFilters ? 'No alerts match the current filters' : 'No open alerts'}
+              description={hasFilters ? 'Try broadening the severity or status filters.' : 'All alerts have been resolved or none have been raised yet.'}
+            />
+          ) : (
+            <div className="flex h-full min-w-0 gap-4">
 
-            {/* Alert list */}
-            <div className="space-y-3">
-              {paged.map((alert) => {
-                const cfg = SEV[alert.severity]
-                const isSelected = selectedAlert?.id === alert.id
-                return (
-                  <div
-                    key={alert.id}
-                    onClick={() => setSelectedAlert(isSelected ? null : alert)}
-                    className={`cursor-pointer overflow-hidden rounded-xl border-l-4 bg-white shadow-sm transition hover:shadow-md ${cfg.border} ${isSelected ? 'ring-2 ring-primary/30' : 'border border-gray-200'}`}
-                  >
-                    {/* Single compact header row: severity + title + status + time */}
-                    <div className="flex items-center gap-2 px-4 py-2.5">
-                      <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide ${cfg.badge}`}>
-                        {alert.severity}
-                      </span>
-                      <p className="min-w-0 flex-1 truncate text-xs font-bold text-text">{alert.type}</p>
-                      <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold ${
-                        alert.status === 'Open' ? 'border-gray-200 text-gray-500' :
-                        alert.status === 'Acknowledged' ? 'border-amber-200 bg-amber-50 text-amber-700' :
-                        'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      }`}>
-                        {alert.status}
-                      </span>
-                      <span className="shrink-0 text-[10px] text-gray-400">{timeAgo(alert.createdAt)}</span>
-                    </div>
+              {/* ── Alert table card — flex-1 flex-col h-full ── */}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
 
-                    {/* Meta row: trip · location · owner */}
-                    <div className="grid grid-cols-3 gap-2 border-t border-gray-100 px-4 py-2">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Trip</p>
-                        <p className="truncate text-xs font-semibold text-text">{alert.tripId}</p>
-                        <p className="truncate text-[11px] text-gray-500">{alert.vehicleNumber}</p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Location</p>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3 shrink-0 text-gray-400" />
-                          <p className="truncate text-xs text-gray-700">{alert.location}</p>
+                {/* Table header — shrink-0 */}
+                <div className="shrink-0 overflow-x-auto">
+                  <div className="grid min-w-[900px] grid-cols-[120px_minmax(180px,1fr)_minmax(150px,180px)_minmax(180px,1fr)_110px_120px_220px] items-center gap-3 border-b border-gray-100 border-l-4 border-l-transparent bg-gray-50 px-3 py-2">
+                    {(['Severity','Alert Type','Trip / Vehicle','Location','Status','Time','Actions'] as const).map((h) => (
+                      <p key={h} className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{h}</p>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rows — flex-1 min-h-0 scrolls internally */}
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <div className="divide-y divide-gray-50">
+                    {paged.map((alert) => {
+                      const cfg = SEV[alert.severity]
+                      const isSelected = selectedAlert?.id === alert.id
+                      return (
+                        <div
+                          key={alert.id}
+                          onClick={() => setSelectedAlertId(isSelected ? null : alert.id)}
+                          className={`grid min-w-[900px] cursor-pointer grid-cols-[120px_minmax(180px,1fr)_minmax(150px,180px)_minmax(180px,1fr)_110px_120px_220px] items-center gap-3 border-l-4 px-3 py-2.5 transition-colors hover:bg-gray-50 ${cfg.border} ${isSelected ? 'bg-primary/[0.04]' : 'bg-white'}`}
+                        >
+                          <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold ${cfg.badge}`}>
+                            {alert.severity}
+                          </span>
+                          <p className="truncate text-[13px] font-medium text-gray-900">{alert.type}</p>
+                          <div className="min-w-0">
+                            <p className="truncate text-[12px] font-semibold text-gray-800">{alert.tripId}</p>
+                            <p className="truncate text-[11px] text-gray-400">{alert.vehicleNumber}</p>
+                          </div>
+                          <div className="flex min-w-0 items-center gap-1">
+                            <MapPin className="h-3 w-3 shrink-0 text-gray-300" />
+                            <p className="truncate text-[12px] text-gray-500">{alert.location}</p>
+                          </div>
+                          <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                            alert.status === 'Open'         ? 'bg-gray-100 text-gray-600' :
+                            alert.status === 'Acknowledged' ? 'bg-amber-50 text-amber-700' :
+                                                              'bg-emerald-50 text-emerald-700'
+                          }`}>
+                            {alert.status}
+                          </span>
+                          <p className="text-[11px] text-gray-400">{timeAgo(alert.createdAt)}</p>
+                          <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            {alert.status === 'Open' && (
+                              <button type="button" onClick={() => void acknowledgeAlert(alert.id, undefined, user?.email)}
+                                className="h-[30px] rounded-lg bg-primary px-3 text-[11px] font-bold text-white transition hover:bg-primary/90">
+                                Ack
+                              </button>
+                            )}
+                            {alert.status !== 'Resolved' && (
+                              <button type="button" onClick={() => void resolveAlert(alert.id, { resolvedBy: user?.email ?? 'control.tower@optimile', resolutionNote: 'Resolved via alerts workspace' })}
+                                className="h-[30px] rounded-lg border border-gray-200 bg-white px-3 text-[11px] font-medium text-gray-600 transition hover:bg-gray-50">
+                                Resolve
+                              </button>
+                            )}
+                            <button type="button" title="View details" onClick={() => setSelectedAlertId(isSelected ? null : alert.id)}
+                              className={`flex h-[30px] w-[30px] items-center justify-center rounded-lg border transition ${
+                                isSelected ? 'border-primary/30 bg-primary/10 text-primary' : 'border-gray-200 bg-white text-gray-400 hover:border-primary/30 hover:bg-primary/5 hover:text-primary'
+                              }`}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-[11px] text-gray-400">
-                          {new Date(alert.createdAt).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Owner</p>
-                        <p className="truncate text-xs text-gray-500">
-                          {alert.assignedTo ?? <span className="italic text-gray-400">Unassigned</span>}
-                        </p>
-                      </div>
-                    </div>
+                      )
+                    })}
+                  </div>
+                </div>
 
-                    {/* Actions row */}
-                    <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2">
-                      <div className="flex gap-1.5">
-                        {alert.status === 'Open' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); void acknowledgeAlert(alert.id, undefined, user?.email) }}
-                            className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-bold text-white transition hover:bg-primary/90"
-                          >
-                            Acknowledge
-                          </button>
-                        )}
-                        {alert.status !== 'Resolved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); void resolveAlert(alert.id, { resolvedBy: user?.email ?? 'control.tower@optimile', resolutionNote: 'Resolved via alerts workspace' }) }}
-                            className="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 transition hover:bg-gray-50"
-                          >
-                            Resolve
-                          </button>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setSelectedAlert(isSelected ? null : alert) }}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
-                      >
-                        <Clock className="h-3 w-3" />
-                        {isSelected ? 'Hide details' : 'View details'}
-                      </button>
+                {/* Pagination — shrink-0 */}
+                {totalPages > 1 && (
+                  <div className="shrink-0 flex items-center justify-between border-t border-gray-100 px-4 py-2.5">
+                    <p className="text-[12px] text-gray-500">
+                      {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredAlerts.length)} of {filteredAlerts.length} alerts
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[12px] font-semibold text-gray-600 disabled:opacity-40 hover:bg-gray-50">← Prev</button>
+                      <span className="text-[12px] text-gray-500">Page {page} of {totalPages}</span>
+                      <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="rounded-lg border border-gray-200 bg-white px-3 py-1 text-[12px] font-semibold text-gray-600 disabled:opacity-40 hover:bg-gray-50">Next →</button>
                     </div>
                   </div>
-                )
-              })}
+                )}
+              </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
-                  <p className="text-xs text-gray-500">
-                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredAlerts.length)} of {filteredAlerts.length} alerts
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="rounded-xl border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-40 hover:bg-gray-50">← Prev</button>
-                    <span className="text-xs font-medium text-gray-500">Page {page} of {totalPages}</span>
-                    <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="rounded-xl border border-gray-300 bg-white px-4 py-1.5 text-xs font-semibold text-gray-700 disabled:opacity-40 hover:bg-gray-50">Next →</button>
-                  </div>
+              {/* ── Incident panel — shrink-0 h-full ── */}
+              {selectedAlert && (
+                <div className="shrink-0 h-full">
+                  <IncidentPanel
+                    alert={selectedAlert}
+                    onClose={() => setSelectedAlertId(null)}
+                    onAcknowledge={(remark) => void acknowledgeAlert(selectedAlert.id, remark, user?.email)}
+                    onResolve={(note) => void resolveAlert(selectedAlert.id, { resolvedBy: user?.email ?? 'control.tower@optimile', resolutionNote: note })}
+                    onRemark={(remark) => void addRemark(selectedAlert.id, remark)}
+                  />
                 </div>
               )}
             </div>
-
-            {/* Incident detail panel */}
-            {selectedAlert && (
-              <div className="xl:sticky xl:top-24 xl:h-[calc(100vh-7rem)]">
-                <IncidentPanel
-                  alert={selectedAlert}
-                  onClose={() => setSelectedAlert(null)}
-                  onAcknowledge={(remark) => void acknowledgeAlert(selectedAlert.id, remark, user?.email)}
-                  onResolve={(note) => void resolveAlert(selectedAlert.id, { resolvedBy: user?.email ?? 'control.tower@optimile', resolutionNote: note })}
-                  onRemark={(remark) => void addRemark(selectedAlert.id, remark)}
-                />
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
       </div>
     </TrackTraceAccessBoundary>
