@@ -13,6 +13,7 @@ const TenantCustomersPage = lazy(() => import('../modules/tenant-admin/pages/cus
 const TenantCustomerDetailPage = lazy(() => import('../modules/tenant-admin/pages/customers/tenant-customers-pages').then((m) => ({ default: m.TenantCustomerDetailPage })))
 const TenantVendorsPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorsPage })))
 const TenantVendorDetailPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorDetailPage })))
+const TenantVendorOnboardingPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorOnboardingPage })))
 const TenantDriversPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantDriversPage })))
 const TenantVehiclesPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantVehiclesPage })))
 const TenantVehicleTypesPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantVehicleTypesPage })))
@@ -147,6 +148,8 @@ function TenantAdminRoutes({
           <Route path="customers" element={<PermissionGate moduleCode="TMS" featureCode="CUSTOMERS"><TenantCustomersPage /></PermissionGate>} />
           <Route path="customers/:tenantCustomerId" element={<PermissionGate moduleCode="TMS" featureCode="CUSTOMERS"><TenantCustomerDetailPage /></PermissionGate>} />
           <Route path="vendors" element={<PermissionGate moduleCode="TMS" featureCode="VENDORS"><TenantVendorsPage /></PermissionGate>} />
+          <Route path="vendors/new" element={<PermissionGate moduleCode="TMS" featureCode="VENDORS"><TenantVendorOnboardingPage /></PermissionGate>} />
+          <Route path="vendors/:tenantVendorId/edit" element={<PermissionGate moduleCode="TMS" featureCode="VENDORS"><TenantVendorOnboardingPage /></PermissionGate>} />
           <Route path="vendors/:tenantVendorId" element={<PermissionGate moduleCode="TMS" featureCode="VENDORS"><TenantVendorDetailPage /></PermissionGate>} />
           <Route path="users" element={<TenantUsersPage />} />
           <Route path="users/:userId" element={<TenantUserDetailPage />} />

@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { FileDown, PencilLine, Plus } from "lucide-react";
 import { z } from "zod";
 import { DataTable } from "@/shared/components/common/data-table";
@@ -23,9 +23,13 @@ import {
   parseVendorRateCardFile,
 } from "@/shared/lib/vendor-rate-card-import";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
-import { useTenantCustomers } from "@/modules/tenant-admin/hooks/useTenantCustomers";
-import { useTenantVehicleTypes } from "@/modules/tenant-admin/hooks/useTenantMasterData";
 import { useTenantVendors } from "@/modules/tenant-admin/hooks/useTenantVendors";
+import { mockTenantVendors } from "@shared-admin-core/mocks/data";
+import {
+  VendorOnboardingWizard,
+  emptyVendorOnboardingDraft,
+  type VendorOnboardingDraft,
+} from "@/vendor-onboarding";
 import type {
   TenantVendor,
   TenantVendorInput,
@@ -48,8 +52,80 @@ const vendorSchema = z.object({
   email: z.string().optional(),
   serviceableLocations: z.array(z.string()).optional(),
   supportedVehicleTypes: z.array(z.string()).optional(),
+  bankName: z.string().optional(),
+  branch: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+  accountType: z.enum(["SAVINGS", "CURRENT"]).optional(),
   status: z.enum(["active", "inactive"]),
 });
+
+function formatAddress(addr: VendorOnboardingDraft["registeredAddress"]) {
+  return [addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
+}
+
+function parseAddress(value: string): VendorOnboardingDraft["registeredAddress"] {
+  const parts = value.split(",").map((p) => p.trim());
+  return {
+    street: parts[0] ?? "",
+    city: parts[1] ?? "",
+    state: parts[2] ?? "",
+    pincode: parts[3] ?? "",
+  };
+}
+
+function tenantFormToDraft(form: TenantVendorInput): VendorOnboardingDraft {
+  return {
+    ...emptyVendorOnboardingDraft,
+    companyName: form.name ?? "",
+    legalName: form.legalName ?? "",
+    gstin: form.gstin ?? form.gstNumber ?? "",
+    pan: form.pan ?? "",
+    registeredAddress: parseAddress(form.address ?? ""),
+    primaryContact: {
+      name: form.contactPerson ?? "",
+      phone: form.phone ?? form.contactNumber ?? "",
+      email: form.email ?? "",
+    },
+    serviceRegions: form.serviceableLocations ?? [],
+    supportedVehicleTypes: form.supportedVehicleTypes ?? [],
+    bankName: form.bankName ?? "",
+    branch: form.branch ?? "",
+    accountNumber: form.accountNumber ?? "",
+    ifscCode: form.ifscCode ?? "",
+    accountType: form.accountType ?? "CURRENT",
+  };
+}
+
+function draftToTenantForm(
+  draft: VendorOnboardingDraft,
+  extras: { code: string; vendorType: string; status: TenantVendorInput["status"] },
+): TenantVendorInput {
+  const phone = draft.primaryContact.phone;
+  const gstin = draft.gstin;
+  return {
+    name: draft.companyName,
+    legalName: draft.legalName,
+    code: extras.code,
+    vendorType: extras.vendorType,
+    gstin,
+    gstNumber: gstin,
+    pan: draft.pan,
+    address: formatAddress(draft.registeredAddress),
+    contactPerson: draft.primaryContact.name,
+    phone,
+    contactNumber: phone,
+    email: draft.primaryContact.email,
+    serviceableLocations: draft.serviceRegions,
+    supportedVehicleTypes: draft.supportedVehicleTypes,
+    bankName: draft.bankName,
+    branch: draft.branch,
+    accountNumber: draft.accountNumber,
+    ifscCode: draft.ifscCode,
+    accountType: draft.accountType,
+    status: extras.status,
+  };
+}
 
 const rateCardSchema = z
   .object({
@@ -127,28 +203,15 @@ const initialRateCardForm = {
 
 export function TenantVendorsPage() {
   const { tenant } = useTenantRouteContext();
-  const { data, createVendor, updateTenantVendor, createRateCard } = useTenantVendors(tenant.id);
-  const customers = useTenantCustomers(tenant.id);
-  const vehicleTypes = useTenantVehicleTypes(tenant.id);
+  const navigate = useNavigate();
+  const { data, updateTenantVendor } = useTenantVendors(tenant.id);
   const [search, setSearch] = useState("");
-  const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [rateCardError, setRateCardError] = useState("");
-  const [editingVendor, setEditingVendor] = useState<TenantVendor | null>(null);
-  const [form, setForm] = useState<TenantVendorInput>(initialVendorForm);
-  const [addRateCardOnCreate, setAddRateCardOnCreate] = useState(false);
-  const [rateCardMode, setRateCardMode] = useState<"Add Manually" | "Bulk Upload">("Bulk Upload");
-  const [rateCardForm, setRateCardForm] = useState(initialRateCardForm);
-  const [rateCardImportSummary, setRateCardImportSummary] =
-    useState<Awaited<ReturnType<typeof parseVendorRateCardFile>> | null>(null);
-  const [rateCardImportError, setRateCardImportError] = useState("");
-  const [rateCardImporting, setRateCardImporting] = useState(false);
-  const [rateCardUploadedFileName, setRateCardUploadedFileName] = useState("");
 
   const rows = useMemo(() => {
+    const source = data.length ? data : mockTenantVendors;
     const normalizedSearch = search.trim().toLowerCase();
-    return data.filter((vendor) => {
+    return source.filter((vendor) => {
       if (!normalizedSearch) {
         return true;
       }
@@ -158,244 +221,9 @@ export function TenantVendorsPage() {
     });
   }, [data, search]);
 
-  const locationOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          data
-            .flatMap((vendor) => vendor.serviceableLocations ?? [])
-            .concat(
-              customers.data.flatMap((customer) =>
-                customers
-                  .listAddresses(customer.id)
-                  .map((address) => `${address.city}, ${address.state}`),
-              ),
-            ),
-        ),
-      ).sort(),
-    [customers, data],
-  );
-
-  function openCreate() {
-    setEditingVendor(null);
-    setForm(initialVendorForm);
-    setError("");
-    setRateCardError("");
-    setAddRateCardOnCreate(false);
-    setRateCardMode("Bulk Upload");
-    setRateCardForm(initialRateCardForm);
-    setRateCardImportSummary(null);
-    setRateCardImportError("");
-    setRateCardImporting(false);
-    setRateCardUploadedFileName("");
-    setOpen(true);
-  }
-
-  function openEdit(vendor: TenantVendor) {
-    setEditingVendor(vendor);
-    setForm({
-      name: vendor.name,
-      legalName: vendor.legalName ?? "",
-      code: vendor.code ?? "",
-      gstin: vendor.gstin ?? vendor.gstNumber ?? "",
-      gstNumber: vendor.gstNumber ?? "",
-      pan: vendor.pan ?? "",
-      address: vendor.address ?? "",
-      vendorType: vendor.vendorType ?? "",
-      contactPerson: vendor.contactPerson ?? "",
-      phone: vendor.phone ?? vendor.contactNumber ?? "",
-      contactNumber: vendor.contactNumber ?? "",
-      email: vendor.email ?? "",
-      serviceableLocations: vendor.serviceableLocations ?? [],
-      supportedVehicleTypes: vendor.supportedVehicleTypes ?? [],
-      status: vendor.status,
-    });
-    setError("");
-    setRateCardError("");
-    setAddRateCardOnCreate(false);
-    setRateCardMode("Bulk Upload");
-    setRateCardForm(initialRateCardForm);
-    setRateCardImportSummary(null);
-    setRateCardImportError("");
-    setRateCardImporting(false);
-    setRateCardUploadedFileName("");
-    setOpen(true);
-  }
-
-  function buildManualRateCardPayload() {
-    return rateCardSchema.safeParse({
-      contractName: rateCardForm.contractName.trim() || undefined,
-      contractCode: rateCardForm.contractCode.trim() || undefined,
-      effectiveFromDate: rateCardForm.effectiveFromDate || undefined,
-      effectiveToDate: rateCardForm.effectiveToDate || undefined,
-      lanes: rateCardForm.lanes.trim(),
-      fromCity: rateCardForm.fromCity.trim() || undefined,
-      toCity: rateCardForm.toCity.trim() || undefined,
-      fromLocation: rateCardForm.fromLocation.trim() || undefined,
-      toLocation: rateCardForm.toLocation.trim() || undefined,
-      sourcePincode: rateCardForm.sourcePincode,
-      destinationPincode: rateCardForm.destinationPincode,
-      rateType: rateCardForm.rateType,
-      vehicleType: rateCardForm.vehicleType.trim() || null,
-      buyingRate: Number(rateCardForm.buyingRate),
-      underloadRate: Number(rateCardForm.underloadRate || rateCardForm.buyingRate),
-      overloadRate: rateCardForm.overloadRate.trim() ? Number(rateCardForm.overloadRate) : null,
-      tat: rateCardForm.tat.trim() || undefined,
-      rate: Number(rateCardForm.rate || rateCardForm.buyingRate),
-      status: rateCardForm.status,
-      remarks: rateCardForm.remarks.trim() || undefined,
-    });
-  }
-
-  function hasManualRateCardDraft() {
-    return [
-      rateCardForm.contractName,
-      rateCardForm.contractCode,
-      rateCardForm.effectiveFromDate,
-      rateCardForm.effectiveToDate,
-      rateCardForm.lanes,
-      rateCardForm.fromCity,
-      rateCardForm.toCity,
-      rateCardForm.fromLocation,
-      rateCardForm.toLocation,
-      rateCardForm.sourcePincode,
-      rateCardForm.destinationPincode,
-      rateCardForm.vehicleType,
-      rateCardForm.buyingRate,
-      rateCardForm.underloadRate,
-      rateCardForm.overloadRate,
-      rateCardForm.tat,
-      rateCardForm.remarks,
-    ].some((value) => value.trim().length > 0);
-  }
-
-  async function handleRateCardUpload(file: File | null) {
-    if (!file) {
-      return;
-    }
-    setRateCardImporting(true);
-    setRateCardImportError("");
-    try {
-      const summary = await parseVendorRateCardFile(file);
-      setRateCardImportSummary(summary);
-      setRateCardUploadedFileName(file.name);
-    } catch (uploadError) {
-      setRateCardImportSummary(null);
-      setRateCardImportError(
-        uploadError instanceof Error ? uploadError.message : "Vendor contract file could not be parsed.",
-      );
-    } finally {
-      setRateCardImporting(false);
-    }
-  }
-
-  function collectVendorRateCards() {
-    const importedRateCards = rateCardMode === "Bulk Upload" ? rateCardImportSummary?.validRows ?? [] : [];
-    const hasManualDraft = rateCardMode === "Add Manually" ? hasManualRateCardDraft() : false;
-    let manualRateCard: TenantVendorRateCardInput | null = null;
-
-    if (rateCardMode === "Add Manually" && hasManualDraft) {
-      const parsedRateCard = buildManualRateCardPayload();
-      if (!parsedRateCard.success) {
-        setRateCardError(parsedRateCard.error.issues[0]?.message ?? "Fix the vendor contract fields.");
-        return null;
-      }
-      manualRateCard = parsedRateCard.data;
-    }
-    if (rateCardMode === "Add Manually" && !manualRateCard) {
-      setRateCardError("Add at least one vendor contract manually.");
-      return null;
-    }
-    if (rateCardMode === "Bulk Upload" && !importedRateCards.length) {
-      setRateCardError("Upload at least one valid vendor contract row.");
-      return null;
-    }
-    if (!importedRateCards.length && !manualRateCard) {
-      setRateCardError("Add at least one vendor contract manually or import valid contract rows.");
-      return null;
-    }
-
-    return {
-      importedRateCards,
-      manualRateCard,
-    };
-  }
-
-  function applyVendorRateCards(
-    tenantVendorId: string,
-    rateCards:
-      | {
-          importedRateCards: TenantVendorRateCardInput[];
-          manualRateCard: TenantVendorRateCardInput | null;
-        }
-      | null,
-  ) {
-    if (!rateCards) {
-      return false;
-    }
-
-    rateCards.importedRateCards.forEach((row) => {
-      createRateCard(tenantVendorId, row);
-    });
-    if (rateCards.manualRateCard) {
-      createRateCard(tenantVendorId, rateCards.manualRateCard);
-    }
-    return true;
-  }
-
-  function submitVendor() {
-    const parsed = vendorSchema.safeParse(form);
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Complete the required vendor fields.");
-      return;
-    }
-    const normalizedPhone = parsed.data.phone?.trim() || parsed.data.contactNumber?.trim() || "";
-    if (normalizedPhone && !/^\d{10}$/.test(normalizedPhone)) {
-      setError("Contact number must be a 10-digit numeric value.");
-      return;
-    }
-    if (parsed.data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.email.trim())) {
-      setError("Enter a valid email address.");
-      return;
-    }
-
-    try {
-      if (editingVendor) {
-        updateTenantVendor(editingVendor.id, parsed.data);
-        if (addRateCardOnCreate) {
-          const collectedRateCards = collectVendorRateCards();
-          const rateCardsApplied = applyVendorRateCards(editingVendor.id, collectedRateCards);
-          if (!rateCardsApplied) {
-            return;
-          }
-          setMessage("Vendor updated and vendor contract added successfully.");
-        } else {
-          setMessage("Vendor updated successfully.");
-        }
-      } else {
-        const collectedRateCards = addRateCardOnCreate ? collectVendorRateCards() : null;
-        if (addRateCardOnCreate && !collectedRateCards) {
-          return;
-        }
-        const createdVendor = createVendor(parsed.data);
-        if (addRateCardOnCreate) {
-          const rateCardsApplied = applyVendorRateCards(createdVendor.id, collectedRateCards);
-          if (!rateCardsApplied) {
-            return;
-          }
-          setMessage("Vendor and vendor contract created successfully.");
-        } else {
-          setMessage("Vendor created successfully.");
-        }
-      }
-      setOpen(false);
-      setError("");
-      setRateCardError("");
-      setRateCardImportError("");
-    } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : "Vendor could not be saved.");
-    }
-  }
+  const openCreate = () => navigate(`/tenant/${tenant.id}/vendors/new`);
+  const openEdit = (vendor: TenantVendor) =>
+    navigate(`/tenant/${tenant.id}/vendors/${vendor.id}/edit`);
 
   return (
     <div className="space-y-6">
@@ -420,287 +248,150 @@ export function TenantVendorsPage() {
         trailing={<div className="text-sm text-muted-foreground">{rows.length} vendors shown</div>}
       />
 
-      {rows.length ? (
-        <DataTable
-          title="Tenant vendors"
-          description="Vendors are now fully tenant-owned. Pricing stays under each vendor workspace."
-          headers={["Vendor", "Type", "Contact", "Status", "Updated", "Actions"]}
-          rows={rows.map((vendor) => [
-            <div key={`${vendor.id}-vendor`} className="min-w-[180px]">
-              <p className="font-semibold">{vendor.name}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{vendor.code || "â€”"}</p>
-            </div>,
-            vendor.vendorType ? <Badge key={`${vendor.id}-type`} variant="outline">{vendor.vendorType}</Badge> : "â€”",
-            <div key={`${vendor.id}-contact`}>
-              <p>{vendor.contactPerson || "â€”"}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{vendor.contactNumber || vendor.email || "â€”"}</p>
-            </div>,
-            <Badge key={`${vendor.id}-status`} variant={vendor.status === "active" ? "success" : "warning"}>{vendor.status}</Badge>,
-            new Date(vendor.updatedAt).toLocaleDateString(),
-            <div key={`${vendor.id}-actions`} className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="ghost">
-                <Link to={`/tenant/${tenant.id}/vendors/${vendor.id}`}>View Rate Cards</Link>
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
-                <PencilLine className="size-4" />
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  updateTenantVendor(vendor.id, {
-                    status: vendor.status === "active" ? "inactive" : "active",
-                  });
-                  setMessage(`${vendor.name} marked as ${vendor.status === "active" ? "inactive" : "active"}.`);
-                }}
-              >
-                {vendor.status === "active" ? "Deactivate" : "Activate"}
-              </Button>
-            </div>,
-          ])}
-          emptyMessage="No tenant vendors found."
-        />
-      ) : (
-        <TenantEmptyState
-          title="No tenant vendors found"
-          description="Create the first vendor to start managing rate cards."
-          action={<Button onClick={openCreate}>Add Vendor</Button>}
-        />
-      )}
+      <DataTable
+        title="Tenant vendors"
+        description="Vendors are now fully tenant-owned. Pricing stays under each vendor workspace."
+        headers={["Vendor", "Type", "Contact", "Status", "Updated", "Actions"]}
+        rows={rows.map((vendor) => [
+          <div key={`${vendor.id}-vendor`} className="min-w-[180px]">
+            <p className="font-semibold">{vendor.name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{vendor.code || "—"}</p>
+          </div>,
+          vendor.vendorType ? <Badge key={`${vendor.id}-type`} variant="outline">{vendor.vendorType}</Badge> : "—",
+          <div key={`${vendor.id}-contact`}>
+            <p>{vendor.contactPerson || "—"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{vendor.contactNumber || vendor.email || "—"}</p>
+          </div>,
+          <div key={`${vendor.id}-status`} className="flex items-center gap-2">
+            <Switch
+              checked={vendor.status === "active"}
+              onCheckedChange={(checked) => {
+                updateTenantVendor(vendor.id, { status: checked ? "active" : "inactive" });
+                setMessage(`${vendor.name} marked as ${checked ? "active" : "inactive"}.`);
+              }}
+            />
+            <span className="text-xs text-muted-foreground">{vendor.status}</span>
+          </div>,
+          new Date(vendor.updatedAt).toLocaleDateString(),
+          <Button key={`${vendor.id}-actions`} size="sm" variant="ghost" onClick={() => openEdit(vendor)}>
+            <PencilLine className="size-4" />
+            Edit
+          </Button>,
+        ])}
+        emptyMessage="No tenant vendors found."
+      />
+    </div>
+  );
+}
 
-      <Dialog
-        open={open}
-        onOpenChange={setOpen}
-        title={editingVendor ? "Edit Vendor" : "Add Vendor"}
-        description="Vendor onboarding now includes business and operational mapping for fleet and booking usage."
-        widthClassName="max-w-5xl"
-        footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submitVendor}>{editingVendor ? "Save Changes" : "Create Vendor"}</Button>
-          </div>
+export function TenantVendorOnboardingPage() {
+  const { tenant } = useTenantRouteContext();
+  const navigate = useNavigate();
+  const { tenantVendorId } = useParams();
+  const { getTenantVendorById, createVendor, updateTenantVendor } = useTenantVendors(tenant.id);
+  const editingVendor = tenantVendorId ? getTenantVendorById(tenantVendorId) : null;
+  const isEdit = Boolean(tenantVendorId);
+
+  const initialForm: TenantVendorInput = useMemo(() => {
+    if (editingVendor) {
+      return {
+        name: editingVendor.name,
+        legalName: editingVendor.legalName ?? "",
+        code: editingVendor.code ?? "",
+        gstin: editingVendor.gstin ?? editingVendor.gstNumber ?? "",
+        gstNumber: editingVendor.gstNumber ?? "",
+        pan: editingVendor.pan ?? "",
+        address: editingVendor.address ?? "",
+        vendorType: editingVendor.vendorType ?? "",
+        contactPerson: editingVendor.contactPerson ?? "",
+        phone: editingVendor.phone ?? editingVendor.contactNumber ?? "",
+        contactNumber: editingVendor.contactNumber ?? "",
+        email: editingVendor.email ?? "",
+        serviceableLocations: editingVendor.serviceableLocations ?? [],
+        supportedVehicleTypes: editingVendor.supportedVehicleTypes ?? [],
+        bankName: editingVendor.bankName ?? "",
+        branch: editingVendor.branch ?? "",
+        accountNumber: editingVendor.accountNumber ?? "",
+        ifscCode: editingVendor.ifscCode ?? "",
+        accountType: editingVendor.accountType ?? "CURRENT",
+        status: editingVendor.status,
+      };
+    }
+    return initialVendorForm;
+  }, [editingVendor]);
+
+  const extras = {
+    code: initialForm.code ?? "",
+    vendorType: initialForm.vendorType ?? "",
+    status: initialForm.status,
+  };
+  const [error, setError] = useState("");
+
+  if (isEdit && !editingVendor) {
+    return (
+      <TenantEmptyState
+        title="Vendor not found"
+        description="This tenant vendor record is not available for the current tenant."
+        action={<Button asChild><Link to={`/tenant/${tenant.id}/vendors`}>Back to vendors</Link></Button>}
+      />
+    );
+  }
+
+  const wizardInitialDraft = tenantFormToDraft(initialForm);
+
+  function submit(draft: VendorOnboardingDraft) {
+    const merged = draftToTenantForm(draft, extras);
+    const parsed = vendorSchema.safeParse(merged);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Complete the required vendor fields.");
+      return;
+    }
+    const phone = parsed.data.phone?.trim() || parsed.data.contactNumber?.trim() || "";
+    if (phone && !/^\d{10}$/.test(phone)) {
+      setError("Contact number must be a 10-digit numeric value.");
+      return;
+    }
+    if (parsed.data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parsed.data.email.trim())) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    try {
+      if (editingVendor) {
+        updateTenantVendor(editingVendor.id, parsed.data);
+      } else {
+        createVendor(parsed.data);
+      }
+      navigate(`/tenant/${tenant.id}/vendors`);
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "Vendor could not be saved.");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Tenant Admin"
+        title={editingVendor ? `Edit ${editingVendor.name}` : "Onboard Vendor"}
+        description="Capture full vendor profile: company, coverage, bank, and tenant tagging."
+        action={
+          <Button asChild variant="outline">
+            <Link to={`/tenant/${tenant.id}/vendors`}>Back to vendors</Link>
+          </Button>
         }
-      >
-        <div className="space-y-6">
-          {error ? <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
-          {rateCardError ? <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">{rateCardError}</div> : null}
-          {rateCardImportError ? <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{rateCardImportError}</div> : null}
+      />
 
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm font-semibold">Basic Details</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <Field label="Vendor Name"><Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></Field>
-              <Field label="Vendor Code" helper="Auto-generated if left blank."><Input value={form.code ?? ""} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))} /></Field>
-              <Field label="Legal Name"><Input value={form.legalName ?? ""} onChange={(event) => setForm((current) => ({ ...current, legalName: event.target.value }))} /></Field>
-              <Field label="Vendor Type"><Input value={form.vendorType ?? ""} onChange={(event) => setForm((current) => ({ ...current, vendorType: event.target.value }))} /></Field>
-              <Field label="Contact Person"><Input value={form.contactPerson ?? ""} onChange={(event) => setForm((current) => ({ ...current, contactPerson: event.target.value }))} /></Field>
-              <Field label="Phone"><Input value={form.phone ?? form.contactNumber ?? ""} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value, contactNumber: event.target.value }))} /></Field>
-              <Field label="Email"><Input value={form.email ?? ""} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></Field>
-              <Field label="Status">
-                <Select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as TenantVendorInput["status"] }))}>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </Select>
-              </Field>
-            </div>
-          </div>
+      {error ? (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+      ) : null}
 
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm font-semibold">Business Info</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <Field label="GSTIN"><Input value={form.gstin ?? form.gstNumber ?? ""} onChange={(event) => setForm((current) => ({ ...current, gstin: event.target.value, gstNumber: event.target.value }))} /></Field>
-              <Field label="PAN"><Input value={form.pan ?? ""} onChange={(event) => setForm((current) => ({ ...current, pan: event.target.value }))} /></Field>
-              <div className="md:col-span-2">
-                <Field label="Address"><Textarea value={form.address ?? ""} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} className="min-h-[100px]" /></Field>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-            <p className="text-sm font-semibold">Operational</p>
-            <div className="mt-4 grid gap-6 xl:grid-cols-2">
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Serviceable Locations</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {locationOptions.map((location) => (
-                    <label key={location} className="flex items-center gap-3 rounded-2xl border bg-background/80 px-4 py-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={form.serviceableLocations?.includes(location) ?? false}
-                        onChange={() =>
-                          setForm((current) => ({
-                            ...current,
-                            serviceableLocations: current.serviceableLocations?.includes(location)
-                              ? current.serviceableLocations.filter((item) => item !== location)
-                              : [...(current.serviceableLocations ?? []), location],
-                          }))
-                        }
-                      />
-                      <span>{location}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-sm font-medium">Supported Vehicle Types</p>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {vehicleTypes.data
-                    .filter((vehicleType) => vehicleType.status === "active")
-                    .map((vehicleType) => (
-                      <label key={vehicleType.id} className="flex items-center gap-3 rounded-2xl border bg-background/80 px-4 py-3 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={form.supportedVehicleTypes?.includes(vehicleType.id) ?? false}
-                          onChange={() =>
-                            setForm((current) => ({
-                              ...current,
-                              supportedVehicleTypes: current.supportedVehicleTypes?.includes(vehicleType.id)
-                                ? current.supportedVehicleTypes.filter((item) => item !== vehicleType.id)
-                                : [...(current.supportedVehicleTypes ?? []), vehicleType.id],
-                            }))
-                          }
-                        />
-                        <span>{vehicleType.typeCode}</span>
-                      </label>
-                    ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-muted/20 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold">Vendor Contract / Rate Card</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Use the same contract upload and lane setup pattern as customer rate cards so buying-side pricing is ready for assignment and finance workflows.
-                  </p>
-                </div>
-                <Switch checked={addRateCardOnCreate} onCheckedChange={setAddRateCardOnCreate} />
-              </div>
-
-              {addRateCardOnCreate ? (
-                <div className="mt-4 space-y-4">
-                  <Tabs
-                    tabs={["Bulk Upload", "Add Manually"]}
-                    active={rateCardMode}
-                    onChange={(value) => {
-                      setRateCardMode(value as "Add Manually" | "Bulk Upload");
-                      setRateCardError("");
-                      setRateCardImportError("");
-                    }}
-                  />
-                  {rateCardMode === "Bulk Upload" ? (
-                    <div className="rounded-2xl border bg-background/80 p-4">
-                      <p className="text-sm font-medium">Vendor Contract Upload</p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Download the vendor contract workbook and upload `.xlsx` or `.csv` rows with lane, source, destination, and buying-rate details.
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-3">
-                        <Button variant="outline" onClick={() => downloadVendorRateCardTemplateWorkbook()}>
-                          <FileDown className="size-4" />
-                          Download Template
-                        </Button>
-                        <label className="inline-flex cursor-pointer items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-                          Upload Vendor Contract
-                          <input
-                            type="file"
-                            accept=".xlsx,.csv"
-                            className="hidden"
-                            onChange={(event) => void handleRateCardUpload(event.target.files?.[0] ?? null)}
-                          />
-                        </label>
-                      </div>
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Accepted formats: `.xlsx`, `.csv`. Template columns are validated strictly before contracts are saved with this vendor.
-                      </p>
-                      {rateCardImporting ? <p className="mt-3 text-sm text-muted-foreground">Validating uploaded file...</p> : null}
-                      {rateCardUploadedFileName ? <p className="mt-3 text-sm font-medium">{rateCardUploadedFileName}</p> : null}
-                      {rateCardImportSummary ? (
-                        <div className="mt-4 grid gap-4 md:grid-cols-2">
-                          <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4">
-                            <p className="font-medium text-emerald-900">Valid rows</p>
-                            <p className="mt-1 text-sm text-emerald-800">
-                              {rateCardImportSummary.validRows.length} rows ready to save with this vendor.
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                            <p className="font-medium text-amber-900">Invalid rows</p>
-                            <p className="mt-1 text-sm text-amber-800">
-                              {rateCardImportSummary.invalidRows.length} rows need correction.
-                            </p>
-                          </div>
-                          {rateCardImportSummary.invalidRows.length ? (
-                            <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                              <p className="font-medium text-amber-900">Validation errors</p>
-                              <div className="mt-3 space-y-3">
-                                {rateCardImportSummary.invalidRows.slice(0, 5).map((row) => (
-                                  <div
-                                    key={`vendor-create-import-${row.rowNumber}`}
-                                    className="rounded-xl border border-amber-200 bg-white/70 px-3 py-3 text-sm text-amber-900"
-                                  >
-                                    <p className="font-medium">Row {row.rowNumber}</p>
-                                    <p className="mt-1">{row.errors.join(" ")}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                  <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Contract name"><Input value={rateCardForm.contractName} onChange={(event) => setRateCardForm((current) => ({ ...current, contractName: event.target.value }))} /></Field>
-                  <Field label="Contract code"><Input value={rateCardForm.contractCode} onChange={(event) => setRateCardForm((current) => ({ ...current, contractCode: event.target.value }))} /></Field>
-                  <Field label="Effective from"><Input type="date" value={rateCardForm.effectiveFromDate} onChange={(event) => setRateCardForm((current) => ({ ...current, effectiveFromDate: event.target.value }))} /></Field>
-                  <Field label="Effective to"><Input type="date" value={rateCardForm.effectiveToDate} onChange={(event) => setRateCardForm((current) => ({ ...current, effectiveToDate: event.target.value }))} /></Field>
-                  <Field label="Lane"><Input value={rateCardForm.lanes} onChange={(event) => setRateCardForm((current) => ({ ...current, lanes: event.target.value }))} placeholder="DEL-BOM" /></Field>
-                  <Field label="Origin city"><Input value={rateCardForm.fromCity} onChange={(event) => setRateCardForm((current) => ({ ...current, fromCity: event.target.value }))} /></Field>
-                  <Field label="Destination city"><Input value={rateCardForm.toCity} onChange={(event) => setRateCardForm((current) => ({ ...current, toCity: event.target.value }))} /></Field>
-                  <Field label="Origin address / location"><Input value={rateCardForm.fromLocation} onChange={(event) => setRateCardForm((current) => ({ ...current, fromLocation: event.target.value }))} /></Field>
-                  <Field label="Destination address / location"><Input value={rateCardForm.toLocation} onChange={(event) => setRateCardForm((current) => ({ ...current, toLocation: event.target.value }))} /></Field>
-                  <Field label="Source pincode"><Input value={rateCardForm.sourcePincode} onChange={(event) => setRateCardForm((current) => ({ ...current, sourcePincode: event.target.value }))} /></Field>
-                  <Field label="Destination pincode"><Input value={rateCardForm.destinationPincode} onChange={(event) => setRateCardForm((current) => ({ ...current, destinationPincode: event.target.value }))} /></Field>
-                  <Field label="Rate type">
-                    <Select value={rateCardForm.rateType} onChange={(event) => setRateCardForm((current) => ({ ...current, rateType: event.target.value as TenantVendorRateCardInput["rateType"] }))}>
-                      <option value="PER_MT">PER_MT</option>
-                      <option value="PER_TRIP">PER_TRIP</option>
-                      <option value="PER_KM">PER_KM</option>
-                    </Select>
-                  </Field>
-                  <Field label="Vehicle type">
-                    <Input value={rateCardForm.vehicleType} onChange={(event) => setRateCardForm((current) => ({ ...current, vehicleType: event.target.value }))} />
-                  </Field>
-                  <Field label="Buying rate">
-                    <Input value={rateCardForm.buyingRate} onChange={(event) => setRateCardForm((current) => ({ ...current, buyingRate: event.target.value, rate: event.target.value }))} />
-                  </Field>
-                  <Field label="Underload rate">
-                    <Input value={rateCardForm.underloadRate} onChange={(event) => setRateCardForm((current) => ({ ...current, underloadRate: event.target.value }))} />
-                  </Field>
-                  <Field label="Overload rate">
-                    <Input value={rateCardForm.overloadRate} onChange={(event) => setRateCardForm((current) => ({ ...current, overloadRate: event.target.value }))} />
-                  </Field>
-                  <Field label="TAT">
-                    <Input value={rateCardForm.tat} onChange={(event) => setRateCardForm((current) => ({ ...current, tat: event.target.value }))} />
-                  </Field>
-                  <Field label="Status">
-                    <Select value={rateCardForm.status} onChange={(event) => setRateCardForm((current) => ({ ...current, status: event.target.value as TenantVendorRateCardInput["status"] }))}>
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </Select>
-                  </Field>
-                  <div className="md:col-span-2">
-                    <Field label="Remarks"><Textarea value={rateCardForm.remarks} onChange={(event) => setRateCardForm((current) => ({ ...current, remarks: event.target.value }))} /></Field>
-                  </div>
-                  </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-        </div>
-      </Dialog>
+      <VendorOnboardingWizard
+        chrome={false}
+        initialDraft={wizardInitialDraft}
+        submitLabel={editingVendor ? "Save Changes" : "Create Vendor"}
+        onSubmit={submit}
+        lockCompanyName={Boolean(editingVendor)}
+        lockPrimaryContactPhone={Boolean(editingVendor)}
+      />
     </div>
   );
 }

@@ -23,6 +23,7 @@ export default defineConfig({
       '@/modules/tms': path.resolve(rootDir, 'modules/tms/src/modules/tms'),
       '@/shared': path.resolve(rootDir, 'packages/shared-admin-core/src/shared'),
       '@/types': path.resolve(rootDir, 'packages/shared-admin-core/src/types'),
+      '@/vendor-onboarding': path.resolve(rootDir, 'packages/shared-admin-core/src/vendor-onboarding'),
       '@/constants': path.resolve(rootDir, 'packages/shared-admin-core/src/constants'),
       '@shared-admin-core': path.resolve(rootDir, 'packages/shared-admin-core/src'),
       '@auction': path.resolve(rootDir, 'modules/auction-web/src'),

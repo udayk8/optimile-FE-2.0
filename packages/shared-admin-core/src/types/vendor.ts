@@ -15,6 +15,11 @@ export interface TenantVendor {
   email?: string;
   serviceableLocations?: string[];
   supportedVehicleTypes?: string[];
+  bankName?: string;
+  branch?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  accountType?: "SAVINGS" | "CURRENT";
   status: "active" | "inactive";
   createdAt: string;
   updatedAt: string;
@@ -65,6 +70,11 @@ export interface TenantVendorInput {
   email?: string;
   serviceableLocations?: string[];
   supportedVehicleTypes?: string[];
+  bankName?: string;
+  branch?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  accountType?: "SAVINGS" | "CURRENT";
   status: "active" | "inactive";
 }
 
