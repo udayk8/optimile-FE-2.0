@@ -58,6 +58,7 @@ export function useTenantPaths() {
     auctionAms: `${root}/auction-ams`,
     customerPortal: `${root}/customer-portal`,
     trackAndTrace: `${root}/track-and-trace`,
+    finance: `${root}/finance`,
   };
 }
 

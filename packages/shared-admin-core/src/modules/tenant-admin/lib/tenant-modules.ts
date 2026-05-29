@@ -118,6 +118,15 @@ const TRACKING_FEATURES: TenantModuleFeature[] = [
   { code: "TRACKING_ANALYTICS", name: "Analytics" },
 ];
 
+const FINANCE_FEATURES: TenantModuleFeature[] = [
+  { code: "FINANCE_DASHBOARD", name: "Finance Command Centre" },
+  { code: "FINANCE_RECEIVABLES", name: "Receivables (POD, Debtors, Disputes, Notes)" },
+  { code: "FINANCE_PAYABLES", name: "Payables (Vendor Match, Sub-Vendor, Retention)" },
+  { code: "FINANCE_CONTROLS", name: "Controls (Credit, Contract, Compliance, Close, Audit)" },
+  { code: "FINANCE_FLEET", name: "Fleet Economics" },
+  { code: "FINANCE_LEDGERS", name: "Ledgers" },
+];
+
 const PLATFORM_MODULE_FEATURES: Record<string, TenantModuleFeature[]> = {
   TMS: BOOKING_FEATURES,
   FLEET: FLEET_FEATURES,
@@ -125,6 +134,7 @@ const PLATFORM_MODULE_FEATURES: Record<string, TenantModuleFeature[]> = {
   CUSTOMER: CUSTOMER_FEATURES,
   VENDOR: VENDOR_FEATURES,
   TRACKING: TRACKING_FEATURES,
+  FINANCE: FINANCE_FEATURES,
 };
 
 export function getTenantAdminModule(): TenantModuleEntry {

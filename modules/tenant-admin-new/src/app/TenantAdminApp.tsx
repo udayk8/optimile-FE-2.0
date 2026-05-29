@@ -58,6 +58,7 @@ const FleetEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedd
 const AuctionEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/auction-embedded').then((m) => ({ default: m.AuctionEmbeddedApp })))
 const CustomerEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/customer-embedded').then((m) => ({ default: m.CustomerEmbeddedApp })))
 const TrackingEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/tracking-embedded').then((m) => ({ default: m.TrackingEmbeddedApp })))
+const FinanceEmbeddedApp = lazy(() => import('../modules/tenant-admin/pages/embedded-modules/finance-embedded').then((m) => ({ default: m.FinanceEmbeddedApp })))
 
 type RouteMode = 'tenant-admin' | 'root-tenant'
 
@@ -180,6 +181,7 @@ function TenantAdminRoutes({
           <Route path="auction-ams/*" element={<PermissionGate moduleCode="AUCTION" featureCode="AUCTION_DASHBOARD"><AuctionEmbeddedApp /></PermissionGate>} />
           <Route path="customer-portal" element={<PermissionGate moduleCode="CUSTOMER" featureCode="CUSTOMER_DASHBOARD"><CustomerEmbeddedApp /></PermissionGate>} />
           <Route path="track-and-trace/*" element={<PermissionGate moduleCode="TRACKING" featureCode="TRACKING_DASHBOARD"><TrackingEmbeddedApp /></PermissionGate>} />
+          <Route path="finance/*" element={<PermissionGate moduleCode="FINANCE" featureCode="FINANCE_DASHBOARD"><FinanceEmbeddedApp /></PermissionGate>} />
           <Route path="modules" element={<TenantModulesPage />} />
           <Route path="booking-setup" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingSetupOverviewPage /></PermissionGate>} />
           <Route path="address-book" element={<PermissionGate moduleCode="TMS" featureCode="ADDRESS_BOOK"><TenantAddressBookPage /></PermissionGate>} />
