@@ -30,6 +30,9 @@ import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
 import { hasPermission, usePermissionMatrixVersion, type PermissionAction } from "@/modules/tenant-admin/lib/tenant-permissions";
 import { isTenantAdminRole } from "@/modules/tenant-admin/lib/tenant-modules";
 import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-profile-menu";
+import { manifestSidebarToTenantChildren } from "@/embedded-module";
+import { vendorManifest } from "@vendor/app/manifest";
+import { auctionManifest } from "@auction/app/manifest";
 
 export function TenantLayout() {
   const location = useLocation();
@@ -161,13 +164,14 @@ export function TenantLayout() {
           label: "Auction / AMS",
           icon: Gavel,
           to: `${paths.auctionAms}/dashboard`,
-          children: [
-            { label: "Auction Dashboard", featureCode: "AUCTION_DASHBOARD", to: `${paths.auctionAms}/dashboard`, icon: Gavel },
-            { label: "Client Hub", featureCode: "AUCTION_CLIENT_HUB", to: `${paths.auctionAms}/sourcing`, icon: ShieldCheck },
-            { label: "RFQ Responses", featureCode: "AUCTION_RFQ_RESPONSES", to: `${paths.auctionAms}/rfq-responses`, icon: ShieldCheck },
-            { label: "Auctions", featureCode: "AUCTION_AUCTIONS", to: `${paths.auctionAms}/auctions`, icon: Gavel },
-            { label: "Contracts", featureCode: "AUCTION_CONTRACTS", to: `${paths.auctionAms}/contracts`, icon: ShieldCheck },
-          ],
+          children: manifestSidebarToTenantChildren(auctionManifest, paths.auctionAms).map(
+            (item) => ({
+              label: item.label,
+              featureCode: "AUCTION_DASHBOARD",
+              to: item.to,
+              icon: (item.icon ?? Gavel) as typeof Truck,
+            }),
+          ),
         },
         {
           moduleCode: "TRACKING",
@@ -188,17 +192,14 @@ export function TenantLayout() {
           label: "Vendor Portal",
           icon: Users,
           to: `${paths.vendorPortal}/dashboard`,
-          children: [
-            { label: "Vendor Dashboard", featureCode: "VENDOR_DASHBOARD", to: `${paths.vendorPortal}/dashboard`, icon: Users },
-            { label: "Assigned Trips", featureCode: "VENDOR_TRIPS", to: `${paths.vendorPortal}/assigned-trips`, icon: Truck },
-            { label: "Sourcing", featureCode: "VENDOR_SOURCING", to: `${paths.vendorPortal}/sourcing`, icon: Gavel },
-            { label: "Contracts", featureCode: "VENDOR_CONTRACTS", to: `${paths.vendorPortal}/contracts`, icon: ShieldCheck },
-            { label: "Invoices", featureCode: "VENDOR_INVOICES", to: `${paths.vendorPortal}/invoices`, icon: ShieldCheck },
-            { label: "Ledger", featureCode: "VENDOR_LEDGER", to: `${paths.vendorPortal}/ledger`, icon: ShieldCheck },
-            { label: "Payments", featureCode: "VENDOR_PAYMENTS", to: `${paths.vendorPortal}/payments`, icon: ShieldCheck },
-            { label: "Vendor Fleet", featureCode: "VENDOR_FLEET", to: `${paths.vendorPortal}/fleet`, icon: Truck },
-            { label: "Vendor Support", featureCode: "VENDOR_SUPPORT", to: `${paths.vendorPortal}/support`, icon: ShieldCheck },
-          ],
+          children: manifestSidebarToTenantChildren(vendorManifest, paths.vendorPortal).map(
+            (item) => ({
+              label: item.label,
+              featureCode: "VENDOR_DASHBOARD",
+              to: item.to,
+              icon: (item.icon ?? Users) as typeof Truck,
+            }),
+          ),
         },
         {
           moduleCode: "FLEET",

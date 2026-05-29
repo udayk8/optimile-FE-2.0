@@ -36,6 +36,8 @@
       "@/types/*": ["packages/shared-admin-core/src/types/*"],
       "@/vendor-onboarding": ["packages/shared-admin-core/src/vendor-onboarding"],
       "@/vendor-onboarding/*": ["packages/shared-admin-core/src/vendor-onboarding/*"],
+      "@/embedded-module": ["packages/shared-admin-core/src/embedded-module"],
+      "@/embedded-module/*": ["packages/shared-admin-core/src/embedded-module/*"],
       "@/constants": ["packages/shared-admin-core/src/constants"],
       "@/constants/*": ["packages/shared-admin-core/src/constants/*"],
       "@shared-admin-core": ["packages/shared-admin-core/src"],
