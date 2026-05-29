@@ -10,6 +10,8 @@ export default defineConfig({
       '@shared-auth': path.resolve(__dirname, '../../packages/shared-auth/src'),
       '@shared-ui':   path.resolve(__dirname, '../../packages/shared-ui/src'),
       '@shared-utils': path.resolve(__dirname, '../../packages/shared-utils/src'),
+      '@/vendor-onboarding': path.resolve(__dirname, '../../packages/shared-admin-core/src/vendor-onboarding'),
+      '@/shared': path.resolve(__dirname, '../../packages/shared-admin-core/src/shared'),
     },
   },
   server: {

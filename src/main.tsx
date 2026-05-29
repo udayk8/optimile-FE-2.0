@@ -4,6 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import {
   AuthProvider,
   ForgotPassword,
+  LoginShell,
   PostLoginDashboard,
   ProtectedRoute,
   ResetPassword,
@@ -109,6 +110,7 @@ function HostRouter() {
         <Suspense fallback={Fallback}>
           <Routes>
             <Route path="/login" element={<UnifiedLoginPage />} />
+            <Route path="/legacy-login" element={<LoginShell />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
