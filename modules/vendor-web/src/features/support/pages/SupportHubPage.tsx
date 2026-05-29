@@ -4,7 +4,8 @@ import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 
 const PAGE_SIZE = 6
 

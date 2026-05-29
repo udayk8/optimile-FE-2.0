@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { Badge } from '@vendor/components/ui/badge'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { useAuthStore } from '@vendor/stores/auth.store'

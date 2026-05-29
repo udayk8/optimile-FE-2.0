@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { FileClock, Gavel, ScrollText } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { KPICard } from '@auction/components/cards/KPICard'
