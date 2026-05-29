@@ -5,6 +5,7 @@ import { SessionProvider } from '../shared/auth/session-context'
 import { ThemeProvider } from '../components/layout/theme-provider'
 import { TenantLayout } from '../layouts/tenant/tenant-layout'
 import { TenantDashboardPage } from '../modules/tenant-admin/pages/dashboard/tenant-dashboard-page'
+import { TenantReportsPage } from '../modules/tenant-admin/pages/reports/tenant-reports-page'
 import { TenantCustomersPage, TenantCustomerDetailPage } from '../modules/tenant-admin/pages/customers/tenant-customers-pages'
 import { TenantVendorsPage, TenantVendorDetailPage } from '../modules/tenant-admin/pages/vendors/tenant-vendors-pages'
 import { TenantDriversPage, TenantVehiclesPage } from '../modules/tenant-admin/pages/fleet/tenant-fleet-pages'
@@ -38,6 +39,7 @@ function TenantAdminRoutes() {
         <Route index element={<Navigate to="tenant/tenant-northstar/dashboard" replace />} />
         <Route path="tenant/:tenantId" element={<TenantLayout />}>
           <Route path="dashboard" element={<TenantDashboardPage />} />
+          <Route path="reports" element={<TenantReportsPage />} />
           <Route path="hierarchy" element={<TenantHierarchyPage />} />
           <Route path="org-units" element={<TenantOrgUnitsPage />} />
           <Route path="customers" element={<TenantCustomersPage />} />

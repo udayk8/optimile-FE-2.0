@@ -17,6 +17,7 @@ export function TenantLayout() {
   const BASE = paths.root.replace(`/tenant/${tenant.id}`, "");
   const tenantNav = [
     { to: `${BASE}/tenant/${tenant.id}/dashboard`, label: "Tenant Dashboard", icon: LayoutDashboard },
+    { to: `${BASE}/tenant/${tenant.id}/reports`, label: "Reports & Analytics", icon: FileDigit },
     {
       label: "Administration", icon: Boxes,
       children: [

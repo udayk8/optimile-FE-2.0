@@ -26,6 +26,7 @@ export function useTenantPaths() {
     hierarchy: `${root}/hierarchy`,
     orgUnits: `${root}/org-units`,
     materials: `${root}/materials`,
+    reports: `${root}/reports`,
     modules: `${root}/modules`,
     auditLogs: `${root}/audit-logs`,
     settings: `${root}/settings`,
