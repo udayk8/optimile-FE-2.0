@@ -21,7 +21,11 @@
       "@shared-ui":     ["../../packages/shared-ui/src"],
       "@shared-ui/*":   ["../../packages/shared-ui/src/*"],
       "@shared-utils":  ["../../packages/shared-utils/src"],
-      "@shared-utils/*":["../../packages/shared-utils/src/*"]
+      "@shared-utils/*":["../../packages/shared-utils/src/*"],
+      "@/vendor-onboarding":   ["../../packages/shared-admin-core/src/vendor-onboarding"],
+      "@/vendor-onboarding/*": ["../../packages/shared-admin-core/src/vendor-onboarding/*"],
+      "@/shared":              ["../../packages/shared-admin-core/src/shared"],
+      "@/shared/*":            ["../../packages/shared-admin-core/src/shared/*"]
     }
   },
   "include": ["src"]

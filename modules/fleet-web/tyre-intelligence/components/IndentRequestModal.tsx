@@ -271,7 +271,7 @@ export const IndentRequestModal: React.FC<IndentRequestModalProps> = ({
           </div>
 
           {/* Total Cost Summary */}
-          <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl p-6 border-2 border-purple-200">
+          <div className="bg-gradient-to-br from-purple-50 to-primary-50 rounded-2xl p-6 border-2 border-purple-200">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">

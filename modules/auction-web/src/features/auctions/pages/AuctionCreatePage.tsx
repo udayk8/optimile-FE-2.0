@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
-import { CheckCircle2, Upload } from 'lucide-react'
+import { CheckCircle2, Lock, Upload } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
+import { useAuctionPermissions } from '@auction/app/permission-context'
 import { createAuction, fetchBookings, fetchVendors } from '@auction/lib/mock-services'
 import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
 
@@ -150,6 +151,7 @@ export default function AuctionCreatePage() {
   const auctionType = ((type?.toUpperCase() ?? '') || '') as AuctionType
   const effectiveType: AuctionType | '' = ['SPOT', 'BULK', 'LOT'].includes(auctionType) ? auctionType : ''
   const { auctionUser } = useAuctionAuth()
+  const { canCreateAuction } = useAuctionPermissions()
 
   const [bookings, setBookings] = useState<BookingReference[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
@@ -303,6 +305,31 @@ export default function AuctionCreatePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (!canCreateAuction) {
+    return (
+      <div>
+        <HeroCard
+          eyebrow="Auction Builder"
+          title="Access Denied"
+          subtitle="Your role doesn't have permission to create auctions."
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <Lock className="size-4" />
+            </div>
+            <div className="text-sm text-[#475569]">
+              Ask a Tenant Admin to grant the <span className="font-medium text-[#0F172A]">Create Auction</span> permission.
+            </div>
+            <Button asChild variant="outline">
+              <Link to="/auction/auctions">Back to Auctions</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

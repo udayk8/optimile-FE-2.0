@@ -9,12 +9,14 @@ import { formatDateTime } from '@auction/lib/date-utils'
 import { Users } from 'lucide-react'
 import type { RfiType, RfqType } from '@auction/types'
 import { fetchRfis, fetchRfqs } from '@auction/lib/mock-services'
+import { useAuctionPermissions } from '@auction/app/permission-context'
 
 const PAGE_SIZE = 10
 
 export default function SourcingPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { canCreateRfi, canCreateRfq } = useAuctionPermissions()
 
   const activeTab = searchParams.get('tab') === 'RFQ' ? 'RFQ' : 'RFI'
 
@@ -103,8 +105,20 @@ export default function SourcingPage() {
         icon={<Users className="h-5 w-5 text-primary" />}
         action={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/auction/sourcing/rfi/new')}>New RFI</Button>
-            <Button onClick={() => navigate('/auction/sourcing/rfq/new')}>New RFQ</Button>
+            {canCreateRfi ? (
+              <Button variant="outline" onClick={() => navigate('/auction/sourcing/rfi/new')}>New RFI</Button>
+            ) : (
+              <span title="Permission not granted — ask your Tenant Admin to enable Create RFI" className="inline-block">
+                <Button variant="outline" disabled aria-disabled="true">New RFI</Button>
+              </span>
+            )}
+            {canCreateRfq ? (
+              <Button onClick={() => navigate('/auction/sourcing/rfq/new')}>New RFQ</Button>
+            ) : (
+              <span title="Permission not granted — ask your Tenant Admin to enable Create RFQ" className="inline-block">
+                <Button disabled aria-disabled="true">New RFQ</Button>
+              </span>
+            )}
           </div>
         }
       />

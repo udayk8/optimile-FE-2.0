@@ -1,15 +1,17 @@
 ﻿import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { createRfq } from '@auction/lib/mock-services'
-import { Upload } from 'lucide-react'
+import { useAuctionPermissions } from '@auction/app/permission-context'
+import { Lock, Upload } from 'lucide-react'
 
 export default function RfqCreatePage() {
   const navigate = useNavigate()
+  const { canCreateRfq } = useAuctionPermissions()
 
   const [title, setTitle] = useState('')
   const [messageToVendor, setMessageToVendor] = useState('')
@@ -52,6 +54,31 @@ export default function RfqCreatePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (!canCreateRfq) {
+    return (
+      <div>
+        <HeroCard
+          eyebrow="Sourcing"
+          title="Access Denied"
+          subtitle="Your role doesn't have permission to create RFQs."
+        />
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <div className="flex size-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <Lock className="size-4" />
+            </div>
+            <div className="text-sm text-[#475569]">
+              Ask a Tenant Admin to grant the <span className="font-medium text-[#0F172A]">Create RFQ</span> permission.
+            </div>
+            <Button asChild variant="outline">
+              <Link to="/auction/sourcing">Back to Client Hub</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

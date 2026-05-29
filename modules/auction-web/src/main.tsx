@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App standalone />
+        <App />
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

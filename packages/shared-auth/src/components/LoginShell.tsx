@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, AlertCircle, WifiOff } from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, ChevronDown } from 'lucide-react'
 import { useAuth, DEMO_CREDENTIALS, DEMO_PASSWORD } from '../context/AuthContext'
 import { OptimileLogo } from './OptimileLogo'
 
 export function LoginShell() {
-  const [email, setEmail]               = useState('')
-  const [password, setPassword]         = useState('')
+  const adminDemoEmail = 'platform-admin@optimile.com'
+  const adminDemoInfo = DEMO_CREDENTIALS[adminDemoEmail]
+  const [email, setEmail]               = useState(adminDemoEmail)
+  const [password, setPassword]         = useState(DEMO_PASSWORD)
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe]     = useState(false)
+  const [showDemoAccounts, setShowDemoAccounts] = useState(false)
 
-  const { login, loading, error, backendAvailable } = useAuth()
+  const { login, loading, error } = useAuth()
   const navigate = useNavigate()
-  const demoEntries = Object.entries(DEMO_CREDENTIALS)
+  const demoEntries = Object.entries(DEMO_CREDENTIALS).filter(([, info]) => info.role !== 'Driver')
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault()
@@ -30,14 +33,17 @@ export function LoginShell() {
   }
 
   const getRoleHelper = (role: string) => {
-    if (role === 'CEO') return 'All Access'
+    if (role === 'CEO') return 'ALL ACCESS'
     return null
   }
 
   const getRoleLabel = (role: string) => {
     if (role === 'Platform Admin') return 'Administration'
+    if (role === 'TMS') return 'TMS'
     return role
   }
+
+  const showErrorBanner = Boolean(error && error.trim() !== 'Request failed (404)')
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
@@ -49,26 +55,30 @@ export function LoginShell() {
             className="text-primary mx-auto mb-4"
             style={{ height: 44, width: 'auto', display: 'block' }}
           />
-          <p className="text-gray-500 text-sm">Logistics Enterprise Resource Planning</p>
+          <p className="text-gray-500 text-base">Logistics Enterprise Resource Planning</p>
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm space-y-5">
-          <div>
-            <h1 className="text-2xl font-extrabold text-text">Welcome back</h1>
-            <p className="text-sm text-gray-500 mt-1">Sign in to your Optimile account</p>
-          </div>
-
-          {/* Offline warning */}
-          {backendAvailable === false && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-warning">
-              <WifiOff className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Backend unavailable — use a demo account below.</span>
+          {adminDemoInfo && (
+            <div className="flex items-center justify-between rounded-xl border border-sky-100 bg-gradient-to-r from-sky-50 via-white to-cyan-50 px-4 py-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">Administration</p>
+                <p className="mt-1 text-sm text-slate-500">Default login is prefilled for faster access.</p>
+              </div>
+                <button
+                  type="button"
+                  onClick={() => handleDemoAutofill(adminDemoEmail)}
+                  disabled={loading}
+                  className="inline-flex h-12 shrink-0 items-center justify-center rounded-xl border border-sky-600 bg-sky-600 px-4 text-base font-semibold text-white transition hover:bg-sky-700 hover:border-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Autofill Admin Login
+                </button>
             </div>
           )}
 
           {/* Error */}
-          {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/10 p-3 text-sm font-semibold text-danger">
+          {showErrorBanner && (
+            <div className="flex items-start gap-2 rounded-lg border border-danger/20 bg-danger/10 p-3 text-base font-semibold text-danger">
               <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -77,7 +87,7 @@ export function LoginShell() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+              <label htmlFor="email" className="block text-sm font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                 Email
               </label>
               <input
@@ -87,7 +97,7 @@ export function LoginShell() {
                 autoComplete="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4"
+                className="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 text-base outline-none ring-primary/20 transition focus:border-primary focus:ring-4"
                 placeholder="you@company.com"
                 required
               />
@@ -95,10 +105,10 @@ export function LoginShell() {
 
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <label htmlFor="password" className="text-sm font-semibold uppercase tracking-wide text-gray-500">
                   Password
                 </label>
-                <Link to="/forgot-password" className="text-xs font-semibold text-primary hover:text-secondary transition">
+                <Link to="/forgot-password" className="text-sm font-semibold text-primary hover:text-secondary transition">
                   Forgot password?
                 </Link>
               </div>
@@ -110,7 +120,7 @@ export function LoginShell() {
                   autoComplete="current-password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 pr-10 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4"
+                  className="h-12 w-full rounded-lg border border-gray-300 bg-white px-3 pr-10 text-base outline-none ring-primary/20 transition focus:border-primary focus:ring-4"
                   placeholder="Enter password"
                   required
                 />
@@ -133,51 +143,70 @@ export function LoginShell() {
                 onChange={e => setRememberMe(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
-              <label htmlFor="remember" className="text-sm text-gray-600 select-none">Remember me</label>
+              <label htmlFor="remember" className="text-base text-gray-600 select-none">Remember me</label>
             </div>
 
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="h-10 w-full inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 text-sm font-semibold text-white transition hover:bg-secondary hover:border-secondary disabled:cursor-not-allowed disabled:border-primary/70 disabled:bg-primary/70 disabled:text-white disabled:opacity-100"
+              className="h-12 w-full inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 text-base font-semibold text-white transition hover:bg-secondary hover:border-secondary disabled:cursor-not-allowed disabled:border-primary/70 disabled:bg-primary/70 disabled:text-white disabled:opacity-100"
             >
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
 
-          {/* Demo accounts */}
           <div className="border-t border-gray-100 pt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-gray-400 text-center mb-3">
-              Quick Demo Login · password: <span className="font-mono">{DEMO_PASSWORD}</span>
-            </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {demoEntries.map(([demoEmail, info]) => (
-                <button
-                  key={demoEmail}
-                  type="button"
-                  onClick={() => handleDemoAutofill(demoEmail)}
-                  disabled={loading}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-bold text-text">{getRoleLabel(info.role)}</p>
-                        {getRoleHelper(info.role) && (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                            {getRoleHelper(info.role)}
-                          </span>
-                        )}
+            <button
+              type="button"
+              onClick={() => setShowDemoAccounts((current) => !current)}
+              className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/20 hover:bg-white"
+            >
+              <div>
+                <p className="text-sm font-extrabold uppercase tracking-wider text-gray-400">
+                  Other Demo Logins
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Click to view the remaining accounts. Password: <span className="font-mono">{DEMO_PASSWORD}</span>
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-2 text-base font-semibold text-primary">
+                {showDemoAccounts ? 'Hide' : 'Show'}
+                <ChevronDown className={`h-4 w-4 transition ${showDemoAccounts ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
+
+            {showDemoAccounts && (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {demoEntries
+                  .filter(([demoEmail]) => demoEmail !== adminDemoEmail)
+                  .map(([demoEmail, info]) => (
+                  <button
+                    key={demoEmail}
+                    type="button"
+                    onClick={() => handleDemoAutofill(demoEmail)}
+                    disabled={loading}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-left transition hover:border-primary/30 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-bold text-text">{getRoleLabel(info.role)}</p>
+                          {getRoleHelper(info.role) && (
+                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                              {getRoleHelper(info.role)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 truncate font-mono text-xs text-gray-400">{demoEmail}</p>
                       </div>
-                      <p className="mt-1 truncate font-mono text-[11px] text-gray-400">{demoEmail}</p>
+                      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-500">
+                        {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-500">
-                      {info.modules.length} module{info.modules.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -12,7 +12,6 @@ export type ERPModule =
   | 'ptl'             // Part Truck Load
   | 'platform-admin'  // Platform Administration (console)
   | 'tenant-admin'    // Tenant Administration (console)
-  | 'tms-booking'     // TMS Booking (standalone)
   | 'driver-app'      // Driver App (standalone)
 
 export type Department =
@@ -46,6 +45,10 @@ export type SystemRole =
   | 'Viewer'
   | 'Platform Admin'
   | 'Tenant Admin'
+  | 'Vendor Fleet'
+  | 'Auction Only'
+  | 'Fleet Only'
+  | 'Vendor Only'
 
 export interface Tenant {
   id: string

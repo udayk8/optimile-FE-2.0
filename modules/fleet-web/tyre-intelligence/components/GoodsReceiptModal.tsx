@@ -65,7 +65,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
         <div className="bg-slate-950 px-10 py-8 text-white flex justify-between items-center">
           <div>
             <h2 className="text-xl font-black uppercase tracking-tight">Goods Receipt Note (GRN)</h2>
-            <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Inward Stock Processing</p>
+            <p className="text-primary-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Inward Stock Processing</p>
           </div>
           <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold hover:bg-white/20 transition-all">✕</button>
         </div>
@@ -77,7 +77,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
               <select 
                 value={locationId}
                 onChange={e => setLocationId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 ring-indigo-500/10"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 ring-primary-500/10"
               >
                 {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
               </select>
@@ -87,7 +87,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
               <select 
                 value={vendorId}
                 onChange={e => setVendorId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 ring-indigo-500/10"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:ring-4 ring-primary-500/10"
               >
                 {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
               </select>
@@ -101,7 +101,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
               value={poRef}
               onChange={e => setPoRef(e.target.value)}
               placeholder="e.g. PO-2024-8891"
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 ring-indigo-500/10"
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold outline-none focus:ring-4 ring-primary-500/10"
             />
           </div>
 
@@ -109,7 +109,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
           <div className="bg-slate-50 p-1 rounded-2xl flex border border-slate-200">
              <button 
                 onClick={() => { setStockType('NEW'); setCost(35000); }}
-                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${stockType === 'NEW' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${stockType === 'NEW' ? 'bg-white shadow-sm text-primary-600' : 'text-slate-400 hover:text-slate-600'}`}
              >
                 New Stock (Life 0)
              </button>
@@ -183,9 +183,9 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
             </div>
           </div>
 
-          <div className="p-4 bg-indigo-50 rounded-2xl flex items-center justify-between">
-             <div className="text-xs font-black text-indigo-900 uppercase">Total GRN Value</div>
-             <div className="text-xl font-black text-indigo-700">₹{(cost * bulkQty).toLocaleString()}</div>
+          <div className="p-4 bg-primary-50 rounded-2xl flex items-center justify-between">
+             <div className="text-xs font-black text-primary-900 uppercase">Total GRN Value</div>
+             <div className="text-xl font-black text-primary-700">₹{(cost * bulkQty).toLocaleString()}</div>
           </div>
         </div>
 
@@ -194,7 +194,7 @@ export const GoodsReceiptModal: React.FC<GoodsReceiptModalProps> = ({ onClose, o
           <button 
             onClick={handleProcess}
             disabled={!poRef || !baseSerial}
-            className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-[2] py-4 bg-primary-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl hover:bg-primary-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Confirm {stockType} Receipt
           </button>

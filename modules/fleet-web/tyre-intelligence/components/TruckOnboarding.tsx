@@ -156,7 +156,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
           <div className="bg-slate-950 p-10 text-white flex justify-between items-center sticky top-0 z-10">
             <div>
               <h1 className="text-3xl font-black uppercase tracking-tight">Onboard Truck</h1>
-              <p className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Brownfield Deployment & Asset Digitization</p>
+              <p className="text-primary-400 text-[10px] font-black uppercase tracking-[0.2em] mt-1">Brownfield Deployment & Asset Digitization</p>
             </div>
             <button onClick={onCancel} className="text-slate-500 hover:text-white transition-colors uppercase text-[10px] font-black tracking-widest">Discard</button>
           </div>
@@ -166,7 +166,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
               <div className="space-y-10 animate-in slide-in-from-right-4">
                 <div className="max-w-md mx-auto space-y-8">
                   <div className="text-center">
-                    <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🚛</div>
+                    <div className="w-20 h-20 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🚛</div>
                     <h2 className="text-lg font-black text-slate-900 uppercase">Vehicle Identification</h2>
                   </div>
                   <div className="space-y-4">
@@ -176,7 +176,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                         type="text"
                         value={vehicleData.plateNumber}
                         onChange={e => setVehicleData({...vehicleData, plateNumber: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 ring-indigo-500/10 outline-none transition-all"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 ring-primary-500/10 outline-none transition-all"
                         placeholder="e.g. MH-43-AW-9901"
                       />
                     </div>
@@ -196,7 +196,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                         type="number"
                         value={vehicleData.odometer}
                         onChange={e => setVehicleData({...vehicleData, odometer: e.target.value})}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 ring-indigo-500/10 outline-none transition-all"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 text-sm font-bold focus:ring-4 ring-primary-500/10 outline-none transition-all"
                         placeholder="e.g. 154000"
                       />
                     </div>
@@ -234,7 +234,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                 <div className="mb-8 bg-slate-50 border border-slate-100 rounded-3xl p-6">
                   <div className="flex justify-between items-center mb-4">
                      <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Bulk Settings</h3>
-                     <button onClick={applyBulkSettings} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline">Apply to Empty Slots</button>
+                     <button onClick={applyBulkSettings} className="text-[10px] font-black text-primary-600 uppercase tracking-widest hover:underline">Apply to Empty Slots</button>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <input
@@ -266,9 +266,9 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                     const isSpare = pos.position === 'Spare';
 
                     return (
-                      <div key={label} className={`p-5 bg-white border rounded-[24px] shadow-sm hover:shadow-md transition-shadow ${isSpare ? 'border-indigo-100 bg-indigo-50/20' : 'border-slate-200'}`}>
+                      <div key={label} className={`p-5 bg-white border rounded-[24px] shadow-sm hover:shadow-md transition-shadow ${isSpare ? 'border-primary-100 bg-primary-50/20' : 'border-slate-200'}`}>
                         <div className="flex justify-between items-center mb-3">
-                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${isSpare ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${isSpare ? 'bg-primary-600 text-white' : 'bg-primary-50 text-primary-600'}`}>
                             {label}
                           </span>
                           {data.id && data.brand && data.treadDepth ? <span className="text-green-500 text-[10px]">✓ Ready</span> : <span className="text-slate-300 text-[10px]">Incomplete</span>}
@@ -279,21 +279,21 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                             placeholder="Serial Number *"
                             value={data.id || ''}
                             onChange={e => handleTyreInput(label, 'id', e.target.value)}
-                            className="col-span-2 w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-colors"
+                            className="col-span-2 w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:bg-white focus:border-primary-300 transition-colors"
                           />
                           <input
                             type="text"
                             placeholder="Brand"
                             value={data.brand || ''}
                             onChange={e => handleTyreInput(label, 'brand', e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:bg-white focus:border-indigo-300 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:bg-white focus:border-primary-300 transition-colors"
                           />
                           <input
                             type="text"
                             placeholder="Model"
                             value={data.model || ''}
                             onChange={e => handleTyreInput(label, 'model', e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:bg-white focus:border-indigo-300 transition-colors"
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-medium outline-none focus:bg-white focus:border-primary-300 transition-colors"
                           />
                         </div>
                         <div className="flex items-center gap-3">
@@ -304,7 +304,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                                placeholder="Current Tread (mm) *"
                                value={data.treadDepth || ''}
                                onChange={e => handleTyreInput(label, 'treadDepth', e.target.value)}
-                               className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:bg-white focus:border-indigo-300 transition-colors"
+                               className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:bg-white focus:border-primary-300 transition-colors"
                              />
                            </div>
                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -322,7 +322,7 @@ export const TruckOnboarding: React.FC<TruckOnboardingProps> = ({ onCancel, onCo
                     onClick={handleSubmit}
                     disabled={!allFilled}
                     className={`flex-[2] py-5 rounded-2xl text-[10px] font-black uppercase shadow-2xl transition-all ${
-                      allFilled ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                      allFilled ? 'bg-primary-600 text-white hover:bg-primary-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                     }`}
                   >
                     Commit & Finalize Fitment

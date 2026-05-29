@@ -10,6 +10,7 @@ import { formatDateTime } from '@auction/lib/date-utils'
 import { fetchAuctions } from '@auction/lib/mock-services'
 import type { Auction } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
+import { useAuctionPermissions } from '@auction/app/permission-context'
 
 const AUCTION_TABS = ['ALL', 'DRAFT', 'UPCOMING', 'LIVE', 'COMPLETED', 'AWARDED', 'NO_BIDS', 'CANCELLED'] as const
 const PAGE_SIZE = 6
@@ -33,6 +34,7 @@ function normalizeTab(tab: string | null) {
 export default function AuctionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { canCreateAuction } = useAuctionPermissions()
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -104,9 +106,17 @@ export default function AuctionsPage() {
         subtitle="Create Spot, Bulk, and Lot auctions, then move directly from monitoring into award decisions."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
-          <Button asChild>
-            <Link to="/auction/auctions/new"><PlusCircle className="h-4 w-4" /> New Auction</Link>
-          </Button>
+          canCreateAuction ? (
+            <Button asChild>
+              <Link to="/auction/auctions/new"><PlusCircle className="h-4 w-4" /> New Auction</Link>
+            </Button>
+          ) : (
+            <span title="Permission not granted — ask your Tenant Admin to enable Create Auction" className="inline-block">
+              <Button disabled aria-disabled="true">
+                <PlusCircle className="h-4 w-4" /> New Auction
+              </Button>
+            </span>
+          )
         }
       />
 

@@ -341,7 +341,7 @@ export const IndentDashboard: React.FC<IndentDashboardProps> = ({
       {selectedIndent && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-6 z-50">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-6 text-white flex justify-between items-center">
+            <div className="bg-gradient-to-r from-purple-600 to-primary-600 px-8 py-6 text-white flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-black uppercase">{selectedIndent.indentNumber}</h3>
                 <p className="text-purple-200 text-xs mt-1">{selectedIndent.location}</p>
@@ -422,7 +422,7 @@ export const IndentDashboard: React.FC<IndentDashboardProps> = ({
                 </div>
               )}
 
-              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+              <div className="bg-gradient-to-br from-purple-50 to-primary-50 rounded-xl p-4 border border-purple-200">
                 <p className="text-xs font-black text-purple-600 uppercase tracking-widest">Total Estimated Cost</p>
                 <p className="text-2xl font-black text-purple-700 mt-1">
                   ₹{selectedIndent.totalEstimatedCost.toLocaleString('en-IN')}

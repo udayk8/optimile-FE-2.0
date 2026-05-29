@@ -1,67 +1,106 @@
-import React, { lazy, Suspense } from 'react'
+import React, { Component, lazy, Suspense, type ErrorInfo, type ReactNode } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AuthProvider,
-  LoginShell,
   ForgotPassword,
-  ResetPassword,
+  LoginShell,
   PostLoginDashboard,
   ProtectedRoute,
+  ResetPassword,
   useAuth,
-  type Portal,
 } from '@shared-auth'
+import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './shell/registry'
 import './styles.css'
 
-const AuctionApp       = lazy(() => import('@auction/app/AdminApp'))
-const VendorApp        = lazy(() => import('@vendor/app/VendorApp'))
-const FleetApp         = lazy(() => import('@fleet/app/FleetApp'))
-const CustomerApp      = lazy(() => import('@customer/app/CustomerApp'))
+const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
+const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
-const TenantAdminApp   = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
-const TmsBookingApp    = lazy(() => import('@tms-booking/app/TmsBookingApp'))
-const TmsDriverAppApp  = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))
-const TrackingApp      = lazy(() => import('./tracking/TrackingApp'))
+const TenantAdminApp = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
+const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
+const UnifiedLoginPage = lazy(() => import('@shared-admin-core/auth/unified-login-page'))
 
 const Fallback = (
   <div style={{ alignItems: 'center', color: '#64748b', display: 'flex', fontSize: 14, justifyContent: 'center', minHeight: '100vh' }}>
-    Loading…
+    Loading...
   </div>
 )
 
-const DEV_PORTAL = import.meta.env.VITE_START_PORTAL as Portal | undefined
-
-function seedDirectPortalSession(portal: Portal) {
-  const demoSessions: Record<Portal, { email: string; role: string }> = {
-    auction: { email: 'auction@pranay.ts.com', role: 'Auction Head' },
-    vendor: { email: 'vendor@pranay.ts.com', role: 'Vendor' },
-    fleet: { email: 'fleet@uday.ts.com', role: 'Fleet Manager' },
-    customer: { email: 'cbd@optimile.com', role: 'CBD' },
-    tracking: { email: 'tracking@optimile.com', role: 'Track and Trace' },
-    admin: { email: 'ceo@uday.ts.com', role: 'CEO' },
-    driver: { email: 'driver@optimile.com', role: 'Driver' },
-    'platform-admin': { email: 'platform-admin@optimile.com', role: 'Platform Admin' },
-    'tenant-admin': { email: 'tenant-admin@optimile.com', role: 'Tenant Admin' },
-    'tms-booking': { email: 'tms-booking@optimile.com', role: 'TMS' },
-    'driver-app': { email: 'driver@optimile.com', role: 'Driver' },
-    tms: { email: 'tms-booking@optimile.com', role: 'TMS' },
-  }
-
-  const session = demoSessions[portal]
-  if (!session) return
-
-  localStorage.setItem('authMode', 'demo')
-  localStorage.setItem('selectedPortal', portal)
-  localStorage.setItem('userRole', session.role)
-  localStorage.setItem('optimile_demo_email', session.email)
+interface HostErrorBoundaryProps {
+  children: ReactNode
 }
 
-function DefaultRedirect() {
+interface HostErrorBoundaryState {
+  error: Error | null
+}
+
+class HostErrorBoundary extends Component<HostErrorBoundaryProps, HostErrorBoundaryState> {
+  state: HostErrorBoundaryState = { error: null }
+
+  static getDerivedStateFromError(error: Error): HostErrorBoundaryState {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Optimile host runtime error', error, errorInfo)
+  }
+
+  render() {
+    if (!this.state.error) {
+      return this.props.children
+    }
+
+    return (
+      <div style={{ background: '#fff7ed', color: '#7c2d12', fontFamily: 'ui-sans-serif, system-ui, sans-serif', minHeight: '100vh', padding: '32px' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #fdba74', borderRadius: '16px', margin: '0 auto', maxWidth: '720px', padding: '24px' }}>
+          <h1 style={{ fontSize: '24px', margin: '0 0 12px' }}>Host app crashed while rendering</h1>
+          <p style={{ lineHeight: 1.5, margin: '0 0 16px' }}>
+            This usually means a shared login, auth, or routing component threw a runtime error before the page could paint.
+          </p>
+          <pre style={{ background: '#fff7ed', borderRadius: '12px', fontSize: '13px', margin: 0, overflowX: 'auto', padding: '16px', whiteSpace: 'pre-wrap' }}>
+            {this.state.error.stack ?? this.state.error.message}
+          </pre>
+        </div>
+      </div>
+    )
+  }
+}
+
+function EntryRoute() {
   const { getPostLoginRoute, isAuthenticated, loading } = useAuth()
 
   if (loading) return Fallback
 
-  return <Navigate to={isAuthenticated ? getPostLoginRoute() : '/login'} replace />
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Navigate to={getPostLoginRoute() || getDefaultLandingPath()} replace />
+}
+
+function DefaultRedirect() {
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) return Fallback
+
+  return <Navigate to={isAuthenticated ? getDefaultLandingPath() : '/login'} replace />
+}
+
+function LegacyTenantRedirect() {
+  const location = useLocation()
+  const nextPath = location.pathname.replace(/^\/tenant\//, '/tenant-admin/tenant/')
+  return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
+}
+
+function LegacyTmsBookingRedirect() {
+  const location = useLocation()
+  const nextPath = location.pathname.replace(/^\/tms\/booking\/tenant\//, '/tenant-admin/tenant/')
+  return <Navigate to={`${nextPath}${location.search}${location.hash}`} replace />
+}
+
+function TenantAdminLoginRedirect() {
+  const location = useLocation()
+  return <Navigate to={`/login${location.search}${location.hash}`} replace />
 }
 
 function HostRouter() {
@@ -70,35 +109,36 @@ function HostRouter() {
       <AuthProvider>
         <Suspense fallback={Fallback}>
           <Routes>
-            {/* Auth pages */}
-            <Route path="/login"           element={<LoginShell />} />
+            <Route path="/login" element={<UnifiedLoginPage />} />
+            <Route path="/legacy-login" element={<LoginShell />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password"  element={<ResetPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Post-login dashboard / module selector */}
-            <Route path="/modules" element={
-              <ProtectedRoute>
-                <PostLoginDashboard />
-              </ProtectedRoute>
-            } />
+            <Route
+              path="/modules"
+              element={
+                <ProtectedRoute>
+                  <PostLoginDashboard />
+                </ProtectedRoute>
+              }
+            />
 
-            {/* Module apps — all protected */}
-            <Route path="/auction/*"  element={<ProtectedRoute portal="auction"><AuctionApp /></ProtectedRoute>} />
-            <Route path="/vendor/*"   element={<ProtectedRoute portal="vendor"><VendorApp /></ProtectedRoute>} />
-            <Route path="/fleet/*"    element={<ProtectedRoute portal="fleet"><FleetApp /></ProtectedRoute>} />
+            <Route element={<ShellLayout />}>
+              {buildShellChildRoutes()}
+            </Route>
+
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
             <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackingApp /></ProtectedRoute>} />
-
-            {/* Extracted console modules */}
             <Route path="/admin/*" element={<ProtectedRoute portal="admin"><PlatformAdminApp /></ProtectedRoute>} />
             <Route path="/platform-admin/*" element={<ProtectedRoute portal="platform-admin"><PlatformAdminApp /></ProtectedRoute>} />
-            <Route path="/tenant-admin/*"   element={<ProtectedRoute portal="tenant-admin"><TenantAdminApp /></ProtectedRoute>} />
-            <Route path="/tms/booking/*"    element={<ProtectedRoute portal="tms-booking"><TmsBookingApp /></ProtectedRoute>} />
-            <Route path="/driver-app/*"     element={<ProtectedRoute portal="driver-app"><TmsDriverAppApp /></ProtectedRoute>} />
+            <Route path="/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTenantRedirect /></ProtectedRoute>} />
+            <Route path="/tenant-admin/login" element={<TenantAdminLoginRedirect />} />
+            <Route path="/tenant-admin/*" element={<ProtectedRoute portal="platform-admin"><TenantAdminApp /></ProtectedRoute>} />
+            <Route path="/tms/booking/tenant/*" element={<ProtectedRoute portal="platform-admin"><LegacyTmsBookingRedirect /></ProtectedRoute>} />
+            <Route path="/tms/booking/*" element={<ProtectedRoute portal="tms"><TmsBookingApp /></ProtectedRoute>} />
 
-            {/* Default */}
-            <Route path="/" element={<DefaultRedirect />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<EntryRoute />} />
+            <Route path="*" element={<DefaultRedirect />} />
           </Routes>
         </Suspense>
       </AuthProvider>
@@ -106,29 +146,10 @@ function HostRouter() {
   )
 }
 
-function DirectPortalBootstrap() {
-  if (DEV_PORTAL) {
-    seedDirectPortalSession(DEV_PORTAL)
-  }
-
-  switch (DEV_PORTAL) {
-    case 'vendor':
-      return <VendorApp standalone />
-    case 'auction':
-      return (
-        <BrowserRouter>
-          <AuthProvider>
-            <AuctionApp standalone />
-          </AuthProvider>
-        </BrowserRouter>
-      )
-    default:
-      return <HostRouter />
-  }
-}
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <DirectPortalBootstrap />
-  </React.StrictMode>
+    <HostErrorBoundary>
+      <HostRouter />
+    </HostErrorBoundary>
+  </React.StrictMode>,
 )
