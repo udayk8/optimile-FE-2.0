@@ -20,7 +20,7 @@ export default function FinanceShell() {
     if (!modeIds(mode).includes(active)) setActive('dash')
   }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const page = PAGES[active] || PAGES.dash
+  const page = PAGES[mode][active] || PAGES[mode].dash
   const Comp = page.comp
 
   return (
@@ -66,7 +66,7 @@ export default function FinanceShell() {
               {grp.group && <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">{grp.group}</div>}
               <div className="space-y-0.5">
                 {grp.items.map((id) => {
-                  const p = PAGES[id]
+                  const p = PAGES[mode][id]
                   const Icon = p.icon
                   return (
                     <button key={id} onClick={() => setActive(id)}
