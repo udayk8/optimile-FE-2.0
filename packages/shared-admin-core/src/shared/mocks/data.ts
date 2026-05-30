@@ -77,6 +77,7 @@ export const mockModules: PlatformModule[] = [
   { id: "mod-fleet", code: "FLEET", name: "Fleet Management", category: "Fleet", description: "Vehicles, drivers, maintenance, garage, tyres, fuel, compliance, dispatch.", status: "active", folderPath: "modules/fleet-web", startRoute: "/fleet/dashboard" },
   { id: "mod-tracking", code: "TRACKING", name: "Track and Trace", category: "Operations", description: "Live map, geofences, alerts, trip replay, route performance analytics.", status: "active", folderPath: "modules/track-trace-web", startRoute: "/tracking" },
   { id: "mod-customer", code: "CUSTOMER", name: "Customer Portal", category: "Operations", description: "Customer-facing booking visibility and dashboard.", status: "active", folderPath: "modules/customer-web", startRoute: "/customer" },
+  { id: "mod-finance", code: "FINANCE", name: "Finance", category: "Finance", description: "Receivables, payables, ledgers, reconciliation, compliance, and fleet economics.", status: "active", folderPath: "modules/finance-web", startRoute: "/finance" },
 ];
 
 export const mockPlatformTenants: TenantRecord[] = [

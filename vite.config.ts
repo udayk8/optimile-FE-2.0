@@ -33,6 +33,7 @@ export default defineConfig({
       '@customer': path.resolve(rootDir, 'modules/customer-web/src'),
       '@console': path.resolve(rootDir, 'modules/console-web/src'),
       '@track-trace': path.resolve(rootDir, 'modules/track-trace-web/src'),
+      '@finance': path.resolve(rootDir, 'modules/finance-web/src'),
       // @platform-admin/hooks (shared path helpers) -> shared-admin-core; general @platform-admin (incl /app) -> platform-admin-new
       '@platform-admin/hooks': path.resolve(rootDir, 'packages/shared-admin-core/src/hooks'),
       '@platform-admin': path.resolve(rootDir, 'modules/platform-admin-new/src'),
