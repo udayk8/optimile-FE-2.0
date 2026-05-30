@@ -1,19 +1,16 @@
-import { useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
   Eye,
-  KeyRound,
   Layers,
   Pencil,
   Plus,
   Search,
-  Send,
   UserRoundCog,
 } from "lucide-react";
-import { z } from "zod";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog } from "@/shared/components/ui/dialog";
@@ -27,51 +24,65 @@ import { displayModule, getModuleNameByCode } from "@/modules/platform-admin/lib
 import type { CreateTenantInput } from "@/types/tenant-workspace";
 
 type BusinessType = "DIRECT_ENTERPRISE" | "THREE_PL" | "FLEET_MANAGEMENT";
-type UiStatus = "active" | "onboarding";
-type OnboardingMode = "temp_password" | "invite_link";
 
 interface WizardForm {
   name: string;
   code: string;
   businessType: BusinessType;
   region: string;
-  status: UiStatus;
+  defaultTimezone: string;
   adminName: string;
   adminEmail: string;
   adminPhone: string;
   adminPassword: string;
   adminPasswordConfirm: string;
-  onboardingMode: OnboardingMode;
   enabledModuleCodes: string[];
 }
 
+type WizardField = keyof WizardForm;
+type WizardErrors = Partial<Record<WizardField, string>>;
+
+interface ModuleCardData {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  required: boolean;
+}
+
+const REQUIRED_MODULE_CODE = "ADMIN";
+const BOOKING_MODULE_CODE = "TMS";
+
 const businessTypeOptions: { value: BusinessType; label: string; helper: string }[] = [
-  { value: "DIRECT_ENTERPRISE", label: "Direct Enterprise", helper: "Operates own transport workflows." },
-  { value: "THREE_PL", label: "3PL", helper: "Operates for multiple customers." },
-  { value: "FLEET_MANAGEMENT", label: "Fleet Management", helper: "Fleet-focused operator (vehicles, drivers, maintenance, dispatch)." },
+  { value: "DIRECT_ENTERPRISE", label: "Direct Enterprise", helper: "Operates its own booking and logistics workflows." },
+  { value: "THREE_PL", label: "3PL / Logistics Provider", helper: "Runs logistics operations for multiple customers." },
+  { value: "FLEET_MANAGEMENT", label: "Fleet Management", helper: "Focuses on fleet, drivers, dispatch, and compliance." },
 ];
 
-const wizardSchema = z.object({
-  name: z.string().trim().min(2, "Tenant name is required"),
-  code: z.string().trim().min(2, "Tenant code is required"),
-  region: z.string().trim().min(2, "Region is required"),
-  adminName: z.string().trim().min(2, "Admin name is required"),
-  adminEmail: z.string().trim().email("Valid email required"),
-  enabledModuleCodes: z.array(z.string()).min(1, "Pick at least one module"),
-});
+const defaultTimezoneOptions = [
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Europe/London",
+  "Europe/Berlin",
+  "America/New_York",
+  "America/Chicago",
+  "America/Los_Angeles",
+];
+
+const moduleOrder = [REQUIRED_MODULE_CODE, BOOKING_MODULE_CODE, "FLEET", "AUCTION", "CUSTOMER", "VENDOR", "TRACKING", "DRIVER_APP"];
 
 const initialForm: WizardForm = {
   name: "",
   code: "",
   businessType: "DIRECT_ENTERPRISE",
   region: "",
-  status: "onboarding",
+  defaultTimezone: "Asia/Kolkata",
   adminName: "",
   adminEmail: "",
   adminPhone: "",
   adminPassword: "",
   adminPasswordConfirm: "",
-  onboardingMode: "invite_link",
   enabledModuleCodes: [],
 };
 
@@ -81,7 +92,9 @@ export function PlatformTenantsPage() {
   const { data: tenants, createTenant, updateTenant, getTenantPrimaryAdminUser } = useTenants();
   const { data: plans } = usePlans();
   const { data: modules } = usePlatformModules();
+
   const activeModules = useMemo(() => modules.filter((module) => module.status === "active"), [modules]);
+  const wizardModules = useMemo(() => buildWizardModules(activeModules), [activeModules]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "trial" | "paused">("all");
@@ -89,6 +102,7 @@ export function PlatformTenantsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<WizardForm>(initialForm);
+  const [fieldErrors, setFieldErrors] = useState<WizardErrors>({});
   const [wizardError, setWizardError] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
 
@@ -121,39 +135,33 @@ export function PlatformTenantsPage() {
     setStep(0);
     setCreatedId(null);
     setWizardError("");
+    setFieldErrors({});
     setForm({
       ...initialForm,
-      enabledModuleCodes: activeModules.slice(0, 3).map((module) => module.code),
+      enabledModuleCodes: getDefaultEnabledModuleCodes(activeModules),
     });
     setWizardOpen(true);
   }
 
-  function update<K extends keyof WizardForm>(key: K, value: WizardForm[K]) {
+  function update<K extends WizardField>(key: K, value: WizardForm[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setFieldErrors((current) => ({ ...current, [key]: undefined }));
+    setWizardError("");
   }
 
-  function validateStep(): string | null {
-    if (step === 0) {
-      if (form.name.trim().length < 2) return "Tenant name is required";
-      if (form.code.trim().length < 2) return "Tenant code is required";
-      if (form.region.trim().length < 2) return "Country / region is required";
-    } else if (step === 1) {
-      if (form.adminName.trim().length < 2) return "Admin name is required";
-      if (!form.adminEmail.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return "Valid admin email required";
-      if (form.adminPassword.length < 6) return "Password must be at least 6 characters";
-      if (form.adminPassword !== form.adminPasswordConfirm) return "Passwords do not match";
-    } else if (step === 2) {
-      if (form.enabledModuleCodes.length === 0) return "Select at least one module";
-    }
-    return null;
+  function validateCurrentStep() {
+    const errors = getStepErrors(step, form, tenants);
+    setFieldErrors(errors);
+    return errors;
   }
 
   function next() {
-    const stepError = validateStep();
-    if (stepError) {
-      setWizardError(stepError);
+    const errors = validateCurrentStep();
+    if (Object.keys(errors).length > 0) {
+      setWizardError(firstError(errors));
       return;
     }
+
     setWizardError("");
     if (step === 3) {
       submitWizard();
@@ -163,49 +171,46 @@ export function PlatformTenantsPage() {
   }
 
   function submitWizard() {
-    const parsed = wizardSchema.safeParse(form);
-    if (!parsed.success) {
-      setWizardError(parsed.error.issues[0]?.message ?? "Complete the form");
+    const errors = getAllErrors(form, tenants);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setWizardError(firstError(errors));
       return;
     }
 
-    // FLEET_MANAGEMENT operates its own fleet → maps to DIRECT_CUSTOMER
-    // (same as Direct Enterprise). Only 3PL maps to LOGISTICS_PROVIDER_3PL.
+    const businessType = businessTypeOptions.find((option) => option.value === form.businessType);
     const tenantType: CreateTenantInput["tenantType"] =
       form.businessType === "THREE_PL" ? "LOGISTICS_PROVIDER_3PL" : "DIRECT_CUSTOMER";
+    const enabledModuleCodes = ensureRequiredModuleCodes(form.enabledModuleCodes);
 
     const payload: CreateTenantInput = {
       name: form.name.trim(),
       code: form.code.trim().toUpperCase(),
-      status: form.status === "active" ? "active" : "trial",
+      status: "active",
       planId: plans[0]?.id ?? "",
+      defaultTimezone: form.defaultTimezone.trim(),
       tenantType,
-      // customerPortalEnabled doubles as the Direct Enterprise vs Fleet
-      // Management discriminator (both store as tenantType=DIRECT_CUSTOMER).
       customerPortalEnabled: form.businessType === "FLEET_MANAGEMENT",
       primaryContactName: form.adminName.trim(),
       primaryContactEmail: form.adminEmail.trim(),
-      primaryContactPhone: form.adminPhone.trim() || undefined,
-      // Demo only: plaintext password stored in mock/localStorage. Remove when backend auth is integrated.
-      primaryContactPassword: form.adminPassword || undefined,
+      primaryContactPhone: form.adminPhone.trim(),
+      primaryContactPassword: form.adminPassword,
       starterRole: "tenant_admin",
-      enabledModuleCodes: form.enabledModuleCodes,
+      enabledModuleCodes,
       defaultHierarchyTemplate: "region-zone",
-      notes: [
-        form.region ? `Region: ${form.region}` : "",
-        form.adminPhone ? `Phone: ${form.adminPhone}` : "",
-        `Admin onboarding: ${form.onboardingMode === "invite_link" ? "Invite link" : "Temporary password"}`,
-      ]
-        .filter(Boolean)
-        .join(" · "),
+      notes: `Country / Region: ${form.region.trim()} | Default Timezone: ${form.defaultTimezone.trim()} | Phone: ${form.adminPhone.trim()}`,
     };
 
     try {
       const created = createTenant(payload);
-      if (form.region) {
-        updateTenant(created.id, { region: form.region });
-      }
+      updateTenant(created.id, {
+        region: form.region.trim(),
+        industry: businessType?.label ?? "Logistics",
+        defaultTimezone: form.defaultTimezone.trim(),
+        enabledModuleCodes,
+      });
       setCreatedId(created.id);
+      setFieldErrors({});
       setWizardError("");
     } catch (submitError) {
       setWizardError(submitError instanceof Error ? submitError.message : "Tenant could not be created");
@@ -216,13 +221,12 @@ export function PlatformTenantsPage() {
     const tenant = tenants.find((item) => item.id === tenantId);
     if (!tenant) return;
     setModuleEditTenantId(tenantId);
-    setModuleEditCodes(tenant.enabledModuleCodes);
+    setModuleEditCodes(ensureRequiredModuleCodes(tenant.enabledModuleCodes));
   }
 
   function saveModuleEdit() {
     if (!moduleEditTenantId) return;
-    if (moduleEditCodes.length === 0) return;
-    updateTenant(moduleEditTenantId, { enabledModuleCodes: moduleEditCodes });
+    updateTenant(moduleEditTenantId, { enabledModuleCodes: ensureRequiredModuleCodes(moduleEditCodes) });
     setModuleEditTenantId(null);
   }
 
@@ -270,7 +274,9 @@ export function PlatformTenantsPage() {
           <option value="trial">Onboarding</option>
           <option value="paused">Inactive</option>
         </Select>
-        <span className="ml-auto text-[12px] text-slate-500">{visibleTenants.length} of {tenants.length}</span>
+        <span className="ml-auto text-[12px] text-slate-500">
+          {visibleTenants.length} of {tenants.length}
+        </span>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-card">
@@ -310,8 +316,8 @@ export function PlatformTenantsPage() {
                       <td className="px-4 py-2.5">
                         <StatusBadge status={tenant.status} />
                       </td>
-                      <td className="px-4 py-2.5 text-slate-700">{tenant.enabledModuleCodes.length}</td>
-                      <td className="px-4 py-2.5 text-slate-700">{admin?.name ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-slate-700">{ensureRequiredModuleCodes(tenant.enabledModuleCodes).length}</td>
+                      <td className="px-4 py-2.5 text-slate-700">{admin?.name ?? "-"}</td>
                       <td className="px-4 py-2.5 text-slate-600">{formatDate(tenant.createdAt)}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1">
@@ -342,7 +348,6 @@ export function PlatformTenantsPage() {
         </div>
       </div>
 
-      {/* Add Tenant Wizard */}
       <Dialog
         open={wizardOpen}
         onOpenChange={(open) => {
@@ -351,17 +356,23 @@ export function PlatformTenantsPage() {
             setStep(0);
             setCreatedId(null);
             setWizardError("");
+            setFieldErrors({});
           }
         }}
-        title={createdId ? "Tenant created" : "Add Tenant"}
-        description={createdId ? "The tenant has been added to the platform." : `Step ${step + 1} of 4 · ${wizardSteps[step].title}`}
-        widthClassName="max-w-2xl"
+        title={createdId ? "Tenant created" : "Create Tenant"}
+        description={createdId ? "The tenant is now available in Platform Admin, Tenant Admin, and the unified login." : `Step ${step + 1} of 4 | ${wizardSteps[step].title}`}
+        widthClassName="max-w-4xl"
         footer={
           createdId ? (
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setWizardOpen(false)}>Close</Button>
-              <Button asChild size="sm">
-                <Link to={paths.tenant(createdId)}>View tenant</Link>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setWizardOpen(false)}>
+                Close
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link to={paths.tenant(createdId)}>View Tenant</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link to={paths.tenantWorkspace(createdId)}>Open Tenant Admin Workspace</Link>
               </Button>
             </div>
           ) : (
@@ -369,13 +380,30 @@ export function PlatformTenantsPage() {
               <span className="text-[12px] text-slate-500">Step {step + 1} of 4</span>
               <div className="flex gap-2">
                 {step > 0 ? (
-                  <Button variant="ghost" size="sm" onClick={() => setStep((current) => current - 1)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setStep((current) => current - 1);
+                      setWizardError("");
+                    }}
+                  >
                     <ArrowLeft className="size-4" />
                     Back
                   </Button>
                 ) : null}
                 <Button size="sm" onClick={next}>
-                  {step === 3 ? (<><CheckCircle2 className="size-4" />Create Tenant</>) : (<>Continue<ArrowRight className="size-4" /></>)}
+                  {step === 3 ? (
+                    <>
+                      <CheckCircle2 className="size-4" />
+                      Create Tenant
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <ArrowRight className="size-4" />
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -385,68 +413,56 @@ export function PlatformTenantsPage() {
         {createdId ? (
           <CreatedSummary tenantName={form.name} />
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <Stepper steps={wizardSteps} current={step} />
             {wizardError ? (
               <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
                 {wizardError}
               </div>
             ) : null}
-            {step === 0 ? <StepBasics form={form} update={update} /> : null}
-            {step === 1 ? <StepAdmin form={form} update={update} /> : null}
-            {step === 2 ? <StepModules form={form} update={update} modules={activeModules} /> : null}
+            {step === 0 ? <StepBasics form={form} update={update} errors={fieldErrors} /> : null}
+            {step === 1 ? <StepAdmin form={form} update={update} errors={fieldErrors} /> : null}
+            {step === 2 ? <StepModules form={form} update={update} modules={wizardModules} errors={fieldErrors} /> : null}
             {step === 3 ? <StepReview form={form} modules={activeModules} /> : null}
           </div>
         )}
       </Dialog>
 
-      {/* Modules Edit Dialog */}
       <Dialog
         open={moduleEditTenant !== null}
         onOpenChange={(open) => {
           if (!open) setModuleEditTenantId(null);
         }}
         title={moduleEditTenant ? `Modules for ${moduleEditTenant.name}` : ""}
-        description="Toggle modules enabled for this tenant."
-        widthClassName="max-w-md"
+        description="Only active registered Optimile Admin business modules are available here."
+        widthClassName="max-w-2xl"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setModuleEditTenantId(null)}>Cancel</Button>
-            <Button size="sm" onClick={saveModuleEdit} disabled={moduleEditCodes.length === 0}>
+            <Button variant="outline" size="sm" onClick={() => setModuleEditTenantId(null)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={saveModuleEdit}>
               Save
             </Button>
           </div>
         }
       >
-        <div className="space-y-1.5">
-          {activeModules.map((module) => {
-            const display = displayModule(module);
+        <div className="grid gap-3 md:grid-cols-2">
+          {wizardModules.map((module) => {
             const checked = moduleEditCodes.includes(module.code);
             return (
-              <label
+              <ModuleCard
                 key={module.id}
-                className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 hover:bg-slate-50"
-              >
-                <div>
-                  <p className="text-[13px] font-medium text-slate-900">{display.name}</p>
-                  <p className="text-[11px] text-slate-500">{display.code}</p>
-                </div>
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={checked}
-                  onChange={() =>
-                    setModuleEditCodes((current) =>
-                      checked ? current.filter((code) => code !== module.code) : [...current, module.code],
-                    )
-                  }
-                />
-              </label>
+                module={module}
+                checked={checked}
+                onToggle={() =>
+                  setModuleEditCodes((current) =>
+                    toggleModuleCode(current, module.code, module.required),
+                  )
+                }
+              />
             );
           })}
-          {moduleEditCodes.length === 0 ? (
-            <p className="text-[11px] text-amber-700">Select at least one module.</p>
-          ) : null}
         </div>
       </Dialog>
     </div>
@@ -454,10 +470,10 @@ export function PlatformTenantsPage() {
 }
 
 const wizardSteps: { title: string; helper: string }[] = [
-  { title: "Basic Details", helper: "Name, code, type" },
-  { title: "Admin User", helper: "Primary admin contact" },
-  { title: "Modules", helper: "Enable modules" },
-  { title: "Review", helper: "Confirm & create" },
+  { title: "Basic Details", helper: "Basic tenant information" },
+  { title: "Tenant Admin User", helper: "Create the primary admin account" },
+  { title: "Modules", helper: "Enable active registered modules" },
+  { title: "Review", helper: "Confirm and create" },
 ];
 
 function Stepper({ steps, current }: { steps: { title: string; helper: string }[]; current: number }) {
@@ -481,11 +497,7 @@ function Stepper({ steps, current }: { steps: { title: string; helper: string }[
               >
                 {isComplete ? <CheckCircle2 className="size-3.5" /> : index + 1}
               </span>
-              <span
-                className={`hidden text-[12px] font-medium md:inline ${
-                  isCurrent ? "text-slate-900" : "text-slate-500"
-                }`}
-              >
+              <span className={`hidden text-[12px] font-medium md:inline ${isCurrent ? "text-slate-900" : "text-slate-500"}`}>
                 {step.title}
               </span>
             </div>
@@ -500,44 +512,42 @@ function Stepper({ steps, current }: { steps: { title: string; helper: string }[
 function StepBasics({
   form,
   update,
+  errors,
 }: {
   form: WizardForm;
-  update: <K extends keyof WizardForm>(key: K, value: WizardForm[K]) => void;
+  update: <K extends WizardField>(key: K, value: WizardForm[K]) => void;
+  errors: WizardErrors;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <Field label="Tenant Name">
+    <div className="grid gap-4 md:grid-cols-2">
+      <Field label="Tenant Name" required error={errors.name}>
         <Input value={form.name} onChange={(event) => update("name", event.target.value)} />
       </Field>
-      <Field label="Tenant Code">
-        <Input
-          value={form.code}
-          onChange={(event) => update("code", event.target.value.toUpperCase())}
-        />
+      <Field label="Tenant Code" required error={errors.code} helper="Must be unique across all tenants.">
+        <Input value={form.code} onChange={(event) => update("code", event.target.value.toUpperCase())} />
       </Field>
-      <Field label="Business Type">
-        <Select
-          value={form.businessType}
-          onChange={(event) => update("businessType", event.target.value as BusinessType)}
-        >
+      <Field label="Business Type" required error={errors.businessType}>
+        <Select value={form.businessType} onChange={(event) => update("businessType", event.target.value as BusinessType)}>
           {businessTypeOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
         </Select>
+        <p className="text-[11px] text-slate-500">
+          {businessTypeOptions.find((option) => option.value === form.businessType)?.helper}
+        </p>
       </Field>
-      <Field label="Country / Region">
-        <Input
-          value={form.region}
-          onChange={(event) => update("region", event.target.value)}
-          placeholder="e.g. India · APAC"
-        />
+      <Field label="Country / Region" required error={errors.region}>
+        <Input value={form.region} onChange={(event) => update("region", event.target.value)} placeholder="e.g. India" />
       </Field>
-      <Field label="Status" className="md:col-span-2">
-        <Select value={form.status} onChange={(event) => update("status", event.target.value as UiStatus)}>
-          <option value="onboarding">Onboarding</option>
-          <option value="active">Active</option>
+      <Field label="Default Timezone" required error={errors.defaultTimezone} className="md:col-span-2">
+        <Select value={form.defaultTimezone} onChange={(event) => update("defaultTimezone", event.target.value)}>
+          {defaultTimezoneOptions.map((timezone) => (
+            <option key={timezone} value={timezone}>
+              {timezone}
+            </option>
+          ))}
         </Select>
       </Field>
     </div>
@@ -547,26 +557,35 @@ function StepBasics({
 function StepAdmin({
   form,
   update,
+  errors,
 }: {
   form: WizardForm;
-  update: <K extends keyof WizardForm>(key: K, value: WizardForm[K]) => void;
+  update: <K extends WizardField>(key: K, value: WizardForm[K]) => void;
+  errors: WizardErrors;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <Field label="Admin Name">
+    <div className="grid gap-4 md:grid-cols-2">
+      <Field label="Tenant Admin Name" required error={errors.adminName}>
         <Input value={form.adminName} onChange={(event) => update("adminName", event.target.value)} />
       </Field>
-      <Field label="Admin Email">
+      <Field label="Tenant Admin Email" required error={errors.adminEmail}>
         <Input
           value={form.adminEmail}
           onChange={(event) => update("adminEmail", event.target.value)}
           placeholder="admin@company.com"
         />
       </Field>
-      <Field label="Phone (optional)" className="md:col-span-2">
-        <Input value={form.adminPhone} onChange={(event) => update("adminPhone", event.target.value)} />
+      <Field label="Phone Number" required error={errors.adminPhone} helper="10 digits only.">
+        <Input
+          value={form.adminPhone}
+          onChange={(event) => update("adminPhone", sanitizePhoneNumber(event.target.value))}
+          inputMode="numeric"
+          maxLength={10}
+          placeholder="9876543210"
+        />
       </Field>
-      <Field label="Password">
+      <div />
+      <Field label="Password" required error={errors.adminPassword}>
         <Input
           type="password"
           value={form.adminPassword}
@@ -574,32 +593,13 @@ function StepAdmin({
           placeholder="Minimum 6 characters"
         />
       </Field>
-      <Field label="Confirm Password">
+      <Field label="Confirm Password" required error={errors.adminPasswordConfirm}>
         <Input
           type="password"
           value={form.adminPasswordConfirm}
           onChange={(event) => update("adminPasswordConfirm", event.target.value)}
         />
       </Field>
-      <div className="md:col-span-2 space-y-2">
-        <p className="text-[12px] font-medium text-slate-700">Onboarding Method</p>
-        <div className="grid gap-2 md:grid-cols-2">
-          <RadioCard
-            icon={Send}
-            label="Invite Link"
-            helper="Email a link to set password."
-            selected={form.onboardingMode === "invite_link"}
-            onClick={() => update("onboardingMode", "invite_link")}
-          />
-          <RadioCard
-            icon={KeyRound}
-            label="Temporary Password"
-            helper="Generate a one-time password."
-            selected={form.onboardingMode === "temp_password"}
-            onClick={() => update("onboardingMode", "temp_password")}
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -608,45 +608,38 @@ function StepModules({
   form,
   update,
   modules,
+  errors,
 }: {
   form: WizardForm;
-  update: <K extends keyof WizardForm>(key: K, value: WizardForm[K]) => void;
-  modules: ReturnType<typeof usePlatformModules>["data"];
+  update: <K extends WizardField>(key: K, value: WizardForm[K]) => void;
+  modules: ModuleCardData[];
+  errors: WizardErrors;
 }) {
-  function toggle(code: string) {
-    update(
-      "enabledModuleCodes",
-      form.enabledModuleCodes.includes(code)
-        ? form.enabledModuleCodes.filter((item) => item !== code)
-        : [...form.enabledModuleCodes, code],
-    );
-  }
-
   return (
-    <div className="grid gap-2 md:grid-cols-2">
-      {modules.map((module) => {
-        const display = displayModule(module);
-        const checked = form.enabledModuleCodes.includes(module.code);
-        return (
-          <label
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-[12px] text-slate-600">
+        Only active registered business modules from the Optimile Admin module registry are shown here. Administration stays enabled for every tenant.
+      </div>
+      {errors.enabledModuleCodes ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+          {errors.enabledModuleCodes}
+        </div>
+      ) : null}
+      <div className="grid gap-3 md:grid-cols-2">
+        {modules.map((module) => (
+          <ModuleCard
             key={module.id}
-            className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 transition ${
-              checked ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
-            }`}
-          >
-            <div>
-              <p className="text-[13px] font-medium text-slate-900">{display.name}</p>
-              <p className="text-[11px] text-slate-500">{display.code}</p>
-            </div>
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              checked={checked}
-              onChange={() => toggle(module.code)}
-            />
-          </label>
-        );
-      })}
+            module={module}
+            checked={form.enabledModuleCodes.includes(module.code)}
+            onToggle={() =>
+              update(
+                "enabledModuleCodes",
+                toggleModuleCode(form.enabledModuleCodes, module.code, module.required),
+              )
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -658,21 +651,48 @@ function StepReview({
   form: WizardForm;
   modules: ReturnType<typeof usePlatformModules>["data"];
 }) {
-  const moduleNames = form.enabledModuleCodes
-    .map((code) => getModuleNameByCode(code, modules))
-    .join(", ");
-  const businessTypeLabel = businessTypeOptions.find((option) => option.value === form.businessType)?.label ?? "—";
+  const moduleNames = ensureRequiredModuleCodes(form.enabledModuleCodes).map((code) => getModuleNameByCode(code, modules));
+  const businessType = businessTypeOptions.find((option) => option.value === form.businessType)?.label ?? "-";
 
   return (
-    <div className="divide-y rounded-lg border bg-slate-50/40 text-[13px]">
-      <ReviewRow label="Tenant Name" value={form.name} />
-      <ReviewRow label="Tenant Code" value={form.code} />
-      <ReviewRow label="Business Type" value={businessTypeLabel} />
-      <ReviewRow label="Country / Region" value={form.region} />
-      <ReviewRow label="Status" value={form.status === "active" ? "Active" : "Onboarding"} />
-      <ReviewRow label="Admin" value={`${form.adminName} · ${form.adminEmail}`} />
-      <ReviewRow label="Admin Onboarding" value={form.onboardingMode === "invite_link" ? "Invite link" : "Temporary password"} />
-      <ReviewRow label="Modules" value={moduleNames} />
+    <div className="space-y-4">
+      <ReviewSection
+        title="Tenant Summary"
+        rows={[
+          ["Tenant Name", form.name],
+          ["Tenant Code", form.code],
+          ["Business Type", businessType],
+          ["Country / Region", form.region],
+          ["Default Timezone", form.defaultTimezone],
+        ]}
+      />
+      <ReviewSection
+        title="Tenant Admin"
+        rows={[
+          ["Tenant Admin Name", form.adminName],
+          ["Tenant Admin Email", form.adminEmail],
+          ["Phone Number", form.adminPhone],
+        ]}
+      />
+      <div className="rounded-xl border bg-slate-50/50 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[13px] font-semibold text-slate-900">Enabled Modules</h3>
+            <p className="mt-1 text-[12px] text-slate-500">Only active registered Optimile modules will be provisioned.</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {moduleNames.map((name) => (
+            <Badge key={name} variant={name === "Administration" ? "accent" : "secondary"}>
+              {name}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12px] text-emerald-800">
+        <p>Tenant Admin login will be available from the unified login page after creation.</p>
+        <p className="mt-1">The new tenant will also be visible in the Tenant Admin tenant selector immediately.</p>
+      </div>
     </div>
   );
 }
@@ -683,39 +703,59 @@ function CreatedSummary({ tenantName }: { tenantName: string }) {
       <CheckCircle2 className="mt-0.5 size-5 text-emerald-600" />
       <div>
         <p className="text-[13px] font-medium text-emerald-900">{tenantName} has been created.</p>
-        <p className="mt-1 text-[12px] text-emerald-800">You can view the tenant or close this dialog.</p>
+        <p className="mt-1 text-[12px] text-emerald-800">
+          The tenant is saved in the shared admin store and is ready in Platform Admin and Tenant Admin.
+        </p>
       </div>
     </div>
   );
 }
 
-function RadioCard({
-  icon: Icon,
-  label,
-  helper,
-  selected,
-  onClick,
+function ModuleCard({
+  module,
+  checked,
+  onToggle,
 }: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  helper: string;
-  selected: boolean;
-  onClick: () => void;
+  module: ModuleCardData;
+  checked: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition ${
-        selected ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
-      }`}
-    >
-      <Icon className="mt-0.5 size-4 text-slate-700" />
-      <div>
-        <p className="text-[13px] font-medium text-slate-900">{label}</p>
-        <p className="text-[11px] text-slate-500">{helper}</p>
+    <div className={`rounded-xl border p-4 transition ${checked ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[14px] font-semibold text-slate-900">{module.name}</p>
+            <Badge variant="neutral">{module.code}</Badge>
+            {module.required ? <Badge variant="accent">Required</Badge> : null}
+          </div>
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-600">{module.description}</p>
+        </div>
+        <label className="flex items-center gap-2 text-[12px] font-medium text-slate-700">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            checked={checked}
+            disabled={module.required}
+            onChange={onToggle}
+          />
+          Enabled
+        </label>
       </div>
-    </button>
+    </div>
+  );
+}
+
+function ReviewSection({ title, rows }: { title: string; rows: Array<[string, string]> }) {
+  return (
+    <div className="rounded-xl border bg-slate-50/50 p-4">
+      <h3 className="text-[13px] font-semibold text-slate-900">{title}</h3>
+      <div className="mt-3 divide-y rounded-lg border bg-white">
+        {rows.map(([label, value]) => (
+          <ReviewRow key={label} label={label} value={value} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -723,7 +763,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
       <span className="text-[12px] text-slate-500">{label}</span>
-      <span className="text-[13px] font-medium text-slate-900">{value || "—"}</span>
+      <span className="text-[13px] font-medium text-slate-900">{value || "-"}</span>
     </div>
   );
 }
@@ -732,15 +772,25 @@ function Field({
   label,
   children,
   className,
+  required,
+  helper,
+  error,
 }: {
   label: string;
   children: ReactNode;
   className?: string;
+  required?: boolean;
+  helper?: string;
+  error?: string;
 }) {
   return (
     <div className={`space-y-1.5 ${className ?? ""}`}>
-      <label className="text-[12px] font-medium text-slate-700">{label}</label>
+      <label className="text-[12px] font-medium text-slate-700">
+        {label}
+        {required ? <span className="ml-1 text-rose-600">*</span> : null}
+      </label>
       {children}
+      {error ? <p className="text-[11px] text-rose-600">{error}</p> : helper ? <p className="text-[11px] text-slate-500">{helper}</p> : null}
     </div>
   );
 }
@@ -789,9 +839,121 @@ function businessTypeLabel(tenant: { tenantType: string; customerPortalEnabled: 
   if (tenant.tenantType === "DIRECT_CUSTOMER") {
     return tenant.customerPortalEnabled ? "Fleet Management" : "Direct Enterprise";
   }
-  return "3PL";
+  return "3PL / Logistics Provider";
 }
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString();
+}
+
+function sanitizePhoneNumber(value: string) {
+  return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function ensureRequiredModuleCodes(moduleCodes: string[]) {
+  const unique = Array.from(new Set(moduleCodes));
+  return unique.includes(REQUIRED_MODULE_CODE) ? unique : [REQUIRED_MODULE_CODE, ...unique];
+}
+
+function toggleModuleCode(currentCodes: string[], moduleCode: string, required: boolean) {
+  if (required) return ensureRequiredModuleCodes(currentCodes);
+  const nextCodes = currentCodes.includes(moduleCode)
+    ? currentCodes.filter((code) => code !== moduleCode)
+    : [...currentCodes, moduleCode];
+  return ensureRequiredModuleCodes(nextCodes);
+}
+
+function getDefaultEnabledModuleCodes(
+  modules: Array<{ code: string; status: "active" | "inactive" }>,
+) {
+  const activeCodes = modules.filter((module) => module.status === "active").map((module) => module.code);
+  const defaults = [REQUIRED_MODULE_CODE];
+  if (activeCodes.includes(BOOKING_MODULE_CODE)) {
+    defaults.push(BOOKING_MODULE_CODE);
+  }
+  return ensureRequiredModuleCodes(defaults.filter((code) => activeCodes.includes(code) || code === REQUIRED_MODULE_CODE));
+}
+
+function buildWizardModules(modules: ReturnType<typeof usePlatformModules>["data"]): ModuleCardData[] {
+  return [...modules]
+    .sort((left, right) => moduleSortIndex(left.code) - moduleSortIndex(right.code) || left.name.localeCompare(right.name))
+    .map((module) => {
+      const display = displayModule(module);
+      return {
+        id: module.id,
+        code: module.code,
+        name: display.name,
+        description: module.description,
+        required: module.code === REQUIRED_MODULE_CODE,
+      };
+    });
+}
+
+function moduleSortIndex(code: string) {
+  const index = moduleOrder.indexOf(code);
+  return index === -1 ? moduleOrder.length + 1 : index;
+}
+
+function getStepErrors(step: number, form: WizardForm, tenants: Array<{ code: string }>) {
+  if (step === 0) return validateBasicDetails(form, tenants);
+  if (step === 1) return validateAdminDetails(form);
+  if (step === 2) return validateModuleSelection(form);
+  return {};
+}
+
+function getAllErrors(form: WizardForm, tenants: Array<{ code: string }>) {
+  return {
+    ...validateBasicDetails(form, tenants),
+    ...validateAdminDetails(form),
+    ...validateModuleSelection(form),
+  };
+}
+
+function validateBasicDetails(form: WizardForm, tenants: Array<{ code: string }>) {
+  const errors: WizardErrors = {};
+  if (form.name.trim().length < 2) errors.name = "Tenant name is required.";
+  const normalizedCode = form.code.trim().toUpperCase();
+  if (normalizedCode.length < 2) {
+    errors.code = "Tenant code is required.";
+  } else if (tenants.some((tenant) => tenant.code.trim().toUpperCase() === normalizedCode)) {
+    errors.code = "Tenant code must be unique.";
+  }
+  if (!form.businessType) errors.businessType = "Business type is required.";
+  if (form.region.trim().length < 2) errors.region = "Country / Region is required.";
+  if (!form.defaultTimezone.trim()) errors.defaultTimezone = "Default timezone is required.";
+  return errors;
+}
+
+function validateAdminDetails(form: WizardForm) {
+  const errors: WizardErrors = {};
+  if (form.adminName.trim().length < 2) errors.adminName = "Tenant admin name is required.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.adminEmail.trim())) {
+    errors.adminEmail = "Enter a valid tenant admin email.";
+  }
+  if (!/^\d{10}$/.test(form.adminPhone.trim())) {
+    errors.adminPhone = "Phone number must be exactly 10 digits.";
+  }
+  if (form.adminPassword.length < 6) {
+    errors.adminPassword = "Password must be at least 6 characters.";
+  }
+  if (form.adminPasswordConfirm !== form.adminPassword) {
+    errors.adminPasswordConfirm = "Confirm password must match password.";
+  }
+  return errors;
+}
+
+function validateModuleSelection(form: WizardForm) {
+  const errors: WizardErrors = {};
+  const enabledCodes = ensureRequiredModuleCodes(form.enabledModuleCodes);
+  if (enabledCodes.length === 0) {
+    errors.enabledModuleCodes = "Select at least one module.";
+  } else if (!enabledCodes.includes(REQUIRED_MODULE_CODE)) {
+    errors.enabledModuleCodes = "Administration must remain enabled.";
+  }
+  return errors;
+}
+
+function firstError(errors: WizardErrors) {
+  const firstKey = Object.keys(errors)[0] as WizardField | undefined;
+  return firstKey ? errors[firstKey] ?? "Please complete the form." : "Please complete the form.";
 }

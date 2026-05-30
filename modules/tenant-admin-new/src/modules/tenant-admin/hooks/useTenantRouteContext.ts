@@ -20,6 +20,7 @@ export function useTenantRouteContext() {
       code: "",
       region: "",
       industry: "",
+      defaultTimezone: "",
       planId: "",
       status: "trial" as const,
       tenantType: "DIRECT_CUSTOMER",

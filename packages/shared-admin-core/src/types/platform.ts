@@ -40,6 +40,7 @@ export interface TenantRecord {
   code: string;
   region: string;
   industry: string;
+  defaultTimezone?: string;
   planId: string;
   status: "active" | "trial" | "paused";
   tenantType: TenantType;
