@@ -23,6 +23,7 @@ import { TrackTraceAccessBoundary } from '@track-trace/components/TrackTraceAcce
 import { useTrackTraceAccess } from '@track-trace/hooks/useTrackTraceAccess'
 import { useTrackTraceRouting } from '@track-trace/hooks/useTrackTraceRouting'
 import { useTrackingStore } from '@track-trace/store/trackingStore'
+import { useTrackTraceEmbedded } from '@track-trace/app/embedded-context'
 import type { TrackTraceFeatureKey, TrackTracePageKey } from '@track-trace/types/access'
 import type { AlertSeverity } from '@track-trace/types/tracking.types'
 
@@ -299,6 +300,7 @@ export function TrackTraceLayout() {
   const { currentPage, scopedPath } = useTrackTraceRouting()
   const { canAccessPage, canUseFeature } = useTrackTraceAccess()
   const { logout, user } = useAuth()
+  const embedded = useTrackTraceEmbedded()
 
   const visibleSections = useMemo(
     () =>
@@ -324,6 +326,20 @@ export function TrackTraceLayout() {
 
   const toggleSection = (id: string) => {
     setCollapsedSections((current) => ({ ...current, [id]: !current[id] }))
+  }
+
+  // Embedded: host owns sidebar/header/auth chrome. Render just the page so
+  // the tenant shell shows a single navigation level, not two.
+  if (embedded) {
+    return (
+      <div className="bg-background text-text">
+        <main className="mx-auto w-full max-w-screen-2xl space-y-4 px-4 py-6 sm:px-6 lg:px-8">
+          <TrackTraceAccessBoundary page={currentPage}>
+            <Outlet />
+          </TrackTraceAccessBoundary>
+        </main>
+      </div>
+    )
   }
 
   return (

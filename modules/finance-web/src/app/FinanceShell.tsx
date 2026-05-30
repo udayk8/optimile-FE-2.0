@@ -4,10 +4,10 @@ import { Toast } from '@finance/components/primitives'
 import { MODES, NAV, PAGES, modeIds, type FinanceMode } from '@finance/modules/finance/nav'
 import { DisputesProvider } from '@finance/lib/disputesStore'
 
-// The full Finance application chrome — sidebar, mode switcher (aggregator /
-// own-fleet / enterprise) and grouped tab navigation — preserved verbatim from
-// the original standalone app. The host (root shell / tenant-admin) mounts this
-// whole component behind a single "Finance" entry, so finance keeps its own UX.
+// Standalone finance chrome — sidebar with mode switcher + grouped tab nav.
+// This component is now mounted ONLY in standalone (no embedded host); the
+// embedded path renders one page at a time without this shell so the host's
+// outer sidebar drives navigation. See FinanceModeRouter / FinanceEmbeddedPage.
 export default function FinanceShell() {
   const [mode, setMode] = useState<FinanceMode>('aggregator')
   const [active, setActive] = useState('dash')

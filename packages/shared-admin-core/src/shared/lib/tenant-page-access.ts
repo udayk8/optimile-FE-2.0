@@ -346,7 +346,7 @@ const allPageDefinitions: TenantPageDefinition[] = [
     label: "Finance Workspace",
     moduleCode: "FINANCE",
     description: "Finance workspace with invoice creation and review.",
-    routePatterns: ["/tenant/:tenantId/finance"],
+    routePatterns: ["/tenant/:tenantId/finance", "/tenant/:tenantId/finance/:pageId"],
     availableActions: ["VIEW", "VIEW_MARGIN", "GENERATE_INVOICE", "VIEW_INVOICE", "PRINT_INVOICE", "MARK_PAID", "RAISE_DISPUTE"],
     requiredPlatformModules: ["FINANCE"],
   },

@@ -34,7 +34,8 @@ import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-prof
 import { manifestSidebarToTenantChildren } from "@/embedded-module";
 import { vendorManifest } from "@vendor/app/manifest";
 import { auctionManifest } from "@auction/app/manifest";
-import { financeManifest } from "@finance/app/manifest";
+import { NAV as FINANCE_NAV, PAGES as FINANCE_PAGES } from "@finance/modules/finance/nav";
+import { resolveFinanceMode } from "@/modules/tenant-admin/lib/finance-mode";
 
 export function TenantLayout() {
   const location = useLocation();
@@ -182,13 +183,18 @@ export function TenantLayout() {
           label: "Track and Trace",
           icon: MapPin,
           to: `${paths.trackAndTrace}/dashboard`,
+          // Mirrors the actual pages under TrackingRoutes. "Active Trips" and
+          // "Analytics" were legacy labels that landed on redirect-only
+          // routes — replaced with their real destinations (Dispatch and
+          // Route Performance) so the tenant sidebar surfaces every section
+          // of the embedded track-and-trace app at one navigation level.
           children: [
-            { label: "Tracking Dashboard", featureCode: "TRACKING_DASHBOARD", to: `${paths.trackAndTrace}/dashboard`, icon: MapPin },
-            { label: "Active Trips", featureCode: "TRACKING_TRIPS", to: `${paths.trackAndTrace}/trips`, icon: Truck },
+            { label: "Dashboard", featureCode: "TRACKING_DASHBOARD", to: `${paths.trackAndTrace}/dashboard`, icon: MapPin },
             { label: "Live Map", featureCode: "TRACKING_LIVE_MAP", to: `${paths.trackAndTrace}/live-map`, icon: MapPin },
+            { label: "Dispatch", featureCode: "TRACKING_TRIPS", to: `${paths.trackAndTrace}/dispatch`, icon: Truck },
             { label: "Alerts", featureCode: "TRACKING_ALERTS", to: `${paths.trackAndTrace}/alerts`, icon: ShieldCheck },
             { label: "Geofences", featureCode: "TRACKING_GEOFENCES", to: `${paths.trackAndTrace}/geofences`, icon: MapPin },
-            { label: "Analytics", featureCode: "TRACKING_ANALYTICS", to: `${paths.trackAndTrace}/analytics`, icon: ShieldCheck },
+            { label: "Route Performance", featureCode: "TRACKING_ANALYTICS", to: `${paths.trackAndTrace}/route-performance`, icon: ShieldCheck },
           ],
         },
         {
@@ -236,20 +242,10 @@ export function TenantLayout() {
             { label: "Customer Dashboard", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: UserCog },
           ],
         },
-        {
-          moduleCode: "FINANCE",
-          label: "Finance",
-          icon: Landmark,
-          to: paths.finance,
-          children: manifestSidebarToTenantChildren(financeManifest, paths.finance).map(
-            (item) => ({
-              label: item.label,
-              featureCode: "FINANCE_DASHBOARD",
-              to: item.to,
-              icon: (item.icon ?? Landmark) as typeof Truck,
-            }),
-          ),
-        },
+        // Finance is intentionally NOT listed here — it renders as a flat
+        // top-level leaf (no nested children) so the tenant sidebar shows a
+        // single "Finance" entry that opens the variant-resolved finance
+        // workspace directly. See the leaf push below.
       ];
 
       portals.forEach((portal) => {
@@ -271,6 +267,45 @@ export function TenantLayout() {
           children: allowedChildren,
         });
       });
+
+      // Finance — variant-aware nested children. The embedded finance routes
+      // render one page at a time with no inner sidebar; the tenant sidebar
+      // owns navigation by mirroring NAV[mode] for the tenant's resolved
+      // finance variant (3PL / own-fleet / enterprise).
+      if (
+        enabled.has("FINANCE")
+        && hasPermission(activeRole, "FINANCE", "FINANCE_DASHBOARD", "view")
+      ) {
+        const financeMode = resolveFinanceMode(tenant.tenantType, tenant.customerPortalEnabled);
+        const financeChildren: ExplorerNavItem[] = FINANCE_NAV[financeMode].flatMap((grp) => {
+          const items = grp.items.map<ExplorerNavItem>((id) => {
+            const meta = FINANCE_PAGES[financeMode][id];
+            return {
+              label: meta.label,
+              icon: meta.icon as unknown as typeof Truck,
+              to: `${paths.finance}/${id}`,
+            };
+          });
+          // Top-level (un-grouped) items — like Command Centre — appear as
+          // direct children of Finance. Grouped items get a sub-folder header
+          // so the user keeps the original section structure.
+          if (grp.group === null) return items;
+          return [
+            {
+              label: grp.group,
+              icon: (items[0]?.icon ?? Landmark) as typeof Truck,
+              children: items,
+            },
+          ];
+        });
+        groups.push({
+          label: "Finance",
+          icon: Landmark,
+          to: paths.finance,
+          pageCode: "FINANCE_WORKSPACE",
+          children: financeChildren,
+        });
+      }
 
       return groups;
     })(),
