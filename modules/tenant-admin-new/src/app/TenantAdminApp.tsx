@@ -15,7 +15,9 @@ const TenantVendorsPage = lazy(() => import('../modules/tenant-admin/pages/vendo
 const TenantVendorDetailPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorDetailPage })))
 const TenantVendorOnboardingPage = lazy(() => import('../modules/tenant-admin/pages/vendors/tenant-vendors-pages').then((m) => ({ default: m.TenantVendorOnboardingPage })))
 const TenantDriversPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantDriversPage })))
+const TenantDriverOnboardingPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantDriverOnboardingPage })))
 const TenantVehiclesPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantVehiclesPage })))
+const TenantVehicleOnboardingPage = lazy(() => import('../modules/tenant-admin/pages/fleet/tenant-fleet-pages').then((m) => ({ default: m.TenantVehicleOnboardingPage })))
 const TenantVehicleTypesPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantVehicleTypesPage })))
 const TenantMaterialsPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantMaterialsPage })))
 const TenantUOMConfigurationPage = lazy(() => import('../modules/tenant-admin/pages/master-data/tenant-master-data-pages').then((m) => ({ default: m.TenantUOMConfigurationPage })))
@@ -159,7 +161,11 @@ function TenantAdminRoutes({
           <Route path="role-permissions" element={<TenantRolePermissionsPage />} />
           <Route path="vehicle-types" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantVehicleTypesPage /></PermissionGate>} />
           <Route path="vehicles" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantVehiclesPage /></PermissionGate>} />
+          <Route path="vehicles/new" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantVehicleOnboardingPage /></PermissionGate>} />
+          <Route path="vehicles/:tenantVehicleId/edit" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantVehicleOnboardingPage /></PermissionGate>} />
           <Route path="drivers" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantDriversPage /></PermissionGate>} />
+          <Route path="drivers/new" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantDriverOnboardingPage /></PermissionGate>} />
+          <Route path="drivers/:tenantDriverId/edit" element={<PermissionGate moduleCode="TMS" featureCode="VEHICLE_TYPES"><TenantDriverOnboardingPage /></PermissionGate>} />
           <Route path="materials" element={<PermissionGate moduleCode="TMS" featureCode="MATERIALS"><TenantMaterialsPage /></PermissionGate>} />
           <Route path="uom-config" element={<PermissionGate moduleCode="TMS" featureCode="UOM"><TenantUOMConfigurationPage /></PermissionGate>} />
           <Route path="lr-config" element={<PermissionGate moduleCode="TMS" featureCode="LR_CONFIGURATION"><TenantLRConfigPage /></PermissionGate>} />

@@ -1,6 +1,19 @@
 export type VehicleOwnershipType = "OWN" | "VENDOR";
 export type VehicleFuelType = "DIESEL" | "PETROL" | "CNG" | "LNG" | "ELECTRIC";
 export type DrugTestStatus = "CLEAR" | "PENDING" | "FAILED";
+export type VehicleOperationalStatus = "ACTIVE" | "UNDER_MAINTENANCE" | "INACTIVE";
+export type ComplianceStatus = "COMPLIANT" | "EXPIRING_SOON" | "EXPIRED" | "PENDING_DOCS";
+
+export interface FleetComplianceDocument {
+  id: string;
+  type: string;
+  referenceNo: string;
+  fileName: string;
+  fileUrl: string;
+  expiryDate: string;
+  status: "VALID" | "EXPIRING_SOON" | "EXPIRED";
+  uploadedAt: string;
+}
 
 export interface TenantVehicle {
   id: string;
@@ -31,6 +44,12 @@ export interface TenantVehicle {
     expiry: string;
   };
   odometer: string;
+  engineNumber?: string;
+  capacityKg?: string;
+  baseLocation?: string;
+  operationalStatus?: VehicleOperationalStatus;
+  complianceStatus?: ComplianceStatus;
+  complianceDocuments?: FleetComplianceDocument[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -63,6 +82,12 @@ export interface TenantVehicleInput {
     expiry: string;
   };
   odometer: string;
+  engineNumber?: string;
+  capacityKg?: string;
+  baseLocation?: string;
+  operationalStatus?: VehicleOperationalStatus;
+  complianceStatus?: ComplianceStatus;
+  complianceDocuments?: FleetComplianceDocument[];
   isActive: boolean;
 }
 
@@ -83,6 +108,15 @@ export interface TenantDriver {
   endorsements: string[];
   assignedVehicleId?: string | null;
   vendorId?: string | null;
+  email?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER" | "";
+  baseLocation?: string;
+  aadhaarMasked?: string;
+  licenseClasses?: string[];
+  currentStatus?: "ACTIVE" | "INACTIVE" | "BLOCKED";
+  complianceStatus?: ComplianceStatus;
+  complianceDocuments?: FleetComplianceDocument[];
+  mobile?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,5 +137,14 @@ export interface TenantDriverInput {
   endorsements: string[];
   assignedVehicleId?: string | null;
   vendorId?: string | null;
+  email?: string;
+  gender?: "MALE" | "FEMALE" | "OTHER" | "";
+  baseLocation?: string;
+  aadhaarMasked?: string;
+  licenseClasses?: string[];
+  currentStatus?: "ACTIVE" | "INACTIVE" | "BLOCKED";
+  complianceStatus?: ComplianceStatus;
+  complianceDocuments?: FleetComplianceDocument[];
+  mobile?: string;
   isActive: boolean;
 }

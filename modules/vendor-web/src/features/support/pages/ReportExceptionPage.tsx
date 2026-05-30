@@ -4,7 +4,8 @@ import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionIssueType, ExceptionSeverity } from '@vendor/types'
 import { AlertTriangle } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 
 const BOOKINGS = [
   { id: 'TRP-045', route: 'Mumbai → Satara', vehicle: 'MH-12-AB-4421', driver: 'Suresh Yadav' },

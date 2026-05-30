@@ -4,7 +4,8 @@ import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionStatus } from '@vendor/types'
 import { AlertTriangle, CheckCircle2, Clock, MessageSquare } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 
 const STATUS_OPTIONS: Array<{ value: ExceptionStatus; label: string }> = [
   { value: 'OPEN', label: 'Open' },

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { ArrowRight, Banknote, Search } from 'lucide-react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'

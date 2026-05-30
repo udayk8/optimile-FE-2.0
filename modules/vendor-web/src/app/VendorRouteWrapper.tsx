@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
 
 export function VendorRouteWrapper({ children }: { children: ReactNode }) {
