@@ -5,6 +5,7 @@ import {
   Boxes,
   Building2,
   Gavel,
+  Landmark,
   LayoutDashboard,
   MapPin,
   Plus,
@@ -33,6 +34,7 @@ import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-prof
 import { manifestSidebarToTenantChildren } from "@/embedded-module";
 import { vendorManifest } from "@vendor/app/manifest";
 import { auctionManifest } from "@auction/app/manifest";
+import { financeManifest } from "@finance/app/manifest";
 
 export function TenantLayout() {
   const location = useLocation();
@@ -233,6 +235,20 @@ export function TenantLayout() {
           children: [
             { label: "Customer Dashboard", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: UserCog },
           ],
+        },
+        {
+          moduleCode: "FINANCE",
+          label: "Finance",
+          icon: Landmark,
+          to: paths.finance,
+          children: manifestSidebarToTenantChildren(financeManifest, paths.finance).map(
+            (item) => ({
+              label: item.label,
+              featureCode: "FINANCE_DASHBOARD",
+              to: item.to,
+              icon: (item.icon ?? Landmark) as typeof Truck,
+            }),
+          ),
         },
       ];
 

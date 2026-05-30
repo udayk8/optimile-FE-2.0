@@ -7,14 +7,16 @@ import { ShellAppShell, type ModuleManifest } from '@shared-ui'
 import { vendorManifest } from '@vendor/app/manifest'
 import { auctionManifest } from '@auction/app/manifest'
 import { fleetManifest } from '@fleet/app/manifest'
+import { financeManifest } from '@finance/app/manifest'
 
-export const MODULES: ModuleManifest[] = [fleetManifest, auctionManifest, vendorManifest]
+export const MODULES: ModuleManifest[] = [fleetManifest, auctionManifest, vendorManifest, financeManifest]
 
 /** manifest.key → ERPModule code on user.modules */
 const MODULE_KEY_TO_ERP: Record<string, string> = {
   fleet: 'fleet',
   auction: 'ams',
   vendor: 'vendor',
+  finance: 'finance',
 }
 
 function filterModulesForUser(
