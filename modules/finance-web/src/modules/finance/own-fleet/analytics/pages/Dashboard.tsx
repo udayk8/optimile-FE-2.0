@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { CLIENTS, TRIPS, INVOICES, VENDOR_BILLS, AGING, POD_FUNNEL } from "@finance/data/mock";
-import EnterpriseCommandCenter from "@finance/modules/finance/analytics/pages/EnterpriseCommandCenter";
+import EnterpriseCommandCenter from "@finance/modules/finance/own-fleet/analytics/pages/EnterpriseCommandCenter";
 
 function Funnel() {
   const { tripsCompleted, podsReceived, invoicesGenerated } = POD_FUNNEL;

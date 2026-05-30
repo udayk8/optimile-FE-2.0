@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { TRIPS, PENDING_POD_DETAILS } from "@finance/data/mock";
-import { Trace } from "@finance/modules/finance/payables/pages/VendorMatch";
+import { Trace } from "@finance/modules/finance/enterprise/payables/pages/VendorMatch";
 import { exportCsv } from "@finance/lib/csv";
 
 const POD_REPORT_COLUMNS = [
