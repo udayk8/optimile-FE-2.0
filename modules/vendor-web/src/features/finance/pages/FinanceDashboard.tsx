@@ -1,6 +1,7 @@
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { ArrowRight, FileSpreadsheet, Wallet } from 'lucide-react'
 
 export default function FinanceDashboard() {

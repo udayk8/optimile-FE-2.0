@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { Clock, Package, Gavel, Truck, AlertTriangle, Home, CalendarClock } from 'lucide-react'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'

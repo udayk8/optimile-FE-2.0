@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'

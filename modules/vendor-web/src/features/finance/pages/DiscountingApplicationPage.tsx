@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { ChevronLeft, Mail, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@vendor/components/ui/button'

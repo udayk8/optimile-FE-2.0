@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { useAuthStore } from '@vendor/stores/auth.store'
 import { MOCK_VENDOR } from '@vendor/lib/mock-data'
 import { Button } from '@vendor/components/ui/button'

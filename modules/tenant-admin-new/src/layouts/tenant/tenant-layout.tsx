@@ -87,6 +87,8 @@ export function TenantLayout() {
         ? [
             { to: paths.customers, label: "Customers", icon: Users, pageCode: "CUSTOMERS", featureCode: "CUSTOMERS" },
             { to: paths.vendors, label: "Vendors", icon: Truck, pageCode: "VENDORS", featureCode: "VENDORS" },
+            { to: paths.vehicles, label: "Vehicles", icon: Truck, pageCode: "VEHICLES", featureCode: "VEHICLE_TYPES" },
+            { to: paths.drivers, label: "Drivers", icon: Users, pageCode: "DRIVERS", featureCode: "VEHICLE_TYPES" },
             { to: paths.vehicleTypes, label: "Vehicle Types", icon: Truck, pageCode: "VEHICLE_TYPES", featureCode: "VEHICLE_TYPES" },
             { to: paths.materials, label: "Materials", icon: Boxes, pageCode: "MATERIALS", featureCode: "MATERIALS" },
             { to: paths.uomConfig, label: "UOM", icon: Boxes, pageCode: "UOM_CONFIG", featureCode: "UOM" },

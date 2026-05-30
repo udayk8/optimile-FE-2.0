@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'

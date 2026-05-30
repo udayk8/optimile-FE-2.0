@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { Card, CardContent, CardHeader, CardTitle } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'

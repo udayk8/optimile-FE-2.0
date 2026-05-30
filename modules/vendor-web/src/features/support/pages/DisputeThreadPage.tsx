@@ -1,6 +1,7 @@
 import { Button } from '@vendor/components/ui/button'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { CheckCircle2, XCircle, Clock, ArrowLeft } from 'lucide-react'
 import { useAppStore } from '@vendor/stores/app.store'
 import type { DisputeStatus } from '@vendor/types'

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
 import { CheckCircle2, Lock, Upload } from 'lucide-react'
