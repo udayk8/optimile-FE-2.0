@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Toast } from '@finance/components/primitives'
 import { PAGES, modeIds, type FinanceMode } from '@finance/modules/finance/nav'
 import { DisputesProvider } from '@finance/lib/disputesStore'
@@ -17,6 +18,10 @@ export default function FinanceEmbeddedPage({
 }) {
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const toast = (m: string) => setToastMsg(m)
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  // Navigate to a sibling finance page by id: …/finance/<current> → …/finance/<id>
+  const onNavigate = (id: string) => navigate(pathname.replace(/\/[^/]+$/, '/' + id))
 
   const ids = modeIds(mode)
   const resolvedId = ids.includes(pageId) ? pageId : 'dash'
@@ -30,7 +35,7 @@ export default function FinanceEmbeddedPage({
         style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
       >
         <div key={mode + resolvedId} className="animate-[fadeUp_.4s_ease]">
-          <Comp mode={mode} toast={toast} />
+          <Comp mode={mode} toast={toast} onNavigate={onNavigate} />
         </div>
         {toastMsg && <Toast msg={toastMsg} onClose={() => setToastMsg(null)} />}
       </div>

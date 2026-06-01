@@ -854,7 +854,7 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-17', to: '2026-05-19' },
-    paymentDueDate: '2026-06-18', status: 'SUBMITTED',
+    paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
       tripId: 'TRP-049', tripReference: 'TRP-049', freightCharge: 74000,
       expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
@@ -865,7 +865,7 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
-    paymentDueDate: '2026-06-17', status: 'REJECTED',
+    paymentDueDate: '2026-06-17', status: 'DISPUTED',
     lineItems: [{
       tripId: 'TRP-050', tripReference: 'TRP-050', freightCharge: 58000,
       expenses: [
@@ -874,14 +874,38 @@ export const MOCK_INVOICES: Invoice[] = [
       ],
       lineTotal: 62500,
     }],
-    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['TRP-050'], notes: 'POD missing for TRP-050 and expense amounts need correction', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['TRP-050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
-    paymentDueDate: '2026-06-16', status: 'CANCELLED',
+    paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
     lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
-    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['TRP-051'], notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
+    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['TRP-051'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
+  },
+  {
+    // CLOSED — finance rejected the invoice outright.
+    id: 'INV-2026-009', invoiceNumber: 'INV-2026-009', invoiceDate: '2026-05-16', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-12', to: '2026-05-16' },
+    paymentDueDate: '2026-06-15', status: 'CLOSED', closeReason: 'REJECTED',
+    lineItems: [{ tripId: 'TRP-052', tripReference: 'TRP-052', freightCharge: 39000, expenses: [], lineTotal: 39000 }],
+    subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['TRP-052'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
+  },
+  {
+    // CLOSED — superseded by INV-2026-011 after a resubmission.
+    id: 'INV-2026-010', invoiceNumber: 'INV-2026-010', invoiceDate: '2026-05-14', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
+    paymentDueDate: '2026-06-13', status: 'CLOSED', closeReason: 'SUPERSEDED', supersededByInvoiceId: 'INV-2026-011',
+    lineItems: [{ tripId: 'TRP-053', tripReference: 'TRP-053', freightCharge: 61000, expenses: [], lineTotal: 61000 }],
+    subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['TRP-053'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
+  },
+  {
+    // PENDING — the corrected invoice that replaced INV-2026-010.
+    id: 'INV-2026-011', invoiceNumber: 'INV-2026-011', invoiceDate: '2026-05-20', vendorGstin: '29AABCF1234M1ZP',
+    customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
+    paymentDueDate: '2026-06-19', status: 'PENDING', supersedesInvoiceId: 'INV-2026-010',
+    lineItems: [{ tripId: 'TRP-053', tripReference: 'TRP-053', freightCharge: 59000, expenses: [], lineTotal: 59000 }],
+    subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['TRP-053'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
   }
 ]
 
@@ -918,13 +942,47 @@ export const MOCK_BANK: BankDetails = {
 export const MOCK_DISPUTES: import('../types').Dispute[] = [
   {
     id: 'DSP-2026-001',
-    invoiceId: 'INV-2026-027',
-    invoiceNumber: 'INV-2026-027',
-    invoiceAmount: 37524,
-    reason: 'Invoice rejected without valid reason. POD was submitted within SLA window.',
-    status: 'CANCELLED',
-    raisedAt: '2026-04-03T10:00:00Z',
-    updatedAt: '2026-04-07T09:30:00Z',
-    notes: 'Dispute cancelled by admin — expense amounts need to be corrected and resubmitted.',
+    invoiceId: 'INV-2026-007',
+    invoiceNumber: 'INV-2026-007',
+    invoiceAmount: 70000,
+    reason: 'Detention and loading charges do not match the approved rate card for TRP-050.',
+    status: 'OPEN',
+    raisedAt: '2026-05-19T10:00:00Z',
+    updatedAt: '2026-05-19T10:00:00Z',
+    responseDueAt: '2026-05-21T10:00:00Z',
+    messages: [
+      {
+        id: 'dmsg-seed-1',
+        sender: 'FINANCE',
+        message: 'Detention and loading charges do not match the approved rate card for TRP-050.',
+        createdAt: '2026-05-19T10:00:00Z',
+      },
+    ],
+  },
+  {
+    id: 'DSP-2026-002',
+    invoiceId: 'INV-2026-008',
+    invoiceNumber: 'INV-2026-008',
+    invoiceAmount: 52640,
+    reason: 'Invoice needs correction and resubmission as per finance review.',
+    status: 'CLOSED',
+    raisedAt: '2026-05-18T09:00:00Z',
+    updatedAt: '2026-05-18T14:30:00Z',
+    notes: 'Please correct the invoice reference and resubmit.',
+    responseDueAt: '2026-05-20T09:00:00Z',
+    messages: [
+      {
+        id: 'dmsg-seed-2',
+        sender: 'FINANCE',
+        message: 'Invoice number conflicts with an earlier submission. Please correct and resubmit.',
+        createdAt: '2026-05-18T09:00:00Z',
+      },
+      {
+        id: 'dmsg-seed-3',
+        sender: 'VENDOR',
+        message: 'Accepted. We will correct the invoice and resubmit.',
+        createdAt: '2026-05-18T14:30:00Z',
+      },
+    ],
   },
 ]

@@ -33,7 +33,7 @@ export default function BillDiscountingPage() {
 
   const rows = useMemo(() => {
     return invoices
-      .filter((inv) => ['APPROVED', 'PAID', 'SUBMITTED'].includes(inv.status) || inv.nbfcDiscountingStatus)
+      .filter((inv) => ['APPROVED', 'PENDING'].includes(inv.status) || inv.nbfcDiscountingStatus)
       .map((inv) => {
         const app = nbfcApplications.find((a) => a.invoiceId === inv.id)
         const status: DiscountingStatus = app?.status ?? (inv.nbfcDiscountingStatus as DiscountingStatus) ?? 'ELIGIBLE'

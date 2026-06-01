@@ -105,7 +105,7 @@ export default function FinanceShell() {
 
         <main className="flex-1 overflow-y-auto px-8 py-7">
           <div key={mode + active} className="animate-[fadeUp_.4s_ease]">
-            <Comp mode={mode} toast={toast} />
+            <Comp mode={mode} toast={toast} onNavigate={(id: string) => setActive(id)} />
           </div>
         </main>
       </div>
