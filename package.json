@@ -15,6 +15,7 @@
     "dev:fleet:standalone": "npm run dev -w @optimile/fleet-web",
     "dev:customer:standalone": "npm run dev -w @optimile/customer-web",
     "dev:console:standalone": "npm run dev -w @optimile/console-web",
+    "dev:tms:standalone": "vite --config modules/tms/vite.config.ts",
     "build": "npm run build -w @optimile/shared-utils && npm run build -w @optimile/shared-auth && npm run build -w @optimile/shared-ui && npm run build -w @optimile/shared-api && vite build && npm run build -w @optimile/auction-portal-web && npm run build -w @optimile/vendor-portal-web && npm run build -w @optimile/customer-web && npm run build -w @optimile/fleet-web && npm run build -w @optimile/console-web"
   },
   "dependencies": {
@@ -29,7 +30,9 @@
     "@vitejs/plugin-react": "^4.3.0",
     "exceljs": "^4.4.0",
     "i18next": "^26.0.10",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
+    "pdfjs-dist": "^5.7.284",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^17.0.7",

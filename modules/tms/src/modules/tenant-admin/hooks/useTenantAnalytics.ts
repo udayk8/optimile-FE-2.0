@@ -17,8 +17,9 @@ export function useTenantAnalytics(query: TemplatedAnalyticsQuery) {
 
   return useMemo(() => {
     const scope: AnalyticsScope = {
-      portal: 'tenant-admin',
+      portal: 'tms-booking',
       tenantId,
+      allowedModuleCodes: ['TMS'],
     }
 
     return runReportingV1(

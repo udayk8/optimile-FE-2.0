@@ -13,6 +13,8 @@ export function useBookingPaths() {
   return {
     root,
     tenantAdminRoot,
+    dashboard: `${root}/dashboard`,
+    reports: `${root}/reports`,
     bookings: `${root}/bookings`,
     booking: (id: string) => `${root}/bookings/${id}`,
     bookingEdit: (id: string) => `${root}/bookings/${id}/edit`,

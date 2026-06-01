@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { CirclePlus, ClipboardList, FileDigit, Truck, Waypoints } from "lucide-react";
+import { BarChart3, CirclePlus, ClipboardList, FileDigit, FileSearch, Truck, Waypoints } from "lucide-react";
 import { WorkspaceShell } from "../shared/workspace-shell";
 import { useTenantRouteContext } from "../../hooks/useTenantRouteContext";
 import { useBookingPaths } from "../../hooks/useBookingPaths";
@@ -13,6 +13,8 @@ export function BookingLayout() {
   const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
 
   const bookingNav = [
+    { to: paths.dashboard, label: "Operations Dashboard", icon: BarChart3, matchMode: "exact" as const },
+    { to: paths.reports, label: "Reports", icon: FileSearch, matchMode: "exact" as const },
     ...(canCreateBooking
       ? [{ to: paths.createBooking, label: "Create Booking", icon: CirclePlus, matchMode: "exact" as const }]
       : []),

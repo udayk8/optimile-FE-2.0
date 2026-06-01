@@ -12,6 +12,8 @@ import { LiveTrackingPlaceholderPage, PODCompletedPage } from '../modules/tms/bo
 import { BookingDetailsPage } from '../modules/tms/booking/BookingDetails'
 import { BookingDocumentsPage } from '../modules/tms/booking/BookingDocumentsPage'
 import { BookingLRViewPage } from '../modules/tms/booking/BookingLRView'
+import { OperationsDashboardPage } from '../modules/tms/reporting/pages/operations-dashboard-page'
+import { OperationsReportsPage } from '../modules/tms/reporting/pages/operations-reports-page'
 
 function TmsBookingRoutes() {
   return (
@@ -29,6 +31,8 @@ function TmsBookingRoutes() {
       >
         <Route index element={<Navigate to="tenant/tenant-northstar/bookings" replace />} />
         <Route path="tenant/:tenantId" element={<BookingLayout />}>
+          <Route path="dashboard" element={<OperationsDashboardPage />} />
+          <Route path="reports" element={<OperationsReportsPage />} />
           <Route path="bookings" element={<BookingListPage />} />
           <Route path="bookings/create" element={<CreateBookingPage />} />
           <Route path="bookings/rate-approval" element={<RateApprovalQueuePage />} />
