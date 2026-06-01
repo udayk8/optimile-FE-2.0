@@ -65,12 +65,31 @@ export interface PlatformAuditEvent {
   result: "success" | "warning" | "denied";
 }
 
+/**
+ * How a tenant-workspace session was established.
+ *  - INTERNAL: a tenant employee (Users module) — role/permission driven.
+ *  - VENDOR / CUSTOMER: an external party signed in from tenant master data
+ *    (Admin → Vendors / Admin → Customers) via phone + OTP. These sessions are
+ *    NOT backed by a tenant user/role and only ever see their own portal.
+ */
+export type PortalLoginType = "INTERNAL" | "VENDOR" | "CUSTOMER";
+
 export interface SessionContext {
   actorType: "platform_admin" | "tenant_admin";
   tenantId?: string;
   actorName: string;
   previewTenantRoleId?: string | null;
   activeTenantOrgUnitId?: string | null;
+  // External-party (vendor/customer) portal login. Absent/"INTERNAL" for the
+  // existing platform-admin and tenant-employee sessions, so all current
+  // behaviour is unchanged.
+  loginType?: PortalLoginType;
+  vendorId?: string;
+  vendorName?: string;
+  customerId?: string;
+  customerName?: string;
+  phone?: string;
+  module?: "VENDOR" | "CUSTOMER";
 }
 
 export interface PlatformSettings {

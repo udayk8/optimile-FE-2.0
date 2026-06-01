@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useFleetData } from '@vendor/integration/useFleetData'
 import { FileCheck, Upload, X, AlertTriangle } from 'lucide-react'
 import type { ComplianceDocument, ComplianceStatus, Driver } from '@vendor/types'
 
@@ -111,7 +111,7 @@ const STATUS_LABELS: Record<ComplianceStatus, string> = {
 }
 
 export function AddDriverModal({ isOpen, onClose, initialDriver }: AddDriverModalProps) {
-  const { addDriver, updateDriver } = useAppStore()
+  const { addDriver, updateDriver } = useFleetData()
   const isEditMode = !!initialDriver
   const [form, setForm] = useState<DriverFormState>(DEFAULT_FORM)
   const [docs, setDocs] = useState<DriverDocs>(DEFAULT_DOCS)

@@ -10,6 +10,8 @@ import { pickTenantLandingPath } from "@/modules/tenant-admin/lib/tenant-landing
 import { storageKeys, writeStoredValue } from "@/shared/lib/storage/browser-storage";
 import { Button } from "@/shared/components/ui/button";
 import type { UserRecord } from "@/types/access";
+import type { TenantVendor } from "@/types/vendor";
+import type { TenantCustomer } from "@/types/customer";
 
 // Demo-only gate credential. Both cards authenticate the host AuthProvider with
 // the platform-admin demo user — RouteGuard bridges platform-admin -> tenant-admin,
@@ -19,6 +21,10 @@ const PLATFORM_ADMIN_DEMO_EMAIL = "platform-admin@optimile.com";
 const DEMO_PASSWORD = "testing";
 const TENANT_ADMIN_SESSION_KEY = "optimile.tenantAdmin.session";
 const ROLE_PERMISSION_MATRIX_KEY = "optimile.tenant.rolePermissionMatrix";
+// Prototype OTP for vendor/customer (external party) logins.
+const PROTOTYPE_OTP = "0000";
+
+type LoginType = "INTERNAL" | "VENDOR" | "CUSTOMER";
 
 export default function UnifiedLoginPage() {
   return (
@@ -41,17 +47,42 @@ function loadPermissionsForRole(roleId: string) {
   }
 }
 
+function vendorPhone(vendor: TenantVendor): string {
+  return vendor.phone ?? vendor.contactNumber ?? "";
+}
+
+function customerPhone(customer: TenantCustomer): string {
+  return (
+    customer.primaryContactPhone ??
+    customer.accountsContactPhone ??
+    customer.logisticsContactPhone ??
+    ""
+  );
+}
+
 function UnifiedLoginInner() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { login } = useAuth();
   const { setSession } = useSessionContext();
   const { data: tenants } = useTenants();
-  const { listTenantUsers, listTenantRoles, listTenantOrgUnits, getTenantPrimaryAdminUser } = useMockStore();
+  const {
+    listTenantUsers,
+    listTenantRoles,
+    listTenantOrgUnits,
+    getTenantPrimaryAdminUser,
+    listTenantVendors,
+    listTenantCustomers,
+  } = useMockStore();
 
   const presetTenantId = params.get("tenantId") ?? "";
   const [selectedTenantId, setSelectedTenantId] = useState(presetTenantId);
+  const [loginType, setLoginType] = useState<LoginType>("INTERNAL");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedVendorId, setSelectedVendorId] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,6 +97,8 @@ function UnifiedLoginInner() {
   const tenantUsers = selectedTenant ? listTenantUsers(selectedTenant.id) : [];
   const tenantRoles = selectedTenant ? listTenantRoles(selectedTenant.id) : [];
   const tenantOrgUnits = selectedTenant ? listTenantOrgUnits(selectedTenant.id) : [];
+  const tenantVendors = selectedTenant ? listTenantVendors(selectedTenant.id) : [];
+  const tenantCustomers = selectedTenant ? listTenantCustomers(selectedTenant.id) : [];
 
   const ownerUser = useMemo<UserRecord | null>(() => {
     if (!selectedTenant) return null;
@@ -99,11 +132,32 @@ function UnifiedLoginInner() {
       }));
   }, [ownerUser, selectedTenant, tenantRoles, tenantUsers]);
 
-  // Default the user picker to the tenant owner whenever the tenant changes.
+  // Default the internal user picker to the tenant owner whenever the tenant changes.
   useEffect(() => {
     setSelectedUserId(ownerUser?.id ?? "");
     setError("");
   }, [selectedTenant?.id, ownerUser?.id]);
+
+  // Reset the external-party (vendor/customer) selections whenever the tenant or
+  // login type changes — the dropdowns are scoped to one tenant + one party type.
+  useEffect(() => {
+    setSelectedVendorId("");
+    setSelectedCustomerId("");
+    setPhone("");
+    setOtp("");
+    setError("");
+  }, [selectedTenant?.id, loginType]);
+
+  const selectedVendor = tenantVendors.find((vendor) => vendor.id === selectedVendorId) ?? null;
+  const selectedCustomer = tenantCustomers.find((customer) => customer.id === selectedCustomerId) ?? null;
+
+  // Auto-fill the phone field from master data when a party is picked (editable).
+  useEffect(() => {
+    if (selectedVendor) setPhone(vendorPhone(selectedVendor));
+  }, [selectedVendorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (selectedCustomer) setPhone(customerPhone(selectedCustomer));
+  }, [selectedCustomerId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function enterPlatformAdmin() {
     setBusy(true);
@@ -130,8 +184,8 @@ function UnifiedLoginInner() {
     }
   }
 
-  async function enterTenant(event: React.FormEvent) {
-    event.preventDefault();
+  // Internal tenant employee — unchanged role/module driven behaviour.
+  async function enterInternalUser() {
     if (!selectedTenant) {
       setError("Select a tenant to continue.");
       return;
@@ -165,6 +219,7 @@ function UnifiedLoginInner() {
         actorName: user.email,
         previewTenantRoleId: null,
         activeTenantOrgUnitId: user.orgUnitIds[0] ?? null,
+        loginType: "INTERNAL" as const,
       };
       // Persist synchronously so the tenant app's fresh SessionProvider hydrates it.
       writeStoredValue(storageKeys.sessionContext, session);
@@ -196,7 +251,95 @@ function UnifiedLoginInner() {
     }
   }
 
+  // Vendor / Customer — external party from tenant master data, phone + OTP.
+  async function enterExternalParty(type: "VENDOR" | "CUSTOMER") {
+    if (!selectedTenant) {
+      setError("Select a tenant to continue.");
+      return;
+    }
+    if (otp.trim() !== PROTOTYPE_OTP) {
+      setError(`Enter the prototype OTP (${PROTOTYPE_OTP}) to continue.`);
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      // The vendor/customer portals are mounted inside the tenant app, which is
+      // gated by the host AuthProvider — bridge it with the demo gate credential.
+      await login(PLATFORM_ADMIN_DEMO_EMAIL, DEMO_PASSWORD);
+
+      if (type === "VENDOR") {
+        if (!selectedVendor) {
+          setError("Select a vendor to continue.");
+          setBusy(false);
+          return;
+        }
+        const session = {
+          actorType: "tenant_admin" as const,
+          tenantId: selectedTenant.id,
+          actorName: selectedVendor.name,
+          previewTenantRoleId: null,
+          activeTenantOrgUnitId: null,
+          loginType: "VENDOR" as const,
+          vendorId: selectedVendor.id,
+          vendorName: selectedVendor.name,
+          phone: phone.trim(),
+          module: "VENDOR" as const,
+        };
+        writeStoredValue(storageKeys.sessionContext, session);
+        setSession(session);
+        navigate(`/tenant-admin/tenant/${selectedTenant.id}/vendor-portal`);
+        return;
+      }
+
+      if (!selectedCustomer) {
+        setError("Select a customer to continue.");
+        setBusy(false);
+        return;
+      }
+      const session = {
+        actorType: "tenant_admin" as const,
+        tenantId: selectedTenant.id,
+        actorName: selectedCustomer.name,
+        previewTenantRoleId: null,
+        activeTenantOrgUnitId: null,
+        loginType: "CUSTOMER" as const,
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        phone: phone.trim(),
+        module: "CUSTOMER" as const,
+      };
+      writeStoredValue(storageKeys.sessionContext, session);
+      setSession(session);
+      navigate(`/tenant-admin/tenant/${selectedTenant.id}/customer-portal`);
+    } catch {
+      setError(`Unable to sign in to the ${type === "VENDOR" ? "vendor" : "customer"} portal.`);
+      setBusy(false);
+    }
+  }
+
+  function handleTenantSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (loginType === "INTERNAL") {
+      void enterInternalUser();
+    } else {
+      void enterExternalParty(loginType);
+    }
+  }
+
   const selectedUser = loginUsers.find((user) => user.id === selectedUserId) ?? null;
+
+  const continueDisabled =
+    busy ||
+    !selectedTenant ||
+    (loginType === "INTERNAL" && !selectedUserId) ||
+    (loginType === "VENDOR" && (!selectedVendorId || otp.trim() !== PROTOTYPE_OTP)) ||
+    (loginType === "CUSTOMER" && (!selectedCustomerId || otp.trim() !== PROTOTYPE_OTP));
+
+  const inputClass =
+    "h-11 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 text-[13px] text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/30 disabled:text-slate-500 [&_option]:bg-slate-900 [&_option]:text-slate-100";
+  const labelClass = "text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400";
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950">
@@ -257,7 +400,7 @@ function UnifiedLoginInner() {
             </div>
           </section>
 
-          {/* SECTION 2 — Tenant Admin */}
+          {/* SECTION 2 — Tenant Workspace (internal users, vendors & customers) */}
           <section className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-7 shadow-2xl backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-indigo-400/40 hover:bg-white/[0.06]">
             <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
             <div className="flex items-center gap-3.5">
@@ -265,18 +408,19 @@ function UnifiedLoginInner() {
                 <Building2 className="size-6" />
               </div>
               <div>
-                <h2 className="text-[16px] font-semibold text-white">Tenant Admin</h2>
-                <p className="text-[12px] text-slate-400">Sign in to a tenant workspace</p>
+                <h2 className="text-[16px] font-semibold text-white">Tenant Workspace</h2>
+                <p className="text-[12px] text-slate-400">Internal users, vendors &amp; customers</p>
               </div>
             </div>
 
-            <form className="mt-5 flex flex-1 flex-col gap-4" onSubmit={enterTenant}>
+            <form className="mt-5 flex flex-1 flex-col gap-4" onSubmit={handleTenantSubmit}>
+              {/* Step 1 — Tenant */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Select Tenant</label>
+                <label className={labelClass}>Select Tenant</label>
                 <select
                   value={selectedTenantId}
                   onChange={(event) => setSelectedTenantId(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 text-[13px] text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 [&_option]:bg-slate-900 [&_option]:text-slate-100"
+                  className={inputClass}
                 >
                   <option value="">— Choose a tenant —</option>
                   {tenants.map((tenant) => (
@@ -287,47 +431,95 @@ function UnifiedLoginInner() {
                 </select>
               </div>
 
+              {/* Step 2 — Login type */}
               <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Select User</label>
+                <label className={labelClass}>Login As</label>
                 <select
-                  value={selectedUserId}
-                  onChange={(event) => setSelectedUserId(event.target.value)}
-                  disabled={!selectedTenant || loginUsers.length === 0}
-                  className="h-11 w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 text-[13px] text-slate-100 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 disabled:cursor-not-allowed disabled:bg-slate-900/30 disabled:text-slate-500 [&_option]:bg-slate-900 [&_option]:text-slate-100"
+                  value={loginType}
+                  onChange={(event) => setLoginType(event.target.value as LoginType)}
+                  disabled={!selectedTenant}
+                  className={inputClass}
                 >
-                  {!selectedTenant ? (
-                    <option value="">Select a tenant first</option>
-                  ) : loginUsers.length === 0 ? (
-                    <option value="">No users for this tenant</option>
-                  ) : (
-                    loginUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.name} — {user.isOwner ? "Tenant Admin" : user.roleName}
-                      </option>
-                    ))
-                  )}
+                  <option value="INTERNAL">Internal User</option>
+                  <option value="VENDOR">Vendor</option>
+                  <option value="CUSTOMER">Customer</option>
                 </select>
               </div>
 
-              {selectedUser ? (
-                <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white ring-1 ring-white/20">
-                    <UserRound className="size-4" />
+              {/* Step 3/4 — Dynamic selector + authentication */}
+              {loginType === "INTERNAL" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <label className={labelClass}>Select User</label>
+                    <select
+                      value={selectedUserId}
+                      onChange={(event) => setSelectedUserId(event.target.value)}
+                      disabled={!selectedTenant || loginUsers.length === 0}
+                      className={inputClass}
+                    >
+                      {!selectedTenant ? (
+                        <option value="">Select a tenant first</option>
+                      ) : loginUsers.length === 0 ? (
+                        <option value="">No users for this tenant</option>
+                      ) : (
+                        loginUsers.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} — {user.isOwner ? "Tenant Admin" : user.roleName}
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[12.5px] font-medium text-slate-100">{selectedUser.email}</p>
-                    <p className="text-[11px] text-slate-400">
-                      {selectedUser.isOwner ? "Tenant Admin" : selectedUser.roleName}
-                    </p>
-                  </div>
-                </div>
-              ) : null}
+
+                  {selectedUser ? (
+                    <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                      <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-white ring-1 ring-white/20">
+                        <UserRound className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[12.5px] font-medium text-slate-100">{selectedUser.email}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {selectedUser.isOwner ? "Tenant Admin" : selectedUser.roleName}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : loginType === "VENDOR" ? (
+                <ExternalPartyFields
+                  kind="VENDOR"
+                  hasTenant={Boolean(selectedTenant)}
+                  options={tenantVendors.map((vendor) => ({ id: vendor.id, name: vendor.name }))}
+                  selectedId={selectedVendorId}
+                  onSelect={setSelectedVendorId}
+                  phone={phone}
+                  onPhoneChange={setPhone}
+                  otp={otp}
+                  onOtpChange={setOtp}
+                  inputClass={inputClass}
+                  labelClass={labelClass}
+                />
+              ) : (
+                <ExternalPartyFields
+                  kind="CUSTOMER"
+                  hasTenant={Boolean(selectedTenant)}
+                  options={tenantCustomers.map((customer) => ({ id: customer.id, name: customer.name }))}
+                  selectedId={selectedCustomerId}
+                  onSelect={setSelectedCustomerId}
+                  phone={phone}
+                  onPhoneChange={setPhone}
+                  otp={otp}
+                  onOtpChange={setOtp}
+                  inputClass={inputClass}
+                  labelClass={labelClass}
+                />
+              )}
 
               <div className="mt-auto">
                 <Button
                   type="submit"
                   className="h-11 w-full border-0 bg-gradient-to-r from-indigo-500 to-violet-500 text-[13px] font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-50"
-                  disabled={busy || !selectedTenant || !selectedUserId}
+                  disabled={continueDisabled}
                 >
                   <LogIn className="size-4" />
                   Continue
@@ -345,9 +537,99 @@ function UnifiedLoginInner() {
         ) : null}
 
         <p className="mx-auto max-w-md text-center text-[11px] leading-relaxed text-slate-500">
-          Demo login · tenants &amp; users come from the shared store — anything created in Optimile Admin appears here automatically.
+          Demo login · tenants, users, vendors &amp; customers come from the shared store — anything created in Optimile Admin or the tenant workspace appears here automatically.
         </p>
       </div>
     </div>
+  );
+}
+
+function ExternalPartyFields({
+  kind,
+  hasTenant,
+  options,
+  selectedId,
+  onSelect,
+  phone,
+  onPhoneChange,
+  otp,
+  onOtpChange,
+  inputClass,
+  labelClass,
+}: {
+  kind: "VENDOR" | "CUSTOMER";
+  hasTenant: boolean;
+  options: Array<{ id: string; name: string }>;
+  selectedId: string;
+  onSelect: (id: string) => void;
+  phone: string;
+  onPhoneChange: (value: string) => void;
+  otp: string;
+  onOtpChange: (value: string) => void;
+  inputClass: string;
+  labelClass: string;
+}) {
+  const noun = kind === "VENDOR" ? "Vendor" : "Customer";
+  const nounPlural = kind === "VENDOR" ? "vendors" : "customers";
+
+  if (!hasTenant) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-[12px] text-slate-400">
+        Select a tenant first to see its {nounPlural}.
+      </div>
+    );
+  }
+
+  if (options.length === 0) {
+    return (
+      <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-[12px] font-medium text-amber-200">
+        No {nounPlural} found for this tenant. Add {nounPlural} from Administration → {noun}s.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-1.5">
+        <label className={labelClass}>Select {noun}</label>
+        <select
+          value={selectedId}
+          onChange={(event) => onSelect(event.target.value)}
+          className={inputClass}
+        >
+          <option value="">— Choose a {noun.toLowerCase()} —</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelClass}>Phone</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(event) => onPhoneChange(event.target.value)}
+          placeholder="Phone number"
+          className={inputClass}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className={labelClass}>OTP</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={4}
+          value={otp}
+          onChange={(event) => onOtpChange(event.target.value.replace(/\D/g, ""))}
+          placeholder="0000"
+          className={`${inputClass} tracking-[0.4em]`}
+        />
+        <p className="text-[11px] text-slate-500">Prototype OTP is 0000.</p>
+      </div>
+    </>
   );
 }

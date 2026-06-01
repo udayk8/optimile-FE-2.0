@@ -5,7 +5,7 @@ import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useFleetData } from '@vendor/integration/useFleetData'
 import { AddVehicleModal } from '@vendor/components/shared/AddVehicleModal'
 import { AddDriverModal } from '@vendor/components/shared/AddDriverModal'
 import type { Driver, Vehicle } from '@vendor/types'
@@ -14,7 +14,9 @@ import { Ship, Truck, Users, Plus, AlertTriangle, ShieldCheck, ShieldX, Edit3, P
 type FleetTab = 'vehicles' | 'drivers'
 
 function getFleetTab(pathname: string): FleetTab {
-  return pathname.split('/')[3] === 'drivers' ? 'drivers' : 'vehicles'
+  // Works for both standalone (/vendor/fleet/drivers) and embedded
+  // (/tenant-admin/.../vendor-portal/fleet/drivers) paths — position-independent.
+  return pathname.includes('/drivers') ? 'drivers' : 'vehicles'
 }
 
 function ComplianceIcon({ status }: { status: string }) {
@@ -50,7 +52,7 @@ export default function FleetPage() {
   const navigate = useNavigate()
   const params = useParams()
   const activeTab = getFleetTab(location.pathname)
-  const { vehicles, drivers, updateVehicle, updateDriver } = useAppStore()
+  const { vehicles, drivers, updateVehicle, updateDriver } = useFleetData()
 
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false)
   const [isAddDriverOpen, setIsAddDriverOpen] = useState(false)

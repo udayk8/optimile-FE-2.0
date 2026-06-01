@@ -20,6 +20,7 @@ import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStat
 import { BookingRemarksTimeline, BookingStatusTimeline } from "@/modules/tms/booking/components/BookingTimeline";
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
 import { useTenantBookings } from "./hooks/useTenantBookings";
+import { useMockStore } from "@/shared/store/mock-store";
 import { areAllDeliveryPodsCaptured, areAllDeliveriesPhysicallyCompleted, calculateMarginAmount, calculateMarginPercent, canCancelBooking, getBookingEditability, getPrimaryBookingStatus, isBookingDelayCandidate, normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
 import {
   buildAddressLookup,
@@ -174,6 +175,7 @@ export function BookingDetailsPage() {
     actionBookingVehicleReplacement,
   } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
+  const { sendBookingVendorIndent, listBookingVendorIndents } = useMockStore();
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [reassignmentOpen, setReassignmentOpen] = useState(false);
   const [breakdownActionOpen, setBreakdownActionOpen] = useState(false);
@@ -1871,6 +1873,32 @@ export function BookingDetailsPage() {
                       </Button>
                     ) : null}
                   {bookingRecord.status === "PENDING_ASSIGNMENT" && access.can("BOOKING_DETAIL", "ASSIGN_VEHICLE") ? <Button size="sm" onClick={() => setAssignmentOpen(true)}>Assign Vehicle</Button> : null}
+                  {bookingRecord.status === "PENDING_ASSIGNMENT" ? (() => {
+                    const myIndents = listBookingVendorIndents(tenant.id).filter((indent) => indent.bookingId === bookingRecord.id);
+                    const pendingCount = myIndents.filter((indent) => indent.status === "PENDING").length;
+                    const winner = myIndents.find((indent) => indent.isWinner);
+                    if (winner) {
+                      return <Badge variant="warning">Accepted · {winner.vendorName} · vehicle pending</Badge>;
+                    }
+                    if (pendingCount > 0) {
+                      return <Badge variant="accent">Indent sent · {pendingCount} notified</Badge>;
+                    }
+                    return (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          try {
+                            sendBookingVendorIndent(bookingRecord.id, session.actorName || "Dispatcher");
+                          } catch (error) {
+                            window.alert((error as Error).message);
+                          }
+                        }}
+                      >
+                        Send Indent to Vendors
+                      </Button>
+                    );
+                  })() : null}
                   {!loadingStarted && ["VEHICLE_ASSIGNED", "ASSIGNED"].includes(bookingRecord.status) && access.can("BOOKING_DETAIL", "START_LOADING") ? <Button size="sm" onClick={startLoading}>Start Loading</Button> : null}
                     {loadingStarted && !loadingCompleted && access.can("BOOKING_DETAIL", "COMPLETE_LOADING") ? <Button size="sm" onClick={endLoading}>Complete Loading</Button> : null}
                   {["LOADING_COMPLETED", "DOCUMENT_PENDING", "DOCUMENT_COMPLETED"].includes(bookingRecord.status) ? (

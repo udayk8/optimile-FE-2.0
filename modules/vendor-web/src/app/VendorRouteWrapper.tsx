@@ -1,12 +1,20 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
+import { useAppStore } from '@vendor/stores/app.store'
 
 export function VendorRouteWrapper({ children }: { children: ReactNode }) {
   const { vendor } = useVendorAuth()
+  const applyVendorDataset = useAppStore((state) => state.applyVendorDataset)
   const location = useLocation()
   const onOnboarding = location.pathname.startsWith('/vendor/onboarding')
+
+  // Scope the portal data to the logged-in vendor. Blank-listed vendors (e.g.
+  // Mahesh Transport) get an empty portal; everyone else keeps the demo data.
+  useEffect(() => {
+    applyVendorDataset(vendor?.tradingName)
+  }, [vendor?.tradingName, applyVendorDataset])
 
   return (
     <>

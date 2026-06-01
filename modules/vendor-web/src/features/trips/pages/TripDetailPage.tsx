@@ -9,11 +9,12 @@ import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { PageHero } from '@shared-ui/page-hero'
-import { ArrowLeft, CheckCircle, Download, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Download, ExternalLink, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
 import type { Trip, TripDocument } from '@vendor/types'
 
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
@@ -32,9 +33,11 @@ export default function TripDetailPage() {
   const [detailTab, setDetailTab] = useState<DetailTab>('freight')
   const [expenseFilter, setExpenseFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL')
 
-  const { indents, trips, declineIndent } = useAppStore()
+  // Source bookings from the cross-module bridge when embedded (trips are
+  // synthesized from shared bookings, not in the local app.store), else fall
+  // back to app.store standalone.
+  const { indents, trips, acceptIndent, declineIndent, getBookingDetail } = useVendorBookings()
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
-  const acceptIndent = useAppStore((s) => s.acceptIndent)
   const [selectedTripForExpense, setSelectedTripForExpense] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
 
@@ -44,6 +47,8 @@ export default function TripDetailPage() {
   const expenses = useMemo(() => allExpenses.filter((expense) => expense.tripId === id), [allExpenses, id])
   const mode = getBookingMode(location.pathname)
   const booking = indent ?? trip
+  // Embedded: rich shared-booking detail (consignor/consignee, docs, LR). Null standalone.
+  const detail = getBookingDetail(id)
   const ASSIGNMENT_STATES: Trip['status'][] = ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED']
   const IN_TRANSIT_STATES: Trip['status'][] = ['IN_TRANSIT', 'DESTINATION_REACHED']
   const resolvedMode: BookingMode =
@@ -58,6 +63,15 @@ export default function TripDetailPage() {
             : trip && (ASSIGNMENT_STATES.includes(trip.status) || IN_TRANSIT_STATES.includes(trip.status))
               ? (trip.exceptionFlag ? 'exception' : 'active')
               : mode
+  const backTab =
+    resolvedMode === 'completed' ? 'completed'
+    : resolvedMode === 'pending-pod' ? 'pending-pod'
+    : resolvedMode === 'cancelled' ? 'cancelled'
+    : resolvedMode === 'rejected' ? 'rejected'
+    : resolvedMode === 'exception' ? 'exception'
+    : resolvedMode === 'active' ? 'in-transit'
+    : (resolvedMode === 'new' || resolvedMode === 'accepted') ? 'pending-allocation'
+    : 'assignment'
   const POST_ACCEPT_STATUSES: Trip['status'][] = ['ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED']
   const tripDocs = booking && 'documents' in booking ? trip?.documents ?? [] : []
   const docs = (() => {
@@ -82,10 +96,10 @@ export default function TripDetailPage() {
     <div className="space-y-6">
       <button
         type="button"
-        onClick={() => navigate(-1)}
+        onClick={() => navigate(`/vendor/bookings?tab=${backTab}`)}
         className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-primary"
       >
-        <ArrowLeft className="h-4 w-4" /> Back
+        <ArrowLeft className="h-4 w-4" /> Back to bookings
       </button>
 
       <PageHero
@@ -121,6 +135,83 @@ export default function TripDetailPage() {
           </div>
         }
       />
+
+      {detail && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-500">
+              <MapPin className="h-4 w-4" /> Consignor (Pickup)
+            </h3>
+            {detail.consignor ? (
+              <div className="mt-2 space-y-0.5 text-sm">
+                <p className="font-semibold text-text">{detail.consignor.name}</p>
+                <p className="text-gray-600">{detail.consignor.address}</p>
+                {detail.consignor.contact && <p className="text-gray-500">Contact: {detail.consignor.contact}</p>}
+                {detail.consignor.phone && <p className="text-gray-500">Phone: {detail.consignor.phone}</p>}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-400">Origin: {detail.origin}</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-gray-500">
+              <MapPin className="h-4 w-4" /> Consignee (Drop)
+            </h3>
+            {detail.consignee ? (
+              <div className="mt-2 space-y-0.5 text-sm">
+                <p className="font-semibold text-text">{detail.consignee.name}</p>
+                <p className="text-gray-600">{detail.consignee.address}</p>
+                {detail.consignee.contact && <p className="text-gray-500">Contact: {detail.consignee.contact}</p>}
+                {detail.consignee.phone && <p className="text-gray-500">Phone: {detail.consignee.phone}</p>}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-400">Destination: {detail.destination}</p>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-2">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Shipment</h3>
+            <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div><p className="text-gray-500">Customer</p><p className="font-semibold text-text">{detail.customerName}</p></div>
+              <div><p className="text-gray-500">Route</p><p className="font-semibold text-text">{detail.origin} → {detail.destination}</p></div>
+              <div><p className="text-gray-500">Qty / Weight</p><p className="font-semibold text-text">{detail.qty} · {detail.weight}</p></div>
+              <div><p className="text-gray-500">Pickup</p><p className="font-semibold text-text">{detail.pickup || '—'}</p></div>
+              <div><p className="text-gray-500">Vehicle</p><p className="font-semibold text-text">{detail.vehicle}</p></div>
+              <div><p className="text-gray-500">Driver</p><p className="font-semibold text-text">{detail.driver}</p></div>
+              <div><p className="text-gray-500">LR</p><p className="font-semibold text-text">{detail.lrNumbers.join(', ') || '—'}</p></div>
+              <div><p className="text-gray-500">Freight</p><p className="font-semibold text-text">₹{detail.freight.toLocaleString()}</p></div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:col-span-2">
+            <h3 className="text-sm font-bold uppercase tracking-wide text-gray-500">Documents</h3>
+            {detail.documents.length ? (
+              <div className="mt-2 divide-y divide-gray-100">
+                {detail.documents.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-3 py-2">
+                    <div className="flex min-w-0 items-center gap-2 text-sm">
+                      <FileText className="h-4 w-4 shrink-0 text-gray-400" />
+                      <span className="font-medium text-text">{doc.title}</span>
+                      <span className="truncate text-gray-400">{doc.fileName}</span>
+                    </div>
+                    <a
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> View
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-gray-400">No documents uploaded yet.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {visibleTabs.map((tab) => (

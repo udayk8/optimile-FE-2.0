@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
 import { Button } from '@vendor/components/ui/button'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useFleetData } from '@vendor/integration/useFleetData'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 
 interface AssignVehicleModalProps {
   isOpen: boolean
@@ -10,7 +11,8 @@ interface AssignVehicleModalProps {
 }
 
 export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleModalProps) {
-  const { vehicles, drivers, assignVehicleToTrip } = useAppStore()
+  const { vehicles, drivers } = useFleetData()
+  const { assignVehicle: assignVehicleToTrip } = useVendorBookings()
   const [selectedVehicle, setSelectedVehicle] = useState<string>('')
   const [selectedDriver, setSelectedDriver] = useState<string>('')
 

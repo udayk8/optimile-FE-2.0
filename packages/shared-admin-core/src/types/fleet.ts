@@ -4,6 +4,23 @@ export type DrugTestStatus = "CLEAR" | "PENDING" | "FAILED";
 export type VehicleOperationalStatus = "ACTIVE" | "UNDER_MAINTENANCE" | "INACTIVE";
 export type ComplianceStatus = "COMPLIANT" | "EXPIRING_SOON" | "EXPIRED" | "PENDING_DOCS";
 
+// Which module created/owns a master-data record. Lets Admin show provenance
+// and lets every module read/write the SAME tenant collection regardless of
+// where the record originated.
+export type MasterDataSource = "ADMIN" | "VENDOR_PORTAL" | "FLEET_MODULE";
+export type MasterDataCreatorLoginType = "TENANT_ADMIN" | "INTERNAL_USER" | "VENDOR" | "FLEET";
+
+// Shared provenance fields tagged onto vehicle/driver master records. All
+// optional + additive so existing records and create flows keep working
+// (source is defaulted to "ADMIN" by the store when absent).
+export interface MasterDataOrigin {
+  vendorName?: string;
+  source?: MasterDataSource;
+  createdByLoginType?: MasterDataCreatorLoginType;
+  createdByUserId?: string | null;
+  createdByVendorId?: string | null;
+}
+
 export interface FleetComplianceDocument {
   id: string;
   type: string;
@@ -51,6 +68,12 @@ export interface TenantVehicle {
   complianceStatus?: ComplianceStatus;
   complianceDocuments?: FleetComplianceDocument[];
   isActive: boolean;
+  // Provenance — who created this vehicle and from which module.
+  vendorName?: string;
+  source?: MasterDataSource;
+  createdByLoginType?: MasterDataCreatorLoginType;
+  createdByUserId?: string | null;
+  createdByVendorId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -89,6 +112,11 @@ export interface TenantVehicleInput {
   complianceStatus?: ComplianceStatus;
   complianceDocuments?: FleetComplianceDocument[];
   isActive: boolean;
+  vendorName?: string;
+  source?: MasterDataSource;
+  createdByLoginType?: MasterDataCreatorLoginType;
+  createdByUserId?: string | null;
+  createdByVendorId?: string | null;
 }
 
 export interface TenantDriver {
@@ -118,6 +146,12 @@ export interface TenantDriver {
   complianceDocuments?: FleetComplianceDocument[];
   mobile?: string;
   isActive: boolean;
+  // Provenance — who created this driver and from which module.
+  vendorName?: string;
+  source?: MasterDataSource;
+  createdByLoginType?: MasterDataCreatorLoginType;
+  createdByUserId?: string | null;
+  createdByVendorId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -147,4 +181,9 @@ export interface TenantDriverInput {
   complianceDocuments?: FleetComplianceDocument[];
   mobile?: string;
   isActive: boolean;
+  vendorName?: string;
+  source?: MasterDataSource;
+  createdByLoginType?: MasterDataCreatorLoginType;
+  createdByUserId?: string | null;
+  createdByVendorId?: string | null;
 }

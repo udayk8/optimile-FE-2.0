@@ -27,6 +27,7 @@ import { useSessionContext } from "@/shared/auth/session-context";
 import {
   canAccessTenantPath,
   filterTenantNavItems,
+  getSessionPortalModule,
   resolveSessionRoleContext,
 } from "@/shared/lib/tenant-rbac";
 import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
@@ -59,7 +60,40 @@ export function TenantLayout() {
     rolePermissions,
   });
 
-  const showGovernanceDashboard = !!activeRole && isTenantAdminRole(activeRole);
+  // External-party portal sessions (vendor/customer signed in from tenant
+  // master data). These have no tenant role — they only ever see their own
+  // portal, with no Administration / Booking / internal pages in the sidebar.
+  const portalModule = getSessionPortalModule(session);
+  const portalNav: ExplorerNavItem[] =
+    portalModule === "VENDOR"
+      ? [
+          {
+            label: "Vendor Portal",
+            icon: Users,
+            to: paths.vendorPortal,
+            children: manifestSidebarToTenantChildren(vendorManifest, paths.vendorPortal).map(
+              (item) => ({
+                label: item.label,
+                to: item.to,
+                icon: (item.icon ?? Users) as typeof Truck,
+              }),
+            ),
+          },
+        ]
+      : portalModule === "CUSTOMER"
+        ? [
+            {
+              label: "Customer Portal",
+              icon: UserCog,
+              to: paths.customerPortal,
+              children: [
+                { label: "Customer Dashboard", to: paths.customerPortal, icon: UserCog },
+              ],
+            },
+          ]
+        : [];
+
+  const showGovernanceDashboard = !portalModule && !!activeRole && isTenantAdminRole(activeRole);
   const tenantNav = [
     // The tenant governance dashboard is only relevant for the Tenant Admin
     // role — everyone else lands directly on their module dashboard and
@@ -314,18 +348,20 @@ export function TenantLayout() {
     })(),
   ];
 
-  const filteredTenantNav = activeRole
-    ? filterTenantNavItems(tenantNav, (pageCode) =>
-        pageCode
-          ? canAccessTenantPath({
-              tenant,
-              pathname: pageCodeToPath(pageCode, paths),
-              role: activeRole,
-              rolePermissions,
-            }).allowed
-          : true,
-      )
-    : tenantNav;
+  const filteredTenantNav = portalModule
+    ? portalNav
+    : activeRole
+      ? filterTenantNavItems(tenantNav, (pageCode) =>
+          pageCode
+            ? canAccessTenantPath({
+                tenant,
+                pathname: pageCodeToPath(pageCode, paths),
+                role: activeRole,
+                rolePermissions,
+              }).allowed
+            : true,
+        )
+      : tenantNav;
   const routeAccess = activeRole
     ? canAccessTenantPath({
         tenant,
@@ -337,10 +373,17 @@ export function TenantLayout() {
   // Sidebar identity: tenant name (title), user name on line 1 of subtitle,
   // role name on line 2. `whitespace-pre-line` inside SidebarExplorer will
   // honour the newline. ActorLabel pill shows the tenant code for context.
-  const sidebarSubtitle = [
-    currentTenantUser?.name ?? session.actorName ?? "User",
-    activeRole?.name ?? "User",
-  ].join("\n");
+  const sidebarSubtitle = portalModule
+    ? [
+        (portalModule === "VENDOR" ? session.vendorName : session.customerName) ??
+          session.actorName ??
+          "User",
+        portalModule === "VENDOR" ? "Vendor" : "Customer",
+      ].join("\n")
+    : [
+        currentTenantUser?.name ?? session.actorName ?? "User",
+        activeRole?.name ?? "User",
+      ].join("\n");
 
   // Compute the logged-in user's effective place scope so the header can
   // surface "viewing as Company Root / Region / Branch — <place>" and any
@@ -383,7 +426,7 @@ export function TenantLayout() {
                 scope the current view is filtered through. Helps users spot
                 "I'm logged in as a Branch manager, so the data is branch-
                 scoped" without having to dig into role settings. */}
-            {currentTenantUser ? (
+            {!portalModule && currentTenantUser ? (
               <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-indigo-100 bg-indigo-50/40 px-3 py-1.5 text-[11px]">
                 <span className="inline-flex items-center rounded-md bg-indigo-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] text-indigo-700">
                   {effectiveScope.isCompanyRoot ? "Company Root" : "Place scope"}

@@ -127,6 +127,102 @@ interface AppState {
   addNotification: (notification: Notification) => void
   loadBackendData: () => Promise<void>
   resetStore: () => void
+  // Scopes the portal dataset to the logged-in vendor. Specific vendors (see
+  // BLANK_VENDOR_NAMES) are demoed as brand-new accounts with no activity, so
+  // their portal shows empty states. Every other vendor keeps the full demo
+  // data. No-ops when the vendor hasn't changed, so in-session edits survive
+  // navigation.
+  appliedVendorKey: string | null
+  applyVendorDataset: (vendorName?: string) => void
+}
+
+// Vendors (by name, case-insensitive) whose portal should appear empty — used
+// to demo a freshly onboarded vendor with no bookings/invoices/etc. yet.
+const BLANK_VENDOR_NAMES = new Set(['mahesh transport'])
+
+function normalizeVendorName(name?: string): string {
+  return (name ?? '').trim().toLowerCase()
+}
+
+function isBlankVendor(name?: string): boolean {
+  return BLANK_VENDOR_NAMES.has(normalizeVendorName(name))
+}
+
+// Reads which vendor (if any) is signed in, from the session the unified login
+// page (shared-admin-core) writes to localStorage. Lets the store start in the
+// correct (full vs. empty) shape on first load — no flash of demo data.
+function readLoggedInVendorName(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const raw = window.localStorage.getItem('optimile.session.context')
+    if (!raw) return undefined
+    const session = JSON.parse(raw) as { loginType?: string; vendorName?: string }
+    if (session?.loginType !== 'VENDOR') return undefined
+    return session.vendorName
+  } catch {
+    return undefined
+  }
+}
+
+type VendorDataCollections = Pick<
+  AppState,
+  | 'indents'
+  | 'trips'
+  | 'auctions'
+  | 'vehicles'
+  | 'drivers'
+  | 'expenses'
+  | 'contracts'
+  | 'invoices'
+  | 'ledger'
+  | 'payments'
+  | 'exceptions'
+  | 'nbfcApplications'
+  | 'capacity'
+  | 'notifications'
+  | 'disputes'
+>
+
+const EMPTY_DATA: VendorDataCollections = {
+  indents: [],
+  trips: [],
+  auctions: [],
+  vehicles: [],
+  drivers: [],
+  expenses: [],
+  contracts: [],
+  invoices: [],
+  ledger: [],
+  payments: [],
+  exceptions: [],
+  nbfcApplications: [],
+  capacity: [],
+  notifications: [],
+  disputes: [],
+}
+
+function buildFullData(): VendorDataCollections {
+  return {
+    indents: [...MOCK_INDENTS],
+    trips: [...MOCK_TRIPS],
+    auctions: [...MOCK_AUCTIONS],
+    vehicles: [...MOCK_VEHICLES],
+    drivers: [...MOCK_DRIVERS],
+    expenses: [...MOCK_EXPENSES],
+    contracts: [...MOCK_CONTRACTS],
+    invoices: [...MOCK_INVOICES],
+    ledger: [...MOCK_LEDGER],
+    payments: buildInitialPayments(),
+    exceptions: [...MOCK_EXCEPTIONS],
+    nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
+    capacity: [...MOCK_CAPACITY],
+    notifications: [...MOCK_NOTIFICATIONS],
+    disputes: [...MOCK_DISPUTES],
+  }
+}
+
+function buildDataForVendor(vendorName?: string): VendorDataCollections {
+  return isBlankVendor(vendorName) ? { ...EMPTY_DATA } : buildFullData()
 }
 
 const INITIAL_NBFC_APPLICATIONS: NBFCApplication[] = [
@@ -243,22 +339,13 @@ const buildInitialPayments = (): PaymentRecord[] =>
       } as PaymentRecord
     })
 
+const INITIAL_VENDOR_NAME = readLoggedInVendorName()
+
 export const useAppStore = create<AppState>((set) => ({
-  indents: [...MOCK_INDENTS],
-  trips: [...MOCK_TRIPS],
-  auctions: [...MOCK_AUCTIONS],
-  vehicles: [...MOCK_VEHICLES],
-  drivers: [...MOCK_DRIVERS],
-  expenses: [...MOCK_EXPENSES],
-  contracts: [...MOCK_CONTRACTS],
-  invoices: [...MOCK_INVOICES],
-  ledger: [...MOCK_LEDGER],
-  payments: buildInitialPayments(),
-  exceptions: [...MOCK_EXCEPTIONS],
-  nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
-  capacity: [...MOCK_CAPACITY],
-  notifications: [...MOCK_NOTIFICATIONS],
-  disputes: [...MOCK_DISPUTES],
+  // Start in the shape that matches the logged-in vendor so there's no flash of
+  // demo data for a "blank" vendor on first paint.
+  ...buildDataForVendor(INITIAL_VENDOR_NAME),
+  appliedVendorKey: normalizeVendorName(INITIAL_VENDOR_NAME),
 
   acceptIndent: (indentId) => {
     set((state) => {
@@ -966,20 +1053,18 @@ export const useAppStore = create<AppState>((set) => ({
 
   resetStore: () =>
     set(() => ({
-      indents: [...MOCK_INDENTS],
-      trips: [...MOCK_TRIPS],
-      auctions: [...MOCK_AUCTIONS],
-      vehicles: [...MOCK_VEHICLES],
-      drivers: [...MOCK_DRIVERS],
-      expenses: [...MOCK_EXPENSES],
-      contracts: [...MOCK_CONTRACTS],
-      invoices: [...MOCK_INVOICES],
-      ledger: [...MOCK_LEDGER],
-      payments: buildInitialPayments(),
-      exceptions: [...MOCK_EXCEPTIONS],
-      nbfcApplications: INITIAL_NBFC_APPLICATIONS.map((app) => ({ ...app })),
-      capacity: [...MOCK_CAPACITY],
-      notifications: [...MOCK_NOTIFICATIONS],
-      disputes: [...MOCK_DISPUTES],
-    }))
+      ...buildFullData(),
+    })),
+
+  applyVendorDataset: (vendorName) =>
+    set((state) => {
+      const key = normalizeVendorName(vendorName)
+      // Same vendor as last applied — leave the store (and any in-session edits)
+      // untouched so navigating around the portal doesn't wipe state.
+      if (state.appliedVendorKey === key) return state
+      return {
+        appliedVendorKey: key,
+        ...buildDataForVendor(vendorName),
+      }
+    }),
 }))

@@ -8,7 +8,7 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { Truck, MapPin, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
@@ -53,12 +53,22 @@ const REASON_LABEL: Record<string, string> = {
   VEHICLE_OR_DRIVER_BREAKDOWN: 'Vehicle / Driver Breakdown',
 }
 
-function getBookingsTab(pathname: string, search: string): BookingsTab {
-  const pathTab = pathname.split('/')[2]
-  if (BOOKING_TABS.includes(pathTab as BookingsTab)) return pathTab as BookingsTab
+// "Indents" is the cross-module label for vendor-assigned bookings awaiting
+// action; it maps onto the existing Pending Allocation tab.
+const TAB_ALIASES: Record<string, BookingsTab> = { indents: 'pending-allocation' }
 
-  const searchTab = new URLSearchParams(search).get('tab')
-  return BOOKING_TABS.includes(searchTab as BookingsTab) ? (searchTab as BookingsTab) : 'pending-allocation'
+function resolveTab(raw: string | null): BookingsTab | null {
+  if (!raw) return null
+  if (BOOKING_TABS.includes(raw as BookingsTab)) return raw as BookingsTab
+  return TAB_ALIASES[raw] ?? null
+}
+
+function getBookingsTab(pathname: string, search: string): BookingsTab {
+  const pathTab = resolveTab(pathname.split('/')[2])
+  if (pathTab) return pathTab
+
+  const searchTab = resolveTab(new URLSearchParams(search).get('tab'))
+  return searchTab ?? 'pending-allocation'
 }
 
 function BookingCard({ title, count, active, onClick }: { title: string; count: number; active: boolean; onClick: () => void }) {
@@ -81,7 +91,7 @@ export default function TripsPage() {
   const navigate = useNavigate()
   const activeTab = getBookingsTab(location.pathname, location.search)
 
-  const { indents, trips, declineIndent, acceptIndent } = useAppStore()
+  const { indents, trips, declineIndent, acceptIndent } = useVendorBookings()
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
   const [reassignTripId, setReassignTripId] = useState<string | null>(null)

@@ -8,23 +8,26 @@ import { formatDateTime } from '@vendor/lib/date-utils'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { KPICard } from '@vendor/components/cards/KPICard'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
 
-  const indents = useAppStore(state => state.indents)
+  // Pending Indents + Active Bookings come from the cross-module bridge when
+  // embedded (bookings assigned to this vendor); other KPIs keep their source.
+  const { indents: vendorIndents, trips: vendorTrips } = useVendorBookings()
   const auctions = useAppStore(state => state.auctions)
   const trips = useAppStore(state => state.trips)
   const vehicles = useAppStore(state => state.vehicles)
   const drivers = useAppStore(state => state.drivers)
-  const pendingIndents = indents.filter(i => i.status === 'PENDING')
+  const pendingIndents = vendorIndents.filter(i => i.status === 'PENDING')
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
   const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.approved > 0))
   const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0) + (booking.expenseSummary.approved || 0), 0)
 
-  const activeBookings = trips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
+  const activeBookings = vendorTrips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
   
   const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
   const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')

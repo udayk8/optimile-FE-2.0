@@ -112,6 +112,18 @@ function hasActiveModuleAccess(
   }
 }
 
+/**
+ * For external-party portal sessions (vendor/customer signed in from tenant
+ * master data) returns the module they are allowed to see ("VENDOR" /
+ * "CUSTOMER"). Returns null for internal tenant-employee and platform-admin
+ * sessions, which keep their normal role/permission-driven access.
+ */
+export function getSessionPortalModule(session: SessionContext): "VENDOR" | "CUSTOMER" | null {
+  if (session.loginType === "VENDOR") return "VENDOR";
+  if (session.loginType === "CUSTOMER") return "CUSTOMER";
+  return null;
+}
+
 export function resolveSessionRoleContext(params: {
   tenant: Pick<TenantRecord, "id" | "tenantType" | "customerPortalEnabled">;
   session: SessionContext;

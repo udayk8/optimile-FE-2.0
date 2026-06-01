@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useFleetData } from '@vendor/integration/useFleetData'
 import { FileCheck, Upload, X, AlertTriangle } from 'lucide-react'
 import type { ComplianceDocument, ComplianceStatus, Vehicle } from '@vendor/types'
 
@@ -122,7 +122,10 @@ const STATUS_LABELS: Record<ComplianceStatus, string> = {
 }
 
 export function AddVehicleModal({ isOpen, onClose, initialVehicle }: AddVehicleModalProps) {
-  const { addVehicle, updateVehicle } = useAppStore()
+  const { addVehicle, updateVehicle, vehicleTypeOptions } = useFleetData()
+  // Embedded: pick from the tenant's vehicle types so the record maps to a real
+  // master vehicle type. Standalone: keep the local default list.
+  const vehicleTypeChoices = vehicleTypeOptions && vehicleTypeOptions.length ? vehicleTypeOptions : VEHICLE_TYPES
   const isEditMode = !!initialVehicle
   const [form, setForm] = useState<VehicleFormState>(DEFAULT_FORM)
   const [docs, setDocs] = useState<VehicleDocs>(DEFAULT_DOCS)
@@ -154,9 +157,11 @@ export function AddVehicleModal({ isOpen, onClose, initialVehicle }: AddVehicleM
         NationalPermit: existing.NationalPermit ?? { ...EMPTY_DOC },
       })
     } else {
-      setForm(DEFAULT_FORM)
+      setForm({ ...DEFAULT_FORM, vehicleType: vehicleTypeChoices[0] ?? DEFAULT_FORM.vehicleType })
       setDocs({ RC: { ...EMPTY_DOC }, Insurance: { ...EMPTY_DOC }, PUC: { ...EMPTY_DOC }, FC: { ...EMPTY_DOC }, NationalPermit: { ...EMPTY_DOC } })
     }
+    // vehicleTypeChoices is stable (memoized in the embed adapter / constant standalone)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialVehicle, isOpen])
 
   const setField = <K extends keyof VehicleFormState>(key: K, value: VehicleFormState[K]) =>
@@ -241,7 +246,7 @@ export function AddVehicleModal({ isOpen, onClose, initialVehicle }: AddVehicleM
               <div>
                 <label className="text-sm font-medium">Vehicle Type *</label>
                 <select required className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.vehicleType} onChange={(e) => setField('vehicleType', e.target.value)}>
-                  {VEHICLE_TYPES.map((t) => <option key={t}>{t}</option>)}
+                  {vehicleTypeChoices.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div>

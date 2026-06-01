@@ -169,6 +169,27 @@ const DRIVER_DOC_CONFIG: Array<{ key: DriverDocKey; label: string; refPlaceholde
 
 // ============================ VEHICLES ============================
 
+// Human label for a master-data record's origin module. Records created before
+// provenance tracking (or directly in Administration) default to "Admin".
+function masterDataSourceLabel(source?: string): string {
+  if (source === "VENDOR_PORTAL") return "Vendor Portal";
+  if (source === "FLEET_MODULE") return "Fleet";
+  return "Admin";
+}
+
+function SourceBadge({ source }: { source?: string }) {
+  const label = masterDataSourceLabel(source);
+  const tone =
+    source === "VENDOR_PORTAL"
+      ? "bg-indigo-50 text-indigo-700"
+      : source === "FLEET_MODULE"
+        ? "bg-amber-50 text-amber-700"
+        : "bg-gray-100 text-gray-600";
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>
+  );
+}
+
 export function TenantVehiclesPage() {
   const { tenant } = useTenantRouteContext();
   const { data, createVehicle, updateVehicle } = useTenantVehicles(tenant.id);
@@ -222,15 +243,17 @@ export function TenantVehiclesPage() {
             <thead className="border-b bg-gray-50">
               <tr>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vendor</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {vehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-sm text-gray-500">No vehicles yet. Click Add Vehicle.</td>
+                  <td colSpan={6} className="p-8 text-center text-sm text-gray-500">No vehicles yet. Click Add Vehicle.</td>
                 </tr>
               ) : null}
               {vehicles.map((vehicle) => {
@@ -254,6 +277,11 @@ export function TenantVehiclesPage() {
                           </div>
                         )}
                       </td>
+                      <td className="p-4 align-top text-sm text-gray-700">
+                        {vehicle.vendorId
+                          ? vendorMap.get(vehicle.vendorId)?.name ?? vehicle.vendorName ?? "Vendor"
+                          : "Own Fleet"}
+                      </td>
                       <td className="p-4 align-top">
                         <ToggleSwitch
                           active={vehicle.isActive}
@@ -267,6 +295,9 @@ export function TenantVehiclesPage() {
                             ? `${vehicle.complianceDocuments.length} doc${vehicle.complianceDocuments.length !== 1 ? "s" : ""}`
                             : "No docs"}
                         </div>
+                      </td>
+                      <td className="p-4 align-top">
+                        <SourceBadge source={vehicle.source} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(vehicle)}>
@@ -620,16 +651,18 @@ export function TenantDriversPage() {
             <thead className="border-b bg-gray-50">
               <tr>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Driver</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vendor</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">License</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {drivers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-sm text-gray-500">No drivers yet. Click Add Driver.</td>
+                  <td colSpan={7} className="p-8 text-center text-sm text-gray-500">No drivers yet. Click Add Driver.</td>
                 </tr>
               ) : null}
               {drivers.map((driver) => {
@@ -653,6 +686,11 @@ export function TenantDriversPage() {
                           </div>
                         )}
                       </td>
+                      <td className="p-4 align-top text-sm text-gray-700">
+                        {driver.vendorId
+                          ? vendors.find((v) => v.id === driver.vendorId)?.name ?? driver.vendorName ?? "Vendor"
+                          : "Own Driver"}
+                      </td>
                       <td className="p-4 align-top">
                         <div className="font-mono text-xs font-medium">{driver.licenseNumber}</div>
                         <div className="mt-0.5 text-xs text-gray-500">
@@ -673,6 +711,9 @@ export function TenantDriversPage() {
                             ? `${driver.complianceDocuments.length} doc${driver.complianceDocuments.length !== 1 ? "s" : ""}`
                             : "No docs"}
                         </div>
+                      </td>
+                      <td className="p-4 align-top">
+                        <SourceBadge source={driver.source} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(driver)}>

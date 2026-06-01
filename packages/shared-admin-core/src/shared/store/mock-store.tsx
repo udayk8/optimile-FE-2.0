@@ -75,6 +75,7 @@ import type {
   TenantCustomerRateCard,
   TenantCustomerRateCardInput,
 } from "@/types/customer";
+import type { BookingVendorIndent } from "@/types/booking-indent";
 import type {
   BookingAssignmentInput,
   BookingInput,
@@ -230,6 +231,13 @@ interface MockStoreValue {
     bookingId: string,
     transition: BookingStatusTransitionInput,
   ) => BookingRecord;
+  listBookingVendorIndents: (tenantId: string) => BookingVendorIndent[];
+  sendBookingVendorIndent: (bookingId: string, actor: string) => BookingVendorIndent[];
+  respondBookingVendorIndent: (
+    indentId: string,
+    action: "ACCEPT" | "REJECT",
+    reason?: string,
+  ) => BookingVendorIndent;
   assignTenantBooking: (bookingId: string, input: BookingAssignmentInput) => BookingRecord;
   reassignTenantBooking: (bookingId: string, input: BookingReassignmentInput) => BookingRecord;
   replaceTenantBookingVehicle: (bookingId: string, input: BookingVehicleReplacementInput) => BookingRecord;
@@ -589,6 +597,8 @@ function buildSeedWorkspaces() {
 function loadSeededState<T>(key: string, seed: T) {
   return readStoredValue(key, seed);
 }
+
+const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 
 // One-time rehydration of specific demo tenants that were originally
 // onboarded via the wizard. If the user's localStorage exists but doesn't
@@ -3244,7 +3254,15 @@ function normalizeBookingStatus(status: BookingRecord["status"]) {
 
 function normalizeStoredTenantBookings(storedBookings: BookingRecord[]) {
   return storedBookings.map((booking) => {
-    const normalizedStatus = normalizeBookingStatus(booking.status);
+    const rawStatus = normalizeBookingStatus(booking.status);
+    // Self-heal stale data: a booking that already carries a vehicle assignment
+    // but is still flagged PENDING_ASSIGNMENT is reconciled to VEHICLE_ASSIGNED
+    // so it leaves the assignment queue and shows the correct status. Bookings
+    // without an assignment are left untouched.
+    const normalizedStatus =
+      booking.assignment?.vehicleId && rawStatus === "PENDING_ASSIGNMENT"
+        ? "VEHICLE_ASSIGNED"
+        : rawStatus;
     const normalizedTimeline = booking.statusTimeline.map((event) => ({
       ...event,
       status: normalizeBookingStatus(event.status),
@@ -3448,6 +3466,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   const [tenantBookings, setTenantBookings] = useState<BookingRecord[]>(() =>
     normalizeStoredTenantBookings(loadSeededState(storageKeys.tenantBookings, mockTenantBookings)),
   );
+  // Vendor indents (multi-vendor "send indent" flow). Persisted under a plain
+  // key (no legacy-recovery machinery needed).
+  const [bookingVendorIndents, setBookingVendorIndents] = useState<BookingVendorIndent[]>(() =>
+    loadSeededState(BOOKING_VENDOR_INDENTS_KEY, [] as BookingVendorIndent[]),
+  );
   const [tenantInvoices, setTenantInvoices] = useState<TenantInvoiceRecord[]>(() =>
     loadSeededState(storageKeys.tenantInvoices, []),
   );
@@ -3586,6 +3609,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     writeStoredValue(storageKeys.tenantBookings, tenantBookings);
   }, [tenantBookings]);
+
+  useEffect(() => {
+    writeStoredValue(BOOKING_VENDOR_INDENTS_KEY, bookingVendorIndents);
+  }, [bookingVendorIndents]);
 
   useEffect(() => {
     writeStoredValue(storageKeys.tenantInvoices, tenantInvoices);
@@ -4978,6 +5005,119 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         );
         return updatedRecord;
       },
+      listBookingVendorIndents: (tenantId) =>
+        bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
+
+      sendBookingVendorIndent: (bookingId, actor) => {
+        const booking = tenantBookings.find((item) => item.id === bookingId);
+        if (!booking) throw new Error("Booking not found.");
+        if (booking.status !== "PENDING_ASSIGNMENT") {
+          throw new Error("Indents can only be sent for bookings pending assignment.");
+        }
+        if (bookingVendorIndents.some((indent) => indent.bookingId === bookingId && indent.status === "PENDING")) {
+          throw new Error("An active indent already exists for this booking.");
+        }
+        const eligibleVendors = tenantVendors.filter(
+          (vendor) => vendor.tenantId === booking.tenantId && vendor.status === "active",
+        );
+        if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
+        const now = new Date().toISOString();
+        const created: BookingVendorIndent[] = eligibleVendors.map((vendor, index) => ({
+          id: `indent-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+          tenantId: booking.tenantId,
+          bookingId: booking.id,
+          bookingRef: booking.bookingId,
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          status: "PENDING",
+          isWinner: false,
+          sentAt: now,
+          respondedAt: null,
+          rejectedReason: null,
+        }));
+        setBookingVendorIndents((current) => [...created, ...current]);
+        setTenantBookings((current) =>
+          current.map((item) =>
+            item.id === booking.id
+              ? {
+                  ...item,
+                  statusTimeline: [
+                    ...item.statusTimeline,
+                    {
+                      id: `booking-status-${Date.now()}-indent-sent`,
+                      status: item.status,
+                      timestamp: now,
+                      actor,
+                      eventLabel: "INDENT_SENT_TO_VENDORS",
+                      note: `Indent sent to ${created.length} vendor(s)`,
+                    },
+                  ],
+                  updatedAt: now,
+                }
+              : item,
+          ),
+        );
+        return created;
+      },
+
+      respondBookingVendorIndent: (indentId, action, reason) => {
+        const indent = bookingVendorIndents.find((item) => item.id === indentId);
+        if (!indent) throw new Error("Indent not found.");
+        if (indent.status !== "PENDING") throw new Error("This indent is no longer open.");
+        const now = new Date().toISOString();
+        const pushTimeline = (eventLabel: string, note: string) =>
+          setTenantBookings((current) =>
+            current.map((item) =>
+              item.id === indent.bookingId
+                ? {
+                    ...item,
+                    statusTimeline: [
+                      ...item.statusTimeline,
+                      {
+                        id: `booking-status-${Date.now()}-${eventLabel.toLowerCase()}`,
+                        status: item.status,
+                        timestamp: now,
+                        actor: indent.vendorName,
+                        eventLabel,
+                        note,
+                      },
+                    ],
+                    updatedAt: now,
+                  }
+                : item,
+            ),
+          );
+
+        if (action === "REJECT") {
+          const updated: BookingVendorIndent = {
+            ...indent,
+            status: "REJECTED",
+            respondedAt: now,
+            rejectedReason: reason ?? null,
+          };
+          setBookingVendorIndents((current) => current.map((item) => (item.id === indentId ? updated : item)));
+          pushTimeline("VENDOR_REJECTED_INDENT", reason ?? "Vendor rejected the indent");
+          return updated;
+        }
+
+        // ACCEPT — first-accept-wins.
+        if (bookingVendorIndents.some((item) => item.bookingId === indent.bookingId && item.isWinner)) {
+          throw new Error("Indent already accepted by another vendor.");
+        }
+        const updated: BookingVendorIndent = { ...indent, status: "ACCEPTED", isWinner: true, respondedAt: now };
+        setBookingVendorIndents((current) =>
+          current.map((item) => {
+            if (item.id === indentId) return updated;
+            if (item.bookingId === indent.bookingId && item.status === "PENDING") {
+              return { ...item, status: "CLOSED", respondedAt: now };
+            }
+            return item;
+          }),
+        );
+        pushTimeline("VENDOR_ACCEPTED_INDENT", "Vendor accepted the indent");
+        return updated;
+      },
+
       assignTenantBooking: (bookingId, input) => {
         const existing = tenantBookings.find((item) => matchesBookingId(item, bookingId));
         if (!existing) {
@@ -6152,6 +6292,9 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             expiry: input.permit.expiry,
           },
           odometer: input.odometer.trim(),
+          // Provenance: default to ADMIN when the caller didn't tag a source
+          // (e.g. Vendor Portal passes "VENDOR_PORTAL").
+          source: input.source ?? "ADMIN",
           createdAt: now,
           updatedAt: now,
         };
@@ -6242,6 +6385,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           endorsements: Array.from(new Set(input.endorsements.map((item) => item.trim()).filter(Boolean))),
           assignedVehicleId: input.assignedVehicleId ?? null,
           vendorId: input.vendorId ?? null,
+          // Provenance: default to ADMIN when the caller didn't tag a source.
+          source: input.source ?? "ADMIN",
           createdAt: now,
           updatedAt: now,
         };

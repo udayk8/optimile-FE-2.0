@@ -21,6 +21,31 @@ import {
 } from 'lucide-react'
 import '../styles/global.css'
 
+// The unified login page (shared-admin-core) writes the signed-in session here.
+// When a customer signs in from tenant master data (Admin → Customers) the
+// session carries which customer they are; the portal then acts AS that customer.
+const SESSION_CONTEXT_KEY = 'optimile.session.context'
+
+type PortalCustomerIdentity = { customerId?: string; customerName?: string; phone?: string }
+
+function readPortalCustomerIdentity(): PortalCustomerIdentity | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
+    if (!raw) return null
+    const session = JSON.parse(raw) as {
+      loginType?: string
+      customerId?: string
+      customerName?: string
+      phone?: string
+    }
+    if (session?.loginType !== 'CUSTOMER') return null
+    return { customerId: session.customerId, customerName: session.customerName, phone: session.phone }
+  } catch {
+    return null
+  }
+}
+
 type CustomerSection = 'overview' | 'requests' | 'shipments' | 'contracts'
 
 const NAV_ITEMS: Array<{
@@ -52,6 +77,9 @@ const NOTIFICATIONS = [
 
 function CustomerDashboardShell() {
   const { logout, user } = useAuth()
+  const portalCustomer = useMemo(() => readPortalCustomerIdentity(), [])
+  const displayName = portalCustomer?.customerName ?? user?.name ?? 'Customer User'
+  const displayRole = portalCustomer ? 'Customer' : user?.role ?? 'CBD'
   const [activeSection, setActiveSection] = useState<CustomerSection>('overview')
   const [query, setQuery] = useState('')
   const [searchFocused, setSearchFocused] = useState(false)
@@ -90,8 +118,8 @@ function CustomerDashboardShell() {
                   <UserCircle2 className="h-6 w-6" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-text">{user?.name ?? 'Customer User'}</p>
-                  <p className="text-xs text-gray-500">{user?.role ?? 'CBD'} · Customer Operations</p>
+                  <p className="truncate text-sm font-bold text-text">{displayName}</p>
+                  <p className="text-xs text-gray-500">{displayRole} · Customer Operations</p>
                 </div>
               </div>
             </div>
@@ -199,8 +227,8 @@ function CustomerDashboardShell() {
                 </button>
 
                 <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-text">{user?.name ?? 'Customer User'}</p>
-                  <p className="text-xs text-gray-500">{user?.role ?? 'CBD'} · Customer Booking Desk</p>
+                  <p className="text-sm font-semibold text-text">{displayName}</p>
+                  <p className="text-xs text-gray-500">{displayRole} · Customer Booking Desk</p>
                 </div>
 
                 <button
@@ -223,7 +251,7 @@ function CustomerDashboardShell() {
                 title="Welcome to the customer workspace"
                 subtitle="Use this dashboard to monitor booking demand, customer commitments, shipment progress, and coordination actions without leaving the shared Optimile operating rhythm."
                 icon={<BookOpenCheck className="h-5 w-5 text-primary" />}
-                action={<Badge variant="default">Role: {user?.role ?? 'CBD'}</Badge>}
+                action={<Badge variant="default">Role: {displayRole}</Badge>}
               />
 
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -253,7 +281,7 @@ function CustomerDashboardShell() {
                 />
                 <KpiCard
                   title="Access profile"
-                  value={user?.role ?? 'CBD'}
+                  value={displayRole}
                   insight="Role-aware customer landing with shared login, notifications, and workspace shell."
                   icon={<ShieldCheck className="h-4 w-4" />}
                 />
@@ -337,8 +365,8 @@ function CustomerDashboardShell() {
                   <CardContent className="space-y-4">
                     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Signed in as</p>
-                        <p className="mt-1 text-sm font-bold text-text">{user?.name ?? 'Customer User'}</p>
-                        <p className="mt-1 text-sm text-gray-600">{user?.role ?? 'CBD'} · Customer Booking Desk</p>
+                        <p className="mt-1 text-sm font-bold text-text">{displayName}</p>
+                        <p className="mt-1 text-sm text-gray-600">{displayRole} · Customer Booking Desk</p>
                       </div>
                       <div className="rounded-xl border border-primary/10 bg-primary/5 p-4 text-sm text-gray-600">
                         Header actions now mirror Fleet more closely: search, notifications, role context, and top-right logout stay together in one clean control strip.

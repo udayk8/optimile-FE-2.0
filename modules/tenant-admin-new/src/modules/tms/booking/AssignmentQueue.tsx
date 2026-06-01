@@ -9,6 +9,7 @@ import { Dialog } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { useSessionContext } from "@/shared/auth/session-context";
+import { useMockStore } from "@/shared/store/mock-store";
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { resolveManualLrScopedOrgUnits } from "@/shared/lib/manual-lr-scope";
@@ -36,6 +37,8 @@ export function AssignmentQueuePage() {
   const { data: bookings, assignBooking } = useTenantBookings(tenant.id);
   const { data: orgUnits } = useTenantOrgUnits(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
+  const { sendBookingVendorIndent, listBookingVendorIndents } = useMockStore();
+  const indents = listBookingVendorIndents(tenant.id);
   const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
   const vehicleMap = useMemo(() => buildVehicleLookup(adminSources.vehicles), [adminSources.vehicles]);
   const vendorMap = useMemo(() => buildVendorLookup(adminSources.vendors), [adminSources.vendors]);
@@ -367,7 +370,12 @@ export function AssignmentQueuePage() {
         title="Assignment Queue"
         description={tenant.assignmentMode === "AUTO_VENDOR_FLOW" ? "Direct-customer workflow supports faster vendor assignment while keeping selling-side freight visible." : "3PL workflow keeps vendor notification controlled until commercial review, buying-rate validation, and assignment confirmation are complete."}
         headers={["Booking", "Customer", "Service", "Commercial", "Selling Freight", "Status", "Actions"]}
-        rows={queue.map((booking) => [
+        rows={queue.map((booking) => {
+          const bookingIndents = indents.filter((indent) => indent.bookingId === booking.id);
+          const pendingIndentCount = bookingIndents.filter((indent) => indent.status === "PENDING").length;
+          const winnerIndent = bookingIndents.find((indent) => indent.isWinner);
+          const hasVehicle = Boolean(booking.assignment?.vehicleId);
+          return [
           <div key={`${booking.id}-booking`} className="space-y-1">
             <div>{booking.bookingId}</div>
             {(booking.destinationChangeRequests ?? []).some((request) => ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(request.status)) ? (
@@ -381,17 +389,43 @@ export function AssignmentQueuePage() {
           booking.commercialType,
           `Rs ${booking.pricing.calculatedFreight.toLocaleString()}`,
           <BookingStatusBadge key={`${booking.id}-status`} status={booking.status} />,
-          <div key={`${booking.id}-actions`} className="flex flex-wrap gap-2">
+          <div key={`${booking.id}-actions`} className="flex flex-wrap items-center gap-2">
             {access.can("ASSIGNMENT_QUEUE", "ASSIGN_VEHICLE") || access.can("ASSIGNMENT_QUEUE", "ASSIGN_VENDOR") ? (
               <Button size="sm" onClick={() => setAssigningBookingId(booking.id)}>
-                Assign
+                Assign Vehicle
               </Button>
+            ) : null}
+            {pendingIndentCount === 0 && !winnerIndent ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  try {
+                    sendBookingVendorIndent(booking.id, session.actorName || "Dispatcher");
+                  } catch (error) {
+                    window.alert((error as Error).message);
+                  }
+                }}
+              >
+                Send Indent to Vendors
+              </Button>
+            ) : null}
+            {pendingIndentCount > 0 && !winnerIndent ? (
+              <Badge variant="accent">Indent sent · {pendingIndentCount} notified</Badge>
+            ) : null}
+            {winnerIndent ? (
+              <Badge variant={hasVehicle ? "success" : "warning"}>
+                {hasVehicle
+                  ? `Assigned · ${winnerIndent.vendorName}`
+                  : `Accepted · ${winnerIndent.vendorName} · vehicle pending`}
+              </Badge>
             ) : null}
             <Button asChild size="sm" variant="ghost">
               <Link to={`/tenant/${tenant.id}/bookings/${booking.id}`}>View</Link>
             </Button>
           </div>,
-        ])}
+          ];
+        })}
         emptyMessage="No bookings are waiting for assignment."
       />
 
