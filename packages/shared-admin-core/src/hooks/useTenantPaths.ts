@@ -37,6 +37,7 @@ export function useTenantPaths() {
     vehicleTypes: `${root}/vehicle-types`,
     uomConfig: `${root}/uom-config`,
     lrConfig: `${root}/lr-config`,
+    lrManagement: `${root}/lr`,
     bookings: `${root}/bookings`,
     booking: (id: string) => `${root}/bookings/${id}`,
     bookingEdit: (id: string) => `${root}/bookings/${id}/edit`,

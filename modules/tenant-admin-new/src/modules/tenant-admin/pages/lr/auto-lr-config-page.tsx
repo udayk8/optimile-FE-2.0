@@ -104,7 +104,12 @@ export function TenantAutoLRConfigPage() {
     if (!sortedActiveLevels.length) {
       return [];
     }
-    const authorityOrder = currentGovernanceLevel?.order ?? sortedActiveLevels[0]?.order ?? 0;
+    // Company Root sits above Level 1, so every business level is a valid
+    // distribution target when no workspace is bound. Mirrors manual-lr.
+    if (!currentGovernanceLevel) {
+      return sortedActiveLevels;
+    }
+    const authorityOrder = currentGovernanceLevel.order;
     return sortedActiveLevels.filter((level) => level.order > authorityOrder);
   }, [currentGovernanceLevel, hierarchyLevels]);
   const managedTargetLevel =
@@ -115,10 +120,20 @@ export function TenantAutoLRConfigPage() {
       : null;
   const managedTargetLevelId = managedTargetLevel?.id ?? "";
   const childLevelLabel = managedTargetLevel?.name ?? "Child level";
-  const currentLevelLabel = currentGovernanceLevel?.name ?? tenantRootLevelName;
+  // Mirrors manual-lr-config-page.tsx: when no workspace is bound, the
+  // user is editing from Company Root context. Pure label flip — runtime
+  // (scopeType="TENANT") is unchanged. Flipping currentLevelLabel at the
+  // source propagates "Company Root" to every "X management / X can do"
+  // label downstream instead of leaking "Region".
+  const isAtCompanyRoot = !currentGovernanceLevel;
+  const currentLevelLabel = isAtCompanyRoot
+    ? "Company Root"
+    : (currentGovernanceLevel?.name ?? tenantRootLevelName);
   const currentScopeLabel = activeGovernanceOrgUnit
     ? `${activeGovernanceOrgUnit.name} (${currentLevelLabel})`
-    : tenantRootLevelName;
+    : isAtCompanyRoot
+      ? tenant.name
+      : tenantRootLevelName;
   const userScopedLevels = useMemo(() => {
     const authorityOrder = currentGovernanceLevel?.order ?? orderedLevels[0]?.order ?? 0;
     return orderedLevels.filter((level) => level.order >= authorityOrder);
@@ -228,10 +243,24 @@ export function TenantAutoLRConfigPage() {
       {message ? <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div> : null}
 
       <TenantPanel title="Auto LR Governance" description="">
+        {/* Same Company Root anchor as the manual page — UI only; the
+            runtime authority chain still starts at the first business
+            level (Level 1) of the configured hierarchy. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-[12px]">
+          <span className="inline-flex items-center rounded-md bg-indigo-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] text-indigo-700">
+            Company Root
+          </span>
+          <span className="text-slate-700">{tenant.name}</span>
+          <span className="text-slate-400">↳</span>
+          <span className="text-slate-600">{tenantRootLevelName} and below</span>
+        </div>
         <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="grid gap-3">
             <div className="grid gap-2 sm:grid-cols-3">
-              <CompactCard label="Root" value={currentLevelLabel} />
+              <CompactCard
+                label="Root Authority"
+                value={isAtCompanyRoot ? `Company Root — ${tenant.name}` : currentLevelLabel}
+              />
               <CompactCard label="Workspace" value={currentScopeLabel} />
               <CompactCard label="Preview" value={buildManualLrPreview(currentFormat)} mono />
             </div>
@@ -239,7 +268,7 @@ export function TenantAutoLRConfigPage() {
               <CompactCard label="Inherited From" value={orderedLevels[0]?.name ?? "Root"} />
             ) : null}
             <div className="grid gap-2 sm:grid-cols-[1.1fr_0.9fr]">
-              <Field label="Distribute Up To">
+              <Field label="Distribute LR Control">
                 <Select
                   value={form.scopeType === "TENANT" ? "TENANT" : managedTargetLevelId}
                   onChange={(event) => setForm((current) => ({
@@ -249,8 +278,13 @@ export function TenantAutoLRConfigPage() {
                   }))}
                   disabled={!canEdit}
                 >
-                  <option value="TENANT">{currentLevelLabel}</option>
-                  {availableTargetLevels.map((level) => <option key={level.id} value={level.id}>Up to {level.name}</option>)}
+                  <option value="TENANT">
+                    {isAtCompanyRoot
+                      || (currentGovernanceLevel && currentGovernanceLevel.order === (orderedLevels[0]?.order ?? 0))
+                      ? `Company Root only (${tenant.name})`
+                      : `${currentLevelLabel} only`}
+                  </option>
+                  {availableTargetLevels.map((level) => <option key={level.id} value={level.id}>Down to {level.name}</option>)}
                 </Select>
               </Field>
               <CompactCard
@@ -258,7 +292,8 @@ export function TenantAutoLRConfigPage() {
                 value={buildLrFlowLabel(
                   userScopedLevels,
                   form.scopeType === "TENANT" ? "" : managedTargetLevelId,
-                  currentLevelLabel,
+                  isAtCompanyRoot ? `Company Root (${tenant.name})` : currentLevelLabel,
+                  isAtCompanyRoot,
                 )}
               />
             </div>
@@ -435,16 +470,17 @@ function buildLrFlowLabel(
   levels: Array<{ id: string; name: string; order: number }>,
   targetLevelId: string,
   rootName: string,
+  rootIsAbove = false,
 ): string {
+  // See manual-lr-config-page.tsx for the rootIsAbove rationale —
+  // mirrors that implementation so both LR pages render the same chain.
   const sorted = [...levels].sort((a, b) => a.order - b.order);
-  if (!sorted.length) return rootName;
-  const root = sorted[0];
-  const targetIndex = targetLevelId ? sorted.findIndex((level) => level.id === targetLevelId) : 0;
-  if (targetIndex <= 0) {
-    return `${root.name} only`;
+  if (!targetLevelId || !sorted.length) return `${rootName} only`;
+  const targetIndex = sorted.findIndex((level) => level.id === targetLevelId);
+  if (targetIndex < 0) return `${rootName} only`;
+  if (rootIsAbove) {
+    return [rootName, ...sorted.slice(0, targetIndex + 1).map((level) => level.name)].join(" → ");
   }
-  return sorted
-    .slice(0, targetIndex + 1)
-    .map((level) => level.name)
-    .join(" → ");
+  if (targetIndex === 0) return `${rootName} only`;
+  return [rootName, ...sorted.slice(1, targetIndex + 1).map((level) => level.name)].join(" → ");
 }

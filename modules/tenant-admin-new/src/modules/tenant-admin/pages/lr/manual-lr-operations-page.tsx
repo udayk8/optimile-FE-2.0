@@ -156,16 +156,60 @@ export function TenantManualLrOperationsPage() {
   const selectedTab = visibleTabs.find((tab) => tab.key === activeTab) ?? visibleTabs[0] ?? null;
   const requiresExplicitPlace = availableActiveOrgUnits.length > 1 && !session.activeTenantOrgUnitId;
   const assignedOrgUnitIds = assignedOrgUnits.map((orgUnit) => orgUnit.id);
+  // Visible-ownership expansion: a parent sees every pool owned by its
+  // descendants too. South-Region sees its own pools AND every pool owned
+  // by Bangalore-Branch / Hub / sub-branch below it. Company Root sees
+  // every pool in the tenant. Branch users still see only their own
+  // pools because they have no descendants.
+  const visibleOwnershipOrgUnitIds = useMemo(() => {
+    if (!assignedOrgUnitIds.length) return [] as string[];
+    const childrenOf = new Map<string, OrgUnit[]>();
+    orgUnits.forEach((unit) => {
+      if (!unit.parentOrgUnitId) return;
+      const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+      list.push(unit);
+      childrenOf.set(unit.parentOrgUnitId, list);
+    });
+    const seen = new Set<string>();
+    const queue = [...assignedOrgUnitIds];
+    while (queue.length) {
+      const id = queue.shift();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      (childrenOf.get(id) ?? []).forEach((child) => queue.push(child.id));
+    }
+    return Array.from(seen);
+  }, [assignedOrgUnitIds, orgUnits]);
+
   const scopedManualPools = useMemo(
-    () =>
-      store.lrPools.filter(
+    () => {
+      const result = store.lrPools.filter(
         (pool) =>
           pool.configId === activeConfig?.id &&
-          (!assignedOrgUnitIds.length ||
+          (!visibleOwnershipOrgUnitIds.length ||
             pool.ownerLevelId == null ||
-            assignedOrgUnitIds.includes(pool.ownerLevelId)),
-      ),
-    [activeConfig?.id, assignedOrgUnitIds, store.lrPools],
+            visibleOwnershipOrgUnitIds.includes(pool.ownerLevelId)),
+      );
+      if (!result.length && store.lrPools.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn("[LR INVENTORY] Pools exist in store but filtered out", {
+          activeConfigId: activeConfig?.id ?? null,
+          assignedOrgUnitIds,
+          visibleOwnershipOrgUnitIds,
+          activeOrgUnitId: activeOrgUnit?.id ?? null,
+          totalPoolsInStore: store.lrPools.length,
+          sampleStorePool: store.lrPools[0] && {
+            configId: store.lrPools[0].configId,
+            ownerLevelId: store.lrPools[0].ownerLevelId,
+            currentPlaceId: store.lrPools[0].currentPlaceId,
+            tenantId: store.lrPools[0].tenantId,
+            lrNumber: store.lrPools[0].lrNumber,
+          },
+        });
+      }
+      return result;
+    },
+    [activeConfig?.id, assignedOrgUnitIds, visibleOwnershipOrgUnitIds, store.lrPools, activeOrgUnit?.id],
   );
   const manualPools = useMemo(
     () =>
@@ -241,6 +285,66 @@ export function TenantManualLrOperationsPage() {
         request.sourceOrgUnitId === activeOrgUnit.id ||
         request.targetOrgUnitId === activeOrgUnit.id),
   );
+  // Hierarchy context for the current view — parent unit + immediate
+  // children of the active place. Used by the context strip and the
+  // parent-side allocation summary so users can see where they sit in
+  // the chain without leaving the LR page.
+  const parentOrgUnit = useMemo(
+    () => (activeOrgUnit?.parentOrgUnitId ? orgUnitMap.get(activeOrgUnit.parentOrgUnitId) ?? null : null),
+    [activeOrgUnit, orgUnitMap],
+  );
+  const childOrgUnits = useMemo(
+    () => (activeOrgUnit ? orgUnits.filter((unit) => unit.parentOrgUnitId === activeOrgUnit.id) : []),
+    [activeOrgUnit, orgUnits],
+  );
+  // Per-child allocation roll-up so a parent user sees "Bangalore Branch ·
+  // 50 approved · 50 available · 0 consumed" at a glance. Counts source
+  // from store.lrPools so they stay live with every approve/transfer/use.
+  const childAllocationSummary = useMemo(() => {
+    if (!childOrgUnits.length) return [];
+    return childOrgUnits
+      .map((child) => {
+        const childPools = allManualPools.filter(
+          (pool) => (pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId) === child.id,
+        );
+        return {
+          unit: child,
+          allocated: childPools.length,
+          available: childPools.filter((pool) => pool.status === "AVAILABLE").length,
+          consumed: childPools.filter((pool) => pool.status === "USED").length,
+          pendingRequests: store.lrRequests.filter(
+            (request) =>
+              request.configId === activeConfig?.id &&
+              request.sourceOrgUnitId === child.id &&
+              request.status === "PENDING",
+          ).length,
+        };
+      })
+      .sort((left, right) => left.unit.name.localeCompare(right.unit.name));
+  }, [activeConfig?.id, allManualPools, childOrgUnits, store.lrRequests]);
+  // Read approval/allocation provenance off the pool's audit trail. The
+  // store appends REQUEST_APPROVED_ALLOCATION / REQUEST_APPROVED_GENERATED
+  // when a request flips to APPROVED — that's the source of truth for
+  // "Approved by / Approved at / From parent place".
+  function getPoolApprovalContext(pool: TenantLrPoolRecord) {
+    const events = pool.auditEvents ?? [];
+    const approval = [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.action === "REQUEST_APPROVED_ALLOCATION" ||
+          event.action === "REQUEST_APPROVED_GENERATED",
+      );
+    if (!approval) return null;
+    return {
+      approvedBy: approval.actor ?? null,
+      approvedAt: approval.timestamp ?? null,
+      fromPlaceName: approval.fromPlaceId
+        ? orgUnitMap.get(approval.fromPlaceId)?.name ?? approval.fromPlaceId
+        : null,
+      requestId: approval.note ?? null,
+    };
+  }
   const recentAudit = store.auditLogs.filter(
     (entry) =>
       entry.entityType.includes("lr") ||
@@ -587,18 +691,29 @@ export function TenantManualLrOperationsPage() {
         pool.ownerLevelId == null ||
         pool.ownerLevelId === request.targetOrgUnitId,
     );
-    const selected = availableForParent.slice(0, request.requestedCount);
-    if (!isTenantRootRequest && selected.length < request.requestedCount) {
-      setMessage("Insufficient manual LR stock to fulfill this request.");
+    const lrType = activeConfig?.lrType ?? null;
+    const canGenerateOnApproval = lrType === "MANUAL" || lrType === "PRE_GENERATED";
+    if (
+      !isTenantRootRequest &&
+      !canGenerateOnApproval &&
+      availableForParent.length < request.requestedCount
+    ) {
+      setMessage(
+        `Insufficient manual LR stock at this place. Have ${availableForParent.length}, need ${request.requestedCount}.`,
+      );
       return;
     }
-    await lrManagement.approveRequest(
-      request.id,
-      request.requestedCount,
-      currentUser?.name ?? currentRole?.name ?? "Tenant User",
-      "Allocated from request queue.",
-    );
-    setMessage(`Allocated ${request.requestedCount} LR numbers to ${orgUnitMap.get(request.sourceOrgUnitId ?? "")?.name ?? "requester"}.`);
+    try {
+      const updated = await lrManagement.approveRequest(
+        request.id,
+        request.requestedCount,
+        currentUser?.name ?? currentRole?.name ?? "Tenant User",
+        "Allocated from request queue.",
+      );
+      setMessage(`Allocated ${updated.approvedCount} LR numbers to ${orgUnitMap.get(request.sourceOrgUnitId ?? "")?.name ?? "requester"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Allocation failed.");
+    }
   }
 
   async function handleInlineRequestDecision(requestId: string, approve: boolean) {
@@ -609,33 +724,55 @@ export function TenantManualLrOperationsPage() {
     }
     if (approve) {
       const isTenantRootRequest = !request.targetOrgUnitId;
-      if (!isTenantRootRequest) {
-        const availableForParent = availablePools.filter(
-          (pool) =>
-            !request.targetOrgUnitId ||
-            pool.ownerLevelId == null ||
-            pool.ownerLevelId === request.targetOrgUnitId,
-        );
-        if (availableForParent.length < request.requestedCount) {
-          setMessage("Insufficient manual LR stock to fulfill this request.");
-          return;
-        }
-      }
-      await lrManagement.approveRequest(
-        request.id,
-        request.requestedCount,
-        currentUser?.name ?? currentRole?.name ?? "Tenant User",
-        "Approved from request list.",
+      const availableForParent = availablePools.filter(
+        (pool) =>
+          !request.targetOrgUnitId ||
+          pool.ownerLevelId == null ||
+          pool.ownerLevelId === request.targetOrgUnitId,
       );
-      setMessage(`Approved ${request.requestedCount} LR numbers for ${orgUnitMap.get(request.sourceOrgUnitId ?? "")?.name ?? "requester"}.`);
+      // The store will allocate existing AVAILABLE pools first and then
+      // generate new pools for the unmatched count when the config is
+      // MANUAL or PRE_GENERATED. Only block here when neither path can
+      // satisfy the request — i.e. AUTO config AND no available pools.
+      const lrType = activeConfig?.lrType ?? null;
+      const canGenerateOnApproval = lrType === "MANUAL" || lrType === "PRE_GENERATED";
+      if (
+        !isTenantRootRequest &&
+        !canGenerateOnApproval &&
+        availableForParent.length < request.requestedCount
+      ) {
+        setMessage(
+          `Insufficient manual LR stock at the approver place. Have ${availableForParent.length}, need ${request.requestedCount}. Upload more or transfer in before approving.`,
+        );
+        return;
+      }
+      try {
+        const updated = await lrManagement.approveRequest(
+          request.id,
+          request.requestedCount,
+          currentUser?.name ?? currentRole?.name ?? "Tenant User",
+          "Approved from request list.",
+        );
+        // Approval now always generates fresh LR numbers at the requesting
+        // place using its configured format — see store approveTenantLrRequest.
+        setMessage(
+          `Approved ${updated.approvedCount} LR numbers — generated at ${orgUnitMap.get(request.sourceOrgUnitId ?? "")?.name ?? "requester"} using its configured format.`,
+        );
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Approve failed.");
+      }
       return;
     }
-    await lrManagement.rejectRequest(
-      request.id,
-      currentUser?.name ?? currentRole?.name ?? "Tenant User",
-      "Rejected from request list.",
-    );
-    setMessage("LR request rejected.");
+    try {
+      await lrManagement.rejectRequest(
+        request.id,
+        currentUser?.name ?? currentRole?.name ?? "Tenant User",
+        "Rejected from request list.",
+      );
+      setMessage("LR request rejected.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Reject failed.");
+    }
   }
 
   async function handleTransfer() {
@@ -724,9 +861,20 @@ export function TenantManualLrOperationsPage() {
         description=""
       />
       <div className="rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <span><span className="font-medium">User:</span> {currentUser?.name ?? "—"}</span>
           <span><span className="font-medium">Role:</span> {currentRole?.name ?? access.activeRole?.name ?? "No role"}</span>
           <span><span className="font-medium">Active place:</span> {activeOrgUnit?.name ?? "Not selected"}</span>
+          <span>
+            <span className="font-medium">Parent:</span>{" "}
+            {parentOrgUnit?.name ?? (activeOrgUnit ? "Company Root" : "—")}
+          </span>
+          <span>
+            <span className="font-medium">Children:</span>{" "}
+            {childOrgUnits.length
+              ? `${childOrgUnits.length} place${childOrgUnits.length === 1 ? "" : "s"}`
+              : "—"}
+          </span>
           <span><span className="font-medium">Visible LR:</span> {availablePools.length}</span>
           <div className="min-w-[220px]">
             <Select value={activeOrgUnit?.id ?? ""} onChange={(event) => setActiveOrgUnit(event.target.value || null)}>
@@ -757,6 +905,40 @@ export function TenantManualLrOperationsPage() {
         <TenantSummaryCard label="Pending approvals" value={String(relevantRequests.filter((request) => request.status === "PENDING").length)} helper="Open LR requests waiting for action" />
         <TenantSummaryCard label="Consumed" value={String(consumedPools.length)} helper="Already linked to booking assignments" />
       </div>
+
+      {childAllocationSummary.length ? (
+        <TenantPanel
+          title="Allocated to child places"
+          description={`Per-child stock owned by ${activeOrgUnit?.name ?? "this place"}. Counts refresh after every approve / allocate / transfer / consume.`}
+        >
+          <div className="overflow-x-auto rounded-2xl border">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  {["Child place", "Allocated", "Available", "Consumed", "Pending requests"].map((label) => (
+                    <th key={label} className="px-4 py-2.5 text-left font-medium text-slate-600">{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {childAllocationSummary.map((row) => (
+                  <tr key={row.unit.id}>
+                    <td className="px-4 py-2.5 font-medium text-slate-900">{row.unit.name}</td>
+                    <td className="px-4 py-2.5">{row.allocated}</td>
+                    <td className="px-4 py-2.5">{row.available}</td>
+                    <td className="px-4 py-2.5">{row.consumed}</td>
+                    <td className="px-4 py-2.5">
+                      {row.pendingRequests
+                        ? <Badge variant="warning">{row.pendingRequests} pending</Badge>
+                        : <span className="text-slate-500">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TenantPanel>
+      ) : null}
 
       {!visibleTabs.length ? (
         <TenantEmptyState
@@ -822,9 +1004,15 @@ export function TenantManualLrOperationsPage() {
                     </Select>
                     <Select value={inventoryPlaceFilter} onChange={(event) => setInventoryPlaceFilter(event.target.value)}>
                       <option value="ALL">All places</option>
-                      {assignedOrgUnits.map((orgUnit) => (
-                        <option key={orgUnit.id} value={orgUnit.id}>{orgUnit.name}</option>
-                      ))}
+                      {/* List every place inside the user's visible scope
+                          (assigned + descendants) so a Region user can
+                          drill into a specific Branch / Hub. Branch users
+                          still see only their own place here. */}
+                      {orgUnits
+                        .filter((unit) => visibleOwnershipOrgUnitIds.includes(unit.id))
+                        .map((orgUnit) => (
+                          <option key={orgUnit.id} value={orgUnit.id}>{orgUnit.name}</option>
+                        ))}
                     </Select>
                     <Select value={inventoryStatusFilter} onChange={(event) => setInventoryStatusFilter(event.target.value)}>
                       <option value="ALL">All statuses</option>
@@ -845,38 +1033,79 @@ export function TenantManualLrOperationsPage() {
                 {inventoryView === "ACTIVE_PLACE"
                   ? `Only ${activeOrgUnit?.name ?? "the active place"}`
                   : assignedOrgUnits.length
-                    ? `All assigned places for ${currentRole?.name ?? "this role"}: ${assignedOrgUnits.map((unit) => unit.name).join(", ")}`
+                    ? (() => {
+                        // List every visible place (assigned + descendants)
+                        // so the user knows which child places they're
+                        // seeing inventory for.
+                        const visibleNames = orgUnits
+                          .filter((unit) => visibleOwnershipOrgUnitIds.includes(unit.id))
+                          .map((unit) => unit.name);
+                        const directNames = assignedOrgUnits.map((unit) => unit.name);
+                        const descendantNames = visibleNames.filter((name) => !directNames.includes(name));
+                        return descendantNames.length
+                          ? `${currentRole?.name ?? "This role"} sees ${directNames.join(", ")} and ${descendantNames.length} descendant place${descendantNames.length === 1 ? "" : "s"} (${descendantNames.join(", ")}).`
+                          : `${currentRole?.name ?? "This role"} sees ${directNames.join(", ")}.`;
+                      })()
                     : "No org-unit scope assigned to this user."}
               </div>
               <div className="mt-4 overflow-x-auto rounded-2xl border">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["LR Number", "Pool Type", "Customer", "Current Place", "Status", "Booking ID", "Created By", "Updated"].map((label) => (
+                      {[
+                        "LR Number",
+                        "Pool Type",
+                        "Customer",
+                        "Owning Place",
+                        "Current Place",
+                        "Status",
+                        "Booking ID",
+                        "Approved From",
+                        "Approved By",
+                        "Approved At",
+                        "Updated",
+                      ].map((label) => (
                         <th key={label} className="px-4 py-3 text-left font-medium text-slate-600">{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredPools.map((pool) => (
-                      <tr key={pool.id}>
-                        <td className="px-4 py-3 font-mono">{pool.lrNumber}</td>
-                        <td className="px-4 py-3">{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")).replace("_", " ")}</td>
-                        <td className="px-4 py-3">{store.customerMap.get(pool.customerId ?? "")?.name ?? "--"}</td>
-                        <td className="px-4 py-3">{orgUnitMap.get(pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool"}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant={getManualLrStatusTone(getManualLrUiStatus(pool)) as never}>
-                            {getManualLrUiStatus(pool)}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">{pool.bookingId ?? "--"}</td>
-                        <td className="px-4 py-3">{pool.createdBy ?? "--"}</td>
-                        <td className="px-4 py-3">{new Date(pool.updatedAt).toLocaleString()}</td>
-                      </tr>
-                    ))}
+                    {filteredPools.map((pool) => {
+                      const approval = getPoolApprovalContext(pool);
+                      const owningPlaceName = orgUnitMap.get(pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool";
+                      const currentPlaceName = orgUnitMap.get(pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool";
+                      return (
+                        <tr key={pool.id}>
+                          {/* Hierarchy-aware LR rendering — show owning place
+                              prefix so "Bangalore Branch · BLSRBLR-2026-000001"
+                              reads as one identifier instead of an orphan
+                              number. */}
+                          <td className="px-4 py-3 font-mono">
+                            <span className="text-[11px] text-slate-500">{owningPlaceName} · </span>
+                            <span>{pool.lrNumber}</span>
+                          </td>
+                          <td className="px-4 py-3">{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")).replace("_", " ")}</td>
+                          <td className="px-4 py-3">{store.customerMap.get(pool.customerId ?? "")?.name ?? "--"}</td>
+                          <td className="px-4 py-3">{owningPlaceName}</td>
+                          <td className="px-4 py-3">{currentPlaceName}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={getManualLrStatusTone(getManualLrUiStatus(pool)) as never}>
+                              {getManualLrUiStatus(pool)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3">{pool.bookingId ?? "--"}</td>
+                          <td className="px-4 py-3">{approval?.fromPlaceName ?? "--"}</td>
+                          <td className="px-4 py-3">{approval?.approvedBy ?? pool.createdBy ?? "--"}</td>
+                          <td className="px-4 py-3">
+                            {approval?.approvedAt ? new Date(approval.approvedAt).toLocaleString() : "--"}
+                          </td>
+                          <td className="px-4 py-3">{new Date(pool.updatedAt).toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
                     {!filteredPools.length ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={11} className="px-4 py-10 text-center text-muted-foreground">
                           No LR inventory is visible for the selected role scope and place view.
                         </td>
                       </tr>

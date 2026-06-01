@@ -3553,10 +3553,33 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             timestamp: new Date().toISOString(),
           }),
         );
+      // BUG FIX: buildTenantLrPoolsFromConfig only returns pools whose
+      // lrNumber is in getPoolEntries(config) (the config's pre-seeded
+      // RANGE / ENTRIES list). Pools that were CREATED DYNAMICALLY after
+      // boot — via request approvals, parent allocations, transfers —
+      // share the same configId but their lrNumber is generated on the
+      // fly, so the previous "remainingPools.filter(no-config-match)"
+      // step wiped them out on every render and persisted the empty
+      // state back to localStorage.
+      //
+      // Two buckets must survive: (a) pools whose config no longer
+      // exists, and (b) pools whose configId matches but whose lrNumber
+      // isn't part of the static entries set (dynamically generated).
+      const seenNumbersByConfig = new Map<string, Set<string>>();
+      configDrivenPools.forEach((pool) => {
+        const set = seenNumbersByConfig.get(pool.configId) ?? new Set<string>();
+        set.add(pool.lrNumber);
+        seenNumbersByConfig.set(pool.configId, set);
+      });
+      const dynamicallyGeneratedPools = current.filter(
+        (pool) =>
+          tenantLRConfigs.some((config) => config.id === pool.configId) &&
+          !(seenNumbersByConfig.get(pool.configId)?.has(pool.lrNumber) ?? false),
+      );
       const remainingPools = current.filter(
         (pool) => !tenantLRConfigs.some((config) => config.id === pool.configId),
       );
-      return [...configDrivenPools, ...remainingPools];
+      return [...configDrivenPools, ...dynamicallyGeneratedPools, ...remainingPools];
     });
   }, [tenantLRConfigs]);
 
@@ -5748,14 +5771,49 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         });
         setTenantLrRequests((current) => current.map((item) => (item.id === requestId ? updated : item)));
         setTenantLrPools((current) => {
+          // Per explicit product requirement: approval is an inventory
+          // CREATION event, not a move event. Always generate fresh LR
+          // numbers at the requesting place using its configured format.
           const nextPools = [...current];
-          let remaining = updated.approvedCount;
+          const canGenerateForApproval =
+            (configForRequest?.lrType === "MANUAL" || configForRequest?.lrType === "PRE_GENERATED") &&
+            Boolean(existing.configId);
+
+          // Diagnostic: surface every input to the generation decision so
+          // a silent miss is visible in the browser console.
+          // eslint-disable-next-line no-console
+          console.log("[LR APPROVE]", {
+            requestId,
+            tenantId: existing.tenantId,
+            requesterOrgUnitId: existing.sourceOrgUnitId,
+            approverOrgUnitId: existing.targetOrgUnitId,
+            configId: existing.configId,
+            configFound: Boolean(configForRequest),
+            configLrType: configForRequest?.lrType ?? null,
+            approvedCount: updated.approvedCount,
+            existingPoolCount: current.length,
+            canGenerateForApproval,
+          });
+
+          if (!canGenerateForApproval || updated.approvedCount <= 0) {
+            // eslint-disable-next-line no-console
+            console.warn("[LR APPROVE] Generation SKIPPED — pools unchanged", {
+              reason: !canGenerateForApproval
+                ? "config not MANUAL/PRE_GENERATED or configId missing"
+                : "approvedCount <= 0",
+            });
+            return nextPools;
+          }
+
           const requesterFormat = resolveStoreLrFormatForOrgUnit(
             configForRequest,
             existing.sourceOrgUnitId,
             orgUnits,
           );
-          let requesterSequence =
+          // Continue from the last sequence number already issued for this
+          // (config, owner place) tuple so a second approval doesn't
+          // restart at 000001.
+          const requesterSequence =
             nextPools
               .filter(
                 (pool) =>
@@ -5768,107 +5826,40 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               })
               .reduce((max, value) => Math.max(max, value), 0) + 1;
 
-          for (let index = 0; index < nextPools.length && remaining > 0; index += 1) {
-            const pool = nextPools[index];
-            if (
-              pool.tenantId !== existing.tenantId ||
-              pool.status !== "AVAILABLE" ||
-              (existing.configId && pool.configId !== existing.configId) ||
-              (existing.customerId &&
-                configForRequest?.lrType === "PRE_GENERATED" &&
-                pool.customerId &&
-                pool.customerId !== existing.customerId) ||
-              (existing.customerId &&
-                configForRequest?.lrType !== "PRE_GENERATED" &&
-                pool.customerId !== existing.customerId) ||
-              (!existing.targetOrgUnitId && pool.ownerLevelId != null) ||
-              (existing.targetOrgUnitId &&
-                pool.ownerLevelId &&
-                pool.ownerLevelId !== existing.targetOrgUnitId) ||
-              (existing.targetUserId && pool.ownerUserId !== existing.targetUserId)
-            ) {
-              continue;
-            }
-
-            remaining -= 1;
-            nextPools[index] = {
-              ...appendPoolAuditEvent(pool, {
-                action: "REQUEST_APPROVED_ALLOCATION",
-                poolType: existing.customerId ? "CUSTOMER_RESERVED" : (pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")),
-                customerId: existing.customerId ?? pool.customerId ?? null,
-                fromPlaceId: pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-                toPlaceId: existing.sourceOrgUnitId ?? pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-                actor,
-                role: actor,
-                timestamp: now,
-                note: existing.id,
-              }),
-              lrNumber: buildStoreFormattedLrNumber(
-                requesterFormat ?? configForRequest ?? {
-                  prefix: "LR",
-                  yearFormat: "YYYY",
-                  numberSeparator: "-",
-                  zeroPaddingLength: 6,
-                },
-                requesterSequence,
-              ),
-              poolType: existing.customerId ? "CUSTOMER_RESERVED" : (pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")),
-              ownerPlaceId: existing.sourceOrgUnitId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-              currentPlaceId: existing.sourceOrgUnitId ?? pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-              ownerLevelId: existing.sourceOrgUnitId ?? pool.ownerLevelId ?? null,
-              ownerUserId: existing.sourceUserId ?? pool.ownerUserId ?? null,
-              customerId: existing.customerId ?? pool.customerId ?? null,
-              updatedAt: now,
-            };
-            requesterSequence += 1;
-          }
-
-          if (
-            remaining > 0 &&
-            (configForRequest?.lrType === "MANUAL" || configForRequest?.lrType === "PRE_GENERATED") &&
-            existing.configId
-          ) {
-            const maxSequence = nextPools
-              .filter((pool) => pool.configId === existing.configId)
-              .map((pool) => {
-                const match = pool.lrNumber.match(/(\d+)(?!.*\d)/);
-                return match ? Number(match[1]) : 0;
-              })
-              .reduce((max, value) => Math.max(max, value), 0);
-            for (let index = 0; index < remaining; index += 1) {
-              nextPools.push(
-                normalizeStoredTenantLrPools([
-                  {
-                    id: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
-                    lrNumberId: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
-                    tenantId: existing.tenantId,
-                    configId: existing.configId,
-                    lrNumber: buildStoreFormattedLrNumber(
-                      requesterFormat ?? configForRequest ?? {
-                        prefix: "LR",
-                        yearFormat: "YYYY",
-                        numberSeparator: "-",
-                        zeroPaddingLength: 6,
-                      },
-                      requesterSequence + index,
-                    ),
-                    poolType: existing.customerId ? "CUSTOMER_RESERVED" : "GENERAL",
-                    status: "AVAILABLE",
-                    customerId: existing.customerId ?? null,
-                    vendorId: null,
-                    ownerPlaceId: existing.sourceOrgUnitId ?? null,
-                    currentPlaceId: existing.sourceOrgUnitId ?? null,
-                    ownerLevelId: existing.sourceOrgUnitId ?? null,
-                    ownerUserId: existing.sourceUserId ?? null,
-                    bookingId: null,
-                    deliveryId: null,
-                    usedAt: null,
-                    voidReason: null,
-                    createdBy: actor,
-                    auditEvents: [{
+          const formatForGeneration = requesterFormat ?? configForRequest ?? {
+            prefix: "LR",
+            yearFormat: "YYYY" as const,
+            numberSeparator: "-",
+            zeroPaddingLength: 6,
+          };
+          const poolType: "GENERAL" | "CUSTOMER_RESERVED" = existing.customerId ? "CUSTOMER_RESERVED" : "GENERAL";
+          for (let index = 0; index < updated.approvedCount; index += 1) {
+            nextPools.push(
+              normalizeStoredTenantLrPools([
+                {
+                  id: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+                  lrNumberId: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+                  tenantId: existing.tenantId,
+                  configId: existing.configId!,
+                  lrNumber: buildStoreFormattedLrNumber(formatForGeneration, requesterSequence + index),
+                  poolType,
+                  status: "AVAILABLE",
+                  customerId: existing.customerId ?? null,
+                  vendorId: null,
+                  ownerPlaceId: existing.sourceOrgUnitId ?? null,
+                  currentPlaceId: existing.sourceOrgUnitId ?? null,
+                  ownerLevelId: existing.sourceOrgUnitId ?? null,
+                  ownerUserId: existing.sourceUserId ?? null,
+                  bookingId: null,
+                  deliveryId: null,
+                  usedAt: null,
+                  voidReason: null,
+                  createdBy: actor,
+                  auditEvents: [
+                    {
                       id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
                       action: "REQUEST_APPROVED_GENERATED",
-                      poolType: existing.customerId ? "CUSTOMER_RESERVED" : "GENERAL",
+                      poolType,
                       customerId: existing.customerId ?? null,
                       fromPlaceId: existing.targetOrgUnitId ?? null,
                       toPlaceId: existing.sourceOrgUnitId ?? null,
@@ -5876,22 +5867,40 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       role: actor,
                       timestamp: now,
                       note: existing.id,
-                    }],
-                    createdAt: now,
-                    updatedAt: now,
-                  },
-                ])[0],
-              );
-            }
-            remaining = 0;
+                    },
+                  ],
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              ])[0],
+            );
           }
-          return rewritePoolsToOwnerFormat({
+          const rewritten = rewritePoolsToOwnerFormat({
             pools: nextPools,
             config: configForRequest,
             ownerLevelId: existing.sourceOrgUnitId,
             orgUnits,
             timestamp: now,
           });
+          const ownedByRequester = rewritten.filter(
+            (pool) =>
+              pool.configId === existing.configId &&
+              pool.ownerLevelId === existing.sourceOrgUnitId,
+          );
+          const generatedThisCall = ownedByRequester.slice(-updated.approvedCount);
+          // eslint-disable-next-line no-console
+          console.log("[LR APPROVE] Generated", {
+            generatedCount: updated.approvedCount,
+            firstGeneratedLr: generatedThisCall[0]?.lrNumber ?? null,
+            lastGeneratedLr: generatedThisCall[generatedThisCall.length - 1]?.lrNumber ?? null,
+            poolsBefore: current.length,
+            poolsAfter: rewritten.length,
+            requesterPoolsTotal: ownedByRequester.length,
+            sampleOwnerLevelId: generatedThisCall[0]?.ownerLevelId ?? null,
+            sampleCurrentPlaceId: generatedThisCall[0]?.currentPlaceId ?? null,
+            sampleConfigId: generatedThisCall[0]?.configId ?? null,
+          });
+          return rewritten;
         });
         setPlatformAuditLogs((current) => [
           {

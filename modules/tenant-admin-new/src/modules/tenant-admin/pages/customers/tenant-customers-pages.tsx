@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { FileDown, PencilLine, Plus } from "lucide-react";
+import { FileDown, Pencil, PencilLine, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { DataTable } from "@/shared/components/common/data-table";
 import { PageHeader } from "@/shared/components/common/page-header";
@@ -2100,9 +2100,13 @@ function BasicDetailsStep({
   form: TenantCustomerInput;
   setForm: React.Dispatch<React.SetStateAction<TenantCustomerInput>>;
 }) {
+  // Status defaults to active; tier and ownership (Billing Address /
+  // Relationship Manager / Internal Account Owner) are deferred to the
+  // customer detail page once the customer record exists. Keeping this step
+  // minimal — identity + tax — so the user gets to the addresses step fast.
   return (
     <div className="grid gap-6">
-      <SectionBlock title="Identity Section">
+      <SectionBlock title="Identity">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Customer Name *">
             <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
@@ -2110,37 +2114,10 @@ function BasicDetailsStep({
           <Field label="Legal Name" helper="As per GST registration">
             <Input value={form.legalName ?? ""} onChange={(event) => setForm((current) => ({ ...current, legalName: event.target.value }))} />
           </Field>
-          <Field label="Tier">
-            <Select value={form.tier ?? "Standard"} onChange={(event) => setForm((current) => ({ ...current, tier: event.target.value }))}>
-              <option value="Standard">Standard</option>
-              <option value="Premium">Premium</option>
-              <option value="Enterprise">Enterprise</option>
-            </Select>
-          </Field>
-          <Field label="Status">
-            <Select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as TenantCustomerInput["status"] }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
-          </Field>
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Address & Ownership">
-        <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Billing Address">
-            <Textarea value={form.billingAddress ?? ""} onChange={(event) => setForm((current) => ({ ...current, billingAddress: event.target.value }))} className="min-h-[112px]" />
-          </Field>
-          <Field label="Relationship Manager">
-            <Input value={form.relationshipManager ?? ""} onChange={(event) => setForm((current) => ({ ...current, relationshipManager: event.target.value }))} />
-          </Field>
-          <Field label="Internal Account Owner">
-            <Input value={form.internalAccountOwner ?? ""} onChange={(event) => setForm((current) => ({ ...current, internalAccountOwner: event.target.value }))} />
-          </Field>
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Tax Information Section">
+      <SectionBlock title="Tax Information">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="GSTIN">
             <Input
@@ -2236,6 +2213,10 @@ function CustomerAddressManagementSection({
   const [importError, setImportError] = useState("");
   const [importing, setImporting] = useState(false);
   const [uploadedFileName, setUploadedFileName] = useState("");
+  // Pagination for the address table. Default 10 rows / page — same as the
+  // booking list — keeps the page short when a customer has 100s of addresses.
+  const ADDRESS_PAGE_SIZE = 10;
+  const [addressPage, setAddressPage] = useState(1);
 
   useEffect(() => {
     if (!addresses.length) {
@@ -2249,7 +2230,10 @@ function CustomerAddressManagementSection({
 
   function openCreate() {
     setEditingId(null);
-    setDraft(emptyCustomerAddressDraft());
+    // The compact dialog no longer surfaces the type picker. Default the
+    // tag to "Consignee" (the booking-relevant one) so saveAddress passes
+    // its `type.length` check without the user having to choose.
+    setDraft({ ...emptyCustomerAddressDraft(), type: ["Consignee"] });
     setError("");
     setAddressDialogOpen(true);
   }
@@ -2305,23 +2289,34 @@ function CustomerAddressManagementSection({
   }
 
   function saveAddress() {
+    // Consignee Name and Address Label are no longer asked for in the
+    // compact dialog. Fall back to `name` for both so downstream consumers
+    // (booking/LR/billing) and the existing list view (which display
+    // consigneeName / addressLabel) keep working unchanged.
+    const filledDraft: CustomerAddressMasterEntry = {
+      ...draft,
+      consigneeName: draft.consigneeName?.trim() || draft.name?.trim() || "",
+      addressLabel: draft.addressLabel?.trim() || draft.name?.trim() || "",
+    };
     const normalized = normalizeCustomerAddressDraft(
-      draft.isTemporary
+      filledDraft.isTemporary
         ? {
-            ...draft,
+            ...filledDraft,
             type: ["Consignee"],
-            operationalAddressType: draft.operationalAddressType ?? "ADDITIONAL",
-            name: draft.name?.trim() || `${draft.consigneeName || "Consignee"} Temporary Address`,
-            addressLabel: draft.addressLabel?.trim() || "Temporary Address",
+            operationalAddressType: filledDraft.operationalAddressType ?? "ADDITIONAL",
+            name: filledDraft.name?.trim() || `${filledDraft.consigneeName || "Consignee"} Temporary Address`,
+            addressLabel: filledDraft.addressLabel?.trim() || "Temporary Address",
           }
-        : draft,
+        : filledDraft,
     );
     if (!normalized.type.length) {
-      setError("Select at least one address type.");
+      // Should never trigger from the UI — openCreate seeds type with
+      // ["Consignee"]. Kept as a safety net for legacy drafts.
+      setError("Address type is missing.");
       return;
     }
-    if (normalized.type.includes("Consignee") && !normalized.consigneeName?.trim()) {
-      setError("Consignee name is required for consignee delivery addresses.");
+    if (!normalized.name?.trim()) {
+      setError("Address name is required.");
       return;
     }
     if (
@@ -2333,7 +2328,7 @@ function CustomerAddressManagementSection({
       !normalized.country ||
       !normalized.pincode
     ) {
-      setError("Contact person name, phone, address line 1, pincode, country, state, and city are required.");
+      setError("Contact person, phone, address line 1, pincode, country, state, and city are required.");
       return;
     }
     if (!isValidCustomerAddressPhone(normalized.contactNumber)) {
@@ -2464,195 +2459,109 @@ function CustomerAddressManagementSection({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold">Address Section</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add reusable customer address master entries for booking, LR generation, and billing. Address creation is optional here and can be completed later.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            You can upload addresses in bulk using Excel. This step can be completed later.
+          <p className="text-sm font-semibold">Addresses</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Optional. Used by booking, LR generation, and billing. Can be added later.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={downloadTemplate}>
-            <FileDown className="size-4" />
-            Download Template
-          </Button>
-          <Button size="sm" variant="outline" onClick={openCreate}>
-            + Add Address
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => openCreateForOperationalType("ADDITIONAL")}>
-            Add Additional Address
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => openCreateForOperationalType("EMERGENCY")}>
-            Add Emergency Address
-          </Button>
-        </div>
+        <Button size="sm" onClick={openCreate}>+ Add Address</Button>
       </div>
 
-      <div className="rounded-2xl border bg-muted/20 px-4 py-3">
-        <p className="text-sm font-medium">{addresses.length} address{addresses.length === 1 ? "" : "es"} configured</p>
-        <p className="mt-1 text-xs text-muted-foreground">{primaryCount} primary | {additionalCount} additional | {emergencyCount} emergency</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {temporaryCount} temporary operational address{temporaryCount === 1 ? "" : "es"}
-        </p>
-      </div>
+      {/* Removed: redundant configured-summary block (X primary / additional /
+          emergency / temporary) and the "Address Pending" amber panel. The
+          empty list state below already communicates "nothing added yet"
+          without restating it twice. Bulk upload + Download Template now
+          live inside the address dialog footer instead of the top toolbar. */}
 
       {!addresses.length ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-4">
-          <p className="text-sm font-semibold text-amber-900">Address Pending</p>
-          <p className="mt-1 text-sm text-amber-800">
-            No reusable customer addresses have been added yet. You can skip this for now and use Add Address later from the customer view.
-          </p>
-          <div className="mt-3">
-            <Button size="sm" onClick={openCreate}>
-              Add Address
+        <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-slate-700">No addresses yet</p>
+          <p className="mt-1 text-xs text-muted-foreground">Skip for now or add the first reusable address.</p>
+          <div className="mt-3 flex justify-center gap-2">
+            <Button size="sm" onClick={openCreate}>+ Add Address</Button>
+            <Button size="sm" variant="outline" onClick={downloadTemplate}>
+              <FileDown className="size-4" />
+              Download Template
             </Button>
           </div>
         </div>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[1.05fr_1.25fr]">
-          <div className="overflow-hidden rounded-[26px] border bg-background/90 shadow-sm">
-            <div className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.1fr)_auto] gap-4 border-b bg-muted/20 px-5 py-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              <span>Consignee</span>
-              <span>Primary</span>
-              <span>Location</span>
-              <span>Addresses</span>
-            </div>
-            <div className="divide-y">
-              {consigneeRows.map((row) => {
-                const isSelected = selectedConsigneeKey === row.key;
-                const address = row.primaryAddress;
-                return (
-                  <button
-                    key={row.key}
-                    type="button"
-                    onClick={() => setSelectedAddressId(address.id)}
-                    className={`grid w-full grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1.1fr)_auto] gap-4 px-5 py-4 text-left transition ${
-                      isSelected ? "bg-amber-50/80 ring-1 ring-inset ring-amber-300" : "hover:bg-muted/30"
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="truncate text-sm font-semibold">{address.consigneeName || address.name}</p>
-                        {row.temporaryCount ? <Badge variant="warning">{row.temporaryCount} TEMP</Badge> : null}
-                      </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {address.contactPerson || "No contact"}{address.contactNumber ? ` | ${address.contactNumber}` : ""}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{address.addressLabel || address.line1}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Primary Address</p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm">{address.city}</p>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {[address.state, address.pincode].filter(Boolean).join(" | ")}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge variant={address.isActive === false ? "outline" : "success"}>{address.isActive === false ? "INACTIVE" : "ACTIVE"}</Badge>
-                      <span className="text-xs text-muted-foreground">{1 + row.secondaryCount} total</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-[26px] border bg-background/90 px-5 py-5 shadow-sm">
-            {selectedPrimaryAddress ? (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-base font-semibold">{selectedPrimaryAddress.consigneeName || selectedPrimaryAddress.name}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Primary address and temporary addresses remain under the same consignee record.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="success">PRIMARY ADDRESS</Badge>
-                    {selectedTemporaryAddresses.length ? <Badge variant="warning">{selectedTemporaryAddresses.length} TEMPORARY</Badge> : null}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border bg-muted/20 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Existing Address</p>
-                  <p className="mt-1 text-sm font-medium">
-                    {selectedPrimaryAddress.fullAddress ||
-                      [selectedPrimaryAddress.line1, selectedPrimaryAddress.line2, selectedPrimaryAddress.city, selectedPrimaryAddress.state, selectedPrimaryAddress.pincode]
-                        .filter(Boolean)
-                        .join(", ")}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {[selectedPrimaryAddress.city, selectedPrimaryAddress.state, selectedPrimaryAddress.pincode].filter(Boolean).join(" | ")}
-                  </p>
-                  {selectedPrimaryAddress.consigneeId ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Consignee ID: {selectedPrimaryAddress.consigneeId}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Temporary Address</p>
-                      <p className="text-xs text-muted-foreground">Add one more address for the same consignee. Primary address does not change.</p>
-                    </div>
-                    <Button size="sm" variant="outline" onClick={() => openCreateTemporaryForConsignee(selectedPrimaryAddress)}>
-                      + Add Temporary Address
+        (() => {
+          // Flat paginated table. Replaces the previous consignee-grouped
+          // 2-pane layout which broke down once a customer had more than a
+          // handful of addresses. Each row is the address; click → edit.
+          const totalPages = Math.max(1, Math.ceil(addresses.length / ADDRESS_PAGE_SIZE));
+          const pageIndex = Math.min(addressPage, totalPages);
+          const pagedAddresses = addresses.slice((pageIndex - 1) * ADDRESS_PAGE_SIZE, pageIndex * ADDRESS_PAGE_SIZE);
+          return (
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                      <th className="px-4 py-2.5">Address Name</th>
+                      <th className="px-4 py-2.5">Contact</th>
+                      <th className="px-4 py-2.5">Location</th>
+                      <th className="px-4 py-2.5">Status</th>
+                      <th className="px-4 py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedAddresses.map((address) => (
+                      <tr
+                        key={address.id}
+                        onClick={() => openEdit(address)}
+                        className="cursor-pointer border-b last:border-0 hover:bg-slate-50/60"
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-medium text-slate-900">{address.name || address.addressLabel || "—"}</span>
+                            {address.isTemporary ? <Badge variant="warning">TEMP</Badge> : null}
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-700">
+                          {address.contactPerson || "—"}
+                          {address.contactNumber ? <span className="ml-1 text-slate-500">· {address.contactNumber}</span> : null}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-700">
+                          {[address.city, address.state, address.pincode].filter(Boolean).join(" · ") || "—"}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <Badge variant={address.isActive === false ? "outline" : "success"}>
+                            {address.isActive === false ? "INACTIVE" : "ACTIVE"}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Edit" onClick={(event) => { event.stopPropagation(); openEdit(address); }}>
+                              <Pencil className="size-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Delete" onClick={(event) => { event.stopPropagation(); deleteDraftAddress(address.id); }}>
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalPages > 1 ? (
+                <div className="flex items-center justify-between gap-3 border-t px-4 py-2.5 text-[12px] text-slate-600">
+                  <span>Page {pageIndex} of {totalPages} · {addresses.length} addresses</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" disabled={pageIndex <= 1} onClick={() => setAddressPage((current) => Math.max(1, current - 1))}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={pageIndex >= totalPages} onClick={() => setAddressPage((current) => Math.min(totalPages, current + 1))}>
+                      Next
                     </Button>
                   </div>
-                  {selectedTemporaryAddresses.length ? (
-                    <div className="grid gap-3">
-                      {selectedTemporaryAddresses.map((address) => (
-                        <button
-                          key={address.id}
-                          type="button"
-                          onClick={() => openEdit(address)}
-                          className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-4 text-left transition hover:border-amber-300"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-sm font-semibold">{address.addressLabel || address.name}</p>
-                                {address.isTemporary ? <Badge variant="warning">TEMPORARY ADDRESS</Badge> : null}
-                              </div>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {address.fullAddress ||
-                                  [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(", ")}
-                              </p>
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                {[address.city, address.state, address.pincode].filter(Boolean).join(" | ")}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); openEdit(address); }}>
-                                Edit
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); deleteDraftAddress(address.id); }}>
-                                Delete
-                              </Button>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-4 text-sm text-muted-foreground">
-                      No temporary address added yet for this consignee.
-                    </div>
-                  )}
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(selectedPrimaryAddress)}>
-                    Edit Primary Address
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
+              ) : null}
+            </div>
+          );
+        })()
       )}
 
       <div className="rounded-2xl border bg-muted/20 p-4">
@@ -2749,8 +2658,8 @@ function CustomerAddressManagementSection({
           }
         }}
         title={editingId ? (draft.isTemporary ? "Edit Temporary Address" : "Edit Address") : (draft.isTemporary ? "Add Temporary Address" : "Add Address")}
-        description={draft.isTemporary ? "Temporary operational address editor. This record will appear automatically in destination change review after saving." : "Manage customer address master details in a separate workspace."}
-        widthClassName="max-w-6xl"
+        description={draft.isTemporary ? "Saved temporary addresses surface automatically in destination-change review." : undefined}
+        widthClassName="max-w-3xl"
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={closeAddressDialog}>Cancel</Button>
@@ -2783,142 +2692,92 @@ function CustomerAddressManagementSection({
               {error}
             </div>
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Field label="Address Type">
-              <Select
-                value={draft.type[0] ?? ""}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    type: event.target.value ? [event.target.value as CustomerAddressTag] : [],
-                  }))
-                }
-              >
-                <option value="">Select address type</option>
-                {customerAddressTagOptions.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Operational Address Type">
-              <Select
-                value={draft.operationalAddressType ?? "PRIMARY"}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    operationalAddressType: event.target.value as CustomerOperationalAddressType,
-                  }))
-                }
-              >
-                {operationalAddressTypeOptions.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Address Status">
-              <Select
-                value={draft.isActive === false ? "inactive" : "active"}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    isActive: event.target.value === "active",
-                  }))
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Select>
-            </Field>
-          </div>
+          {/* Removed surface: Address Type / Operational Address Type /
+              Address Status / Consignee ID / Contact Code / Latitude /
+              Longitude. They were either auto-derivable or operational
+              metadata that bloated the form. The draft still carries the
+              same fields under the hood — `type` defaults to ["Consignee"]
+              (the booking-relevant tag), `operationalAddressType` defaults
+              to PRIMARY, `isActive` to true, and `consigneeId` /
+              `contactCode` are generated by prepareCustomerAddressDraft
+              when blank. This keeps every downstream consumer (booking, LR,
+              billing) reading the same shape. */}
           {draft.isTemporary && draft.consigneeName ? (
             <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">Temporary Address For</p>
               <p className="mt-1 text-sm font-medium text-amber-950">{draft.consigneeName}</p>
-              {draft.consigneeId ? (
-                <p className="mt-1 text-xs text-amber-800">Consignee ID: {draft.consigneeId}</p>
-              ) : null}
             </div>
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-            {!draft.isTemporary ? (
-              <>
-                <Field label="Consignee ID">
-                  <Input value={draft.consigneeId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, consigneeId: event.target.value }))} placeholder="Auto-generated if blank" />
-                </Field>
-                <Field label="Consignee Name">
-                  <Input value={draft.consigneeName ?? ""} onChange={(event) => setDraft((current) => ({ ...current, consigneeName: event.target.value }))} placeholder="Sharma Traders" />
-                </Field>
-              </>
-            ) : null}
-            <Field label="Address Label">
-              <Input value={draft.addressLabel ?? ""} onChange={(event) => setDraft((current) => ({ ...current, addressLabel: event.target.value }))} placeholder="Main plant gate / Yard 2 / Emergency yard" />
-            </Field>
-            <Field label="Contact Code*" helper="Auto-generated as ADDR-0001 if left blank">
-              <Input value={draft.contactCode ?? ""} onChange={(event) => setDraft((current) => ({ ...current, contactCode: event.target.value }))} placeholder="Enter or leave blank" />
-            </Field>
-            <Field label="Contact person name*">
-              <Input value={draft.contactPerson ?? ""} onChange={(event) => setDraft((current) => ({ ...current, contactPerson: event.target.value }))} placeholder="Enter" />
-            </Field>
-            <Field label="Phone*">
-              <Input value={draft.contactNumber ?? ""} onChange={(event) => setDraft((current) => ({ ...current, contactNumber: event.target.value }))} placeholder="+91 00000 00000" />
-            </Field>
-            <Field label="Email ID">
-              <Input value={draft.emailId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, emailId: event.target.value }))} placeholder="Enter" />
-            </Field>
-          </div>
-          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-            <Field label="Address Name">
+          {/* Address Name is the human identifier for this address (e.g.
+              "Bangalore Warehouse"). Consignee / Consignor / Billing role
+              is assigned at booking creation, not here — so the dialog no
+              longer asks for Consignee Name or Address Label. */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Address Name *">
               <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="Bangalore Warehouse" />
             </Field>
-            <div className="grid gap-4">
-              <Field label="Address Line 1*">
-                <Input value={draft.line1} onChange={(event) => setDraft((current) => ({ ...current, line1: event.target.value }))} placeholder="Address" />
-              </Field>
-              <Field label="Address Line 2">
-                <Input value={draft.line2 ?? ""} onChange={(event) => setDraft((current) => ({ ...current, line2: event.target.value }))} />
-              </Field>
-              <Field label="Full Address">
-                <Textarea value={draft.fullAddress ?? ""} onChange={(event) => setDraft((current) => ({ ...current, fullAddress: event.target.value }))} className="min-h-[120px]" placeholder="Operational display address used in review workspaces" />
-              </Field>
-            </div>
+            <Field label="Contact Person *">
+              <Input value={draft.contactPerson ?? ""} onChange={(event) => setDraft((current) => ({ ...current, contactPerson: event.target.value }))} />
+            </Field>
+            <Field label="Phone *">
+              <Input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                autoComplete="off"
+                placeholder="10-digit mobile number"
+                value={draft.contactNumber ?? ""}
+                onChange={(event) => {
+                  const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 10);
+                  setDraft((current) => ({ ...current, contactNumber: digitsOnly }));
+                }}
+              />
+            </Field>
+            <Field label="Email">
+              <Input type="email" value={draft.emailId ?? ""} onChange={(event) => setDraft((current) => ({ ...current, emailId: event.target.value }))} />
+            </Field>
           </div>
-          <div className="grid gap-4 lg:grid-cols-4 xl:grid-cols-7">
-            <Field label="Pincode*">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Address Line 1 *">
+              <Input value={draft.line1} onChange={(event) => setDraft((current) => ({ ...current, line1: event.target.value }))} />
+            </Field>
+            <Field label="Address Line 2">
+              <Input value={draft.line2 ?? ""} onChange={(event) => setDraft((current) => ({ ...current, line2: event.target.value }))} />
+            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Field label="Pincode *">
               <Input value={draft.pincode} onChange={(event) => setDraft((current) => ({ ...current, pincode: event.target.value }))} />
+            </Field>
+            <Field label="City *">
+              <Input value={draft.city} onChange={(event) => setDraft((current) => ({ ...current, city: event.target.value }))} />
+            </Field>
+            <Field label="State *">
+              <Input value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))} />
             </Field>
             <Field label="Country">
               <Input value={draft.country ?? ""} onChange={(event) => setDraft((current) => ({ ...current, country: event.target.value }))} />
             </Field>
-            <Field label="State*">
-              <Input value={draft.state} onChange={(event) => setDraft((current) => ({ ...current, state: event.target.value }))} />
-            </Field>
-            <Field label="City*">
-              <Input value={draft.city} onChange={(event) => setDraft((current) => ({ ...current, city: event.target.value }))} />
-            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="GSTIN">
-              <Input value={draft.gstin ?? ""} onChange={(event) => setDraft((current) => ({ ...current, gstin: event.target.value }))} />
+              <Input value={draft.gstin ?? ""} onChange={(event) => setDraft((current) => ({ ...current, gstin: event.target.value }))} placeholder="29AAAAA0000A1Z5" />
             </Field>
-            <Field label="Latitude">
-              <Input value={draft.latitude != null ? String(draft.latitude) : ""} onChange={(event) => setDraft((current) => ({ ...current, latitude: event.target.value ? Number(event.target.value) : null }))} placeholder="28.4595" />
-            </Field>
-            <Field label="Longitude">
-              <Input value={draft.longitude != null ? String(draft.longitude) : ""} onChange={(event) => setDraft((current) => ({ ...current, longitude: event.target.value ? Number(event.target.value) : null }))} placeholder="77.0266" />
+            <Field label="Remarks">
+              <Input value={draft.remarks ?? ""} onChange={(event) => setDraft((current) => ({ ...current, remarks: event.target.value }))} placeholder="Notes (optional)" />
             </Field>
           </div>
-          <Field label="Operational Remarks">
-            <Textarea value={draft.remarks ?? ""} onChange={(event) => setDraft((current) => ({ ...current, remarks: event.target.value }))} className="min-h-[84px]" placeholder="Emergency unloading, alternate unloading point, rerouting notes, etc." />
-          </Field>
-          {draft.type.includes("Consignee") ? (
-            <div className="flex justify-start">
-              <Button variant="outline" onClick={() => openCreateTemporaryForConsignee()}>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={downloadTemplate}>
+              <FileDown className="size-4" />
+              Download Template
+            </Button>
+            {draft.type.includes("Consignee") && !draft.isTemporary ? (
+              <Button variant="outline" size="sm" onClick={() => openCreateTemporaryForConsignee()}>
                 + Add Temporary Address
               </Button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
       </Dialog>
     </div>
@@ -2998,30 +2857,37 @@ function CreditBillingStep({
   const outstanding = form.currentOutstanding ?? 0;
   const utilization = creditLimit > 0 ? (outstanding / creditLimit) * 100 : 0;
 
+  // Credit & Billing — minimal set. The previous version had three "Display
+  // Section / Input Fields / Tax & Finance" headings that wasted space and a
+  // mojibake'd ₹ in the labels. Now: one row of inputs + one row of utility
+  // summaries + a compact GST/TDS strip.
   return (
     <div className="grid gap-6">
-      <SectionBlock title="Credit Health (Display Section)">
-        <div className="grid gap-4 md:grid-cols-2">
-          <SummaryCard title={`Outstanding: ${formatCurrency(outstanding)} / ${formatCurrency(creditLimit)}`} helper="Current exposure against configured credit limit" />
-          <SummaryCard title={`Utilization % (${utilization.toFixed(1)}%)`} helper="Derived from current outstanding and credit limit" />
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Input Fields">
+      <SectionBlock title="Credit">
         <div className="grid gap-4 md:grid-cols-3">
-          <Field label="Credit Limit (â‚¹)">
+          <Field label="Credit Limit (₹)">
             <Input type="number" value={String(form.creditLimit ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditLimit: Number(event.target.value || 0) }))} />
           </Field>
           <Field label="Credit Days">
             <Input type="number" value={String(form.creditDays ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditDays: Number(event.target.value || 0) }))} />
           </Field>
-          <Field label="Current Outstanding (â‚¹)">
+          <Field label="Current Outstanding (₹)">
             <Input type="number" value={String(form.currentOutstanding ?? "")} onChange={(event) => setForm((current) => ({ ...current, currentOutstanding: Number(event.target.value || 0) }))} />
           </Field>
         </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border bg-muted/20 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Outstanding / Limit</p>
+            <p className="mt-1 text-sm font-semibold">{formatCurrency(outstanding)} / {formatCurrency(creditLimit)}</p>
+          </div>
+          <div className="rounded-lg border bg-muted/20 px-4 py-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilization</p>
+            <p className="mt-1 text-sm font-semibold">{utilization.toFixed(1)}%</p>
+          </div>
+        </div>
       </SectionBlock>
 
-      <SectionBlock title="Tax & Finance">
+      <SectionBlock title="Tax & Invoicing">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="GST Charge Type">
             <Select value={form.gstChargeType ?? "Forward Charge (12% GST on Transport)"} onChange={(event) => setForm((current) => ({ ...current, gstChargeType: event.target.value }))}>
@@ -3033,15 +2899,10 @@ function CreditBillingStep({
             <Input value={form.invoiceFormat ?? ""} onChange={(event) => setForm((current) => ({ ...current, invoiceFormat: event.target.value }))} />
           </Field>
         </div>
-        <div className="rounded-2xl border bg-muted/20 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">TDS Configuration</p>
-              <p className="mt-1 text-xs text-muted-foreground">Toggle TDS Applicable</p>
-            </div>
-            <Switch checked={Boolean(form.tdsApplicable)} onCheckedChange={(checked) => setForm((current) => ({ ...current, tdsApplicable: checked }))} />
-          </div>
-        </div>
+        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border bg-muted/10 px-4 py-3">
+          <span className="text-sm font-medium">TDS applicable</span>
+          <Switch checked={Boolean(form.tdsApplicable)} onCheckedChange={(checked) => setForm((current) => ({ ...current, tdsApplicable: checked }))} />
+        </label>
       </SectionBlock>
     </div>
   );

@@ -769,9 +769,19 @@ export function buildDefaultRoleAccess(
   );
   const hasModule = (moduleCode: string) => role.moduleCodes.includes(moduleCode);
   const roleName = role.name.toLowerCase();
-  const isAdminLike = /(admin|ceo|manager|head|owner|super)/.test(roleName);
-  const isOpsLike = /(dispatch|operator|planner|ops|booking|control)/.test(roleName);
-  const isFinanceLike = /(finance|accounts?)/.test(roleName);
+  // Name-based heuristics used to grant admin / ops / finance pages by
+  // *regex on the role name alone* — e.g. "Operational-branch-manager"
+  // matched /manager/ and silently received every admin page (Customers,
+  // Vendors, Vehicles, etc.) even when the explicit permission matrix
+  // didn't grant them. Heuristics now require the role to ALSO have the
+  // matching governance module enabled. The persisted permission matrix
+  // remains the authoritative source — these defaults only fire when no
+  // matrix entry exists for a cell.
+  const isAdminLike = /(admin|ceo|head|owner|super)/.test(roleName) && hasModule("ADMIN");
+  const isOpsLike =
+    /(dispatch|operator|planner|ops|booking|control)/.test(roleName)
+    && (hasModule("TMS") || hasModule("ADMIN"));
+  const isFinanceLike = /(finance|accounts?)/.test(roleName) && hasModule("FINANCE");
   const isDriverLike = /driver/.test(roleName);
   const isVendorLike = /vendor/.test(roleName);
   const isCustomerLike = /customer/.test(roleName);

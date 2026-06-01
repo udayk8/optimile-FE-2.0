@@ -74,6 +74,60 @@ export function AssignmentQueuePage() {
     const driverVendorId = driver.vendorId ?? null;
     return vendorId === OWN_FLEET_VENDOR ? driverVendorId === null : driverVendorId === vendorId;
   });
+  // Diagnostic: surface the exact counts and filter inputs the assignment
+  // page is reading so we can tell at a glance whether the store has the
+  // tenant's vendors/vehicles/drivers and which filter step is dropping
+  // them. Triggers whenever the user opens the assign dialog or picks a
+  // vendor. Safe to remove once the issue is confirmed fixed.
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log("[ASSIGNMENT SOURCES]", {
+      tenantId: tenant.id,
+      sessionActor: session.actorName,
+      currentUserId: currentUser?.id ?? null,
+      activeTenantOrgUnitId: session.activeTenantOrgUnitId ?? null,
+      vendorsTotal: adminSources.vendors.length,
+      vendorsActive: adminSources.vendors.filter((v) => v.status === "active").length,
+      vehiclesTotal: adminSources.vehicles.length,
+      vehiclesActive: adminSources.vehicles.filter((v) => v.isActive).length,
+      driversTotal: adminSources.drivers.length,
+      driversActive: adminSources.drivers.filter((d) => d.isActive).length,
+      sampleVendor: adminSources.vendors[0] && {
+        id: adminSources.vendors[0].id,
+        tenantId: adminSources.vendors[0].tenantId,
+        name: adminSources.vendors[0].name,
+        status: adminSources.vendors[0].status,
+      },
+      sampleVehicle: adminSources.vehicles[0] && {
+        id: adminSources.vehicles[0].id,
+        tenantId: adminSources.vehicles[0].tenantId,
+        vendorId: adminSources.vehicles[0].vendorId,
+        isActive: adminSources.vehicles[0].isActive,
+        registrationNumber: adminSources.vehicles[0].registrationNumber,
+      },
+      sampleDriver: adminSources.drivers[0] && {
+        id: adminSources.drivers[0].id,
+        tenantId: adminSources.drivers[0].tenantId,
+        vendorId: adminSources.drivers[0].vendorId,
+        isActive: adminSources.drivers[0].isActive,
+        name: adminSources.drivers[0].name,
+      },
+      currentlySelectedVendorId: vendorId || null,
+      availableVehiclesAfterFilter: availableVehicles.length,
+      availableDriversAfterFilter: availableDrivers.length,
+    });
+  }, [
+    tenant.id,
+    session.actorName,
+    session.activeTenantOrgUnitId,
+    currentUser?.id,
+    adminSources.vendors,
+    adminSources.vehicles,
+    adminSources.drivers,
+    vendorId,
+    availableVehicles.length,
+    availableDrivers.length,
+  ]);
   const marginPercent = calculateMarginPercent(customerFreight, Number(vendorFreight || 0));
   const selectedLrConfig = useMemo(
     () =>
@@ -411,6 +465,39 @@ export function AssignmentQueuePage() {
                 </option>
               ))}
             </Select>
+            {/* Helpful empty-state explanation. The dropdown is gated by
+                vendor ownership — if the user creates a vehicle without
+                linking it to the selected vendor (or as OWN), it won't
+                show up under that vendor selection. We surface the
+                mismatch instead of leaving the dropdown silently empty. */}
+            {vendorId && availableVehicles.length === 0 ? (
+              (() => {
+                const tenantActiveVehicles = adminSources.vehicles.filter((v) => v.isActive);
+                const ownFleetCount = tenantActiveVehicles.filter((v) => !v.vendorId).length;
+                const otherVendorCount = vendorId === OWN_FLEET_VENDOR
+                  ? tenantActiveVehicles.filter((v) => Boolean(v.vendorId)).length
+                  : tenantActiveVehicles.filter((v) => v.vendorId && v.vendorId !== vendorId).length;
+                const total = tenantActiveVehicles.length;
+                if (total === 0) {
+                  return (
+                    <p className="mt-1 text-xs text-amber-700">
+                      No active vehicles for this tenant. Add vehicles in Administration → Vehicles.
+                    </p>
+                  );
+                }
+                const selectedVendorName = vendorId === OWN_FLEET_VENDOR
+                  ? "Own Fleet"
+                  : vendorMap.get(vendorId)?.name ?? "the selected vendor";
+                return (
+                  <p className="mt-1 text-xs text-amber-700">
+                    No active vehicles linked to {selectedVendorName}.
+                    {" "}{ownFleetCount > 0 && vendorId !== OWN_FLEET_VENDOR ? `${ownFleetCount} OWN-fleet vehicle${ownFleetCount === 1 ? " is" : "s are"} available — switch the vendor dropdown to "Own Fleet" to use ${ownFleetCount === 1 ? "it" : "them"}. ` : ""}
+                    {otherVendorCount > 0 ? `${otherVendorCount} vehicle${otherVendorCount === 1 ? " is" : "s are"} linked to other vendors. ` : ""}
+                    Or edit the vehicle in Administration → Vehicles to link it to {selectedVendorName}.
+                  </p>
+                );
+              })()
+            ) : null}
           </CompactField>
           <CompactField label="Driver">
             <Select value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={!selectedVehicle}>
@@ -421,6 +508,33 @@ export function AssignmentQueuePage() {
                 </option>
               ))}
             </Select>
+            {selectedVehicle && availableDrivers.length === 0 ? (
+              (() => {
+                const matchOwnership = vendorId === OWN_FLEET_VENDOR
+                  ? (d: typeof adminSources.drivers[number]) => !d.vendorId
+                  : (d: typeof adminSources.drivers[number]) => d.vendorId === vendorId;
+                const tenantActiveDrivers = adminSources.drivers.filter((d) => d.isActive);
+                const matchingDrivers = tenantActiveDrivers.filter(matchOwnership).length;
+                const selectedVendorName = vendorId === OWN_FLEET_VENDOR
+                  ? "Own Fleet"
+                  : vendorMap.get(vendorId)?.name ?? "the selected vendor";
+                if (tenantActiveDrivers.length === 0) {
+                  return (
+                    <p className="mt-1 text-xs text-amber-700">
+                      No active drivers for this tenant. Add drivers in Administration → Drivers.
+                    </p>
+                  );
+                }
+                if (matchingDrivers === 0) {
+                  return (
+                    <p className="mt-1 text-xs text-amber-700">
+                      No active drivers linked to {selectedVendorName}. Add a driver under this affiliation in Administration → Drivers.
+                    </p>
+                  );
+                }
+                return null;
+              })()
+            ) : null}
           </CompactField>
           <CompactField label="Vendor Freight / Buying Rate">
             <Input value={vendorFreight} onChange={(event) => setVendorFreight(event.target.value)} placeholder="Enter vendor freight" />

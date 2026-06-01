@@ -16,6 +16,8 @@ import { Select } from "@/shared/components/ui/select";
 import { useTenantAuditLogs } from "@/modules/tenant-admin/hooks/useTenantAuditLogs";
 import { useTenantCustomers } from "@/modules/tenant-admin/hooks/useTenantCustomers";
 import { useTenantHierarchy } from "@/modules/tenant-admin/hooks/useTenantHierarchy";
+import { useEffectiveScope } from "@/modules/tenant-admin/hooks/useEffectiveScope";
+import { isRecordInScope } from "@/modules/tenant-admin/lib/user-scope";
 import { useTenantModules } from "@/modules/tenant-admin/hooks/useTenantModules";
 import { useTenantOrgTypes } from "@/modules/tenant-admin/hooks/useTenantOrgTypes";
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
@@ -67,7 +69,7 @@ const DEFAULT_HIERARCHY_LEVEL_NAMES = ["Region", "Zone", "Branch", "Sub-Branch",
 const MAX_HIERARCHY_LEVELS = 5;
 
 export function TenantHierarchyPage() {
-  const { tenantId } = useTenantRouteContext();
+  const { tenantId, tenant } = useTenantRouteContext();
   const { data: hierarchyState, saveHierarchy } = useTenantHierarchy(tenantId);
   const { data: orgUnits } = useTenantOrgUnits(tenantId);
   const { data: roles } = useTenantRoles(tenantId);
@@ -226,10 +228,10 @@ export function TenantHierarchyPage() {
           {Array.from({ length: levelCount }).map((_, index) => (
             <div key={index} className="flex items-center gap-3">
               <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[11px] font-semibold text-slate-700">
-                {index}
+                {index + 1}
               </span>
               <div className="flex flex-1 items-center gap-2">
-                <label className="w-[120px] text-[12px] text-slate-500">Level {index} Name</label>
+                <label className="w-[120px] text-[12px] text-slate-500">Level {index + 1} Name</label>
                 <Input
                   value={levelNames[index] ?? ""}
                   disabled={!customEnabled}
@@ -246,8 +248,23 @@ export function TenantHierarchyPage() {
         <div className="border-b px-4 py-2.5">
           <h2 className="text-[13px] font-semibold text-slate-900">Preview</h2>
         </div>
-        <div className="px-4 py-3 text-[13px] text-slate-700">
-          {levelNames.slice(0, levelCount).map((name) => name.trim() || "—").join(" → ")}
+        <div className="space-y-1.5 px-4 py-3 text-[13px]">
+          {/* Company Root — the tenant itself is the permanent parent of the
+              configured hierarchy. It is not counted as a configurable level
+              but is shown here so the structure reads as a real tree. */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+              Company Root
+            </span>
+            <span className="font-semibold text-slate-900">{tenant.name}</span>
+          </div>
+          {levelNames.slice(0, levelCount).map((name, index) => (
+            <div key={index} className="flex items-center gap-2 text-slate-700" style={{ paddingLeft: `${(index + 1) * 14}px` }}>
+              <span className="text-slate-400">↳</span>
+              <span>{name.trim() || "—"}</span>
+              <span className="text-[11px] text-slate-400">Level {index + 1}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -255,9 +272,16 @@ export function TenantHierarchyPage() {
 }
 
 export function TenantOrgUnitsPage() {
-  const { tenantId } = useTenantRouteContext();
+  const { tenantId, tenant } = useTenantRouteContext();
   const { data: levels } = useTenantOrgTypes(tenantId);
-  const { data: orgUnits, createOrgUnit, updateOrgUnit, deleteOrgUnit } = useTenantOrgUnits(tenantId);
+  const { data: rawOrgUnits, createOrgUnit, updateOrgUnit, deleteOrgUnit } = useTenantOrgUnits(tenantId);
+  // Place-scoped view: a Branch manager only sees their branch and any
+  // sub-branches; Company Root sees the full tree.
+  const scope = useEffectiveScope();
+  const orgUnits = useMemo(
+    () => rawOrgUnits.filter((unit) => scope.isCompanyRoot || scope.allowedOrgUnitIds.has(unit.id)),
+    [rawOrgUnits, scope],
+  );
 
   const orderedLevels = useMemo(() => [...levels].sort((a, b) => a.order - b.order), [levels]);
   const levelMap = useMemo(() => new Map(orderedLevels.map((level) => [level.id, level.name])), [orderedLevels]);
@@ -445,8 +469,8 @@ export function TenantOrgUnitsPage() {
                     <tr key={unit.id} className="border-b last:border-0 hover:bg-slate-50/60">
                       <td className="px-4 py-2.5 font-medium text-slate-900">{unit.name}</td>
                       <td className="px-4 py-2.5 text-slate-700">{levelMap.get(unit.hierarchyLevelId) ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-700">{parent?.name ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-slate-600">{buildOrgUnitPath(unit.id, orgUnits) || "—"}</td>
+                      <td className="px-4 py-2.5 text-slate-700">{parent?.name ?? tenant.name}</td>
+                      <td className="px-4 py-2.5 text-slate-600">{buildOrgUnitPathWithRoot(unit.id, orgUnits, tenant.name) || "—"}</td>
                       <td className="px-4 py-2.5">
                         <Badge variant={unit.status === "active" ? "success" : "warning"}>{unit.status}</Badge>
                       </td>
@@ -481,7 +505,18 @@ export function TenantOrgUnitsPage() {
             <h2 className="text-[13px] font-semibold text-slate-900">Org Tree</h2>
           </div>
           <div className="p-3">
-            <OrgTree units={orgUnits} levelMap={levelMap} />
+            {/* Company Root is the tenant itself — always present, never
+                editable or deletable. Rendered as the permanent parent of
+                every real org unit. */}
+            <div className="flex items-center gap-2 py-1 text-[12px]">
+              <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                Company Root
+              </span>
+              <span className="font-semibold text-slate-900">{tenant.name}</span>
+            </div>
+            <div className="pl-3">
+              <OrgTree units={orgUnits} levelMap={levelMap} />
+            </div>
           </div>
         </section>
       ) : null}
@@ -597,11 +632,16 @@ function CompactStat({ label, value, tone }: { label: string; value: number; ton
 }
 
 export function TenantUsersPage() {
-  const { tenantId } = useTenantRouteContext();
+  const { tenantId, tenant } = useTenantRouteContext();
   const { data: users, createUser, updateUser } = useTenantUsers(tenantId);
   const { data: orgUnits } = useTenantOrgUnits(tenantId);
   const { data: roles } = useTenantRoles(tenantId);
   const { data: levels } = useTenantOrgTypes(tenantId);
+  // Place-based read gate. A logged-in user only sees other users whose
+  // assigned org units sit inside the current user's effective scope —
+  // Company Root sees everyone; a Branch manager sees only users in their
+  // branch and any sub-branches. See lib/user-scope.ts.
+  const scope = useEffectiveScope();
 
   const roleMap = useMemo(() => new Map(roles.map((role) => [role.id, role])), [roles]);
   const levelMap = useMemo(() => new Map(levels.map((level) => [level.id, level.name])), [levels]);
@@ -618,6 +658,8 @@ export function TenantUsersPage() {
     password: string;
   };
 
+  // Form always creates INTERNAL users — vendor/driver/customer accounts
+  // come from their own onboarding flows.
   const initialUserForm: UserFormState = {
     name: "",
     email: "",
@@ -648,19 +690,25 @@ export function TenantUsersPage() {
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((user) => {
+      // Place gate first — outside the user's scope, the row never exists.
+      // External users (VENDOR / DRIVER / CUSTOMER) are linked through their
+      // partner entity rather than org units, so we let them through and
+      // rely on the existing type filter.
+      if (user.userType === "INTERNAL" && !isRecordInScope(scope, user.orgUnitIds)) return false;
       if (statusFilter !== "all" && user.status !== statusFilter) return false;
       if (typeFilter !== "all" && user.userType !== typeFilter) return false;
       if (roleFilter !== "all" && user.roleId !== roleFilter) return false;
       if (q && !`${user.name} ${user.email}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [roleFilter, search, statusFilter, typeFilter, users]);
+  }, [roleFilter, scope, search, statusFilter, typeFilter, users]);
 
   const activeUsers = users.filter((user) => user.status === "active").length;
   const invitedUsers = users.filter((user) => user.status === "invited").length;
   const userTypes = new Set(users.map((user) => user.userType)).size;
 
   const selectedRole = roleMap.get(form.roleId);
+  const selectedRoleIsTenantWide = selectedRole?.dataScope === "ALL_TENANT";
   const scopeLevelId = selectedRole?.hierarchyLevelId ?? "";
   const scopeOrgUnits = orgUnits.filter((unit) => unit.hierarchyLevelId === scopeLevelId && unit.status === "active");
 
@@ -690,8 +738,14 @@ export function TenantUsersPage() {
   function save() {
     if (form.name.trim().length < 2) { setError("Name is required."); return; }
     if (!form.email.trim().match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) { setError("Valid email required."); return; }
+    if (form.phone && form.phone.length !== 10) { setError("Phone must be 10 digits."); return; }
     if (!form.roleId) { setError("Choose a role."); return; }
-    if (form.userType === "INTERNAL" && scopeOrgUnits.length > 0 && form.orgUnitIds.length === 0) {
+    if (
+      form.userType === "INTERNAL"
+      && !selectedRoleIsTenantWide
+      && scopeOrgUnits.length > 0
+      && form.orgUnitIds.length === 0
+    ) {
       setError("Choose at least one access-scope org unit.");
       return;
     }
@@ -857,7 +911,20 @@ export function TenantUsersPage() {
                       <td className="px-4 py-2.5 text-slate-700">{user.userType.toLowerCase()}</td>
                       <td className="px-4 py-2.5 text-slate-700">{role?.name ?? "—"}</td>
                       <td className="px-4 py-2.5 text-slate-600">
-                        {scopeLabel ? `${scopeLabel}${extra}` : (role ? levelMap.get(role.hierarchyLevelId) ?? "—" : "—")}
+                        {role?.dataScope === "ALL_TENANT" ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                              Company Root
+                            </span>
+                            <span className="text-slate-500">{tenant.name}</span>
+                          </span>
+                        ) : scopeLabel ? (
+                          `${scopeLabel}${extra}`
+                        ) : role ? (
+                          levelMap.get(role.hierarchyLevelId) ?? "—"
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td className="px-4 py-2.5">
                         <Badge variant={user.status === "active" ? "success" : user.status === "invited" ? "info" : "warning"}>
@@ -912,16 +979,26 @@ export function TenantUsersPage() {
             <Input value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
           </SmallField>
           <SmallField label="Phone">
-            <Input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />
+            {/* 10-digit numeric only. autoComplete=off stops the browser from
+                pre-filling email/usernames into this field. */}
+            <Input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              autoComplete="off"
+              placeholder="10-digit mobile number"
+              value={form.phone}
+              onChange={(event) => {
+                const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 10);
+                setForm((current) => ({ ...current, phone: digitsOnly }));
+              }}
+            />
           </SmallField>
-          <SmallField label="User Type">
-            <Select value={form.userType} onChange={(event) => setForm((current) => ({ ...current, userType: event.target.value as UserType }))}>
-              <option value="INTERNAL">Internal</option>
-              <option value="VENDOR">Vendor</option>
-              <option value="DRIVER">Driver</option>
-              <option value="CUSTOMER">Customer</option>
-            </Select>
-          </SmallField>
+          {/* User Type is omitted on purpose. Vendor, Driver, and Customer
+              users are onboarded from their respective modules (Vendors,
+              Fleet, Customers); the tenant Users page only creates internal
+              workforce accounts. The form still writes userType=INTERNAL
+              under the hood so the store's UserRecord shape is unchanged. */}
           <SmallField label="Role">
             <Select value={form.roleId} onChange={(event) => setForm((current) => ({ ...current, roleId: event.target.value, orgUnitIds: [] }))}>
               <option value="">Select role</option>
@@ -940,9 +1017,18 @@ export function TenantUsersPage() {
           <div className="md:col-span-2 space-y-1.5">
             <label className="text-[12px] font-medium text-slate-700">
               Access Scope
-              {selectedRole ? <span className="ml-1 text-slate-500">(role level: {levelMap.get(selectedRole.hierarchyLevelId) ?? "—"})</span> : null}
+              {selectedRole ? (
+                <span className="ml-1 text-slate-500">
+                  (role level: {selectedRoleIsTenantWide ? `Company Root — ${tenant.name}` : levelMap.get(selectedRole.hierarchyLevelId) ?? "—"})
+                </span>
+              ) : null}
             </label>
-            {scopeOrgUnits.length === 0 ? (
+            {selectedRoleIsTenantWide ? (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[12px] text-indigo-800">
+                <span className="font-medium">Company Root scope.</span> This role spans the entire tenant ({tenant.name}); no
+                org-unit selection is required.
+              </div>
+            ) : scopeOrgUnits.length === 0 ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
                 No org units exist at this role's level yet. You can save the user now — they'll be unscoped until you add one. {selectedRole ? (
                   <Link
@@ -1050,6 +1136,16 @@ export function TenantRolesPage() {
     moduleCodes: [],
     permissions: {},
   });
+  // Scope choice surfaced as a Company-Root toggle alongside the hierarchy
+  // level. "TENANT" maps to dataScope: "ALL_TENANT" (full tenant access from
+  // the root, same shape as seeded CEO / COO roles). "LEVEL" leaves dataScope
+  // unset so the role's reach stays bound to its mapped hierarchy level.
+  const [scopeMode, setScopeMode] = useState<"TENANT" | "LEVEL">("LEVEL");
+  // Permissions step is opt-in. By default we let users save the role and
+  // configure permissions later via the role-edit flow — the granular matrix
+  // was unwieldy and is rarely needed up-front.
+  const [permissionsMode, setPermissionsMode] = useState<"DEFER" | "NOW">("DEFER");
+  const [advancedModules, setAdvancedModules] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!feedback) return;
@@ -1093,6 +1189,9 @@ export function TenantRolesPage() {
       moduleCodes: [],
       permissions: {},
     });
+    setScopeMode("LEVEL");
+    setPermissionsMode("DEFER");
+    setAdvancedModules(new Set());
     setWizardOpen(true);
   }
 
@@ -1113,6 +1212,16 @@ export function TenantRolesPage() {
       moduleCodes: role.moduleCodes,
       permissions: matrix,
     });
+    setScopeMode(role.dataScope === "ALL_TENANT" ? "TENANT" : "LEVEL");
+    // If the role already has any permissions set, default to NOW so the
+    // editor opens straight on the matrix; otherwise let them defer again.
+    const hasExistingPermissions = Object.values(matrix).some((moduleMap) =>
+      Object.values(moduleMap ?? {}).some((featureActions) =>
+        Object.values(featureActions ?? {}).some(Boolean),
+      ),
+    );
+    setPermissionsMode(hasExistingPermissions ? "NOW" : "DEFER");
+    setAdvancedModules(new Set());
     setWizardOpen(true);
   }
 
@@ -1120,7 +1229,9 @@ export function TenantRolesPage() {
     if (step === 0) {
       if (form.name.trim().length < 2) return "Role name is required.";
     } else if (step === 1) {
-      if (!form.hierarchyLevelId) return "Choose a hierarchy level.";
+      // Company Root scope auto-pins to the first business level (store
+      // requires a hierarchyLevelId), so the user doesn't pick one.
+      if (scopeMode === "LEVEL" && !form.hierarchyLevelId) return "Choose a hierarchy level.";
     } else if (step === 2) {
       if (!form.moduleCodes.length) return "Select at least one module.";
     }
@@ -1138,31 +1249,45 @@ export function TenantRolesPage() {
   function submitWizard() {
     try {
       let savedId = editingRoleId;
+      // Company-Root scope is expressed as dataScope: "ALL_TENANT" — the same
+      // shape used by seeded tenant-wide roles (CEO, COO, Tenant Admin). The
+      // store still requires a hierarchyLevelId so we auto-pin it to the top
+      // business level; only the access scope widens.
+      const dataScope = scopeMode === "TENANT" ? "ALL_TENANT" : undefined;
+      const hierarchyLevelId = scopeMode === "TENANT"
+        ? (form.hierarchyLevelId || levels.filter(isBusinessHierarchyLevel)[0]?.id || levels[0]?.id || "")
+        : form.hierarchyLevelId;
       if (editingRoleId) {
         updateRole(editingRoleId, {
           name: form.name.trim(),
           description: form.description.trim(),
-          hierarchyLevelId: form.hierarchyLevelId,
+          hierarchyLevelId,
           moduleCodes: form.moduleCodes,
           active: form.active,
+          ...(dataScope ? { dataScope } : {}),
         });
       } else {
         const created = createRole({
           tenantId,
           name: form.name.trim(),
           description: form.description.trim(),
-          hierarchyLevelId: form.hierarchyLevelId,
+          hierarchyLevelId,
           moduleCodes: form.moduleCodes,
           active: form.active,
-        });
+          ...(dataScope ? { dataScope } : {}),
+        } as Parameters<typeof createRole>[0]);
         savedId = created.id;
       }
-      // Prune permissions for any module the role no longer has.
-      const prunedPermissions: WizardForm["permissions"] = {};
-      form.moduleCodes.forEach((code) => {
-        if (form.permissions[code]) prunedPermissions[code] = form.permissions[code];
-      });
-      if (savedId) savePermissionMatrix(savedId, prunedPermissions);
+      // Skip persisting the matrix when the user chose to set permissions
+      // later — leaves their existing matrix (if any) untouched on edit and
+      // saves an empty matrix on create (matches the prior default).
+      if (permissionsMode === "NOW") {
+        const prunedPermissions: WizardForm["permissions"] = {};
+        form.moduleCodes.forEach((code) => {
+          if (form.permissions[code]) prunedPermissions[code] = form.permissions[code];
+        });
+        if (savedId) savePermissionMatrix(savedId, prunedPermissions);
+      }
 
       setWizardOpen(false);
       setFeedback(editingRoleId ? "Role updated." : "Role created.");
@@ -1180,6 +1305,41 @@ export function TenantRolesPage() {
       const permissions = { ...current.permissions };
       if (has) delete permissions[code];
       return { ...current, moduleCodes, permissions };
+    });
+  }
+
+  function classifyFeaturePreset(actions: Record<TenantPermissionAction, boolean>): "NONE" | "VIEW" | "FULL" | "CUSTOM" {
+    const anyOn = TENANT_PERMISSION_ACTIONS.some((a) => actions[a]);
+    if (!anyOn) return "NONE";
+    const allOn = TENANT_PERMISSION_ACTIONS.every((a) => actions[a]);
+    if (allOn) return "FULL";
+    const onlyView = actions.view && TENANT_PERMISSION_ACTIONS.filter((a) => a !== "view").every((a) => !actions[a]);
+    return onlyView ? "VIEW" : "CUSTOM";
+  }
+
+  function applyFeaturePreset(moduleCode: string, featureCode: string, preset: "NONE" | "VIEW" | "FULL") {
+    setForm((current) => {
+      const next: Record<TenantPermissionAction, boolean> = buildEmptyActions();
+      if (preset === "VIEW") next.view = true;
+      if (preset === "FULL") TENANT_PERMISSION_ACTIONS.forEach((a) => { next[a] = true; });
+      const modulePerm = { ...(current.permissions[moduleCode] ?? {}) };
+      modulePerm[featureCode] = next;
+      return { ...current, permissions: { ...current.permissions, [moduleCode]: modulePerm } };
+    });
+  }
+
+  function applyModulePreset(moduleCode: string, preset: "NONE" | "VIEW" | "FULL") {
+    const entry = moduleEntryByCode.get(moduleCode);
+    if (!entry) return;
+    entry.features.forEach((feature) => applyFeaturePreset(moduleCode, feature.code, preset));
+  }
+
+  function toggleAdvanced(moduleCode: string) {
+    setAdvancedModules((current) => {
+      const next = new Set(current);
+      if (next.has(moduleCode)) next.delete(moduleCode);
+      else next.add(moduleCode);
+      return next;
     });
   }
 
@@ -1297,7 +1457,16 @@ export function TenantRolesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">
-                        {levelMap.get(role.hierarchyLevelId) ?? "—"}
+                        {role.dataScope === "ALL_TENANT" ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                              Company Root
+                            </span>
+                            <span className="text-slate-500">{tenant.name}</span>
+                          </span>
+                        ) : (
+                          levelMap.get(role.hierarchyLevelId) ?? "—"
+                        )}
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">{assignedUsers}</td>
                       <td className="px-4 py-2.5">
@@ -1413,20 +1582,64 @@ export function TenantRolesPage() {
 
           {wizardStep === 1 ? (
             <div className="grid gap-3">
-              <RoleField label="Mapped Level Type">
-                <Select
-                  value={form.hierarchyLevelId}
-                  onChange={(event) => setForm((current) => ({ ...current, hierarchyLevelId: event.target.value }))}
-                >
-                  <option value="">Select level</option>
-                  {levels.filter(isBusinessHierarchyLevel).map((level) => (
-                    <option key={level.id} value={level.id}>{level.name}</option>
-                  ))}
-                </Select>
+              <RoleField label="Scope">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                      scopeMode === "TENANT" ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="mt-0.5 size-3.5 accent-primary"
+                      checked={scopeMode === "TENANT"}
+                      onChange={() => setScopeMode("TENANT")}
+                    />
+                    <div>
+                      <p className="text-[13px] font-medium text-slate-900">Company Root</p>
+                      <p className="text-[11px] text-slate-500">Tenant-wide access ({tenant.name}). Example: CEO, COO, Tenant Admin.</p>
+                    </div>
+                  </label>
+                  <label
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                      scopeMode === "LEVEL" ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="mt-0.5 size-3.5 accent-primary"
+                      checked={scopeMode === "LEVEL"}
+                      onChange={() => setScopeMode("LEVEL")}
+                    />
+                    <div>
+                      <p className="text-[13px] font-medium text-slate-900">Business level</p>
+                      <p className="text-[11px] text-slate-500">Bound to a specific hierarchy level (Region / Branch / Hub / etc).</p>
+                    </div>
+                  </label>
+                </div>
               </RoleField>
-              <p className="text-[12px] text-slate-500">
-                Business levels only (Region / Zone / Branch / Hub / etc). The role stores the level type; specific org units are assigned when a user is mapped to this role.
-              </p>
+              {scopeMode === "LEVEL" ? (
+                <>
+                  <RoleField label="Mapped Level Type">
+                    <Select
+                      value={form.hierarchyLevelId}
+                      onChange={(event) => setForm((current) => ({ ...current, hierarchyLevelId: event.target.value }))}
+                    >
+                      <option value="">Select level</option>
+                      {levels.filter(isBusinessHierarchyLevel).map((level) => (
+                        <option key={level.id} value={level.id}>{level.name}</option>
+                      ))}
+                    </Select>
+                  </RoleField>
+                  <p className="text-[12px] text-slate-500">
+                    Business levels only (Region / Zone / Branch / Hub / etc). The role stores the level type; specific org units are assigned when a user is mapped to this role.
+                  </p>
+                </>
+              ) : (
+                <p className="text-[12px] text-slate-500">
+                  Role spans the whole tenant ({tenant.name}). No level mapping required.
+                </p>
+              )}
             </div>
           ) : null}
 
@@ -1459,53 +1672,133 @@ export function TenantRolesPage() {
 
           {wizardStep === 3 ? (
             <div className="space-y-4">
-              {form.moduleCodes.length === 0 ? (
-                <p className="text-[13px] text-slate-500">Select at least one module in Step 3 to set permissions.</p>
-              ) : (
-                form.moduleCodes.map((moduleCode) => {
-                  const entry = moduleEntryByCode.get(moduleCode);
-                  if (!entry) return null;
-                  return (
-                    <div key={moduleCode} className="overflow-hidden rounded-lg border">
-                      <div className="border-b bg-slate-50/60 px-3 py-2 text-[12px] font-semibold text-slate-700">
-                        {entry.name}
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-[12px]">
-                          <thead>
-                            <tr className="border-b text-left text-[10px] uppercase tracking-[0.08em] text-slate-500">
-                              <th className="px-3 py-2">Feature</th>
-                              {TENANT_PERMISSION_ACTIONS.map((action) => (
-                                <th key={action} className="px-3 py-2 text-center capitalize">{action}</th>
+              {/* Permissions are optional. Roles can be saved now and the
+                  granular matrix tuned later from the role-edit flow. */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                    permissionsMode === "DEFER" ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    className="mt-0.5 size-3.5 accent-primary"
+                    checked={permissionsMode === "DEFER"}
+                    onChange={() => setPermissionsMode("DEFER")}
+                  />
+                  <div>
+                    <p className="text-[13px] font-medium text-slate-900">Set up later</p>
+                    <p className="text-[11px] text-slate-500">Save the role now. Configure feature permissions from Roles → Edit anytime.</p>
+                  </div>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 transition ${
+                    permissionsMode === "NOW" ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    className="mt-0.5 size-3.5 accent-primary"
+                    checked={permissionsMode === "NOW"}
+                    onChange={() => setPermissionsMode("NOW")}
+                  />
+                  <div>
+                    <p className="text-[13px] font-medium text-slate-900">Configure now</p>
+                    <p className="text-[11px] text-slate-500">Pick None / View / Full per feature. Advanced toggle reveals per-action controls.</p>
+                  </div>
+                </label>
+              </div>
+
+              {permissionsMode === "NOW" ? (
+                form.moduleCodes.length === 0 ? (
+                  <p className="text-[13px] text-slate-500">Select at least one module in Step 3 to set permissions.</p>
+                ) : (
+                  form.moduleCodes.map((moduleCode) => {
+                    const entry = moduleEntryByCode.get(moduleCode);
+                    if (!entry) return null;
+                    const showAdvanced = advancedModules.has(moduleCode);
+                    return (
+                      <div key={moduleCode} className="overflow-hidden rounded-lg border">
+                        <div className="flex items-center justify-between gap-3 border-b bg-slate-50/60 px-3 py-2">
+                          <span className="text-[12px] font-semibold text-slate-700">{entry.name}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] uppercase tracking-[0.08em] text-slate-500">Apply to all:</span>
+                              {(["NONE", "VIEW", "FULL"] as const).map((preset) => (
+                                <button
+                                  key={preset}
+                                  type="button"
+                                  onClick={() => applyModulePreset(moduleCode, preset)}
+                                  className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-100"
+                                >
+                                  {preset === "NONE" ? "None" : preset === "VIEW" ? "View" : "Full"}
+                                </button>
                               ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {entry.features.map((feature) => {
-                              const featurePerm = form.permissions[moduleCode]?.[feature.code] ?? buildEmptyActions();
-                              return (
-                                <tr key={feature.code} className="border-b last:border-0">
-                                  <td className="px-3 py-2 text-slate-900">{feature.name}</td>
-                                  {TENANT_PERMISSION_ACTIONS.map((action) => (
-                                    <td key={action} className="px-3 py-2 text-center">
-                                      <input
-                                        type="checkbox"
-                                        className="size-3.5 accent-primary"
-                                        checked={featurePerm[action]}
-                                        onChange={() => togglePermission(moduleCode, feature.code, action)}
-                                      />
-                                    </td>
-                                  ))}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleAdvanced(moduleCode)}
+                              className="text-[11px] font-medium text-primary hover:underline"
+                            >
+                              {showAdvanced ? "Hide advanced" : "Advanced"}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="divide-y">
+                          {entry.features.map((feature) => {
+                            const featurePerm = form.permissions[moduleCode]?.[feature.code] ?? buildEmptyActions();
+                            const preset = classifyFeaturePreset(featurePerm);
+                            return (
+                              <div key={feature.code} className="px-3 py-2">
+                                <div className="flex items-center justify-between gap-3">
+                                  <span className="text-[13px] text-slate-900">{feature.name}</span>
+                                  <div className="flex items-center gap-1">
+                                    {(["NONE", "VIEW", "FULL"] as const).map((option) => {
+                                      const active = preset === option;
+                                      return (
+                                        <button
+                                          key={option}
+                                          type="button"
+                                          onClick={() => applyFeaturePreset(moduleCode, feature.code, option)}
+                                          className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition ${
+                                            active
+                                              ? "bg-primary text-primary-foreground"
+                                              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                                          }`}
+                                        >
+                                          {option === "NONE" ? "No access" : option === "VIEW" ? "View only" : "Full access"}
+                                        </button>
+                                      );
+                                    })}
+                                    {preset === "CUSTOM" ? (
+                                      <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">Custom</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                {showAdvanced ? (
+                                  <div className="mt-1.5 flex flex-wrap items-center gap-3 pl-1">
+                                    {TENANT_PERMISSION_ACTIONS.map((action) => (
+                                      <label key={action} className="inline-flex items-center gap-1.5 text-[11px] text-slate-600">
+                                        <input
+                                          type="checkbox"
+                                          className="size-3.5 accent-primary"
+                                          checked={featurePerm[action]}
+                                          onChange={() => togglePermission(moduleCode, feature.code, action)}
+                                        />
+                                        <span className="capitalize">{action}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
+                    );
+                  })
+                )
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -1675,6 +1968,10 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
     key: "ADMIN",
     title: "Administration",
     badge: "Tenant governance & setup",
+    // LR Configuration + LR Management live here per request — both are
+    // governance concerns, just one is design-time (numbering/ownership)
+    // and the other is runtime (inventory/operations). Sidebar surfaces
+    // them only when the matrix grants view on the matching featureCode.
     rows: [
       { label: "Org Units", helper: "Hierarchy Setup, Org Units", moduleCode: "ADMIN", featureCodes: ["ORG_UNITS"] },
       { label: "Users", helper: "Tenant user management", moduleCode: "ADMIN", featureCodes: ["USERS"] },
@@ -1682,6 +1979,7 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
       { label: "Master Data", helper: "Customers, vendors, vehicle types, materials, UOM, address book", moduleCode: "TMS", featureCodes: ["CUSTOMERS", "VENDORS", "VEHICLE_TYPES", "MATERIALS", "UOM", "ADDRESS_BOOK"] },
       { label: "Rules Configuration", helper: "Assignment, document, and POD rules", moduleCode: "TMS", featureCodes: ["ASSIGNMENT_RULES", "DOCUMENT_RULES", "POD_RULES"] },
       { label: "LR Configuration", helper: "LR ownership, numbering, governance", moduleCode: "TMS", featureCodes: ["LR_CONFIGURATION"] },
+      { label: "LR Management", helper: "LR inventory and runtime operations", moduleCode: "TMS", featureCodes: ["LR_MANAGEMENT"] },
     ],
   },
   {
@@ -1693,7 +1991,6 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
       { label: "Create Booking", helper: "Booking creation workflows", moduleCode: "TMS", featureCodes: ["CREATE_BOOKING"] },
       { label: "Assignment", helper: "Vendor, vehicle, and driver assignment", moduleCode: "TMS", featureCodes: ["BOOKING_ASSIGNMENT"] },
       { label: "Shipment Documents", helper: "Invoice, e-waybill, supporting docs", moduleCode: "TMS", featureCodes: ["SHIPMENT_DOCUMENTS"] },
-      { label: "LR Management", helper: "LR inventory and runtime operations", moduleCode: "TMS", featureCodes: ["LR_MANAGEMENT"] },
       { label: "POD", helper: "Proof of delivery capture", moduleCode: "TMS", featureCodes: ["POD"] },
       { label: "Reports", helper: "Booking analytics and exports", moduleCode: "TMS", featureCodes: ["BOOKING_REPORTS"] },
     ],
@@ -1771,6 +2068,20 @@ const PERMISSION_GROUPS: PermissionGroupCard[] = [
       { label: "Create RFQ", helper: "New RFQ button + create page", moduleCode: "AUCTION", featureCodes: ["CREATE_RFQ"] },
     ],
   },
+  {
+    key: "FINANCE",
+    title: "Finance",
+    badge: "modules/finance-web — /finance/*",
+    // Feature codes mirror FINANCE_FEATURES in shared-admin-core/.../tenant-modules.ts
+    rows: [
+      { label: "Finance Command Centre", helper: "Finance home / dashboard", moduleCode: "FINANCE", featureCodes: ["FINANCE_DASHBOARD"] },
+      { label: "Receivables", helper: "POD, Debtors, Disputes, Notes", moduleCode: "FINANCE", featureCodes: ["FINANCE_RECEIVABLES"] },
+      { label: "Payables", helper: "Vendor Match, Sub-Vendor, Retention", moduleCode: "FINANCE", featureCodes: ["FINANCE_PAYABLES"] },
+      { label: "Controls", helper: "Credit, Contract, Compliance, Close, Audit", moduleCode: "FINANCE", featureCodes: ["FINANCE_CONTROLS"] },
+      { label: "Fleet Economics", helper: "Own-fleet finance views", moduleCode: "FINANCE", featureCodes: ["FINANCE_FLEET"] },
+      { label: "Ledgers", helper: "Ledger statements", moduleCode: "FINANCE", featureCodes: ["FINANCE_LEDGERS"] },
+    ],
+  },
 ];
 
 type PermissionMatrix = Record<string, Record<TenantPermissionAction, boolean>>;
@@ -1844,17 +2155,19 @@ export function TenantRolePermissionsPage() {
     if (!selectedRole) return [] as PermissionGroupCard[];
     const codes = new Set(selectedRole.moduleCodes ?? []);
     return PERMISSION_GROUPS.filter((group) => {
-      // Administration governance is reserved for the system Tenant Admin
-      // role only. We deliberately ignore stray ADMIN codes in moduleCodes
-      // (legacy default-leftover from earlier wizard versions) — the saved
-      // data stays untouched, the matrix just doesn't surface the card.
-      if (group.key === "ADMIN") return isTenantAdminRole(selectedRole);
+      // Administration card is visible for the system Tenant Admin AND
+      // for any tenant-created role that explicitly has ADMIN in its
+      // moduleCodes (e.g. Operational-Head with Admin enabled). The card
+      // was previously hidden for everyone except Tenant Admin, which
+      // meant Operational-Head could not be configured.
+      if (group.key === "ADMIN") return isTenantAdminRole(selectedRole) || codes.has("ADMIN");
       if (group.key === "BOOKING_OPS") return codes.has("TMS");
       if (group.key === "FLEET") return codes.has("FLEET");
       if (group.key === "AUCTION") return codes.has("AUCTION") || codes.has("PROCUREMENT");
       if (group.key === "CUSTOMER") return codes.has("CUSTOMER");
       if (group.key === "VENDOR") return codes.has("VENDOR") || codes.has("PROCUREMENT");
       if (group.key === "TRACKING") return codes.has("TRACKING");
+      if (group.key === "FINANCE") return codes.has("FINANCE");
       return false;
     });
   }, [selectedRole]);
@@ -2090,6 +2403,18 @@ export function TenantRolePermissionsPage() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* "Clear all" empties the working state for every card. Pair with
+                Save to wipe the role's persisted matrix entirely — useful
+                when an earlier wizard run or test seeded cells the user
+                doesn't want. */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setWorking({})}
+              disabled={Object.keys(working).length === 0}
+            >
+              Clear all
+            </Button>
             <Button size="sm" variant="outline" onClick={reset} disabled={!dirty}>Reset</Button>
             <Button size="sm" onClick={save} disabled={!dirty}>
               <CheckCircle2 className="size-4" />
@@ -2572,6 +2897,15 @@ function buildOrgUnitPath(orgUnitId: string, orgUnits: OrgUnit[]) {
   }
 
   return parts.join(" / ");
+}
+
+// Same as buildOrgUnitPath but rooted at the tenant (Company Root) so paths
+// read as "Ambuja / North Region / Delhi Branch" instead of starting partway
+// down the tree.
+function buildOrgUnitPathWithRoot(orgUnitId: string, orgUnits: OrgUnit[], tenantName: string) {
+  const path = buildOrgUnitPath(orgUnitId, orgUnits);
+  if (!path) return tenantName;
+  return `${tenantName} / ${path}`;
 }
 
 function buildPathPreview(name: string, parentOrgUnitId: string | null, orgUnits: OrgUnit[]) {

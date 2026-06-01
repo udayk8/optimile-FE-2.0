@@ -21,6 +21,8 @@ import { useTenantRolePermissions } from "@/modules/tenant-admin/hooks/useTenant
 import { useTenantRoles } from "@/modules/tenant-admin/hooks/useTenantRoles";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
+import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
+import { computeEffectiveUserScope } from "@/modules/tenant-admin/lib/user-scope";
 import { useSessionContext } from "@/shared/auth/session-context";
 import {
   canAccessTenantPath,
@@ -97,6 +99,7 @@ export function TenantLayout() {
             { to: paths.uomConfig, label: "UOM", icon: Boxes, pageCode: "UOM_CONFIG", featureCode: "UOM" },
             { to: paths.addressBook, label: "Address Book", icon: Building2, pageCode: "ADDRESS_BOOK", featureCode: "ADDRESS_BOOK" },
             { to: paths.lrConfig, label: "LR Configuration", icon: ShieldCheck, pageCode: "LR_CONFIG", featureCode: "LR_CONFIGURATION" },
+            { to: paths.lrManagement, label: "LR Management", icon: ShieldCheck, pageCode: "LR_DASHBOARD", featureCode: "LR_MANAGEMENT" },
             { to: paths.assignmentRules, label: "Assignment Rules", icon: ShieldCheck, pageCode: "ASSIGNMENT_RULES", featureCode: "ASSIGNMENT_RULES" },
             { to: paths.documentRules, label: "Document Rules", icon: ShieldCheck, pageCode: "DOCUMENT_RULES", featureCode: "DOCUMENT_RULES" },
             { to: paths.podRules, label: "POD Rules", icon: ShieldCheck, pageCode: "POD_RULES", featureCode: "POD_RULES" },
@@ -339,6 +342,20 @@ export function TenantLayout() {
     activeRole?.name ?? "User",
   ].join("\n");
 
+  // Compute the logged-in user's effective place scope so the header can
+  // surface "viewing as Company Root / Region / Branch — <place>" and any
+  // data list can filter records through it.
+  const { data: scopeOrgUnits } = useTenantOrgUnits(tenant.id);
+  const effectiveScope = computeEffectiveUserScope(currentTenantUser, activeRole, scopeOrgUnits);
+  const directOrgUnitNames = effectiveScope.directOrgUnitIds
+    .map((id) => scopeOrgUnits.find((unit) => unit.id === id)?.name)
+    .filter((name): name is string => Boolean(name));
+  const scopeBannerLabel = effectiveScope.isCompanyRoot
+    ? `Company Root — ${tenant.name}`
+    : directOrgUnitNames.length > 0
+      ? `${directOrgUnitNames.slice(0, 2).join(", ")}${directOrgUnitNames.length > 2 ? ` +${directOrgUnitNames.length - 2}` : ""}`
+      : "No place mapping";
+
   return (
     <WorkspaceShell
       title={tenant.name}
@@ -361,15 +378,34 @@ export function TenantLayout() {
             description="You do not have permission to access this page."
           />
         ) : (
-          <Suspense
-            fallback={
-              <div className="flex items-center justify-center py-24 text-[13px] text-muted-foreground">
-                Loading…
+          <>
+            {/* Scope banner — every page in the tenant shell shows whose
+                scope the current view is filtered through. Helps users spot
+                "I'm logged in as a Branch manager, so the data is branch-
+                scoped" without having to dig into role settings. */}
+            {currentTenantUser ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-indigo-100 bg-indigo-50/40 px-3 py-1.5 text-[11px]">
+                <span className="inline-flex items-center rounded-md bg-indigo-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                  {effectiveScope.isCompanyRoot ? "Company Root" : "Place scope"}
+                </span>
+                <span className="text-slate-700">{scopeBannerLabel}</span>
+                {effectiveScope.isCompanyRoot ? null : (
+                  <span className="text-slate-500">
+                    · Lists are filtered to records inside this scope.
+                  </span>
+                )}
               </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
+            ) : null}
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-24 text-[13px] text-muted-foreground">
+                  Loading…
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </>
         )}
       </motion.main>
     </WorkspaceShell>
