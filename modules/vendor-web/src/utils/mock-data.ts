@@ -475,7 +475,7 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-17', to: '2026-05-19' },
-    paymentDueDate: '2026-06-18', status: 'SUBMITTED',
+    paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
       tripId: 'TRP-049', tripReference: 'TRP-049', freightCharge: 74000,
       expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
@@ -486,7 +486,7 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
-    paymentDueDate: '2026-06-17', status: 'REJECTED',
+    paymentDueDate: '2026-06-17', status: 'CLOSED', closeReason: 'REJECTED',
     lineItems: [{
       tripId: 'TRP-050', tripReference: 'TRP-050', freightCharge: 58000,
       expenses: [
@@ -500,7 +500,7 @@ export const MOCK_INVOICES: Invoice[] = [
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
-    paymentDueDate: '2026-06-16', status: 'CANCELLED',
+    paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
     lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
     subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
   }

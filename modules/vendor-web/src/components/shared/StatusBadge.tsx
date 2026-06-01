@@ -39,6 +39,8 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   QUOTE_REVISED: { variant: 'info', label: 'Quote Revised' },
   LIVE: { variant: 'info', label: 'Live' },
   UNDER_REVIEW: { variant: 'info', label: 'Under Review' },
+  DISPUTED: { variant: 'destructive', label: 'Disputed' },
+  IN_REVIEW: { variant: 'info', label: 'In Review' },
   // Amber statuses
   PENDING: { variant: 'warning', label: 'Pending' },
   INVITED: { variant: 'warning', label: 'Invited' },
@@ -48,6 +50,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   EXPIRING_SOON: { variant: 'warning', label: 'Expiring Soon' },
   PARTIALLY_AVAILABLE: { variant: 'warning', label: 'Partially Available' },
   UNDER_MAINTENANCE: { variant: 'warning', label: 'Under Maintenance' },
+  RESUBMISSION_REQUIRED: { variant: 'warning', label: 'Resubmission' },
   // Red statuses
   REJECTED: { variant: 'destructive', label: 'Rejected' },
   REJECTED_BY_VENDOR: { variant: 'destructive', label: 'Rejected by Vendor' },
@@ -65,6 +68,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   // Gray statuses
   DRAFT: { variant: 'muted', label: 'Draft' },
   CANCELLED: { variant: 'muted', label: 'Cancelled' },
+  CLOSED: { variant: 'muted', label: 'Closed' },
   INACTIVE: { variant: 'muted', label: 'Inactive' },
   INVOICED: { variant: 'muted', label: 'Invoiced' },
   REVISED: { variant: 'muted', label: 'Revised' },

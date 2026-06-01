@@ -18,7 +18,7 @@ import {
   Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
-  Dispute, DisputeStatus, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
+  Dispute, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
 } from '@vendor/types'
 
 interface AppState {
@@ -38,11 +38,16 @@ interface AppState {
   notifications: Notification[]
 
   disputes: Dispute[]
-  raiseDispute: (invoiceId: string, invoiceNumber: string, invoiceAmount: number, reason: string) => void
-  updateDisputeStatus: (disputeId: string, status: DisputeStatus, notes?: string) => void
-  acceptDispute: (disputeId: string) => void
-  cancelDispute: (disputeId: string) => void
-  resubmitInvoice: (invoiceId: string, lineItems: InvoiceLineItem[]) => void
+  // Vendor-side: reply / upload documents on an open dispute. Never changes the invoice status.
+  respondToDispute: (disputeId: string, message: string, attachmentNames?: string[]) => void
+  // Vendor-side: a RESUBMISSION_REQUIRED invoice cannot be edited in place — the vendor
+  // creates a NEW (PENDING) invoice; the old one is CLOSED with closeReason SUPERSEDED.
+  createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[]) => void
+  // Finance-side transitions (driven by the finance module / demo seed). Only finance changes status.
+  financeApproveInvoice: (invoiceId: string) => void
+  financeRaiseDispute: (invoiceId: string, reason: string) => void
+  financeRequestResubmission: (invoiceId: string, message?: string) => void
+  financeRejectInvoice: (invoiceId: string, reason?: string) => void
   recordInvoicePayment: (payload: {
     invoiceId: string
     paymentKind: PaymentKind
@@ -466,7 +471,7 @@ export const useAppStore = create<AppState>((set) => ({
         subtotal,
         gstAmount,
         grandTotal: subtotal + gstAmount,
-        status: 'SUBMITTED' as any,
+        status: 'PENDING' as any,
         lineItems,
         vendorGstin: '29AABCF1234M1ZP',
         customerGstin: selectedTrips[0]?.contractId ? '27AABCU9603R1ZM' : '27AABCU9603R1ZM',
@@ -892,74 +897,179 @@ export const useAppStore = create<AppState>((set) => ({
     // Mock-only mode: backend not called.
   },
 
-  raiseDispute: (invoiceId, invoiceNumber, invoiceAmount, reason) => {
+  respondToDispute: (disputeId, message, attachmentNames) =>
     set((state) => {
-      if (state.disputes.find((d) => d.invoiceId === invoiceId)) return state
-      const num = state.disputes.length + 1
-      const newDispute: Dispute = {
-        id: `DSP-${new Date().getFullYear()}-${String(num).padStart(3, '0')}`,
-        invoiceId,
-        invoiceNumber,
-        invoiceAmount,
-        reason,
-        status: 'OPEN',
-        raisedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+      const dispute = state.disputes.find((d) => d.id === disputeId)
+      // Vendor can only post while the dispute is OPEN, and this never changes the invoice status.
+      if (!dispute || dispute.status !== 'OPEN') return state
+      const timestamp = new Date().toISOString()
+      const nextIndex = (dispute.messages?.length ?? 0) + 1
+      const attachments = (attachmentNames ?? [])
+        .map((name) => name.trim())
+        .filter(Boolean)
+        .map((fileName, index) => ({ id: `datt-${dispute.id.toLowerCase()}-${nextIndex}-${index + 1}`, fileName }))
+      if (!message.trim() && attachments.length === 0) return state
+      return {
+        disputes: state.disputes.map((d) =>
+          d.id === disputeId
+            ? {
+                ...d,
+                updatedAt: timestamp,
+                messages: [
+                  ...(d.messages ?? []),
+                  {
+                    id: `dmsg-${d.id.toLowerCase()}-${nextIndex}`,
+                    sender: 'VENDOR' as const,
+                    message: message.trim() || 'Documents uploaded for finance review.',
+                    createdAt: timestamp,
+                    attachments: attachments.length ? attachments : undefined,
+                  },
+                ],
+              }
+            : d
+        ),
       }
-      return { disputes: [newDispute, ...state.disputes] }
-    })
-  },
+    }),
 
-  updateDisputeStatus: (disputeId, status, notes) =>
+  createResubmissionInvoice: (oldInvoiceId, updatedLineItems) =>
+    set((state) => {
+      const oldInvoice = state.invoices.find((inv) => inv.id === oldInvoiceId)
+      if (!oldInvoice || oldInvoice.status !== 'RESUBMISSION_REQUIRED') return state
+
+      const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
+      const gstRate = oldInvoice.subtotal > 0 ? oldInvoice.gstAmount / oldInvoice.subtotal : 0.12
+      const gstAmount = Math.round(subtotal * gstRate)
+      const nowIso = new Date().toISOString()
+      const newInvoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
+
+      const newInvoice: Invoice = {
+        ...oldInvoice,
+        id: newInvoiceNumber,
+        invoiceNumber: newInvoiceNumber,
+        invoiceDate: nowIso.slice(0, 10),
+        status: 'PENDING',
+        closeReason: undefined,
+        supersedesInvoiceId: oldInvoice.id,
+        supersededByInvoiceId: undefined,
+        lineItems: updatedLineItems,
+        subtotal,
+        gstAmount,
+        grandTotal: subtotal + gstAmount,
+        notes: `Resubmission of ${oldInvoice.invoiceNumber}.`,
+        pdfUrl: `/invoices/${newInvoiceNumber}.pdf`,
+        createdAt: nowIso,
+      }
+
+      return {
+        // Old invoice closes as SUPERSEDED; the corrected one starts fresh as PENDING.
+        invoices: [
+          newInvoice,
+          ...state.invoices.map((inv) =>
+            inv.id === oldInvoiceId
+              ? { ...inv, status: 'CLOSED' as const, closeReason: 'SUPERSEDED' as const, supersededByInvoiceId: newInvoiceNumber }
+              : inv
+          ),
+        ],
+      }
+    }),
+
+  financeApproveInvoice: (invoiceId) =>
     set((state) => ({
+      invoices: state.invoices.map((inv) =>
+        inv.id === invoiceId && (inv.status === 'PENDING' || inv.status === 'DISPUTED')
+          ? { ...inv, status: 'APPROVED' as const }
+          : inv
+      ),
       disputes: state.disputes.map((d) =>
-        d.id === disputeId ? { ...d, status, notes: notes ?? d.notes, updatedAt: new Date().toISOString() } : d
+        d.invoiceId === invoiceId && d.status === 'OPEN'
+          ? { ...d, status: 'CLOSED' as const, updatedAt: new Date().toISOString() }
+          : d
       ),
     })),
 
-  acceptDispute: (disputeId) =>
-    set((state) => {
-      const dispute = state.disputes.find((d) => d.id === disputeId)
-      if (!dispute) return state
-      return {
-        disputes: state.disputes.map((d) =>
-          d.id === disputeId ? { ...d, status: 'ACCEPTED', updatedAt: new Date().toISOString() } : d
-        ),
-        invoices: state.invoices.map((inv) =>
-          inv.id === dispute.invoiceId ? { ...inv, status: 'APPROVED' } : inv
-        ),
-      }
-    }),
-
-  cancelDispute: (disputeId) =>
-    set((state) => {
-      const dispute = state.disputes.find((d) => d.id === disputeId)
-      if (!dispute) return state
-      return {
-        disputes: state.disputes.map((d) =>
-          d.id === disputeId ? { ...d, status: 'CANCELLED', updatedAt: new Date().toISOString() } : d
-        ),
-        invoices: state.invoices.map((inv) =>
-          inv.id === dispute.invoiceId ? { ...inv, status: 'CANCELLED' } : inv
-        ),
-      }
-    }),
-
-  resubmitInvoice: (invoiceId, updatedLineItems) =>
+  financeRaiseDispute: (invoiceId, reason) =>
     set((state) => {
       const invoice = state.invoices.find((inv) => inv.id === invoiceId)
-      if (!invoice) return state
-      const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const gstRate = invoice.subtotal > 0 ? invoice.gstAmount / invoice.subtotal : 0.12
-      const gstAmount = Math.round(subtotal * gstRate)
+      if (!invoice || invoice.status !== 'PENDING') return state
+      const nowIso = new Date().toISOString()
+      const existing = state.disputes.find((d) => d.invoiceId === invoiceId)
+      const num = state.disputes.length + 1
+      const dispute: Dispute = existing
+        ? { ...existing, reason, status: 'OPEN', updatedAt: nowIso }
+        : {
+            id: `DSP-${new Date().getFullYear()}-${String(num).padStart(3, '0')}`,
+            invoiceId,
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceAmount: invoice.grandTotal,
+            reason,
+            status: 'OPEN',
+            raisedAt: nowIso,
+            updatedAt: nowIso,
+            responseDueAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+            messages: [{ id: `dmsg-${num}-1`, sender: 'FINANCE', message: reason, createdAt: nowIso }],
+          }
+      return {
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'DISPUTED' as const } : inv)),
+        disputes: existing
+          ? state.disputes.map((d) => (d.invoiceId === invoiceId ? dispute : d))
+          : [dispute, ...state.disputes],
+      }
+    }),
+
+  financeRequestResubmission: (invoiceId, message) =>
+    set((state) => {
+      const invoice = state.invoices.find((inv) => inv.id === invoiceId)
+      if (!invoice || invoice.status !== 'DISPUTED') return state
+      const timestamp = new Date().toISOString()
+      return {
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'RESUBMISSION_REQUIRED' as const } : inv)),
+        disputes: state.disputes.map((d) =>
+          d.invoiceId === invoiceId && d.status === 'OPEN'
+            ? {
+                ...d,
+                status: 'CLOSED' as const,
+                updatedAt: timestamp,
+                messages: [
+                  ...(d.messages ?? []),
+                  {
+                    id: `dmsg-${d.id.toLowerCase()}-${(d.messages?.length ?? 0) + 1}`,
+                    sender: 'FINANCE' as const,
+                    message: message?.trim() || 'Resubmission required. Please create a new corrected invoice.',
+                    createdAt: timestamp,
+                  },
+                ],
+              }
+            : d
+        ),
+      }
+    }),
+
+  financeRejectInvoice: (invoiceId, reason) =>
+    set((state) => {
+      const invoice = state.invoices.find((inv) => inv.id === invoiceId)
+      if (!invoice || (invoice.status !== 'PENDING' && invoice.status !== 'DISPUTED')) return state
+      const timestamp = new Date().toISOString()
       return {
         invoices: state.invoices.map((inv) =>
-          inv.id === invoiceId
-            ? { ...inv, status: 'SUBMITTED', lineItems: updatedLineItems, subtotal, gstAmount, grandTotal: subtotal + gstAmount }
-            : inv
+          inv.id === invoiceId ? { ...inv, status: 'CLOSED' as const, closeReason: 'REJECTED' as const } : inv
         ),
         disputes: state.disputes.map((d) =>
-          d.invoiceId === invoiceId ? { ...d, status: 'CLOSED', updatedAt: new Date().toISOString() } : d
+          d.invoiceId === invoiceId && d.status === 'OPEN'
+            ? {
+                ...d,
+                status: 'CLOSED' as const,
+                updatedAt: timestamp,
+                messages: [
+                  ...(d.messages ?? []),
+                  {
+                    id: `dmsg-${d.id.toLowerCase()}-${(d.messages?.length ?? 0) + 1}`,
+                    sender: 'FINANCE' as const,
+                    message: reason?.trim() || 'Invoice rejected by finance.',
+                    createdAt: timestamp,
+                  },
+                ],
+              }
+            : d
         ),
       }
     }),

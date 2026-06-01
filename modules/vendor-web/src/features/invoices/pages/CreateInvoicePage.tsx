@@ -346,7 +346,7 @@ export default function CreateInvoicePage() {
             </div>
 
             <div className="rounded-xl bg-white/5 p-4 text-xs text-gray-300">
-              After submission, this invoice will be created with status <span className="font-semibold text-white">SUBMITTED</span> and move to the invoice list. Once approved, it can be used in bill discounting.
+              After submission, this invoice will be created with status <span className="font-semibold text-white">PENDING</span> and move to the invoice list for finance review. Once approved, it can be used in bill discounting.
             </div>
           </div>
         </div>

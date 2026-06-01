@@ -430,7 +430,16 @@ export interface CapacityDeclaration {
 }
 
 // ==================== INVOICE TYPES ====================
-export type InvoiceStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+// Lifecycle: PENDING → APPROVED | DISPUTED. DISPUTED → APPROVED | RESUBMISSION_REQUIRED | CLOSED.
+// A CLOSED invoice always carries a closeReason (REJECTED = finance rejected, SUPERSEDED = replaced by a new invoice).
+export type InvoiceStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'DISPUTED'
+  | 'RESUBMISSION_REQUIRED'
+  | 'CLOSED'
+
+export type InvoiceCloseReason = 'SUPERSEDED' | 'REJECTED'
 
 export interface Invoice {
   id: string
@@ -445,6 +454,9 @@ export interface Invoice {
   gstAmount: number
   grandTotal: number
   status: InvoiceStatus
+  closeReason?: InvoiceCloseReason
+  supersedesInvoiceId?: string // set on the NEW invoice — the old invoice it replaces
+  supersededByInvoiceId?: string // set on the OLD invoice — the new invoice that replaced it
   paymentDate?: string
   notes?: string
   pdfUrl: string
@@ -461,7 +473,22 @@ export interface InvoiceLineItem {
   lineTotal: number
 }
 
-export type DisputeStatus = 'OPEN' | 'IN_REVIEW' | 'ACCEPTED' | 'CANCELLED' | 'CLOSED'
+// A dispute thread is OPEN while finance is reviewing (invoice = DISPUTED) and CLOSED
+// once finance takes a final decision. The vendor can only post messages while OPEN.
+export type DisputeStatus = 'OPEN' | 'CLOSED'
+
+export interface DisputeAttachment {
+  id: string
+  fileName: string
+}
+
+export interface DisputeMessage {
+  id: string
+  sender: 'FINANCE' | 'VENDOR'
+  message: string
+  createdAt: string
+  attachments?: DisputeAttachment[]
+}
 
 export interface Dispute {
   id: string
@@ -473,6 +500,8 @@ export interface Dispute {
   raisedAt: string
   updatedAt: string
   notes?: string
+  responseDueAt?: string
+  messages?: DisputeMessage[]
 }
 
 export type LedgerType = 'CUSTOMER' | 'NBFC'
