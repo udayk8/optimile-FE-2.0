@@ -95,7 +95,20 @@ export const DISPUTES = [
   { id: "INV-2026-0170", client: "Asian Paints Ltd", amount: 67000, reason: "Detention charge not authorised by consignee", stage: "raised", raised: "2026-05-20", slaHrs: 40, owner: "Priya Nair" },
   { id: "INV-2026-0158", client: "Asian Paints Ltd", amount: 38000, reason: "Wrong trip details — TR reference incorrect", stage: "escalated", raised: "2026-05-18", slaHrs: -6, owner: "Finance Head" },
   { id: "INV-2026-0131", client: "Marico Limited", amount: 54000, reason: "Duplicate invoice — already settled in April", stage: "resolved", raised: "2026-05-10", slaHrs: 0, owner: "Priya Nair", resolution: "Credit note CN-2026-014 issued" },
+  { id: "VB-8790", client: "Royal Carriers", amount: 96000, reason: "Billed above contract — accessorial added without authorisation", stage: "vendor-response", raised: "2026-05-21", slaHrs: 30, owner: "Royal Carriers", kind: "subvendor", notifiedAt: "2026-05-21", respondedAt: "2026-05-22", vendorResponseType: "reject", vendorResponse: "Accessorial reflects a documented multi-pickup; LR annexure attached. Requesting approval at the billed amount.", vendorDocs: ["Multi-pickup-LR-annexure.pdf"] },
+  { id: "VB-8782", client: "Sharma Transport", amount: 61000, reason: "Detention charge not authorised by consignee", stage: "escalated", raised: "2026-05-17", slaHrs: -8, owner: "Finance Head", kind: "subvendor", notifiedAt: "2026-05-17", respondedAt: "2026-05-18", vendorResponseType: "reject", vendorResponse: "Detention was authorised verbally on site; awaiting written confirmation.", vendorDocs: ["Site-detention-log.pdf"] },
 ];
+
+/* Canned vendor replies for disputes raised from Vendor Match (mock — finance-side only).
+   Vendor either accepts (issues corrected invoice / credit note) or rejects with a
+   counter-argument + supporting documents — BRD step 14. */
+export type VendorDisputeReply = { type: "accept" | "reject"; message: string; docs: string[] };
+export const VENDOR_DISPUTE_RESPONSES: Record<string, VendorDisputeReply> = {
+  "Royal Carriers": { type: "reject", message: "Rate revised per fuel-surcharge clause 4.2 of the contract — the billed amount is correct. Requesting approval at the invoiced value.", docs: ["Signed-rate-annexure.pdf", "Fuel-surcharge-clause-4.2.pdf"] },
+  "Sharma Transport": { type: "accept", message: "Agreed — rate keyed in error. We will issue a corrected invoice / credit note for the difference.", docs: ["Corrected-invoice-draft.pdf"] },
+};
+export const DEFAULT_VENDOR_DISPUTE_RESPONSE: VendorDisputeReply =
+  { type: "reject", message: "We stand by the billed amount; supporting documents attached for your review.", docs: ["POD.pdf", "E-way-bill.pdf"] };
 
 /* ---------- Credit & debit notes (BRD 6) ---------- */
 export const DEBIT_NOTES = [
@@ -489,6 +502,63 @@ export const VENDOR_BILL_DETAILS = {
     comparison: [
       { head: "Base freight", contracted: 108000, invoiced: 108000 },
       { head: "Detention charges", contracted: 0, invoiced: 1500 },
+      { head: "Loading / unloading", contracted: 0, invoiced: 0 },
+      { head: "Other charges", contracted: 0, invoiced: 0 },
+      { head: "Advance adjusted", contracted: 0, invoiced: 0 },
+    ],
+  },
+  // Disputed bills surfaced on the Disputes page (not in the live Vendor Match list)
+  "VB-8790": {
+    invoice: {
+      invoiceNo: "RC-2026-0309", billDate: "2026-05-19", dueDate: "2026-06-18", terms: "30 Days",
+      bookingId: "BKG-4438", lrNo: "LR-77201", qty: 1, shippingDate: "2026-04-26", deliveryDate: "2026-04-29",
+      truckNo: "MH-12-GH-5521", origin: "Pune", destination: "Nagpur",
+      lineItems: { freight: 84000, advance: 0, detention: 0, loading: 6000, other: 6000, freightCost: 96000 },
+      taxableValue: 96000, igstPct: 18, igst: 17280, cgst: 0, sgst: 0, total: 113280,
+      amountInWords: "Rupees One Lakh Thirteen Thousand Two Hundred Eighty Only",
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-04-24 09:30", actor: "TMS · Indent IND-4438", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-04-24 13:10", actor: "Royal Carriers", done: true },
+      { label: "Dispatched from origin", ts: "2026-04-26 06:40", actor: "Pune hub", done: true },
+      { label: "In transit", ts: "2026-04-26 → 04-29", actor: "MH-12-GH-5521 · S. Rao", done: true },
+      { label: "Delivered at destination", ts: "2026-04-29 18:20", actor: "Nagpur · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-04-29 20:05", actor: "e-POD via driver app", done: true },
+      { label: "POD verified", ts: "2026-04-30 10:15", actor: "Ops desk", done: true },
+      { label: "Vendor invoice received", ts: "2026-05-19 14:20", actor: "Royal Carriers portal", done: true },
+      { label: "3-way match — variance flagged", ts: "2026-05-19 14:21", actor: "System · unauthorised accessorial", done: true, warn: true },
+    ],
+    comparison: [
+      { head: "Base freight", contracted: 84000, invoiced: 84000 },
+      { head: "Detention charges", contracted: 0, invoiced: 0 },
+      { head: "Loading / unloading", contracted: 0, invoiced: 6000 },
+      { head: "Other charges", contracted: 0, invoiced: 6000 },
+      { head: "Advance adjusted", contracted: 0, invoiced: 0 },
+    ],
+  },
+  "VB-8782": {
+    invoice: {
+      invoiceNo: "STR-2026-0121", billDate: "2026-05-17", dueDate: "2026-06-06", terms: "20 Days",
+      bookingId: "BKG-4425", lrNo: "LR-77098", qty: 1, shippingDate: "2026-05-08", deliveryDate: "2026-05-10",
+      truckNo: "MH-04-AB-6612", origin: "Mumbai", destination: "Indore",
+      lineItems: { freight: 52000, advance: 0, detention: 9000, loading: 0, other: 0, freightCost: 61000 },
+      taxableValue: 61000, igstPct: 18, igst: 10980, cgst: 0, sgst: 0, total: 71980,
+      amountInWords: "Rupees Seventy One Thousand Nine Hundred Eighty Only",
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-06 10:40", actor: "TMS · Indent IND-4425", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-06 15:00", actor: "Sharma Transport", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-08 07:15", actor: "Mumbai hub", done: true },
+      { label: "In transit", ts: "2026-05-08 → 05-10", actor: "MH-04-AB-6612 · K. Joshi", done: true },
+      { label: "Delivered at destination", ts: "2026-05-10 16:45", actor: "Indore · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-10 18:30", actor: "e-POD via driver app", done: true },
+      { label: "POD verified", ts: "2026-05-11 09:50", actor: "Ops desk", done: true },
+      { label: "Vendor invoice received", ts: "2026-05-17 11:25", actor: "Sharma Transport portal", done: true },
+      { label: "3-way match — variance flagged", ts: "2026-05-17 11:26", actor: "System · unauthorised detention", done: true, warn: true },
+    ],
+    comparison: [
+      { head: "Base freight", contracted: 52000, invoiced: 52000 },
+      { head: "Detention charges", contracted: 0, invoiced: 9000 },
       { head: "Loading / unloading", contracted: 0, invoiced: 0 },
       { head: "Other charges", contracted: 0, invoiced: 0 },
       { head: "Advance adjusted", contracted: 0, invoiced: 0 },

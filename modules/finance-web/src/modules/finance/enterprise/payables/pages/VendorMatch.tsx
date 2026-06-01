@@ -3,12 +3,43 @@ import {
   AlertTriangle, Clock, CheckCircle2, XCircle, Check, X, Wallet,
   ArrowLeft, Download, FileText, Loader2, PackageCheck,
 } from "lucide-react";
-import { Card, Pill, SectionTitle } from "@finance/components/primitives";
+import { Card, Pill, SectionTitle, Modal, ModalHeader } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
-import { VENDOR_BILLS, VENDOR_BILL_DETAILS, OPTIMILE_BILL_TO, vendorMeta } from "@finance/data/mock";
+import { VENDOR_BILLS, VENDOR_BILL_DETAILS, OPTIMILE_BILL_TO, vendorMeta, VENDOR_DISPUTE_RESPONSES, DEFAULT_VENDOR_DISPUTE_RESPONSE } from "@finance/data/mock";
+import { useDisputes } from "@finance/lib/disputesStore";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+function RaiseDisputeModal({ bill, onClose, onSubmit }: any) {
+  const [reason, setReason] = useState("");
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title="Raise dispute with vendor" tone="amber" icon={AlertTriangle} onClose={onClose} />
+      <div className="p-6">
+        <div className="mb-4 space-y-1 text-sm">
+          <div className="flex justify-between"><span className="text-slate-500">Vendor bill</span><span className="font-mono text-slate-800">{bill.id}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Vendor</span><span className="text-slate-800">{bill.vendor}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Trip · Lane</span><span className="text-slate-800">{bill.trip} · {bill.lane}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500">Billed</span><span className="font-mono font-semibold text-slate-800">{fmtINR(bill.billed)}</span></div>
+        </div>
+        <label className="text-xs font-medium text-slate-500">Reason for dispute</label>
+        <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
+          placeholder="e.g. Billed above contract rate / accessorial not authorised / short delivery"
+          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-300 focus:bg-white" />
+        <div className="mt-5 flex gap-3">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={() => onSubmit(reason.trim())} disabled={!reason.trim()}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+            <AlertTriangle size={14} />Raise dispute
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 const Match = ({ label, v, ok }: any) => (
   <div className="text-center">
@@ -42,7 +73,7 @@ export function Trace({ steps }: any) {
   );
 }
 
-function VendorBillDetail({ bill, onBack, onAct, toast }: any) {
+export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dispute, onNavigate, toast, backLabel = "Back to vendor bills" }: any) {
   const detail = (VENDOR_BILL_DETAILS as Record<string, any>)[bill.id];
   const invoiceRef = useRef(null);
   const podRef = useRef(null);
@@ -81,7 +112,7 @@ function VendorBillDetail({ bill, onBack, onAct, toast }: any) {
   return (
     <div>
       <button onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
-        <ArrowLeft size={15} />Back to vendor bills
+        <ArrowLeft size={15} />{backLabel}
       </button>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -95,8 +126,20 @@ function VendorBillDetail({ bill, onBack, onAct, toast }: any) {
           <p className="mt-1 text-sm text-slate-500">{bill.vendor} · {bill.trip} · {bill.lane} · {bill.terms} (due {bill.due})</p>
         </div>
         <div className="flex gap-2">
-          {!noPod && <button onClick={() => onAct(bill.id, "dispute")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><XCircle size={14} />Dispute</button>}
-          <button onClick={() => onAct(bill.id, "approve")} disabled={noPod} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"><Check size={14} />{bill.status === "variance" ? "Approve anyway" : "Approve & schedule"}</button>
+          {disputed ? (
+            <Pill tone="amber"><AlertTriangle size={12} />Disputed — vendor responded</Pill>
+          ) : dispute ? (
+            dispute.stage === "resolved" ? (
+              <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"><Check size={14} />Dispute closed</button>
+            ) : (
+              <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={14} />In Dispute</button>
+            )
+          ) : (
+            <>
+              {!noPod && <button onClick={() => onDispute(bill)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><XCircle size={14} />Dispute</button>}
+              <button onClick={() => onAct(bill.id, "approve")} disabled={noPod} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"><Check size={14} />{bill.status === "variance" ? "Approve anyway" : "Approve & schedule"}</button>
+            </>
+          )}
         </div>
       </div>
 
@@ -189,16 +232,34 @@ function VendorBillDetail({ bill, onBack, onAct, toast }: any) {
   );
 }
 
-export default function VendorMatch({ toast }: any) {
+export default function VendorMatch({ toast, onNavigate }: any) {
+  const { disputes, addDispute } = useDisputes();
   const [bills, setBills] = useState(VENDOR_BILLS);
   const [batch, setBatch] = useState<any[]>([]);
   const [open, setOpen] = useState<any>(null);
+  const [raising, setRaising] = useState<any>(null);
 
-  const act = (id: any, action: any) => {
+  const disputeOf = (id: any) => disputes.find((d) => d.id === id && d.kind === "subvendor");
+
+  const act = (id: any, _action: any) => {
     setBills((bs) => bs.filter((b) => b.id !== id));
     setBatch((p) => p.filter((x) => x !== id));
     setOpen(null);
-    toast(action === "approve" ? "Payment scheduled" : "Dispute raised with vendor");
+    toast("Payment scheduled");
+  };
+
+  const submitDispute = (reason: any) => {
+    const b = raising;
+    const reply = VENDOR_DISPUTE_RESPONSES[b.vendor] ?? DEFAULT_VENDOR_DISPUTE_RESPONSE;
+    addDispute({
+      id: b.id, client: b.vendor, amount: b.billed, reason, kind: "subvendor",
+      stage: "vendor-response", raised: today(), slaHrs: 48, owner: b.vendor,
+      notifiedAt: today(), respondedAt: today(),
+      vendorResponseType: reply.type, vendorResponse: reply.message, vendorDocs: reply.docs,
+    });
+    setRaising(null);
+    setOpen(null);
+    toast(`Dispute raised on ${b.id} — vendor notified & responded · see the Disputes page`);
   };
   const toggleBatch = (id: any) => setBatch((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const runBatch = () => {
@@ -211,7 +272,12 @@ export default function VendorMatch({ toast }: any) {
 
   if (open) {
     const bill = bills.find((b) => b.id === open);
-    if (bill) return <VendorBillDetail bill={bill} onBack={() => setOpen(null)} onAct={act} toast={toast} />;
+    if (bill) return (
+      <>
+        <VendorBillDetail bill={bill} onBack={() => setOpen(null)} onAct={act} onDispute={setRaising} dispute={disputeOf(bill.id)} onNavigate={onNavigate} toast={toast} />
+        {raising && <RaiseDisputeModal bill={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}
+      </>
+    );
   }
 
   return (
@@ -262,19 +328,30 @@ export default function VendorMatch({ toast }: any) {
               {noPod && <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700"><Clock size={15} />POD not yet uploaded — approval gated until delivery is proven.</div>}
               {ok && <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"><CheckCircle2 size={15} />All three match within tolerance — eligible for auto-approval.</div>}
 
-              <div className="mt-4 flex justify-end gap-3">
+              <div className="mt-4 flex items-center justify-end gap-3">
                 <button onClick={() => setOpen(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><FileText size={13} />View invoice &amp; trace</button>
-                {!noPod && <button onClick={() => act(b.id, "dispute")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><XCircle size={13} />Dispute</button>}
-                <button onClick={() => act(b.id, "approve")} disabled={noPod}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50">
-                  <Check size={13} />{variance ? "Approve anyway" : "Approve & schedule"}
-                </button>
+                {(() => {
+                  const dz = disputeOf(b.id);
+                  if (dz?.stage === "resolved") return <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"><Check size={13} />Dispute closed</button>;
+                  if (dz) return <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={13} />In Dispute</button>;
+                  return (
+                    <>
+                      {!noPod && <button onClick={() => setRaising(b)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><XCircle size={13} />Dispute</button>}
+                      <button onClick={() => act(b.id, "approve")} disabled={noPod}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+                        <Check size={13} />{variance ? "Approve anyway" : "Approve & schedule"}
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </Card>
           );
         })}
         {bills.length === 0 && <Card className="p-12 text-center text-slate-400">All vendor bills cleared. 🎉</Card>}
       </div>
+
+      {raising && <RaiseDisputeModal bill={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}
     </div>
   );
 }

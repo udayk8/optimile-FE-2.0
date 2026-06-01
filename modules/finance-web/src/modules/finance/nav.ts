@@ -182,8 +182,9 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
 export const NAV: Record<FinanceMode, NavGroup[]> = {
   aggregator: [
     { group: null, items: ['dash'] },
-    { group: 'Receivables', items: ['pod', 'ar', 'disputes', 'notes'] },
+    { group: 'Receivables', items: ['pod', 'ar', 'notes'] },
     { group: 'Payables', items: ['vendor', 'subvendor', 'retention'] },
+    { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract', 'margin'] },
     { group: 'Reports', items: ['profit', 'cash', 'recon', 'wc'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
@@ -200,7 +201,8 @@ export const NAV: Record<FinanceMode, NavGroup[]> = {
   enterprise: [
     { group: null, items: ['dash'] },
     { group: 'Payables', items: ['vendor', 'notes'] },
-    { group: 'Receivables', items: ['pod', 'disputes'] },
+    { group: 'Receivables', items: ['pod'] },
+    { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract'] },
     { group: 'Reports', items: ['reports'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
