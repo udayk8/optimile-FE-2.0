@@ -1,10 +1,10 @@
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
-import CustomerApp from "@customer/app/CustomerApp";
+import { CustomerDashboardShell } from "@customer/app/CustomerBrdDashboard";
 
-// Renders the customer portal inside the tenant shell using the default
-// customer app export available on this branch.
+// Renders the customer portal inside the tenant shell. The tenant route already
+// validates the external customer session, so avoid the standalone customer guard.
 
 export function CustomerEmbeddedApp() {
   return (
@@ -17,7 +17,7 @@ export function CustomerEmbeddedApp() {
           </Link>
         </Button>
       </div>
-      <CustomerApp />
+      <CustomerDashboardShell />
     </div>
   );
 }

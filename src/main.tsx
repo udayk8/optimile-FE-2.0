@@ -15,6 +15,7 @@ import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './she
 import './styles.css'
 
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
+const CustomerBrdDashboard = lazy(() => import('@customer/app/CustomerBrdDashboard'))
 const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
 const TenantAdminApp   = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
@@ -131,6 +132,7 @@ function HostRouter() {
               {buildShellChildRoutes()}
             </Route>
 
+            <Route path="/customer/brd-dashboard" element={<CustomerBrdDashboard />} />
             <Route path="/customer/*" element={<ProtectedRoute portal="customer"><CustomerApp /></ProtectedRoute>} />
             <Route path="/tracking/*" element={<ProtectedRoute portal="tracking"><TrackingApp /></ProtectedRoute>} />
             <Route path="/admin/*" element={<ProtectedRoute portal="admin"><PlatformAdminApp /></ProtectedRoute>} />
