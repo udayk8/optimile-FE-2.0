@@ -9,12 +9,18 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useSourcingBridge } from '@vendor/integration/auctionBridge'
 import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { auctions, submitBid } = useAppStore()
+  // Cross-module: read the auction from the shared auction-web store and write
+  // bids back into it; fall back to the local demo store when not present.
+  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid, hasShared } = useSourcingBridge()
+  const { auctions: storeAuctions, submitBid } = useAppStore()
+  const auctions = hasShared ? bridgeAuctions : storeAuctions
+  const submitBidFn = hasShared ? bridgePlaceBid : submitBid
 
   const auction = auctions.find(a => a.id === id)
 
@@ -73,7 +79,7 @@ export default function AuctionDetailPage() {
     if (!isValid) return
     Object.entries(bids).forEach(([laneId, amount]) => {
       if (amount > 0) {
-        submitBid(auction.id, laneId, amount)
+        submitBidFn(auction.id, laneId, amount)
       }
     })
     setSubmitted(true)

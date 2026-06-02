@@ -6,6 +6,7 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useAuctionContractsBridge } from '@vendor/integration/auctionBridge'
 import { FileText, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ContractStatus } from '@vendor/types'
 
@@ -30,7 +31,11 @@ export default function ContractsPage() {
   const [page, setPage] = useState(1)
   const navigate = useNavigate()
   const { id: selectedContractId } = useParams()
-  const { contracts } = useAppStore()
+  const { contracts: storeContracts } = useAppStore()
+  // Cross-module: contracts awarded to this vendor via auction-web, surfaced
+  // alongside the local demo contracts.
+  const auctionContracts = useAuctionContractsBridge()
+  const contracts = [...auctionContracts, ...storeContracts]
 
   const filtered = contracts.filter((c) => {
     if (c.status === 'DRAFT') return false

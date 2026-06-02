@@ -8,6 +8,7 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useSourcingBridge } from '@vendor/integration/auctionBridge'
 import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AuctionState } from '@vendor/types'
 
@@ -26,7 +27,11 @@ function getSourcingTab(search: string): SourcingTab {
 export default function SourcingPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { auctions } = useAppStore()
+  // Cross-module: prefer auctions authored in auction-web (shared store); fall
+  // back to the local demo store when auction-web hasn't been opened.
+  const { auctions: bridgeAuctions, hasShared } = useSourcingBridge()
+  const { auctions: storeAuctions } = useAppStore()
+  const auctions = hasShared ? bridgeAuctions : storeAuctions
   const activeTab = getSourcingTab(location.search)
   const [page, setPage] = useState(1)
 

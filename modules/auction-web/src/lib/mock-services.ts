@@ -8,15 +8,23 @@ import type {
   VendorOption,
 } from '@auction/types'
 import {
-  MOCK_AUCTIONS,
   MOCK_BOOKINGS,
-  MOCK_CONTRACTS,
   MOCK_DASHBOARD_RESPONSE,
   MOCK_RFIS,
   MOCK_RFQS,
   MOCK_RFQ_RESPONSES,
   MOCK_VENDORS,
 } from '@auction/lib/mock-data'
+import {
+  addAuction,
+  getAuction,
+  getAuctions,
+  getContracts,
+  loadStore,
+  replaceLaneContracts,
+  saveStore,
+  updateAuction,
+} from '@auction/lib/auction-store'
 
 // ── Shared types (re-exported for pages that imported them from services) ──
 export interface KpiData {
@@ -153,8 +161,10 @@ export async function patchRfqStatus(id: string, status: string): Promise<RfqTyp
 }
 
 // ── Auctions ──
+// Backed by the cross-module localStorage store so the Vendor Portal sees the
+// same auctions, bids flow back, and award produces shared contract records.
 export async function fetchAuctions(params?: { status?: string; type?: string; search?: string }): Promise<Auction[]> {
-  let out = MOCK_AUCTIONS
+  let out = getAuctions()
   if (params?.status) out = out.filter((a) => a.status === params.status)
   if (params?.type) out = out.filter((a) => a.type === params.type)
   if (params?.search) {
@@ -164,83 +174,193 @@ export async function fetchAuctions(params?: { status?: string; type?: string; s
   return out
 }
 export async function fetchAuction(id: string): Promise<Auction> {
-  const item = MOCK_AUCTIONS.find((a) => a.id === id)
+  const item = getAuction(id)
   if (!item) throw new Error(`Auction ${id} not found`)
   return item
 }
 export async function createAuction(data: any): Promise<Auction> {
+  const now = new Date()
+  const launchNow = data.launchNow ?? data.status === 'LIVE'
+  const windowMinutes = data.biddingWindowMinutes ?? 60
+  const timerEndsAt = new Date(now.getTime() + windowMinutes * 60 * 1000).toISOString()
+  const id = `AUC-${data.type ?? 'SPOT'}-${Date.now().toString().slice(-6)}`
   const next: Auction = {
-    id: `AUC-LOCAL-${Date.now()}`,
+    id,
     title: data.title ?? 'New auction',
     type: data.type ?? 'SPOT',
-    status: 'DRAFT',
-    createdBy: 'u-ops-1',
-    createdByRole: 'OPS',
-    createdAt: new Date().toISOString(),
-    startAt: data.startAt ?? new Date().toISOString(),
+    status: launchNow ? 'LIVE' : 'DRAFT',
+    createdBy: data.createdBy ?? 'u-ops-1',
+    createdByRole: data.createdByRole ?? 'OPS',
+    createdAt: now.toISOString(),
+    startAt: launchNow ? now.toISOString() : data.startAt,
+    contractStartDate: data.contractStartDate,
+    contractEndDate: data.contractEndDate,
     minBidDecrement: data.minBidDecrement ?? 500,
     extensionTriggerMinutes: data.extensionTriggerMinutes ?? 5,
     extensionDurationMinutes: data.extensionDurationMinutes ?? 10,
     maxExtensions: data.maxExtensions ?? 3,
-    biddingWindowMinutes: data.biddingWindowMinutes ?? 60,
+    biddingWindowMinutes: windowMinutes,
     bookingId: data.bookingId,
     region: data.region,
     invitedVendorIds: data.invitedVendorIds ?? [],
-    awardDeadline: data.awardDeadline ?? new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    lanes: data.lanes ?? [],
+    awardDeadline: data.awardDeadline ?? new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    lanes: (data.lanes ?? []).map((lane: any, index: number) => ({
+      timerEndsAt,
+      extensionCount: 0,
+      bidCount: 0,
+      ranking: [],
+      ...lane,
+      id: lane.id ?? `${id}-L${index + 1}`,
+      // Normalize the create-form's flat allocation percents into the nested
+      // shape the award flow and contract generation expect.
+      allocation: lane.allocation ?? {
+        l1: lane.l1AllocationPct ?? 100,
+        l2: lane.l2AllocationPct ?? 0,
+        l3: lane.l3AllocationPct ?? 0,
+      },
+    })),
     auditTrail: [
-      { id: `e-${Date.now()}`, type: 'CREATED', message: 'Auction draft created.', actor: 'u-ops-1', timestamp: new Date().toISOString() },
+      { id: `e-${Date.now()}`, type: 'CREATED', message: 'Auction draft created.', actor: data.createdBy ?? 'u-ops-1', timestamp: now.toISOString() },
+      ...(launchNow ? [{ id: `e-${Date.now()}-l`, type: 'LAUNCHED' as const, message: 'Auction launched on creation.', actor: data.createdBy ?? 'u-ops-1', timestamp: now.toISOString() }] : []),
     ],
   }
-  MOCK_AUCTIONS.unshift(next)
+  addAuction(next)
   return next
 }
 export async function launchAuction(id: string): Promise<Auction> {
-  const item = MOCK_AUCTIONS.find((a) => a.id === id)
-  if (!item) throw new Error(`Auction ${id} not found`)
-  item.status = 'LIVE'
-  return item
+  updateAuction(id, (a) => ({
+    ...a,
+    status: 'LIVE',
+    startAt: a.startAt ?? new Date().toISOString(),
+    auditTrail: [...a.auditTrail, { id: `e-${Date.now()}`, type: 'LAUNCHED', message: 'Auction launched and configuration locked.', actor: a.createdBy, timestamp: new Date().toISOString() }],
+  }))
+  return fetchAuction(id)
 }
-export async function cancelAuction(id: string, _reason?: string): Promise<Auction> {
-  const item = MOCK_AUCTIONS.find((a) => a.id === id)
-  if (!item) throw new Error(`Auction ${id} not found`)
-  item.status = 'CANCELLED'
-  return item
+export async function cancelAuction(id: string, reason?: string): Promise<Auction> {
+  updateAuction(id, (a) => ({
+    ...a,
+    status: 'CANCELLED',
+    auditTrail: [...a.auditTrail, { id: `e-${Date.now()}`, type: 'CANCELLED', message: `Auction cancelled. Reason: ${reason ?? 'n/a'}`, actor: a.createdBy, timestamp: new Date().toISOString() }],
+  }))
+  return fetchAuction(id)
 }
 export async function completeAuction(id: string): Promise<Auction> {
-  const item = MOCK_AUCTIONS.find((a) => a.id === id)
-  if (!item) throw new Error(`Auction ${id} not found`)
-  item.status = 'COMPLETED'
-  return item
+  updateAuction(id, (a) => ({
+    ...a,
+    status: 'COMPLETED',
+    completedAt: a.completedAt ?? new Date().toISOString(),
+    auditTrail: [...a.auditTrail, { id: `e-${Date.now()}`, type: 'COMPLETED', message: 'Bidding window closed.', actor: a.createdBy, timestamp: new Date().toISOString() }],
+  }))
+  return fetchAuction(id)
 }
 export async function fetchBids(auctionId: string, laneId: string) {
-  const auction = MOCK_AUCTIONS.find((a) => a.id === auctionId)
+  const auction = getAuction(auctionId)
   const lane = auction?.lanes.find((l) => l.id === laneId)
   return lane?.ranking ?? []
 }
 export async function placeBid(_auctionId: string, _laneId: string, _data: { vendorId: string; vendorName: string; amount: number }) {
   return { ok: true }
 }
-export async function awardAuction(auctionId: string, _decisions: any[]) {
-  const item = MOCK_AUCTIONS.find((a) => a.id === auctionId)
-  if (!item) throw new Error(`Auction ${auctionId} not found`)
-  item.status = 'AWARDED'
-  return item
+
+interface AwardDecisionInput {
+  laneId: string
+  vendorId: string
+  vendorName: string
+  allocationRank: 'L1' | 'L2' | 'L3'
+  awardedBidRank: 'L1' | 'L2' | 'L3'
+  awardedAmount: number
+  allocationPercent: number
+  overrideReason?: string
 }
+
+// Award writes the lane award decisions AND generates the linked contract
+// records (for BULK/LOT) into the shared store, so both the auction Contract
+// Output panel and the Vendor Portal Contracts page see them.
+export async function awardAuction(auctionId: string, decisions: any[]) {
+  const auction = getAuction(auctionId)
+  if (!auction) throw new Error(`Auction ${auctionId} not found`)
+
+  const byLane = new Map<string, AwardDecisionInput[]>()
+  ;(decisions as AwardDecisionInput[]).forEach((d) => {
+    byLane.set(d.laneId, [...(byLane.get(d.laneId) ?? []), d])
+  })
+
+  byLane.forEach((laneDecisions, laneId) => {
+    const lane = auction.lanes.find((l) => l.id === laneId)
+    if (!lane) return
+    const contracts: Contract[] =
+      auction.type === 'SPOT'
+        ? []
+        : laneDecisions.map((d) => ({
+            id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
+            sourceAuctionId: auction.id,
+            contractType: auction.type as 'BULK' | 'LOT',
+            vendorId: d.vendorId,
+            vendorName: d.vendorName,
+            lane: lane.lane,
+            region: lane.region,
+            vehicleType: lane.vehicleType,
+            contractedRate: d.awardedAmount,
+            rateUnit: lane.rateUnit,
+            volumeAllocationPercent: d.allocationPercent,
+            allocationRank: d.allocationRank,
+            startDate: auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
+            endDate: auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+            estimatedTrips: lane.estimatedTrips ?? 0,
+            status: 'ACTIVE' as const,
+            l1OverrideReason: d.overrideReason,
+            rateSyncedToTms: true,
+            placementFailures: [],
+            rateDeviationOpen: false,
+          }))
+    if (contracts.length > 0) replaceLaneContracts(auction.id, lane.lane, contracts)
+  })
+
+  updateAuction(auctionId, (a) => {
+    const lanes = a.lanes.map((lane) => {
+      const laneDecisions = byLane.get(lane.id)
+      if (!laneDecisions) return lane
+      return {
+        ...lane,
+        awardDecision: laneDecisions.map((d) => ({
+          vendorId: d.vendorId,
+          vendorName: d.vendorName,
+          allocationRank: d.allocationRank,
+          awardedBidRank: d.awardedBidRank,
+          awardedAmount: d.awardedAmount,
+          overrideReason: d.overrideReason,
+          allocationPercent: d.allocationPercent,
+        })),
+      }
+    })
+    return {
+      ...a,
+      lanes,
+      auditTrail: [...a.auditTrail, { id: `e-${Date.now()}`, type: 'AWARDED', message: 'Award decision saved and contract output prepared.', actor: a.createdBy, timestamp: new Date().toISOString() }],
+    }
+  })
+
+  return fetchAuction(auctionId)
+}
+
+// Marks the auction AWARDED once every lane is either awarded or rejected.
 export async function finalizeAuction(auctionId: string) {
-  const item = MOCK_AUCTIONS.find((a) => a.id === auctionId)
-  if (!item) throw new Error(`Auction ${auctionId} not found`)
-  item.status = 'AWARDED'
-  return item
+  updateAuction(auctionId, (a) => {
+    const allResolved = a.lanes.every((l) => l.awardDecision || l.rejectionReason)
+    return allResolved
+      ? { ...a, status: 'AWARDED', completedAt: a.completedAt ?? new Date().toISOString() }
+      : a
+  })
+  return fetchAuction(auctionId)
 }
 export async function rejectAuction(auctionId: string, reason?: string): Promise<Auction> {
-  const item = MOCK_AUCTIONS.find((a) => a.id === auctionId)
-  if (!item) throw new Error(`Auction ${auctionId} not found`)
-  item.status = 'NO_BIDS'
-  if (reason) {
-    item.lanes = item.lanes.map((l) => ({ ...l, rejectionReason: reason }))
-  }
-  return item
+  updateAuction(auctionId, (a) => ({
+    ...a,
+    status: 'NO_BIDS',
+    lanes: reason ? a.lanes.map((l) => ({ ...l, rejectionReason: reason })) : a.lanes,
+    auditTrail: [...a.auditTrail, { id: `e-${Date.now()}`, type: 'CANCELLED', message: `Marked no bids. Reason: ${reason ?? 'n/a'}`, actor: a.createdBy, timestamp: new Date().toISOString() }],
+  }))
+  return fetchAuction(auctionId)
 }
 export async function fetchVendors(search?: string): Promise<VendorOption[]> {
   if (!search) return MOCK_VENDORS
@@ -258,7 +378,7 @@ export async function fetchBooking(id: string): Promise<BookingReference> {
 
 // ── Contracts ──
 export async function fetchContracts(params?: { status?: string; search?: string; vendorId?: string }): Promise<Contract[]> {
-  let out = MOCK_CONTRACTS
+  let out = getContracts()
   if (params?.status) out = out.filter((c) => c.status === params.status)
   if (params?.vendorId) out = out.filter((c) => c.vendorId === params.vendorId)
   if (params?.search) {
@@ -273,15 +393,19 @@ export async function fetchContracts(params?: { status?: string; search?: string
   return out
 }
 export async function fetchContract(id: string): Promise<Contract> {
-  const item = MOCK_CONTRACTS.find((c) => c.id === id)
+  const item = getContracts().find((c) => c.id === id)
   if (!item) throw new Error(`Contract ${id} not found`)
   return item
 }
 export async function terminateContract(id: string): Promise<Contract> {
-  const item = MOCK_CONTRACTS.find((c) => c.id === id)
+  const store = loadStore()
+  const item = store.contracts.find((c) => c.id === id)
   if (!item) throw new Error(`Contract ${id} not found`)
-  item.status = 'TERMINATED'
-  return item
+  saveStore({
+    ...store,
+    contracts: store.contracts.map((c) => (c.id === id ? { ...c, status: 'TERMINATED' } : c)),
+  })
+  return { ...item, status: 'TERMINATED' }
 }
 
 // ── RFQ responses ──
@@ -324,10 +448,10 @@ export async function uploadRfqResponse(
 export async function searchAuctionService(q: string): Promise<SearchResponse> {
   const lower = q.toLowerCase()
   return {
-    auctions: MOCK_AUCTIONS.filter(
+    auctions: getAuctions().filter(
       (a) => a.title.toLowerCase().includes(lower) || a.id.toLowerCase().includes(lower)
     ).map((a) => ({ id: a.id, title: a.title, type: a.type, status: a.status })),
-    contracts: MOCK_CONTRACTS.filter(
+    contracts: getContracts().filter(
       (c) =>
         c.id.toLowerCase().includes(lower) ||
         c.vendorName.toLowerCase().includes(lower) ||
