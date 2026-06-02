@@ -1,8 +1,8 @@
-import React, { useState } from "react";
-import { FileText, Hash, AlertTriangle, ScrollText } from "lucide-react";
-import { Card, Pill, Money, SectionTitle, Modal, ModalHeader } from "@finance/components/primitives";
-import { SUBVENDOR_ROWS } from "@finance/data/mock";
+import React, { useMemo, useState } from "react";
+import { FileText, Hash, AlertTriangle, ScrollText, Banknote, CheckCircle2 } from "lucide-react";
+import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finance/components/primitives";
 import { useDisputes } from "@finance/lib/disputesStore";
+import { usePayables, type SubvendorRow } from "@finance/lib/payablesStore";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const disputeId = (ref: any) => `SVD-${ref}`;
@@ -35,21 +35,39 @@ function RaiseDisputeModal({ row, onClose, onSubmit }: any) {
   );
 }
 
+const statusTone = { matched: "green", variance: "red", "no-invoice": "amber" };
+const statusLabel = { matched: "Matched", variance: "Variance", "no-invoice": "No invoice — vehicle-wise" };
+
 export default function SubVendor({ toast }: any) {
   const { disputes, addDispute } = useDisputes();
+  const { subvendorRows, recordSubvendorPayment } = usePayables();
   const [filter, setFilter] = useState("all");
   const [raising, setRaising] = useState<any>(null);
-  const rows = SUBVENDOR_ROWS.filter((r) => filter === "all" || r.mode === filter);
+
+  const rows = subvendorRows.filter((r) => filter === "all" || r.mode === filter);
   const disputedIds = new Set(disputes.filter((d) => d.kind === "subvendor").map((d) => d.id));
 
-  const statusTone = { matched: "green", variance: "red", "no-invoice": "amber" };
-  const statusLabel = { matched: "Matched", variance: "Variance", "no-invoice": "No invoice — vehicle-wise" };
+  // BRD 5.2 — vehicle-number consolidation: what's owed per informal transporter,
+  // summed across trips, when no formal invoice exists to account vendor-wise.
+  const vehicleConsolidation = useMemo(() => {
+    const m = new Map<string, { party: string; trips: number; payable: number; paid: number }>();
+    subvendorRows.filter((r) => r.mode === "vehicle").forEach((r) => {
+      const prev = m.get(r.party) || { party: r.party, trips: 0, payable: 0, paid: 0 };
+      m.set(r.party, { party: r.party, trips: prev.trips + 1, payable: prev.payable + r.payable, paid: prev.paid + (r.stage === "paid" ? r.payable : 0) });
+    });
+    return [...m.values()];
+  }, [subvendorRows]);
 
   const submitDispute = (reason: any) => {
     const r = raising;
     addDispute({ id: disputeId(r.ref), client: r.party, amount: r.payable, reason, stage: "raised", raised: today(), slaHrs: 48, owner: "Aggregator", kind: "subvendor" });
     setRaising(null);
     toast(`Dispute raised with ${r.party} — tracked on the Disputes page`);
+  };
+
+  const pay = (r: SubvendorRow) => {
+    recordSubvendorPayment(r.ref);
+    toast(r.mode === "vehicle" ? `Vehicle-number payment recorded for ${r.ref}` : `Vendor payment recorded for ${r.ref}`);
   };
 
   return (
@@ -84,14 +102,20 @@ export default function SubVendor({ toast }: any) {
                   <td className="px-5 py-3.5"><Money value={r.payable} className="font-semibold text-slate-800" /></td>
                   <td className="px-5 py-3.5"><Pill tone={statusTone[r.status as keyof typeof statusTone] as any}>{r.status === "variance" && <AlertTriangle size={11} />}{statusLabel[r.status as keyof typeof statusLabel]}</Pill></td>
                   <td className="px-5 py-3.5 text-right">
-                    {disputed ? (
-                      <Pill tone="amber"><AlertTriangle size={11} />Disputed</Pill>
-                    ) : (
-                      <button onClick={() => setRaising(r)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100">
-                        <ScrollText size={12} />Raise dispute
-                      </button>
-                    )}
+                    <div className="flex items-center justify-end gap-2">
+                      {r.stage === "paid" ? (
+                        <Pill tone="green"><CheckCircle2 size={11} />Paid</Pill>
+                      ) : (
+                        <>
+                          {disputed ? (
+                            <Pill tone="amber"><AlertTriangle size={11} />Disputed</Pill>
+                          ) : (
+                            <button onClick={() => setRaising(r)} className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100"><ScrollText size={12} />Dispute</button>
+                          )}
+                          <Btn onClick={() => pay(r)}><Banknote size={12} />{r.mode === "vehicle" ? "Pay (vehicle-wise)" : "Pay (vendor-wise)"}</Btn>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -99,6 +123,26 @@ export default function SubVendor({ toast }: any) {
           </tbody>
         </table>
       </Card>
+
+      {/* BRD 5.2 — consolidated payable per vehicle owner across trips */}
+      {vehicleConsolidation.length > 0 && (
+        <Card className="mt-6 p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-semibold text-slate-800"><Hash size={16} className="text-amber-500" />Vehicle-number consolidation</h3>
+          <p className="mb-4 text-xs text-slate-400">Informal transporters who never submit an invoice — what's owed, consolidated by registration across trips.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {vehicleConsolidation.map((v) => (
+              <div key={v.party} className="flex items-center justify-between rounded-lg border border-slate-200 p-3 text-sm">
+                <div><div className="text-slate-700">{v.party}</div><div className="text-xs text-slate-400">{v.trips} trip{v.trips > 1 ? "s" : ""}</div></div>
+                <div className="text-right">
+                  <Money value={v.payable} className="font-semibold text-slate-800" />
+                  {v.paid > 0 && <div className="text-xs text-emerald-600">{<Money value={v.paid} />} paid</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <p className="mt-3 text-xs text-slate-400">Vehicle-number rows track what's owed to informal transporters who never submit a formal invoice — consolidated by registration number across trips. As a customer to your sub-vendors, you can raise a dispute against any line — it is tracked on the <span className="font-medium text-slate-500">Disputes</span> page.</p>
 
       {raising && <RaiseDisputeModal row={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}

@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { Bell, Download, ScrollText, AlertTriangle } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader } from "@finance/components/primitives";
-import { INVOICES, INVOICE_SERIES } from "@finance/data/mock";
 import { exportCsv } from "@finance/lib/csv";
 import { useDisputes } from "@finance/lib/disputesStore";
+import { useReceivables } from "@finance/lib/receivablesStore";
 
 const STATUS_LABEL = { overdue: "Overdue", "due-soon": "Due soon", current: "Current" };
 const STATUS_TONE = { overdue: "red", "due-soon": "amber", current: "green" };
@@ -48,11 +48,14 @@ function RaiseDisputeModal({ invoice, onClose, onSubmit }: any) {
 
 export default function Collections({ toast }: any) {
   const { disputes, addDispute } = useDisputes();
+  const { invoices } = useReceivables();
   const [customer, setCustomer] = useState("all");
   const [raising, setRaising] = useState<any>(null);
 
-  const customers = useMemo(() => [...new Set(INVOICES.map((i) => i.client))], []);
-  const rows = INVOICES.filter((i) => customer === "all" || i.client === customer);
+  // Debtors = invoices the client has approved (now outstanding in the AR ledger).
+  const approved = useMemo(() => invoices.filter((i) => i.stage === "approved"), [invoices]);
+  const customers = useMemo(() => [...new Set(approved.map((i) => i.client))], [approved]);
+  const rows = approved.filter((i) => customer === "all" || i.client === customer);
 
   // Live dispute summary (customer-raised, still open)
   const openDisputes = disputes.filter((d) => d.kind === "customer" && d.stage !== "resolved");
@@ -170,23 +173,6 @@ export default function Collections({ toast }: any) {
             })}
           </tbody>
         </table>
-      </Card>
-
-      {/* Invoice numbering / series config — BRD 4.2 */}
-      <Card className="mt-6 p-5">
-        <h3 className="mb-1 font-semibold text-slate-800">Invoice numbering & series</h3>
-        <p className="mb-4 text-xs text-slate-400">Sequential, no gaps. Resets each financial year (1 April).</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {INVOICE_SERIES.map((s) => (
-            <div key={s.series} className="rounded-lg border border-slate-200 p-4">
-              <div className="font-mono text-sm font-semibold text-slate-800">{s.series}<span className="text-slate-400">{String(s.next).padStart(4, "0")}</span></div>
-              <div className="mt-1 text-xs text-slate-500">{s.label}</div>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                <span>Next: {s.next}</span><Pill tone="slate">FY {s.fy}</Pill>
-              </div>
-            </div>
-          ))}
-        </div>
       </Card>
 
       {raising && <RaiseDisputeModal invoice={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}

@@ -3,7 +3,8 @@ import {
   GitCompareArrows, BookOpen, TrendingUp, Truck, FileText,
   Hash, Lock, ScrollText, FilePlus2, Wrench, BadgeIndianRupee,
   CalendarClock, Banknote, PieChart, Building2, Landmark, ShieldCheck,
-  BarChart3, NotebookText, type LucideIcon,
+  BarChart3, NotebookText, ReceiptIndianRupee, ListOrdered, FileSpreadsheet, Fuel,
+  type LucideIcon,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 
@@ -13,6 +14,8 @@ import Tp_Margins from '@finance/modules/finance/threepl/analytics/pages/Margins
 import Tp_Profitability from '@finance/modules/finance/threepl/analytics/pages/Profitability'
 import Tp_CashFlow from '@finance/modules/finance/threepl/analytics/pages/CashFlow'
 import Tp_PendingPOD from '@finance/modules/finance/threepl/revenue/pages/PendingPOD'
+import Tp_Invoicing from '@finance/modules/finance/threepl/revenue/pages/Invoicing'
+import Tp_InvoiceSeries from '@finance/modules/finance/threepl/revenue/pages/InvoiceSeries'
 import Tp_Collections from '@finance/modules/finance/threepl/revenue/pages/Collections'
 import Tp_Disputes from '@finance/modules/finance/threepl/revenue/pages/Disputes'
 import Tp_Notes from '@finance/modules/finance/threepl/revenue/pages/Notes'
@@ -20,6 +23,9 @@ import Tp_Reconciliation from '@finance/modules/finance/threepl/revenue/pages/Re
 import Tp_VendorMatch from '@finance/modules/finance/threepl/payables/pages/VendorMatch'
 import Tp_SubVendor from '@finance/modules/finance/threepl/payables/pages/SubVendor'
 import Tp_Retention from '@finance/modules/finance/threepl/payables/pages/Retention'
+import Tp_ScheduledPayments from '@finance/modules/finance/threepl/payables/pages/ScheduledPayments'
+import Tp_ARReport from '@finance/modules/finance/threepl/revenue/pages/ARReport'
+import Tp_APReport from '@finance/modules/finance/threepl/payables/pages/APReport'
 import Tp_CreditLimits from '@finance/modules/finance/threepl/controls/pages/CreditLimits'
 import Tp_ContractBudget from '@finance/modules/finance/threepl/controls/pages/ContractBudget'
 import Tp_Compliance from '@finance/modules/finance/threepl/controls/pages/Compliance'
@@ -37,6 +43,7 @@ import Of_Maintenance from '@finance/modules/finance/own-fleet/fleet/pages/Maint
 import Of_DriverAdvances from '@finance/modules/finance/own-fleet/fleet/pages/DriverAdvances'
 import Of_Lifecycle from '@finance/modules/finance/own-fleet/fleet/pages/Lifecycle'
 import Of_FleetLedgers from '@finance/modules/finance/own-fleet/fleet/pages/FleetLedgers'
+import Of_FuelReport from '@finance/modules/finance/own-fleet/fleet/pages/FuelReport'
 import Of_PendingPOD from '@finance/modules/finance/own-fleet/revenue/pages/PendingPOD'
 import Of_Collections from '@finance/modules/finance/own-fleet/revenue/pages/Collections'
 import Of_Notes from '@finance/modules/finance/own-fleet/revenue/pages/Notes'
@@ -90,12 +97,15 @@ export const MODES: Record<FinanceMode, ModeMeta> = {
 const META: Record<string, { label: string; icon: LucideIcon }> = {
   dash: { label: 'Command Centre', icon: LayoutDashboard },
   pod: { label: 'Pending POD', icon: FileWarning },
+  invoicing: { label: 'POD → Invoice', icon: ReceiptIndianRupee },
   ar: { label: 'Debtors', icon: ReceiptText },
+  series: { label: 'Invoice Series', icon: ListOrdered },
   disputes: { label: 'Disputes', icon: ScrollText },
   notes: { label: 'Credit / Debit Notes', icon: FilePlus2 },
   vendor: { label: 'Vendor Match', icon: GitCompareArrows },
   subvendor: { label: 'Sub-Vendor / Vehicle', icon: Hash },
   retention: { label: 'Retention', icon: Lock },
+  payments: { label: 'Scheduled Payments', icon: Banknote },
   credit: { label: 'Credit Limits', icon: ShieldAlert },
   contract: { label: 'Contract & Budget', icon: Building2 },
   margin: { label: 'Margin Tracker', icon: TrendingUp },
@@ -112,6 +122,9 @@ const META: Record<string, { label: string; icon: LucideIcon }> = {
   audit: { label: 'Audit Trail', icon: ShieldCheck },
   ledger: { label: 'Ledgers', icon: BookOpen },
   reports: { label: 'Reports', icon: BarChart3 },
+  arreport: { label: 'AR / Collections Report', icon: FileSpreadsheet },
+  apreport: { label: 'AP Report', icon: FileSpreadsheet },
+  fuelreport: { label: 'Daily Fuel Report', icon: Fuel },
   fleetledger: { label: 'Fleet Ledgers', icon: NotebookText },
 }
 
@@ -126,12 +139,17 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
   aggregator: {
     dash: meta('dash', Tp_Dashboard),
     pod: meta('pod', Tp_PendingPOD),
+    invoicing: meta('invoicing', Tp_Invoicing),
     ar: meta('ar', Tp_Collections),
+    series: meta('series', Tp_InvoiceSeries),
     disputes: meta('disputes', Tp_Disputes),
     notes: meta('notes', Tp_Notes),
     vendor: meta('vendor', Tp_VendorMatch),
     subvendor: meta('subvendor', Tp_SubVendor),
     retention: meta('retention', Tp_Retention),
+    payments: meta('payments', Tp_ScheduledPayments),
+    arreport: meta('arreport', Tp_ARReport),
+    apreport: meta('apreport', Tp_APReport),
     credit: meta('credit', Tp_CreditLimits),
     contract: meta('contract', Tp_ContractBudget),
     margin: meta('margin', Tp_Margins),
@@ -151,8 +169,12 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
     advances: meta('advances', Of_DriverAdvances),
     lifecycle: meta('lifecycle', Of_Lifecycle),
     pod: meta('pod', Of_PendingPOD),
+    invoicing: meta('invoicing', Tp_Invoicing),
     ar: meta('ar', Of_Collections),
+    series: meta('series', Tp_InvoiceSeries),
     notes: meta('notes', Of_Notes),
+    arreport: meta('arreport', Tp_ARReport),
+    fuelreport: meta('fuelreport', Of_FuelReport),
     profit: meta('profit', Of_Profitability),
     cash: meta('cash', Of_CashFlow),
     recon: meta('recon', Of_Reconciliation),
@@ -165,12 +187,14 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
   enterprise: {
     dash: meta('dash', En_Dashboard),
     vendor: meta('vendor', En_VendorMatch),
+    payments: meta('payments', Tp_ScheduledPayments),
     notes: meta('notes', En_Notes),
     pod: meta('pod', En_PendingPOD),
     disputes: meta('disputes', En_Disputes),
     credit: meta('credit', En_CreditLimits),
     contract: meta('contract', En_ContractBudget),
     reports: meta('reports', En_EnterpriseReports),
+    apreport: meta('apreport', Tp_APReport),
     tax: meta('tax', En_Compliance),
     audit: meta('audit', En_AuditTrail),
     close: meta('close', En_MonthClose),
@@ -182,28 +206,28 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
 export const NAV: Record<FinanceMode, NavGroup[]> = {
   aggregator: [
     { group: null, items: ['dash'] },
-    { group: 'Receivables', items: ['pod', 'ar', 'notes'] },
-    { group: 'Payables', items: ['vendor', 'subvendor', 'retention'] },
+    { group: 'Receivables', items: ['pod', 'invoicing', 'ar', 'series', 'notes'] },
+    { group: 'Payables', items: ['vendor', 'subvendor', 'retention', 'payments'] },
     { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract', 'margin'] },
-    { group: 'Reports', items: ['profit', 'cash', 'recon', 'wc'] },
+    { group: 'Reports', items: ['arreport', 'apreport', 'profit', 'cash', 'recon', 'wc'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
     { group: 'Ledgers', items: ['ledger'] },
   ],
   fleet: [
     { group: null, items: ['dash'] },
     { group: 'Fleet', items: ['fleet', 'maint', 'advances', 'lifecycle'] },
-    { group: 'Revenue', items: ['pod', 'ar', 'notes'] },
-    { group: 'Reports', items: ['profit', 'cash', 'recon'] },
+    { group: 'Revenue', items: ['pod', 'invoicing', 'ar', 'series', 'notes'] },
+    { group: 'Reports', items: ['arreport', 'fuelreport', 'profit', 'cash', 'recon'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
     { group: 'Ledgers', items: ['fleetledger', 'ledger'] },
   ],
   enterprise: [
     { group: null, items: ['dash'] },
-    { group: 'Payables', items: ['vendor', 'notes', 'pod'] },
+    { group: 'Payables', items: ['vendor', 'notes', 'pod', 'payments'] },
     { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract'] },
-    { group: 'Reports', items: ['reports'] },
+    { group: 'Reports', items: ['reports', 'apreport'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
     { group: 'Ledgers', items: ['ledger'] },
   ],

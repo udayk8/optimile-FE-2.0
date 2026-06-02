@@ -40,12 +40,50 @@ export const INVOICE_SERIES = [
   { series: "DN-2026-", label: "Debit notes", next: 10, fy: "2026-27" },
 ];
 
-/* ---------- Vendor bills (AP 3-way match) ---------- */
+/* ---------- Contract rates by lane + truck type (BRD 4.1) ----------
+   The draft invoice pulls its base freight from here automatically — no
+   manual rate entry. Derived from the live trip set so a trip awaiting POD
+   always resolves to a rate. Payment terms come from the client. */
+const TERMS_BY_CLIENT: Record<string, string> = {
+  "Britannia Industries": "Net 30",
+  "Asian Paints Ltd": "Net 20",
+  "Marico Limited": "Net 30",
+  "Dabur India": "Net 20",
+};
+export const contractTermsFor = (client: string): string => TERMS_BY_CLIENT[client] || "Net 30";
+
+export const CONTRACT_RATES: Record<string, { base: number; terms: string }> = TRIPS.reduce(
+  (m, t) => ({ ...m, [`${t.lane}|${t.truck}`]: { base: t.revenue, terms: contractTermsFor(t.client) } }),
+  {} as Record<string, { base: number; terms: string }>,
+);
+export const contractRateFor = (lane: string, truck: string, client?: string): { base: number; terms: string } =>
+  CONTRACT_RATES[`${lane}|${truck}`] || { base: 0, terms: client ? contractTermsFor(client) : "Net 30" };
+
+/* ---------- Standard accessorial charge library (BRD 4.1) ----------
+   Pre-configured charges added to a draft invoice at the accessorial step. */
+export const ACCESSORIAL_LIBRARY = [
+  { code: "DET", label: "Detention (beyond free period)", rate: 7000 },
+  { code: "LUL", label: "Loading / unloading assistance", rate: 2400 },
+  { code: "WKND", label: "Weekend surcharge", rate: 3500 },
+  { code: "MULTI", label: "Multi-pickup / multi-drop", rate: 6000 },
+];
+
+/* ---------- Client-approval variance tolerance (BRD 4.1) ----------
+   Invoiced amount beyond ±this% of the contracted rate is auto-flagged. */
+export const AR_TOLERANCE_PCT = 2;
+
+/* ---------- Vendor-bill 3-way-match tolerance (BRD 5.1) ----------
+   Configurable. A vendor bill within ±this% of the contract rate (with POD)
+   is auto-approved; outside it requires manual finance approval. */
+export const AP_TOLERANCE_PCT = 2;
+
+/* ---------- Vendor bills (AP 3-way match) ----------
+   vendorId + category/commodity feed the AP report drill-downs (BRD 8.3). */
 export const VENDOR_BILLS = [
-  { id: "VB-8801", vendor: "Sharma Transport", trip: "TR-4401", lane: "Mumbai → Delhi", contractRate: 118000, billed: 118000, pod: true, status: "matched", terms: "Net 30", due: "2026-05-24" },
-  { id: "VB-8809", vendor: "Royal Carriers", trip: "TR-4441", lane: "Pune → Hyderabad", contractRate: 74000, billed: 84900, pod: true, status: "variance", variance: 14.7, terms: "Net 30", due: "2026-05-26" },
-  { id: "VB-8814", vendor: "Sharma Transport", trip: "TR-4452", lane: "Mumbai → Nagpur", contractRate: 52000, billed: 52000, pod: false, status: "no-pod", terms: "Net 20", due: "2026-05-28" },
-  { id: "VB-8820", vendor: "Royal Carriers", trip: "TR-4419", lane: "Surat → Delhi", contractRate: 108000, billed: 109500, pod: true, status: "matched", terms: "Net 30", due: "2026-05-24" },
+  { id: "VB-8801", vendorId: "V-SHARMA", vendor: "Sharma Transport", trip: "TR-4401", lane: "Mumbai → Delhi", contractRate: 118000, billed: 118000, pod: true, status: "matched", terms: "Net 30", due: "2026-05-24", category: "Vehicle hire", commodity: "FMCG" },
+  { id: "VB-8809", vendorId: "V-ROYAL", vendor: "Royal Carriers", trip: "TR-4441", lane: "Pune → Hyderabad", contractRate: 74000, billed: 84900, pod: true, status: "variance", variance: 14.7, terms: "Net 30", due: "2026-05-26", category: "Accessorial charges", commodity: "Chemicals" },
+  { id: "VB-8814", vendorId: "V-SHARMA", vendor: "Sharma Transport", trip: "TR-4452", lane: "Mumbai → Nagpur", contractRate: 52000, billed: 52000, pod: false, status: "no-pod", terms: "Net 20", due: "2026-05-28", category: "Vehicle hire", commodity: "Auto parts" },
+  { id: "VB-8820", vendorId: "V-ROYAL", vendor: "Royal Carriers", trip: "TR-4419", lane: "Surat → Delhi", contractRate: 108000, billed: 109500, pod: true, status: "matched", terms: "Net 30", due: "2026-05-24", category: "Vehicle hire", commodity: "FMCG" },
 ];
 
 /* ---------- AR aging ---------- */
@@ -59,11 +97,14 @@ export const AGING = [
   { bucket: "OD 60d+", amount: 0, color: "#991b1b" },
 ];
 
-/* ---------- Cash flow (30 / 60 / 90) ---------- */
+/* ---------- Cash flow (30 / 60 / 90) — net balance + inflow/outflow split (BRD 8.5) ---------- */
 export const CASHFLOW = Array.from({ length: 90 }, (_, i) => {
   const base = 850000 - i * 12000 + Math.sin(i / 3) * 120000;
   const dip = i > 18 && i < 40 ? -180000 : 0;
-  return { day: i + 1, balance: Math.round(base + dip) };
+  // Projected client receipts vs vendor/fuel/salary/EMI outflows for the day.
+  const inflow = Math.round(95000 + Math.abs(Math.sin(i / 4)) * 140000);
+  const outflow = Math.round(90000 + Math.abs(Math.cos(i / 5)) * 95000 + (i > 18 && i < 40 ? 60000 : 0));
+  return { day: i + 1, balance: Math.round(base + dip), inflow, outflow };
 });
 
 /* ---------- Margins (aggregator) ---------- */
@@ -75,6 +116,20 @@ export const MARGINS = [
   { trip: "TR-4430", lane: "Chennai → Bengaluru", charged: 38000, paid: 31500 },
 ];
 
+/* ---------- Trip-level profitability (BRD 8.6 drill-down) ----------
+   Each trip's revenue vs fully-loaded cost. The Profitability page groups these
+   by client / lane / vehicle and drills into the trip rows behind any group. */
+export const PROFIT_TRIPS = [
+  { trip: "TR-4401", client: "Britannia Industries", lane: "Mumbai → Delhi", vehicle: "MH-12-AB-1234", revenue: 145000, cost: 118000 },
+  { trip: "TR-4470", client: "Britannia Industries", lane: "Mumbai → Delhi", vehicle: "MH-12-AB-1234", revenue: 142000, cost: 130000 },
+  { trip: "TR-4419", client: "Britannia Industries", lane: "Surat → Delhi", vehicle: "MH-14-XY-7788", revenue: 132000, cost: 108000 },
+  { trip: "TR-4430", client: "Asian Paints Ltd", lane: "Chennai → Bengaluru", vehicle: "GJ-01-PQ-5566", revenue: 38000, cost: 31500 },
+  { trip: "TR-4452", client: "Asian Paints Ltd", lane: "Mumbai → Nagpur", vehicle: "MH-12-AB-1234", revenue: 67000, cost: 52000 },
+  { trip: "TR-4441", client: "Marico Limited", lane: "Pune → Hyderabad", vehicle: "MH-14-XY-7788", revenue: 92000, cost: 74000 },
+  { trip: "TR-4465", client: "Marico Limited", lane: "Pune → Hyderabad", vehicle: "GJ-01-PQ-5566", revenue: 90000, cost: 88000 },
+  { trip: "TR-4448", client: "Dabur India", lane: "Delhi → Jaipur", vehicle: "GJ-01-PQ-5566", revenue: 24500, cost: 19000 },
+];
+
 /* ---------- Own fleet vehicles ---------- */
 export const VEHICLES = [
   { id: "MH-12-AB-1234", type: "32ft MXL", revenue: 412000, fuel: 152000, driver: 25000, maint: 18000, emi: 50000, toll: 28000 },
@@ -82,11 +137,13 @@ export const VEHICLES = [
   { id: "GJ-01-PQ-5566", type: "20ft", revenue: 245000, fuel: 88000, driver: 22000, maint: 14000, emi: 38000, toll: 17000 },
 ];
 
-/* ---------- Daily fuel log ---------- */
+/* ---------- Daily fuel log (BRD 8.4) ----------
+   odoStart/odoEnd bracket the fill; kmCovered = litres × kmpl; avg30Kmpl is the
+   vehicle's 30-day average — anomaly is set when kmpl deviates >15% from it. */
 export const FUEL = [
-  { vehicle: "MH-12-AB-1234", date: "2026-05-20", loc: "Vadodara HP", litres: 220, rate: 94.2, odo: 142300, kmpl: 4.1, anomaly: false },
-  { vehicle: "MH-14-XY-7788", date: "2026-05-20", loc: "Nashik IOC", litres: 240, rate: 93.8, odo: 98750, kmpl: 2.9, anomaly: true },
-  { vehicle: "GJ-01-PQ-5566", date: "2026-05-19", loc: "Surat BPCL", litres: 140, rate: 94.0, odo: 67200, kmpl: 5.2, anomaly: false },
+  { vehicle: "MH-12-AB-1234", driver: "R. Yadav", date: "2026-05-20", loc: "Vadodara HP", litres: 220, rate: 94.2, odoStart: 141398, odoEnd: 142300, odo: 142300, kmCovered: 902, kmpl: 4.1, avg30Kmpl: 4.3, anomaly: false },
+  { vehicle: "MH-14-XY-7788", driver: "M. Singh", date: "2026-05-20", loc: "Nashik IOC", litres: 240, rate: 93.8, odoStart: 98054, odoEnd: 98750, odo: 98750, kmCovered: 696, kmpl: 2.9, avg30Kmpl: 3.6, anomaly: true },
+  { vehicle: "GJ-01-PQ-5566", driver: "S. Kumar", date: "2026-05-19", loc: "Surat BPCL", litres: 140, rate: 94.0, odoStart: 66472, odoEnd: 67200, odo: 67200, kmCovered: 728, kmpl: 5.2, avg30Kmpl: 5.1, anomaly: false },
 ];
 
 /* ---------- Invoice disputes (BRD 4.3) ---------- */
@@ -266,6 +323,16 @@ export const CLIENT_LEDGER = [
   { date: "2026-05-02", type: "Payment", ref: "RCPT-3301", amt: -100000, bal: 177000 },
   { date: "2026-05-10", type: "Credit Note", ref: "CN-2026-014", amt: -8000, bal: 169000 },
   { date: "2026-05-15", type: "Debit Note", ref: "DN-2026-009", amt: 12000, bal: 181000 },
+];
+
+/* ---------- Vendor (AP) ledger (sample, append-only) ----------
+   Payables side: a bill approval increases what we owe (debit), a payment
+   reduces it (credit/negative). Running balance = what's still owed. */
+export const VENDOR_LEDGER = [
+  { date: "2026-04-11", type: "Bill approved", ref: "VB-8780", amt: 96000, bal: 96000 },
+  { date: "2026-04-24", type: "Payment", ref: "PAY-7741", amt: -96000, bal: 0 },
+  { date: "2026-05-10", type: "Bill approved", ref: "VB-8801", amt: 118000, bal: 118000 },
+  { date: "2026-05-11", type: "Bill approved", ref: "VB-8820", amt: 109500, bal: 227500 },
 ];
 
 /* ---------- Enterprise Reports hub (freight analytics cards) ---------- */
