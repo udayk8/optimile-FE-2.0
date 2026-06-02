@@ -19,6 +19,11 @@ import { useTenantOrgTypes } from "@/modules/tenant-admin/hooks/useTenantOrgType
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
 import { useTenantLrManagementService } from "@/modules/tenant-admin/hooks/useTenantLrManagementService";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
+import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
+import { useTenantRoles } from "@/modules/tenant-admin/hooks/useTenantRoles";
+import { useTenantRolePermissions } from "@/modules/tenant-admin/hooks/useTenantRolePermissions";
+import { resolveSessionRoleContext } from "@/shared/lib/tenant-rbac";
+import { computeEffectiveUserScope } from "@/modules/tenant-admin/lib/user-scope";
 import { useAppStore } from "@/shared/store/useAppStore";
 import type { OrgUnit } from "@/types/access";
 import type {
@@ -418,6 +423,48 @@ export function TenantLRManagementPage() {
   const customerMap = useMemo(() => new Map(customers.map((item) => [item.id, item])), [customers]);
   const hierarchyLevelMap = useMemo(() => new Map(hierarchyLevels.map((item) => [item.id, item])), [hierarchyLevels]);
 
+  // --- Customer / Pre-generated LR place governance (ISOLATED) ---
+  // Reuses the app's hierarchy scope model so the customer/pre-generated LR
+  // place selector only offers the logged-in user's active place + its child
+  // places (Company Root sees all). Does NOT affect Manual LR lists/flows.
+  const { data: scopeUsers } = useTenantUsers(tenant.id);
+  const { data: scopeRoles } = useTenantRoles(tenant.id);
+  const { data: scopeRolePermissions } = useTenantRolePermissions(tenant.id);
+  const { currentTenantUser: scopeUser, activeRole: scopeRole } = resolveSessionRoleContext({
+    tenant,
+    session,
+    users: scopeUsers,
+    roles: scopeRoles,
+    rolePermissions: scopeRolePermissions,
+  });
+  const allowedPlaceIds = useMemo(
+    () => computeEffectiveUserScope(scopeUser, scopeRole, orgUnits).allowedOrgUnitIds,
+    [scopeUser, scopeRole, orgUnits],
+  );
+  const customerLrPlaceOptions = useMemo(
+    () =>
+      orgUnits
+        .filter((unit) => unit.status !== "planned" && allowedPlaceIds.has(unit.id))
+        .slice()
+        .sort(
+          (left, right) =>
+            (hierarchyLevelMap.get(left.hierarchyLevelId)?.order ?? 0) -
+              (hierarchyLevelMap.get(right.hierarchyLevelId)?.order ?? 0) || left.name.localeCompare(right.name),
+        ),
+    [allowedPlaceIds, hierarchyLevelMap, orgUnits],
+  );
+  const buildPlacePath = (orgUnitId: string | null | undefined): string[] => {
+    const path: string[] = [];
+    let cursor = orgUnitId ? orgUnitMap.get(orgUnitId) : undefined;
+    let guard = 0;
+    while (cursor && guard < 12) {
+      path.unshift(cursor.name);
+      cursor = cursor.parentOrgUnitId ? orgUnitMap.get(cursor.parentOrgUnitId) : undefined;
+      guard += 1;
+    }
+    return path.length ? path : [];
+  };
+
   const activeConfigs = useMemo(
     () => [...lrConfigs].sort((left, right) => Number(right.status === "active") - Number(left.status === "active")),
     [lrConfigs],
@@ -426,6 +473,8 @@ export function TenantLRManagementPage() {
     () => activeConfigs.find((config) => config.id === selectedConfigId) ?? activeConfigs[0] ?? null,
     [activeConfigs, selectedConfigId],
   );
+  // Customer / Pre-generated LR uses the governed place selector + scoped visibility.
+  const isCustomerLrConfig = selectedConfig?.lrType === "PRE_GENERATED";
   const selectedConfigFlowLevels = useMemo(
     () =>
       selectedConfig?.allocationFlow?.levels?.slice().sort(
@@ -485,10 +534,13 @@ export function TenantLRManagementPage() {
               (!selectedHierarchyLevelId ||
                 !isHierarchyConfig(selectedConfig) ||
                 !pool.ownerLevelId ||
-                scopedHierarchyOrgUnitIds.includes(pool.ownerLevelId)),
+                scopedHierarchyOrgUnitIds.includes(pool.ownerLevelId)) &&
+              // Customer/Pre-generated LR: only show pools owned by the user's
+              // place scope (self + child places). Manual LR is unaffected.
+              (!isCustomerLrConfig || !pool.ownerLevelId || allowedPlaceIds.has(pool.ownerLevelId)),
           )
         : [],
-    [lrPools, scopedHierarchyOrgUnitIds, selectedConfig, selectedHierarchyLevelId],
+    [lrPools, scopedHierarchyOrgUnitIds, selectedConfig, selectedHierarchyLevelId, isCustomerLrConfig, allowedPlaceIds],
   );
   const selectedLrs = useMemo(
     () => (selectedConfig ? lrs.filter((record) => record.configId === selectedConfig.id) : []),
@@ -761,6 +813,10 @@ export function TenantLRManagementPage() {
   }
 
   function selectPoolOwner(config: TenantLRConfig) {
+    // Customer/Pre-generated LR is always owned by the chosen place (governed).
+    if (config.lrType === "PRE_GENERATED") {
+      return { ownerOrgUnitId: poolForm.ownerOrgUnitId || null };
+    }
     if (!isHierarchyConfig(config)) {
       return { ownerOrgUnitId: null as string | null };
     }
@@ -790,6 +846,16 @@ export function TenantLRManagementPage() {
         setMessage("Select the hierarchy node that should own this LR pool.");
         return;
       }
+    }
+    // Customer/Pre-generated LR place governance: a place is required, and it
+    // must be the user's active place or a child place — never a parent/unrelated.
+    if (isCustomerLrConfig && !ownerOrgUnitId) {
+      setMessage("Select the place that should own this customer LR.");
+      return;
+    }
+    if (isCustomerLrConfig && ownerOrgUnitId && !allowedPlaceIds.has(ownerOrgUnitId)) {
+      setMessage("You can only create customer LR for your active place or its child places.");
+      return;
     }
 
     let lrNumbers: string[] = [];
@@ -1873,7 +1939,7 @@ export function TenantLRManagementPage() {
         footer={
           <div className="flex justify-end gap-3">
             <Button variant="outline" onClick={() => setPoolOpen(false)}>Cancel</Button>
-            <Button onClick={createPool}>Save Pool</Button>
+            <Button onClick={createPool}>{isCustomerLrConfig ? "Create Customer Reserved LR" : "Save Pool"}</Button>
           </div>
         }
       >
@@ -1896,7 +1962,27 @@ export function TenantLRManagementPage() {
                 </Select>
               </Field>
             ) : null}
-            {isHierarchyConfig(selectedConfig) ? (
+            {isCustomerLrConfig ? (
+              <Field label="Place / Owning Place">
+                <Select value={poolForm.ownerOrgUnitId} onChange={(event) => setPoolForm((current) => ({ ...current, ownerOrgUnitId: event.target.value }))}>
+                  <option value="">Select place</option>
+                  {customerLrPlaceOptions.map((orgUnit) => (
+                    <option key={orgUnit.id} value={orgUnit.id}>
+                      {orgUnit.name}
+                      {hierarchyLevelMap.get(orgUnit.hierarchyLevelId)?.name ? ` · ${hierarchyLevelMap.get(orgUnit.hierarchyLevelId)?.name}` : ""}
+                    </option>
+                  ))}
+                </Select>
+                {poolForm.ownerOrgUnitId ? (
+                  <p className="mt-1 text-xs font-medium text-slate-600">
+                    Selected Place: {buildPlacePath(poolForm.ownerOrgUnitId).join(" → ") || "—"}
+                  </p>
+                ) : null}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Customer LR will be available only for bookings of this customer within the selected place scope.
+                </p>
+              </Field>
+            ) : isHierarchyConfig(selectedConfig) ? (
               <Field label="Owner Node">
                 <Select value={poolForm.ownerOrgUnitId} onChange={(event) => setPoolForm((current) => ({ ...current, ownerOrgUnitId: event.target.value }))}>
                   <option value="">Select owner node</option>
@@ -1906,6 +1992,11 @@ export function TenantLRManagementPage() {
                     <option key={orgUnit.id} value={orgUnit.id}>{orgUnit.name}</option>
                   ))}
                 </Select>
+              </Field>
+            ) : null}
+            {isCustomerLrConfig ? (
+              <Field label="Pool Type">
+                <Input value="Customer Reserved" disabled />
               </Field>
             ) : null}
           </div>
@@ -1930,6 +2021,29 @@ export function TenantLRManagementPage() {
           <Field label="Remarks">
             <Input value={poolForm.remarks} onChange={(event) => setPoolForm((current) => ({ ...current, remarks: event.target.value }))} />
           </Field>
+          {isCustomerLrConfig ? (() => {
+            const start = Number(poolForm.rangeStart);
+            const end = Number(poolForm.rangeEnd);
+            const validRange =
+              poolForm.mode === "RANGE" && Number.isFinite(start) && Number.isFinite(end) && end >= start && Boolean(selectedConfig);
+            const range = validRange && selectedConfig ? buildRangeValues(selectedConfig, start, end) : [];
+            const customerName = customers.find((customer) => customer.id === poolForm.customerId)?.name ?? "—";
+            const placeName = poolForm.ownerOrgUnitId ? orgUnitMap.get(poolForm.ownerOrgUnitId)?.name ?? "—" : "—";
+            const ready = Boolean(poolForm.customerId && poolForm.ownerOrgUnitId && range.length);
+            return (
+              <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-sky-700">Customer Reserved LR — Preview</p>
+                <div className="mt-2 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  <div><p className="text-slate-500">Customer</p><p className="font-semibold text-slate-800">{customerName}</p></div>
+                  <div><p className="text-slate-500">Place</p><p className="font-semibold text-slate-800">{placeName}</p></div>
+                  <div><p className="text-slate-500">Pool Type</p><p className="font-semibold text-slate-800">Customer Reserved</p></div>
+                  <div><p className="text-slate-500">LR Range</p><p className="font-semibold text-slate-800">{range.length ? `${range[0]} → ${range[range.length - 1]}` : "—"}</p></div>
+                  <div><p className="text-slate-500">Count</p><p className="font-semibold text-slate-800">{range.length || "—"}</p></div>
+                  <div><p className="text-slate-500">Status</p><p className={`font-semibold ${ready ? "text-emerald-600" : "text-slate-500"}`}>{ready ? "Ready to create" : "Incomplete"}</p></div>
+                </div>
+              </div>
+            );
+          })() : null}
           <div className="rounded-2xl border bg-slate-50/70 p-4 text-sm text-muted-foreground">
             Format preview: {selectedConfig ? formatPreview(selectedConfig) : "--"}
           </div>

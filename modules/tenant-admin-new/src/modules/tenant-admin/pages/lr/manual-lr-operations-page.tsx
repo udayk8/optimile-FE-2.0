@@ -118,13 +118,37 @@ export function TenantManualLrOperationsPage() {
       (unit) => unit.hierarchyLevelId === managedLevelId && unit.parentOrgUnitId === activeOrgUnit.id,
     );
   }, [activeOrgUnit, managedLevelId, orgUnits, ownershipOrgUnits]);
-  const reservedDestinationOptions = useMemo(
-    () => [
-      ...(activeOrgUnit ? [{ id: activeOrgUnit.id, name: activeOrgUnit.name }] : []),
-      ...managedDestinationOrgUnits.filter((unit) => unit.id !== activeOrgUnit?.id),
-    ],
-    [activeOrgUnit, managedDestinationOrgUnits],
-  );
+  // Pre-generated / Customer LR place governance (isolated — does NOT affect the
+  // Manual allocation/transfer dropdowns, which keep using managedDestinationOrgUnits).
+  // Scope = the user's active place + ALL its child places (descendants). Never a
+  // parent or unrelated place. Company Root / no active place => every place.
+  const reservedDestinationOptions = useMemo(() => {
+    const childrenOf = new Map<string, OrgUnit[]>();
+    orgUnits.forEach((unit) => {
+      if (!unit.parentOrgUnitId) return;
+      const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+      list.push(unit);
+      childrenOf.set(unit.parentOrgUnitId, list);
+    });
+    let scopedIds: Set<string>;
+    if (activeOrgUnit) {
+      scopedIds = new Set<string>();
+      const queue = [activeOrgUnit.id];
+      while (queue.length) {
+        const id = queue.shift();
+        if (!id || scopedIds.has(id)) continue;
+        scopedIds.add(id);
+        (childrenOf.get(id) ?? []).forEach((child) => queue.push(child.id));
+      }
+    } else {
+      scopedIds = new Set(orgUnits.map((unit) => unit.id));
+    }
+    return orgUnits
+      .filter((unit) => unit.status !== "planned" && scopedIds.has(unit.id))
+      .slice()
+      .sort((left, right) => left.name.localeCompare(right.name))
+      .map((unit) => ({ id: unit.id, name: unit.name }));
+  }, [activeOrgUnit, orgUnits]);
   const visibleTabs = manualLrTabDefinitions.filter((tab) => {
     if (!["inventory", "reserved", "allocation", "requests", "transfer"].includes(tab.key)) {
       return false;
@@ -234,9 +258,26 @@ export function TenantManualLrOperationsPage() {
     }
     return !pool.customerId;
   });
-  const availableGeneralPoolsAtActivePlace = availablePools
-    .filter((pool) => (pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "GENERAL" && !pool.customerId)
+  // Start LR / End LR for Customer-reserved creation follow the SELECTED
+  // "Place / Owning Place" — show that place's own GENERAL manual LR stock
+  // (sourced from the in-scope pools, so a child branch's stock is included).
+  // Falls back to the active place when no place is explicitly selected.
+  const reservedPlaceId = reservedDestinationId || activeOrgUnit?.id || "";
+  const availableGeneralPoolsAtActivePlace = scopedManualPools
+    .filter(
+      (pool) =>
+        ["AVAILABLE", "ALLOCATED"].includes(pool.status) &&
+        (pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "GENERAL" &&
+        !pool.customerId &&
+        (pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId) === reservedPlaceId,
+    )
     .sort((left, right) => left.lrNumber.localeCompare(right.lrNumber));
+  // Reset the Start/End LR selection when the owning place changes, so stale
+  // picks from a different place don't linger in the dropdowns.
+  useEffect(() => {
+    setReservedStartPoolId("");
+    setReservedEndPoolId("");
+  }, [reservedPlaceId]);
   const reservedStartIndex = availableGeneralPoolsAtActivePlace.findIndex((pool) => pool.id === reservedStartPoolId);
   const reservedEndIndex = availableGeneralPoolsAtActivePlace.findIndex((pool) => pool.id === reservedEndPoolId);
   const reservedSelectedCount =
@@ -591,8 +632,12 @@ export function TenantManualLrOperationsPage() {
   }
 
   async function handleCreateReservedCustomerLr() {
-    if (!activeOrgUnit) {
-      setMessage("Select active place first.");
+    // Customer LR uses its own "Place / Owning Place" selector, so it does not
+    // require a manual active place (e.g. a Tenant Admin at Company Root can pick
+    // any in-scope place directly).
+    const destinationPlaceId = reservedDestinationId || activeOrgUnit?.id || "";
+    if (!destinationPlaceId) {
+      setMessage("Select a place / owning place first.");
       return;
     }
     if (!reservedCustomerId) {
@@ -603,7 +648,6 @@ export function TenantManualLrOperationsPage() {
       setMessage("Select valid start LR and end LR from available stock.");
       return;
     }
-    const destinationPlaceId = reservedDestinationId || activeOrgUnit.id;
     const now = new Date().toISOString();
     const selectedPools = availableGeneralPoolsAtActivePlace.slice(reservedStartIndex, reservedEndIndex + 1);
     const destinationFormat = resolveManualLrFormatForOrgUnit(manualConfig, destinationPlaceId, orgUnits);
@@ -1129,12 +1173,29 @@ export function TenantManualLrOperationsPage() {
                         ))}
                       </Select>
                     </Field>
-                    <Field label="Place">
+                    <Field label="Place / Owning Place">
                       <Select value={reservedDestinationId || activeOrgUnit?.id || ""} onChange={(event) => setReservedDestinationId(event.target.value)}>
                         {reservedDestinationOptions.map((option) => (
                           <option key={option.id} value={option.id}>{option.name}</option>
                         ))}
                       </Select>
+                      {(() => {
+                        const placeId = reservedDestinationId || activeOrgUnit?.id || "";
+                        const path: string[] = [];
+                        let cursor = placeId ? orgUnitMap.get(placeId) : undefined;
+                        let guard = 0;
+                        while (cursor && guard < 12) {
+                          path.unshift(cursor.name);
+                          cursor = cursor.parentOrgUnitId ? orgUnitMap.get(cursor.parentOrgUnitId) : undefined;
+                          guard += 1;
+                        }
+                        return path.length ? (
+                          <p className="mt-1 text-xs font-medium text-slate-600">Selected place: {path.join(" → ")}</p>
+                        ) : null;
+                      })()}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Customer LR will be available only for bookings of this customer within the selected place scope.
+                      </p>
                     </Field>
                     <Field label="Start LR">
                       <Select value={reservedStartPoolId} onChange={(event) => setReservedStartPoolId(event.target.value)}>
@@ -1157,7 +1218,7 @@ export function TenantManualLrOperationsPage() {
                     </Field>
                   </div>
                   <div className="mt-4">
-                    <Button onClick={handleCreateReservedCustomerLr} disabled={!canRunWorkflowAction("UPLOAD_LR") || requiresExplicitPlace}>
+                    <Button onClick={handleCreateReservedCustomerLr} disabled={!canRunWorkflowAction("UPLOAD_LR") || !(reservedDestinationId || activeOrgUnit?.id)}>
                       Create Customer LR
                     </Button>
                   </div>
