@@ -22,8 +22,7 @@ export function AuctionEmbeddedApp() {
   return (
     <ManifestEmbeddedApp
       manifest={auctionManifest}
-      standaloneHref="/auction/dashboard"
-      standaloneLabel="Open standalone Auction Portal"
+      showStandaloneLink={false}
       extraWrapper={(children) => (
         <AuctionPermissionProvider value={permissions}>{children}</AuctionPermissionProvider>
       )}

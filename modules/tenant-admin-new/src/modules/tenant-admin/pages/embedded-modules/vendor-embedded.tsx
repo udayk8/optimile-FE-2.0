@@ -16,7 +16,7 @@ export function VendorEmbeddedApp() {
   const app = (
     <ManifestEmbeddedApp
       manifest={vendorManifest}
-      standaloneLabel="Open standalone Vendor Portal"
+      showStandaloneLink={false}
     />
   );
   return bridge ? <TenantDataBridgeProvider value={bridge}>{app}</TenantDataBridgeProvider> : app;
