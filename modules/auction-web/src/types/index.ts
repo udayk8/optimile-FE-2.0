@@ -89,6 +89,8 @@ export interface Auction {
   title: string
   type: AuctionType
   status: AuctionStatus
+  /** Tenant that created the auction. Vendors of the same tenant can see it. */
+  tenantId?: string
   createdBy: string
   createdByRole: InternalRole
   createdAt: string

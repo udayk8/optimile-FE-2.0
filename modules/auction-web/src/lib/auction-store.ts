@@ -15,6 +15,23 @@ import { MOCK_AUCTIONS, MOCK_CONTRACTS } from '@auction/lib/mock-data'
  * data when the key is absent (standalone vendor build).
  */
 export const AUCTION_STORE_KEY = 'optimile.auction-store'
+const SESSION_CONTEXT_KEY = 'optimile.session.context'
+
+/**
+ * Tenant the current internal user belongs to, from the shared session the
+ * unified login writes. Stamped onto created auctions so the Vendor Portal can
+ * scope visibility to vendors of the same tenant.
+ */
+export function readSessionTenantId(): string | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
+    if (!raw) return undefined
+    return (JSON.parse(raw) as { tenantId?: string }).tenantId
+  } catch {
+    return undefined
+  }
+}
 
 export interface AuctionStoreSnapshot {
   auctions: Auction[]

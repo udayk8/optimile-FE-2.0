@@ -59,6 +59,7 @@ interface SourceAuction {
   title: string
   type: 'SPOT' | 'BULK' | 'LOT'
   status: 'DRAFT' | 'LIVE' | 'COMPLETED' | 'AWARDED' | 'NO_BIDS' | 'CANCELLED'
+  tenantId?: string
   createdAt: string
   startAt?: string
   completedAt?: string
@@ -92,6 +93,7 @@ interface SourceStore {
 interface VendorIdentity {
   vendorId: string
   vendorName: string
+  tenantId?: string
 }
 
 function readIdentity(): VendorIdentity {
@@ -100,11 +102,17 @@ function readIdentity(): VendorIdentity {
   try {
     const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
     if (!raw) return fallback
-    const session = JSON.parse(raw) as { loginType?: string; vendorId?: string; vendorName?: string }
+    const session = JSON.parse(raw) as {
+      loginType?: string
+      vendorId?: string
+      vendorName?: string
+      tenantId?: string
+    }
     if (session?.loginType !== 'VENDOR') return fallback
     return {
       vendorId: session.vendorId ?? fallback.vendorId,
       vendorName: session.vendorName ?? fallback.vendorName,
+      tenantId: session.tenantId,
     }
   } catch {
     return fallback
@@ -209,17 +217,14 @@ function mapAuction(source: SourceAuction, identity: VendorIdentity): Auction {
   }
 }
 
-function isVisibleToVendor(source: SourceAuction, identity: VendorIdentity, anyInvites: boolean): boolean {
+// Visibility is tenant-scoped, NOT invite-scoped: once an auction is created it
+// is visible to every vendor onboarded under the same tenant. Drafts are hidden.
+// Auctions with no tenant stamp (legacy/seed data) stay visible to all so the
+// demo dataset still shows up.
+function isVisibleToVendor(source: SourceAuction, identity: VendorIdentity): boolean {
   if (source.status === 'DRAFT') return false
-  if (!anyInvites) return true // vendor not named on any auction → demo-friendly: show all
-  const myId = identity.vendorId
-  const myName = identity.vendorName.toLowerCase()
-  const invitedById = source.invitedVendorIds.includes(myId)
-  const invitedByName = source.invitedVendorIds.some((v) => v.toLowerCase() === myName)
-  const eligibleOnLane = source.lanes.some(
-    (l) => l.eligibleVendorIds.includes(myId) || l.eligibleVendorIds.some((v) => v.toLowerCase() === myName),
-  )
-  return invitedById || invitedByName || eligibleOnLane
+  if (!source.tenantId || !identity.tenantId) return true
+  return source.tenantId === identity.tenantId
 }
 
 function mapContractStatus(status: SourceContract['status']): ContractStatus {
@@ -293,13 +298,8 @@ export function useSourcingBridge(): SourcingBridge {
 
   const auctions = useMemo(() => {
     const store = readStore()
-    const anyInvites = store.auctions.some(
-      (a) =>
-        a.invitedVendorIds.includes(identity.vendorId) ||
-        a.invitedVendorIds.some((v) => v.toLowerCase() === identity.vendorName.toLowerCase()),
-    )
     return store.auctions
-      .filter((a) => isVisibleToVendor(a, identity, anyInvites))
+      .filter((a) => isVisibleToVendor(a, identity))
       .map((a) => mapAuction(a, identity))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision, identity])
