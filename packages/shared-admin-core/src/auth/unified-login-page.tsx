@@ -220,6 +220,7 @@ function UnifiedLoginInner() {
         previewTenantRoleId: null,
         activeTenantOrgUnitId: user.orgUnitIds[0] ?? null,
         loginType: "INTERNAL" as const,
+        userId: user.id,
       };
       // Persist synchronously so the tenant app's fresh SessionProvider hydrates it.
       writeStoredValue(storageKeys.sessionContext, session);
@@ -282,6 +283,7 @@ function UnifiedLoginInner() {
           previewTenantRoleId: null,
           activeTenantOrgUnitId: null,
           loginType: "VENDOR" as const,
+          userId: selectedVendor.id,
           vendorId: selectedVendor.id,
           vendorName: selectedVendor.name,
           phone: phone.trim(),
@@ -305,6 +307,7 @@ function UnifiedLoginInner() {
         previewTenantRoleId: null,
         activeTenantOrgUnitId: null,
         loginType: "CUSTOMER" as const,
+        userId: selectedCustomer.id,
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         phone: phone.trim(),

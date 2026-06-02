@@ -21,7 +21,7 @@ import {
   getAuctions,
   getContracts,
   loadStore,
-  readSessionTenantId,
+  readSessionPrincipal,
   replaceLaneContracts,
   saveStore,
   updateAuction,
@@ -181,6 +181,7 @@ export async function fetchAuction(id: string): Promise<Auction> {
 }
 export async function createAuction(data: any): Promise<Auction> {
   const now = new Date()
+  const principal = readSessionPrincipal()
   const launchNow = data.launchNow ?? data.status === 'LIVE'
   const windowMinutes = data.biddingWindowMinutes ?? 60
   const timerEndsAt = new Date(now.getTime() + windowMinutes * 60 * 1000).toISOString()
@@ -190,8 +191,9 @@ export async function createAuction(data: any): Promise<Auction> {
     title: data.title ?? 'New auction',
     type: data.type ?? 'SPOT',
     status: launchNow ? 'LIVE' : 'DRAFT',
-    tenantId: data.tenantId ?? readSessionTenantId(),
+    tenantId: data.tenantId ?? principal.tenantId,
     createdBy: data.createdBy ?? 'u-ops-1',
+    createdByUserId: data.createdByUserId ?? principal.userId,
     createdByRole: data.createdByRole ?? 'OPS',
     createdAt: now.toISOString(),
     startAt: launchNow ? now.toISOString() : data.startAt,
@@ -281,6 +283,7 @@ interface AwardDecisionInput {
 export async function awardAuction(auctionId: string, decisions: any[]) {
   const auction = getAuction(auctionId)
   if (!auction) throw new Error(`Auction ${auctionId} not found`)
+  const principal = readSessionPrincipal()
 
   const byLane = new Map<string, AwardDecisionInput[]>()
   ;(decisions as AwardDecisionInput[]).forEach((d) => {
@@ -296,6 +299,8 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
         : laneDecisions.map((d) => ({
             id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
             sourceAuctionId: auction.id,
+            tenantId: auction.tenantId,
+            awardedByUserId: principal.userId,
             contractType: auction.type as 'BULK' | 'LOT',
             vendorId: d.vendorId,
             vendorName: d.vendorName,

@@ -29,6 +29,8 @@ export interface AuctionLaneBid {
   vendorName: string
   amount: number
   timestamp: string
+  /** Tenant the bidding vendor belongs to (== auction tenant). */
+  tenantId?: string
 }
 
 export interface AuctionEvent {
@@ -92,6 +94,8 @@ export interface Auction {
   /** Tenant that created the auction. Vendors of the same tenant can see it. */
   tenantId?: string
   createdBy: string
+  /** Stable id of the creating tenant user (scoped to tenantId). */
+  createdByUserId?: string
   createdByRole: InternalRole
   createdAt: string
   startAt?: string
@@ -125,6 +129,10 @@ export interface PlacementFailure {
 export interface Contract {
   id: string
   sourceAuctionId: string
+  /** Tenant the contract belongs to (inherited from the source auction). */
+  tenantId?: string
+  /** Tenant user who finalized the award. */
+  awardedByUserId?: string
   contractType: 'BULK' | 'LOT'
   vendorId: string
   vendorName: string

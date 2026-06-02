@@ -84,6 +84,11 @@ export interface SessionContext {
   // existing platform-admin and tenant-employee sessions, so all current
   // behaviour is unchanged.
   loginType?: PortalLoginType;
+  // Stable id of the signed-in principal, always scoped to `tenantId`. For
+  // INTERNAL it is the tenant user's id; for VENDOR/CUSTOMER it mirrors the
+  // vendor/customer id. Every module persists tenantId + userId on the records
+  // it creates so data is consistently tenant- and owner-scoped.
+  userId?: string;
   vendorId?: string;
   vendorName?: string;
   customerId?: string;

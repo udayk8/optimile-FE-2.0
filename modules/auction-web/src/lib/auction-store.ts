@@ -22,15 +22,20 @@ const SESSION_CONTEXT_KEY = 'optimile.session.context'
  * unified login writes. Stamped onto created auctions so the Vendor Portal can
  * scope visibility to vendors of the same tenant.
  */
-export function readSessionTenantId(): string | undefined {
-  if (typeof window === 'undefined') return undefined
+export function readSessionPrincipal(): { tenantId?: string; userId?: string } {
+  if (typeof window === 'undefined') return {}
   try {
     const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
-    if (!raw) return undefined
-    return (JSON.parse(raw) as { tenantId?: string }).tenantId
+    if (!raw) return {}
+    const session = JSON.parse(raw) as { tenantId?: string; userId?: string }
+    return { tenantId: session.tenantId, userId: session.userId }
   } catch {
-    return undefined
+    return {}
   }
+}
+
+export function readSessionTenantId(): string | undefined {
+  return readSessionPrincipal().tenantId
 }
 
 export interface AuctionStoreSnapshot {

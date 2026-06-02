@@ -37,6 +37,7 @@ interface SourceLaneBid {
   vendorName: string
   amount: number
   timestamp: string
+  tenantId?: string
 }
 interface SourceLane {
   id: string
@@ -319,7 +320,14 @@ export function useSourcingBridge(): SourcingBridge {
             const others = lane.ranking.filter((b) => b.vendorId !== identity.vendorId)
             const ranking = [
               ...others,
-              { rank: 0, vendorId: identity.vendorId, vendorName: identity.vendorName, amount, timestamp },
+              {
+                rank: 0,
+                vendorId: identity.vendorId,
+                vendorName: identity.vendorName,
+                amount,
+                timestamp,
+                tenantId: identity.tenantId,
+              },
             ]
               .sort((a, b) => a.amount - b.amount)
               .map((b, index) => ({ ...b, rank: index + 1 }))
