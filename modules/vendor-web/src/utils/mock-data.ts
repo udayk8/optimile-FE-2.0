@@ -30,7 +30,7 @@ export const MOCK_DASHBOARD: DashboardData = {
 export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/trips/indents/IND-001', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
   { id: 'n2', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/vendor/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
-  { id: 'n3', type: 'EXPENSES', title: 'Expense Approved', message: 'Expense expense ₹2,500 for TRP-045 approved', deepLink: '/vendor/expenses/EXP-101', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
+  { id: 'n3', type: 'EXPENSES', title: 'Expense Added', message: 'Expense ₹2,500 added for TRP-045', deepLink: '/vendor/bookings/completed/TRP-045', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
   { id: 'n4', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 3600000).toISOString() },
   { id: 'n5', type: 'CONTRACTS', title: 'Contract Ready', message: 'Contract CNT-005 from Tata Steel awaiting your signature', deepLink: '/vendor/contracts/CNT-005', isRead: false, createdAt: new Date(Date.now() - 7200000).toISOString() },
 ]
@@ -250,7 +250,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    freightRate: 45000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 45000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
@@ -259,7 +259,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-04-20T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-043',
-    freightRate: 45000, expenseSummary: { total: 5500, approved: 5500, pending: 0 }, isInvoiced: false,
+    freightRate: 45000, expenseSummary: { total: 5500 }, isInvoiced: false,
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
@@ -267,7 +267,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Pune', city: 'Pune', state: 'MH' }, destination: { name: 'Chennai', city: 'Chennai', state: 'TN' }, distanceKm: 1200 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    freightRate: 65000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 65000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -276,7 +276,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-04-10T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-041',
-    freightRate: 45000, expenseSummary: { total: 4800, approved: 4800, pending: 0 }, isInvoiced: true,
+    freightRate: 45000, expenseSummary: { total: 4800 }, isInvoiced: true,
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
@@ -284,7 +284,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Chennai', city: 'Chennai', state: 'TN' }, destination: { name: 'Bangalore', city: 'Bangalore', state: 'KA' }, distanceKm: 350 },
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
-    freightRate: 15000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 15000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
@@ -293,7 +293,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-05-11T10:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-046',
-    freightRate: 32000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 32000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-10T07:00:00Z',
   },
   {
@@ -302,7 +302,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-05-12T15:30:00Z', podStatus: 'CONFIRMED', podReference: 'POD-047',
-    freightRate: 28000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 28000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-11T06:30:00Z',
   },
   {
@@ -311,7 +311,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-05-17T17:30:00Z', podStatus: 'PENDING',
-    freightRate: 36000, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 36000, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-16T08:30:00Z',
   },
   {
@@ -320,7 +320,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-05-18T09:30:00Z', podStatus: 'PENDING',
-    freightRate: 34500, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 34500, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-17T07:45:00Z',
   }
 ]
@@ -334,7 +334,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-101-1', expenseType: 'EXPENSE', amount: 3000, description: 'Mumbai-Delhi highway toll' },
     ],
     amount: 3000,
-    status: 'APPROVED',
     submittedAt: '2026-04-21T10:00:00Z',
   },
   {
@@ -345,7 +344,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-102-1', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
     ],
     amount: 2500,
-    status: 'APPROVED',
     submittedAt: '2026-04-21T10:00:00Z',
   },
   {
@@ -356,7 +354,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800 },
     ],
     amount: 1800,
-    status: 'PENDING',
     submittedAt: '2026-04-22T14:00:00Z',
   },
   {
@@ -367,8 +364,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
     ],
     amount: 500,
-    status: 'REJECTED',
-    rejectionReason: 'Receipt illegible',
     submittedAt: '2026-04-22T15:00:00Z',
   }
 ]

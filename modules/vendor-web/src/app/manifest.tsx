@@ -21,7 +21,6 @@ import AuctionDetailPage from '@vendor/features/sourcing/pages/AuctionDetailPage
 import ContractsPage from '@vendor/features/contracts/pages/ContractsPage'
 import TripsPage from '@vendor/features/trips/pages/TripsPage'
 import TripDetailPage from '@vendor/features/trips/pages/TripDetailPage'
-import ExpensesPage from '@vendor/features/expenses/pages/ExpensesPage'
 import FleetPage from '@vendor/features/fleet/pages/FleetPage'
 import InvoicesPage from '@vendor/features/invoices/pages/InvoicesPage'
 import InvoiceDetailPage from '@vendor/features/invoices/pages/InvoiceDetailPage'
@@ -85,9 +84,6 @@ export const vendorManifest: ModuleManifest = {
     { path: 'bookings/rejected/:id', element: <TripDetailPage /> },
     { path: 'trips/exception/:id', element: <TripDetailPage /> },
     { path: 'bookings/exception/:id', element: <TripDetailPage /> },
-    { path: 'expenses', element: <ExpensesPage /> },
-    { path: 'expenses/add/:tripId', element: <ExpensesPage /> },
-    { path: 'expenses/:id', element: <ExpensesPage /> },
     { path: 'fleet', element: <FleetPage /> },
     { path: 'fleet/vehicles', element: <FleetPage /> },
     { path: 'fleet/vehicles/add', element: <FleetPage /> },

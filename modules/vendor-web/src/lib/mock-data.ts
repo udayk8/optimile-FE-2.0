@@ -42,13 +42,13 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1',  type: 'ONBOARDING', title: 'Complete vendor setup',       message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/vendor/profile/company',              isRead: false, createdAt: new Date(Date.now() - 2   * 60  * 1000).toISOString() },
   { id: 'n2',  type: 'TRIPS',      title: 'New Booking Request',         message: 'Indent IND-001 for Mumbai → Delhi',                                                  deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 10  * 60  * 1000).toISOString() },
   { id: 'n3',  type: 'SOURCING',   title: 'Auction Going Live',          message: 'Reverse Auction AUC-012 starts in 30 min',                                           deepLink: '/vendor/sourcing/auctions/AUC-012',    isRead: false, createdAt: new Date(Date.now() - 30  * 60  * 1000).toISOString() },
-  { id: 'n4',  type: 'EXPENSES',   title: 'Expense Approved',            message: 'Expense bundle ₹5,500 for TRP-043 approved',                                         deepLink: '/vendor/expenses',                     isRead: false, createdAt: new Date(Date.now() - 60  * 60  * 1000).toISOString() },
+  { id: 'n4',  type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense bundle ₹5,500 added for TRP-043',                                            deepLink: '/vendor/bookings/completed/TRP-043',  isRead: false, createdAt: new Date(Date.now() - 60  * 60  * 1000).toISOString() },
   { id: 'n5',  type: 'INVOICES',   title: 'Payment Received',            message: '₹1,45,000 credited for INV-2026-028',                                                deepLink: '/vendor/invoices/INV-2026-028',        isRead: true,  createdAt: new Date(Date.now() - 2   * 3600 * 1000).toISOString() },
   { id: 'n6',  type: 'CONTRACTS',  title: 'Contract Updated',            message: 'Contract CNT-001 rate card and SLA details were updated',                            deepLink: '/vendor/contracts/CNT-001',            isRead: false, createdAt: new Date(Date.now() - 3   * 3600 * 1000).toISOString() },
   { id: 'n7',  type: 'INVOICES',   title: 'Invoice Rejected',            message: 'Invoice INV-2026-026 was rejected. Raise a dispute if you disagree.',                deepLink: '/vendor/invoices/INV-2026-026',        isRead: false, createdAt: new Date(Date.now() - 5   * 3600 * 1000).toISOString() },
   { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip TRP-051 (Mumbai → Pune)',                       deepLink: '/vendor/bookings/completed/TRP-051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
   { id: 'n9',  type: 'SOURCING',   title: 'Auction Awarded',             message: 'You won R1 allocation on AUC-009 – Mumbai → Nashik lane',                           deepLink: '/vendor/sourcing',                    isRead: true,  createdAt: new Date(Date.now() - 12  * 3600 * 1000).toISOString() },
-  { id: 'n10', type: 'EXPENSES',   title: 'Expense Rejected',            message: 'Expense expense ₹850 for TRP-048 rejected. Missing receipt.',                          deepLink: '/vendor/expenses',                    isRead: false, createdAt: new Date(Date.now() - 24  * 3600 * 1000).toISOString() },
+  { id: 'n10', type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense ₹850 added for TRP-048',                                                     deepLink: '/vendor/bookings/completed/TRP-048',  isRead: false, createdAt: new Date(Date.now() - 24  * 3600 * 1000).toISOString() },
   { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-007 for Delhi → Jaipur is ready for review',                     deepLink: '/vendor/contracts',                   isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
   { id: 'n12', type: 'INVOICES',   title: 'Invoice Approved',            message: 'Invoice INV-2026-024 approved. Payment due in 15 days.',                            deepLink: '/vendor/invoices/INV-2026-024',        isRead: true,  createdAt: new Date(Date.now() - 48  * 3600 * 1000).toISOString() },
   { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent IND-008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
@@ -390,7 +390,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-60a', title: 'Accepted', description: 'Vendor accepted booking, awaiting vehicle assignment', timestamp: new Date(Date.now() - 900000).toISOString(), status: 'ACCEPTED' },
     ],
-    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 900000).toISOString(),
   },
   {
@@ -403,7 +403,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-50a', title: 'Accepted', description: 'Vendor accepted booking', timestamp: new Date(Date.now() - 3600000).toISOString(), status: 'ACCEPTED' },
       { id: 'tt-50b', title: 'Assigned', description: 'Vehicle and driver assigned, LR generated', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'ASSIGNED' },
     ],
-    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -416,7 +416,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-51a', title: 'Assigned', description: 'Vehicle assigned', timestamp: new Date(Date.now() - 7200000).toISOString(), status: 'ASSIGNED' },
       { id: 'tt-51b', title: 'Out for Pickup', description: 'Driver started movement toward pickup', timestamp: new Date(Date.now() - 3600000).toISOString(), status: 'OUT_FOR_PICKUP' },
     ],
-    freightRate: 42000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 42000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 7200000).toISOString(),
   },
   {
@@ -430,7 +430,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-61b', title: 'Out for Pickup', description: 'Driver moving to pickup', timestamp: new Date(Date.now() - 10800000).toISOString(), status: 'OUT_FOR_PICKUP' },
       { id: 'tt-61c', title: 'Pickup Reached', description: 'Vehicle entered pickup geofence', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'PICKUP_REACHED' },
     ],
-    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
@@ -444,7 +444,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-52b', title: 'Pickup Reached', description: 'Reached pickup location', timestamp: new Date(Date.now() - 7200000).toISOString(), status: 'PICKUP_REACHED' },
       { id: 'tt-52c', title: 'Loading Started', description: 'Loading started at pickup', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'LOADING_STARTED' },
     ],
-    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
@@ -457,7 +457,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-62a', title: 'Loading Started', description: 'Loading underway', timestamp: new Date(Date.now() - 10800000).toISOString(), status: 'LOADING_STARTED' },
       { id: 'tt-62b', title: 'Loading Completed', description: 'Loading completed; awaiting invoice + e-way bill + LR', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'LOADING_COMPLETED' },
     ],
-    freightRate: 22000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 22000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 21600000).toISOString(),
   },
   {
@@ -473,7 +473,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-1', title: 'Assigned', description: 'Vehicle and driver assigned', timestamp: '2026-04-22T08:05:00Z', status: 'ASSIGNED' },
       { id: 'tt-2', title: 'In Transit', description: 'Truck is en route to destination', timestamp: '2026-04-22T11:30:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
@@ -487,7 +487,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-5', title: 'In Transit', description: 'Loaded and dispatched from Pune yard', timestamp: '2026-04-22T10:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 65000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 65000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -502,7 +502,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-7', title: 'Disruption reported', description: 'Driver breakdown at unloading point', timestamp: '2026-04-26T13:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 15000, slaFlag: 'DELAYED', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 15000, slaFlag: 'DELAYED', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
@@ -517,7 +517,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-10', title: 'Disrupted', description: 'Vehicle breakdown during transit', timestamp: '2026-04-27T12:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 18000, slaFlag: 'DELAYED', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 18000, slaFlag: 'DELAYED', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-04-26T08:00:00Z',
   },
   {
@@ -530,7 +530,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-11', title: 'Disrupted', description: 'Vehicle and driver replacement requested', timestamp: '2026-04-28T07:30:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 24000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 24000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-04-27T18:00:00Z',
   },
   {
@@ -545,7 +545,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-63a', title: 'In Transit', description: 'Dispatched from origin', timestamp: '2026-05-18T07:00:00Z', status: 'IN_TRANSIT' },
       { id: 'tt-63b', title: 'Destination Reached', description: 'Vehicle entered delivery geofence', timestamp: new Date(Date.now() - 900000).toISOString(), status: 'DESTINATION_REACHED' },
     ],
-    freightRate: 52000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 52000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-18T06:30:00Z',
   },
   {
@@ -561,7 +561,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-12', title: 'Destination Reached', description: 'Reached delivery location', timestamp: '2026-05-17T16:30:00Z', status: 'DESTINATION_REACHED' },
       { id: 'tt-12b', title: 'POD Pending', description: 'Delivery handed over; POD pending from destination team', timestamp: '2026-05-17T17:30:00Z', status: 'POD_PENDING' },
     ],
-    freightRate: 36000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 36000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-16T08:30:00Z',
   },
   {
@@ -577,7 +577,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-8', title: 'POD Pending', description: 'Delivery handed over; awaiting POD', timestamp: '2026-04-26T09:00:00Z', status: 'POD_PENDING' },
     ],
-    freightRate: 32000, slaFlag: 'ON_TIME', expenseSummary: { total: 1400, approved: 0, pending: 1400 }, isInvoiced: false,
+    freightRate: 32000, slaFlag: 'ON_TIME', expenseSummary: { total: 1400 }, isInvoiced: false,
     createdAt: '2026-04-25T06:00:00Z',
   },
   {
@@ -595,7 +595,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-3', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-04-18T09:30:00Z', status: 'IN_TRANSIT' },
       { id: 'tt-4', title: 'Completed', description: 'POD uploaded; booking ended', timestamp: '2026-04-20T16:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 5500, approved: 5500, pending: 0 }, isInvoiced: false,
+    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 5500 }, isInvoiced: false,
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
@@ -611,7 +611,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-6', title: 'Completed', description: 'Booking completed and invoiced', timestamp: '2026-04-10T16:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 4800, approved: 4800, pending: 0 }, isInvoiced: true,
+    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 4800 }, isInvoiced: true,
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
@@ -626,7 +626,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-9', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-04-24T10:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 28000, slaFlag: 'ON_TIME', expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 28000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-04-24T08:00:00Z',
   },
   {
@@ -640,7 +640,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-13', title: 'Cancelled', description: 'Booking cancelled', timestamp: '2026-05-18T10:00:00Z', status: 'CANCELLED' },
     ],
-    freightRate: 34500, expenseSummary: { total: 0, approved: 0, pending: 0 }, isInvoiced: false,
+    freightRate: 34500, expenseSummary: { total: 0 }, isInvoiced: false,
     createdAt: '2026-05-17T07:45:00Z',
   }
 ]
@@ -655,7 +655,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-101-2', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
     ],
     amount: 5500,
-    status: 'APPROVED',
     submittedAt: '2026-04-21T10:00:00Z',
   },
   {
@@ -666,7 +665,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800, description: 'Pune bypass toll' },
     ],
     amount: 1800,
-    status: 'PENDING',
     submittedAt: '2026-04-22T14:00:00Z',
   },
   {
@@ -677,8 +675,6 @@ export const MOCK_EXPENSES: Expense[] = [
       { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
     ],
     amount: 500,
-    status: 'REJECTED',
-    rejectionReason: 'Receipt illegible',
     submittedAt: '2026-04-22T15:00:00Z',
   }
 ]

@@ -31,7 +31,6 @@ export default function TripDetailPage() {
   const params = useParams()
   const id = params.id ?? ''
   const [detailTab, setDetailTab] = useState<DetailTab>('freight')
-  const [expenseFilter, setExpenseFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL')
 
   // Source bookings from the cross-module bridge when embedded (trips are
   // synthesized from shared bookings, not in the local app.store), else fall
@@ -306,44 +305,19 @@ export default function TripDetailPage() {
                     <ReceiptText className="h-5 w-5 text-primary" /> Expenses
                   </CardTitle>
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
-                      {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
-                        <button
-                          key={f}
-                          onClick={() => setExpenseFilter(f)}
-                          className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                            expenseFilter === f ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'
-                          }`}
-                        >
-                          {f.charAt(0) + f.slice(1).toLowerCase()}
-                        </button>
-                      ))}
-                    </div>
-                    {trip?.status === 'COMPLETED' && !trip.isInvoiced && (
+                    {trip && !trip.isInvoiced && (
                       <Button size="sm" onClick={() => setSelectedTripForExpense(trip.id)}>
-                        Add Expense
+                        {expenses.length > 0 ? 'Edit Expense' : 'Add Expense'}
                       </Button>
                     )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-1">
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total claimed</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total expenses</div>
                     <div className="mt-1 text-sm font-bold text-text"><CurrencyDisplay amount={trip.expenseSummary.total} /></div>
-                  </div>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Approved</div>
-                    <div className="mt-1 text-sm font-bold text-success"><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
-                  </div>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pending</div>
-                    <div className="mt-1 text-sm font-bold text-warning"><CurrencyDisplay amount={trip.expenseSummary.pending} /></div>
-                  </div>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Rejected</div>
-                    <div className="mt-1 text-sm font-bold text-danger"><CurrencyDisplay amount={allExpenses.filter((expense) => expense.tripId === id && expense.status === 'REJECTED').reduce((sum, expense) => sum + expense.amount, 0)} /></div>
                   </div>
                 </div>
 
@@ -356,20 +330,17 @@ export default function TripDetailPage() {
                         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                           <tr>
                             <th className="px-5 py-3 font-bold">Expense</th>
-                            <th className="px-5 py-3 font-bold">Status</th>
-                            <th className="px-5 py-3 font-bold">Submitted</th>
+                            <th className="px-5 py-3 font-bold">Updated</th>
                             <th className="px-5 py-3 font-bold">Line Items</th>
                             <th className="px-5 py-3 font-bold text-right">Amount</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {expenses.filter(e => expenseFilter === 'ALL' || e.status === expenseFilter).map((expense) => (
+                          {expenses.map((expense) => (
                             <tr key={expense.id} className="hover:bg-gray-50">
                               <td className="px-5 py-4">
                                 <div className="font-mono text-sm font-semibold text-text">{expense.id}</div>
-                                {expense.rejectionReason && <div className="mt-1 text-xs text-danger">{expense.rejectionReason}</div>}
                               </td>
-                              <td className="px-5 py-4"><StatusBadge status={expense.status} /></td>
                               <td className="px-5 py-4 text-sm text-text">{formatDateTime(expense.submittedAt)}</td>
                               <td className="px-5 py-4">
                                 <div className="flex flex-wrap gap-1">
@@ -385,13 +356,6 @@ export default function TripDetailPage() {
                               </td>
                             </tr>
                           ))}
-                          {expenses.filter(e => expenseFilter === 'ALL' || e.status === expenseFilter).length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="p-4 text-center text-sm text-gray-500">
-                                No expenses match this filter.
-                              </td>
-                            </tr>
-                          )}
                         </tbody>
                       </table>
                     </div>
@@ -414,7 +378,7 @@ export default function TripDetailPage() {
                 <div><span className="text-gray-500">Vehicle: </span>{trip.assignedVehicle?.registrationNumber ?? '—'}</div>
                 <div><span className="text-gray-500">Driver: </span>{trip.assignedDriver?.name ?? '—'}</div>
                 <div><span className="text-gray-500">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
-                <div><span className="text-gray-500">Approved expenses: </span><CurrencyDisplay amount={trip.expenseSummary.approved} /></div>
+                <div><span className="text-gray-500">Expenses: </span><CurrencyDisplay amount={trip.expenseSummary.total} /></div>
               </CardContent>
             </Card>
           )}

@@ -369,7 +369,7 @@ export const useAppStore = create<AppState>((set) => ({
         status: 'ACCEPTED',
         slaFlag: 'ON_TIME',
         freightRate: 0,
-        expenseSummary: { total: 0, approved: 0, pending: 0 },
+        expenseSummary: { total: 0 },
         isInvoiced: false,
         createdAt: new Date().toISOString(),
       }
@@ -486,18 +486,12 @@ export const useAppStore = create<AppState>((set) => ({
 
       if (tripIndex !== -1) {
         const trip = state.trips[tripIndex] as Trip
-        const previousPending = existingExpense?.status === 'PENDING' ? existingExpense.amount : 0
-        const previousApproved = existingExpense?.status === 'APPROVED' ? existingExpense.amount : 0
-        const nextPending = expense.status === 'PENDING' ? expense.amount : 0
-        const nextApproved = expense.status === 'APPROVED' ? expense.amount : 0
 
         updatedTrips = [...state.trips]
         updatedTrips[tripIndex] = {
           ...trip,
           expenseSummary: {
             total: trip.expenseSummary.total - (existingExpense?.amount ?? 0) + expense.amount,
-            approved: trip.expenseSummary.approved - previousApproved + nextApproved,
-            pending: trip.expenseSummary.pending - previousPending + nextPending,
           },
         }
       }
@@ -525,7 +519,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (selectedTrips.length === 0) return state
 
       const subtotal = selectedTrips.reduce(
-        (sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.approved || 0),
+        (sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.total || 0),
         0
       )
       const gstAmount = Math.round(subtotal * (gstRate / 100))
@@ -534,10 +528,10 @@ export const useAppStore = create<AppState>((set) => ({
 
       const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
         const freightCharge = trip.freightRate || 0
-        const expenses: { type: ExpenseType; amount: number }[] = trip.expenseSummary.approved > 0
-          ? [{ type: 'OTHER', amount: trip.expenseSummary.approved }]
+        const expenses: { type: ExpenseType; amount: number }[] = trip.expenseSummary.total > 0
+          ? [{ type: 'OTHER', amount: trip.expenseSummary.total }]
           : []
-        const lineTotal = freightCharge + trip.expenseSummary.approved
+        const lineTotal = freightCharge + trip.expenseSummary.total
         return {
           tripId: trip.id,
           tripReference: trip.id,

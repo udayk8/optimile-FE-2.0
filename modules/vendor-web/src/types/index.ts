@@ -277,7 +277,7 @@ export interface Trip {
   documents?: TripDocument[]
   timeline?: TripTimelineEvent[]
   freightRate: number
-  expenseSummary: { total: number; approved: number; pending: number }
+  expenseSummary: { total: number }
   isInvoiced: boolean
   createdAt: string
 }
@@ -304,7 +304,6 @@ export interface TripTimelineEvent {
 }
 
 // ==================== EXPENSE TYPES ====================
-export type ExpenseStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type ExpenseType = 'EXPENSE' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
 
 export interface ExpenseLineItem {
@@ -321,8 +320,6 @@ export interface Expense {
   tripReference: string
   lineItems: ExpenseLineItem[]
   amount: number
-  status: ExpenseStatus
-  rejectionReason?: string
   submittedAt: string
 }
 

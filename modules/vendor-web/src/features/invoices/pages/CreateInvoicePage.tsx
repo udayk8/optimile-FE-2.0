@@ -24,7 +24,7 @@ export default function CreateInvoicePage() {
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
 
   const eligibleTrips = useMemo(
-    () => trips.filter((trip) => trip.status === 'COMPLETED' && !trip.isInvoiced && (trip.freightRate > 0 || trip.expenseSummary.approved > 0)),
+    () => trips.filter((trip) => trip.status === 'COMPLETED' && !trip.isInvoiced && (trip.freightRate > 0 || trip.expenseSummary.total > 0)),
     [trips],
   )
 
@@ -36,7 +36,7 @@ export default function CreateInvoicePage() {
   )
 
   const totals = useMemo(() => {
-    const subtotal = selectedTrips.reduce((sum, trip) => sum + trip.freightRate + trip.expenseSummary.approved, 0)
+    const subtotal = selectedTrips.reduce((sum, trip) => sum + trip.freightRate + trip.expenseSummary.total, 0)
     const gstAmount = Math.round(subtotal * (GST_RATE / 100))
     return {
       subtotal,
@@ -109,7 +109,7 @@ export default function CreateInvoicePage() {
           <div className="mt-2 text-3xl font-semibold tracking-tight text-text">
             <CurrencyDisplay amount={totals.subtotal} />
           </div>
-          <div className="mt-2 text-sm text-gray-500">Freight plus approved expenses.</div>
+          <div className="mt-2 text-sm text-gray-500">Freight plus booking expenses.</div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="text-sm font-medium text-gray-500">GST at {GST_RATE}%</div>
@@ -165,13 +165,13 @@ export default function CreateInvoicePage() {
                       <th className="px-5 py-3 font-bold">Route</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold text-right">Freight</th>
-                      <th className="px-5 py-3 font-bold text-right">Approved expenses</th>
+                      <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Line total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {pagedTrips.map((trip) => {
-                      const lineTotal = trip.freightRate + trip.expenseSummary.approved
+                      const lineTotal = trip.freightRate + trip.expenseSummary.total
                       const selected = selectedTripIds.includes(trip.id)
                       return (
                         <tr
@@ -206,7 +206,7 @@ export default function CreateInvoicePage() {
                             <CurrencyDisplay amount={trip.freightRate} />
                           </td>
                           <td className="px-5 py-4 text-right font-medium text-rose-600">
-                            <CurrencyDisplay amount={trip.expenseSummary.approved} />
+                            <CurrencyDisplay amount={trip.expenseSummary.total} />
                           </td>
                           <td className="px-5 py-4 text-right font-semibold text-text">
                             <CurrencyDisplay amount={lineTotal} />
@@ -298,7 +298,7 @@ export default function CreateInvoicePage() {
                   <div className="text-right">
                     <div className="text-sm text-gray-500">Line total</div>
                     <div className="font-semibold text-text">
-                      <CurrencyDisplay amount={trip.freightRate + trip.expenseSummary.approved} />
+                      <CurrencyDisplay amount={trip.freightRate + trip.expenseSummary.total} />
                     </div>
                   </div>
                 </div>

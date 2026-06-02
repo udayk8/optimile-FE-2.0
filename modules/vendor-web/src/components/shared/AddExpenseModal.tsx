@@ -114,7 +114,6 @@ export function AddExpenseModal({ isOpen, onClose, initialTripId }: AddExpenseMo
       tripReference: tripId,
       lineItems,
       amount: totalAmount,
-      status: 'PENDING',
       submittedAt: new Date().toISOString(),
     }
 
@@ -129,9 +128,9 @@ export function AddExpenseModal({ isOpen, onClose, initialTripId }: AddExpenseMo
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[720px]">
         <DialogHeader>
-          <DialogTitle>Submit Trip Expenses</DialogTitle>
+          <DialogTitle>Booking Expenses</DialogTitle>
           <DialogDescription>
-            Create one expense submission per trip and include all expense lines in the same approval request.
+            Add or edit expense lines for this booking. Changes save immediately.
           </DialogDescription>
         </DialogHeader>
 
@@ -225,7 +224,7 @@ export function AddExpenseModal({ isOpen, onClose, initialTripId }: AddExpenseMo
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-            <Button type="submit">Send for Approval</Button>
+            <Button type="submit">Save Expense</Button>
           </DialogFooter>
         </form>
       </DialogContent>

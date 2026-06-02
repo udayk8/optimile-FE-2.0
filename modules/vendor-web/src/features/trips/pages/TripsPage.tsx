@@ -347,7 +347,7 @@ export default function TripsPage() {
                       </td>
                       <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.pending} /></td>
+                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.total} /></td>
                       <td className="px-5 py-4 text-right">
                         <div className="inline-flex items-center gap-2">
                           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-text hover:bg-gray-50">
@@ -386,7 +386,7 @@ export default function TripsPage() {
                     <th className="px-5 py-3 font-bold">Route</th>
                     <th className="px-5 py-3 font-bold">Delivered</th>
                     <th className="px-5 py-3 font-bold">Freight</th>
-                    <th className="px-5 py-3 font-bold">Approved Expenses</th>
+                    <th className="px-5 py-3 font-bold">Expenses</th>
                     <th className="px-5 py-3 text-right font-bold">Actions</th>
                   </tr>
                 </thead>
@@ -402,7 +402,7 @@ export default function TripsPage() {
                       <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                       <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
-                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.approved} /></td>
+                      <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.expenseSummary.total} /></td>
                       <td className="px-5 py-4 text-right">
                         <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/completed/${trip.id}`)}>
                           View Details
