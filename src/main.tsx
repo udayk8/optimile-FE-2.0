@@ -10,15 +10,18 @@ import {
   ResetPassword,
   useAuth,
 } from '@shared-auth'
+import UnifiedLoginPage from '@shared-admin-core/auth/unified-login-page'
 import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './shell/registry'
 import './styles.css'
 
 const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
 const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
-const TenantAdminApp = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
-const TmsBookingApp = lazy(() => import('@tms-booking/app/TmsBookingApp'))
-const UnifiedLoginPage = lazy(() => import('@shared-admin-core/auth/unified-login-page'))
+const TenantAdminApp   = lazy(() => import('@tenant-admin/app/TenantAdminApp'))
+const TmsBookingApp    = lazy(() => import('@tms-booking/app/TmsBookingApp'))
+// const TmsDriverAppApp  = lazy(() => import('@tms-driver-app/app/TmsDriverAppApp'))
+// const TrackingApp      = lazy(() => import('./tracking/TrackingApp'))
+const ConsigneeTrackingLayout = lazy(() => import('../modules/consignee-web/ConsigneeTrackingLayout'));
 
 const Fallback = (
   <div style={{ alignItems: 'center', color: '#64748b', display: 'flex', fontSize: 14, justifyContent: 'center', minHeight: '100vh' }}>
@@ -112,7 +115,8 @@ function HostRouter() {
             <Route path="/login" element={<UnifiedLoginPage />} />
             <Route path="/legacy-login" element={<LoginShell />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/reset-password"  element={<ResetPassword />} />
+            <Route path="/Consigneetracking" element={<ConsigneeTrackingLayout />} />
 
             <Route
               path="/modules"
