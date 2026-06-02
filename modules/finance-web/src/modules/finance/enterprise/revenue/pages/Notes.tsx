@@ -1,15 +1,16 @@
 import React, { useState } from "react";
 import { Check, FileMinus, FilePlus, ShieldCheck } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Stepper } from "@finance/components/primitives";
-import { DEBIT_NOTES, CREDIT_NOTES } from "@finance/data/mock";
+import { DEBIT_NOTES, ENTERPRISE_CREDIT_NOTES } from "@finance/data/mock";
 
 const DN_STAGES = ["Ops Raises", "Decision-maker Approves", "Issued", "Ledger Updated"];
-const CN_STAGES = ["Dispute Raised", "Internal Review", "Approved", "Issued"];
+const CN_STAGES = ["Vendor Raises", "Finance Review", "Approved", "Applied to Payable"];
 const STAGE_IDX = { "pending-approval": 1, issued: 3 };
 
 function NoteCard({ n, kind, stages, onApprove }: any) {
   const idx = n.stage === "issued" ? 3 : (STAGE_IDX as Record<string, any>)[n.stage] ?? 1;
-  const party = kind === "debit" ? n.vendor : n.client;
+  // Buyer mode: both debit (we charge vendor) and credit (vendor credits us) are vendor-side.
+  const party = n.vendor;
   return (
     <Card className={`p-5 ${n.stage === "pending-approval" ? "ring-1 ring-amber-200" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -41,10 +42,10 @@ function NoteCard({ n, kind, stages, onApprove }: any) {
 export default function Notes({ toast }: any) {
   const [tab, setTab] = useState("debit");
   const [debit, setDebit] = useState(DEBIT_NOTES);
-  const [credit, setCredit] = useState(CREDIT_NOTES);
+  const [credit, setCredit] = useState(ENTERPRISE_CREDIT_NOTES);
 
   const approveDebit = (id: any) => { setDebit((xs) => xs.map((n) => (n.id === id ? { ...n, stage: "issued", approvedBy: "VP Ops" } : n))); toast(`Debit note ${id} approved & issued to vendor`); };
-  const approveCredit = (id: any) => { setCredit((xs) => xs.map((n) => (n.id === id ? { ...n, stage: "issued", approvedBy: "Finance Head" } : n))); toast(`Credit note ${id} approved & issued to client`); };
+  const approveCredit = (id: any) => { setCredit((xs) => xs.map((n) => (n.id === id ? { ...n, stage: "issued", approvedBy: "Finance Head" } : n))); toast(`Credit note ${id} approved & applied to vendor payable`); };
 
   return (
     <div>
@@ -52,7 +53,7 @@ export default function Notes({ toast }: any) {
 
       <div className="mb-5 inline-flex rounded-lg bg-slate-100 p-1 text-sm">
         <button onClick={() => setTab("debit")} className={`inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 font-medium transition ${tab === "debit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><FileMinus size={14} />Debit notes (vs vendor)</button>
-        <button onClick={() => setTab("credit")} className={`inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 font-medium transition ${tab === "credit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><FilePlus size={14} />Credit notes (to client)</button>
+        <button onClick={() => setTab("credit")} className={`inline-flex items-center gap-1.5 rounded-md px-4 py-1.5 font-medium transition ${tab === "credit" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}><FilePlus size={14} />Credit notes (from vendor)</button>
       </div>
 
       <div className="space-y-4">

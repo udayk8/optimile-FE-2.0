@@ -29,7 +29,7 @@ export default function FinanceEmbeddedPage({
   const Comp = page.comp
 
   return (
-    <DisputesProvider>
+    <DisputesProvider mode={mode}>
       <div
         className="min-h-full bg-slate-50 px-8 py-7 text-slate-900"
         style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
