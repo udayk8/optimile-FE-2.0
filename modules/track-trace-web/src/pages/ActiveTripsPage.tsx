@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button, Card } from '@shared-ui'
 import { Filter, Search } from 'lucide-react'
 import { TrackTraceAccessBoundary } from '../components/TrackTraceAccessBoundary'
@@ -43,10 +44,17 @@ function filterChipClassName(active: boolean) {
 
 export function ActiveTripsPage() {
   const { scopedPath } = useTrackTraceRouting()
-  const { activeTrips, error, loading } = useTrackingStore()
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<TrackingStatus | 'All'>('All')
-  const [delayFilter, setDelayFilter] = useState<(typeof DELAY_OPTIONS)[number]>('All')
+  const { activeTrips, alerts, error, loading } = useTrackingStore()
+  const [searchParams] = useSearchParams()
+
+  // AT1: seed filters from URL params so deep-links from Dashboard/Alerts work
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '')
+  const [statusFilter, setStatusFilter] = useState<TrackingStatus | 'All'>(
+    () => (searchParams.get('status') as TrackingStatus | 'All') ?? 'All',
+  )
+  const [delayFilter, setDelayFilter] = useState<(typeof DELAY_OPTIONS)[number]>(
+    () => (searchParams.get('delay') as (typeof DELAY_OPTIONS)[number]) ?? 'All',
+  )
   const [showFilters, setShowFilters] = useState(false)
   const [showMoreStatuses, setShowMoreStatuses] = useState(false)
 
@@ -80,6 +88,25 @@ export function ActiveTripsPage() {
       return matchesSearch && matchesStatus && matchesDelay
     })
   }, [delayFilter, queueTrips, search, statusFilter])
+
+  // AT2: alert context per trip for badge rendering in the table
+  const alertsByTripId = useMemo(() => {
+    const severityOrder = ['Critical', 'High', 'Medium', 'Low']
+    const map: Record<string, { count: number; worst: string }> = {}
+    alerts.forEach((a) => {
+      if (a.status === 'Resolved') return
+      const existing = map[a.tripId]
+      if (!existing) {
+        map[a.tripId] = { count: 1, worst: a.severity }
+      } else {
+        existing.count += 1
+        if (severityOrder.indexOf(a.severity) < severityOrder.indexOf(existing.worst)) {
+          existing.worst = a.severity
+        }
+      }
+    })
+    return map
+  }, [alerts])
 
   const counts = useMemo(() => ({
     inTransit: queueTrips.filter((trip) => inTransitStatuses.includes(trip.status)).length,
@@ -124,46 +151,32 @@ export function ActiveTripsPage() {
     <TrackTraceAccessBoundary page="shipments">
       <div className="space-y-6">
         <Card className="overflow-hidden px-6 py-5">
+          {/* AT4: KPI counts are clickable filter shortcuts */}
           <div className="grid gap-5 md:grid-cols-[220px,repeat(5,minmax(0,1fr))]">
             <div className="border-b border-gray-200 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-6">
               <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Total Active</p>
               <p className="mt-2 text-4xl font-extrabold text-text">{queueTrips.length}</p>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">In Transit</p>
-              </div>
-              <div className="mt-2 text-3xl font-extrabold text-text">{counts.inTransit}</div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-warning" />
-                <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Delayed</p>
-              </div>
-              <div className="mt-2 text-3xl font-extrabold text-text">{counts.delayed}</div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
-                <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Idle</p>
-              </div>
-              <div className="mt-2 text-3xl font-extrabold text-text">{counts.idle}</div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-danger" />
-                <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Offline</p>
-              </div>
-              <div className="mt-2 text-3xl font-extrabold text-text">{counts.offline}</div>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-secondary" />
-                <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">Deviation</p>
-              </div>
-              <div className="mt-2 text-3xl font-extrabold text-text">{counts.deviation}</div>
-            </div>
+            {([
+              { label: 'In Transit', dot: 'bg-primary',    count: counts.inTransit, action: () => setStatusFilter('In Transit') },
+              { label: 'Delayed',    dot: 'bg-warning',    count: counts.delayed,   action: () => setDelayFilter('Delayed') },
+              { label: 'Idle',       dot: 'bg-gray-400',   count: counts.idle,      action: () => setStatusFilter('Idle') },
+              { label: 'Offline',    dot: 'bg-danger',     count: counts.offline,   action: () => setStatusFilter('Offline') },
+              { label: 'Deviation',  dot: 'bg-secondary',  count: counts.deviation, action: () => setStatusFilter('Route Deviated') },
+            ] as const).map(({ label, dot, count, action }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={action}
+                className="text-left transition hover:opacity-75 cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                  <p className="text-xs font-extrabold uppercase tracking-widest text-gray-500">{label}</p>
+                </div>
+                <div className="mt-2 text-3xl font-extrabold text-text">{count}</div>
+              </button>
+            ))}
           </div>
         </Card>
 
@@ -277,7 +290,14 @@ export function ActiveTripsPage() {
 
           {filteredTrips.length ? (
             <>
-              <ActiveTripsTable showMobileCards trips={paginatedTrips} tripBasePath={scopedPath('/trips')} />
+              <ActiveTripsTable
+                showMobileCards
+                trips={paginatedTrips}
+                tripBasePath={scopedPath('/trips')}
+                alertsByTripId={alertsByTripId}
+                alertsBasePath={scopedPath('/alerts')}
+                liveMapPath={scopedPath('/live-map')}
+              />
               <PaginationStrip
                 page={page}
                 totalPages={totalPages}

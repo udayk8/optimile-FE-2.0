@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, OverlayView, useJsApiLoader } from '@react-google-maps/api';
-import { BarChart3, Gauge, Minus, Navigation, Phone, Plus, Search, Truck, X, Zap } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, BarChart3, Gauge, Minus, Navigation, Phone, Plus, Search, Truck, X, Zap } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { HistoryPlaybackModal, PlaybackAlertPoint, PlaybackPoint } from '../components/HistoryPlaybackModal';
 import { Driver, TelemetryEvent, Vehicle } from '../types/fleet.types';
 import { DriverAPI, TelematicsAPI, VehicleAPI } from '../services/mockDatabase';
+import { useTrackingStore } from '../store/trackingStore';
+import { useTrackTraceRouting } from '../hooks/useTrackTraceRouting';
 
 type LiveStatus = 'Moving' | 'Idle' | 'Stopped' | 'Offline';
 
@@ -108,12 +110,14 @@ function VehicleMarker({
   vehicle,
   selected,
   showBadge,
+  hasCriticalAlert,
   onSelect,
   onHover,
 }: {
   vehicle: LiveVehicle;
   selected: boolean;
   showBadge: boolean;
+  hasCriticalAlert: boolean;
   onSelect: () => void;
   onHover: (hovered: boolean) => void;
 }) {
@@ -146,6 +150,10 @@ function VehicleMarker({
         >
           <div className="mt-[5px] h-[13px] w-8 rounded bg-sky-400" />
           <div className="absolute bottom-[6px] text-[20px] leading-none">🚚</div>
+          {/* LM2: red alert dot when vehicle has open critical alerts */}
+          {hasCriticalAlert && (
+            <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-red-500" />
+          )}
         </div>
       </button>
     </OverlayView>
@@ -183,6 +191,9 @@ function ClusterMarker({
 
 export const LiveMapPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { scopedPath } = useTrackTraceRouting();
+  const { activeTrips, alerts } = useTrackingStore();
   const mapRef = useRef<google.maps.Map | null>(null);
 
   const { isLoaded: isMapLoaded, loadError } = useJsApiLoader({
@@ -198,10 +209,52 @@ export const LiveMapPage: React.FC = () => {
   const [playbackOpen, setPlaybackOpen] = useState(false);
   const [mapZoom, setMapZoom] = useState(5);
 
+  // LM3: join tracking store trips to vehicles by registration_number
+  const trackingTripByVehicleReg = useMemo(() => {
+    const map: Record<string, typeof activeTrips[number]> = {};
+    activeTrips.forEach((t) => {
+      if (t.vehicleNumber) map[t.vehicleNumber] = t;
+    });
+    return map;
+  }, [activeTrips]);
+
+  // LM2: open alert count + worst severity per trip id
+  const openAlertsByTripId = useMemo(() => {
+    const severityOrder = ['Critical', 'High', 'Medium', 'Low'];
+    const map: Record<string, { count: number; worst: string }> = {};
+    alerts.forEach((a) => {
+      if (a.status === 'Resolved') return;
+      const existing = map[a.tripId];
+      if (!existing) {
+        map[a.tripId] = { count: 1, worst: a.severity };
+      } else {
+        existing.count += 1;
+        if (severityOrder.indexOf(a.severity) < severityOrder.indexOf(existing.worst)) {
+          existing.worst = a.severity;
+        }
+      }
+    });
+    return map;
+  }, [alerts]);
+
   const selected = useMemo(() => {
     if (!selectedVehicle) return null;
     return vehicles.find((v) => v.vehicle.vehicle_id === selectedVehicle.vehicle.vehicle_id) || selectedVehicle;
   }, [vehicles, selectedVehicle]);
+
+  // LM4: pre-select vehicle from ?vehicle URL param once vehicles are loaded
+  useEffect(() => {
+    const reg = searchParams.get('vehicle');
+    if (!reg || vehicles.length === 0) return;
+    const found = vehicles.find((v) => v.vehicle.registration_number === reg);
+    if (!found) return;
+    setSelectedVehicle(found);
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: found.position[0], lng: found.position[1] });
+      mapRef.current.setZoom(13);
+      setMapZoom(13);
+    }
+  }, [vehicles, searchParams]);
 
   const counts = useMemo(
     () => ({
@@ -431,16 +484,21 @@ export const LiveMapPage: React.FC = () => {
               - All vehicles at zoom >= 8
               - Unclustered vehicles at zoom < 8
               - Selected vehicle always (never hidden by clustering) */}
-          {individualMarkers.map((vehicle) => (
-            <VehicleMarker
-              key={vehicle.vehicle.vehicle_id}
-              vehicle={vehicle}
-              selected={selectedVehicle?.vehicle.vehicle_id === vehicle.vehicle.vehicle_id}
-              showBadge={hoveredId === vehicle.vehicle.vehicle_id}
-              onSelect={() => setSelectedVehicle(vehicle)}
-              onHover={(hovered) => setHoveredId(hovered ? vehicle.vehicle.vehicle_id : null)}
-            />
-          ))}
+          {individualMarkers.map((vehicle) => {
+            const vTrip = trackingTripByVehicleReg[vehicle.vehicle.registration_number];
+            const vAlerts = vTrip ? openAlertsByTripId[vTrip.id] : undefined;
+            return (
+              <VehicleMarker
+                key={vehicle.vehicle.vehicle_id}
+                vehicle={vehicle}
+                selected={selectedVehicle?.vehicle.vehicle_id === vehicle.vehicle.vehicle_id}
+                showBadge={hoveredId === vehicle.vehicle.vehicle_id}
+                hasCriticalAlert={vAlerts?.worst === 'Critical'}
+                onSelect={() => setSelectedVehicle(vehicle)}
+                onHover={(hovered) => setHoveredId(hovered ? vehicle.vehicle.vehicle_id : null)}
+              />
+            );
+          })}
         </GoogleMap>
       ) : null}
 
@@ -635,17 +693,104 @@ export const LiveMapPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* LM3: Active trip context from tracking store */}
+            {(() => {
+              const trip = trackingTripByVehicleReg[selected.vehicle.registration_number];
+              if (!trip) {
+                return (
+                  <div className="border-t border-slate-100 px-5 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Active Trip</p>
+                    <p className="mt-1 text-xs text-slate-400">No active tracking trip</p>
+                  </div>
+                );
+              }
+              const total = trip.distanceCoveredKm + trip.remainingDistanceKm;
+              const progress = total > 0 ? Math.round((trip.distanceCoveredKm / total) * 100) : 0;
+              const statusColors: Record<string, string> = {
+                'Delayed': 'bg-red-100 text-red-700',
+                'Route Deviated': 'bg-orange-100 text-orange-700',
+                'Offline': 'bg-gray-200 text-gray-600',
+                'In Transit': 'bg-emerald-100 text-emerald-700',
+                'At Checkpoint': 'bg-blue-100 text-blue-700',
+                'Near Destination': 'bg-teal-100 text-teal-700',
+              };
+              // LM2: alerts for this trip
+              const tripAlerts = openAlertsByTripId[trip.id];
+              const alertColors: Record<string, string> = {
+                Critical: 'bg-red-100 text-red-700',
+                High: 'bg-orange-100 text-orange-700',
+                Medium: 'bg-amber-100 text-amber-700',
+                Low: 'bg-blue-100 text-blue-700',
+              };
+              return (
+                <div className="border-t border-slate-100 px-5 py-3 space-y-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Active Trip</p>
+                  {/* Origin → Destination */}
+                  <div className="flex items-center gap-1 text-[12px] font-semibold text-slate-800">
+                    <span className="truncate">{trip.origin}</span>
+                    <ArrowRight className="h-3 w-3 shrink-0 text-slate-400" />
+                    <span className="truncate">{trip.destination}</span>
+                  </div>
+                  {/* Status + delay */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusColors[trip.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {trip.status}
+                    </span>
+                    {trip.delayMinutes > 0 && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                        +{trip.delayMinutes} min
+                      </span>
+                    )}
+                  </div>
+                  {/* Progress bar */}
+                  <div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-1.5 rounded-full ${trip.delayMinutes > 0 ? 'bg-red-400' : 'bg-emerald-500'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                      <span>{progress}% done</span>
+                      <span>{trip.remainingDistanceKm} km left</span>
+                    </div>
+                  </div>
+                  {/* LM2: alert badge */}
+                  {tripAlerts && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(scopedPath('/alerts') + '?tripId=' + trip.id)}
+                      className={`flex w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition hover:opacity-80 ${alertColors[tripAlerts.worst] ?? 'bg-gray-100 text-gray-600'}`}
+                    >
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      {tripAlerts.count} open alert{tripAlerts.count !== 1 ? 's' : ''} · {tripAlerts.worst} — View →
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Action buttons */}
+          {/* LM5: "View Details" → tracking trip detail when trip exists, else fleet */}
           <div className="flex-shrink-0 grid grid-cols-2 gap-3 border-t border-slate-100 px-5 py-4">
-            <button
-              type="button"
-              onClick={() => navigate('/fleet/fleet', { state: { openVehicleId: selected.vehicle.vehicle_id } })}
-              className="h-9 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-slate-700 hover:bg-gray-50"
-            >
-              View Details
-            </button>
+            {(() => {
+              const trip = selected ? trackingTripByVehicleReg[selected.vehicle.registration_number] : null;
+              return (
+                <button
+                  type="button"
+                  onClick={() =>
+                    trip
+                      ? navigate(scopedPath('/trips/' + trip.id))
+                      : navigate('/fleet/fleet', { state: { openVehicleId: selected?.vehicle.vehicle_id } })
+                  }
+                  className="h-9 rounded-xl border border-gray-300 bg-white text-sm font-semibold text-slate-700 hover:bg-gray-50"
+                >
+                  {trip ? 'View Trip' : 'View Vehicle'}
+                </button>
+              );
+            })()}
             <button
               type="button"
               onClick={() => setPlaybackOpen(true)}

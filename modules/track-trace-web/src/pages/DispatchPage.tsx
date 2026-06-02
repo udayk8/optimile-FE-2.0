@@ -1,52 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowRight, Filter, Search, Send, X } from 'lucide-react';
-import { Trip, TripStatus, Vehicle, Driver, VehicleStatus, DriverStatus } from '../types/fleet.types';
-import { TripAPI, VehicleAPI, DriverAPI, ConfidenceAPI } from '../services/mockDatabase';
-import { TyreAPI } from '../services/tyreDatabase';
-import { Button, Select, Badge, Modal } from '../components/UI';
-import { IconEdit, IconArrowRight, IconShieldExclamation } from '../components/Icons';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowRight, Search, Send, X } from 'lucide-react';
+import { Trip, TripStatus, Vehicle, Driver } from '../types/fleet.types';
+import { TripAPI, VehicleAPI, DriverAPI } from '../services/mockDatabase';
+import { IconEdit, IconArrowRight } from '../components/Icons';
 import { TripDetailsPage } from './TripDetailsPage';
+import { useTrackingStore } from '../store/trackingStore';
+import { useTrackTraceRouting } from '../hooks/useTrackTraceRouting';
+
+function sourceTag(label: string, active: boolean, color: string) {
+  return active ? (
+    <span key={label} className={`rounded px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide ${color}`}>{label}</span>
+  ) : null
+}
 
 export const DispatchPage: React.FC = () => {
   // Navigation State
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const { activeTrips, alerts, geofences } = useTrackingStore();
+  const { scopedPath } = useTrackTraceRouting();
 
   // Data State
   const [trips, setTrips] = useState<Trip[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicleTyreHealth, setVehicleTyreHealth] = useState<Record<string, 'Healthy' | 'Warning' | 'Critical'>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '');
+  // activeFilter: TripStatus string | 'delayed' | 'offline' | ''
+  const [activeFilter, setActiveFilter] = useState<string>('');
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
-
-  // Guardrail State
-  const [guardrailWarnings, setGuardrailWarnings] = useState<string[]>([]);
-
-  // Inline banner state
-  const [dispatchBanner, setDispatchBanner] = useState<{type:'error'|'warning', msg:string}|null>(null);
-  const [modalError, setModalError] = useState<string|null>(null);
-
-  // Cancel confirm state
-  const [cancelConfirmId, setCancelConfirmId] = useState<string|null>(null);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    booking_reference: '',
-    origin: '',
-    destination: '',
-    scheduled_start_time: '',
-    vehicle_id: '',
-    driver_id: ''
-  });
 
   useEffect(() => {
     fetchData();
@@ -63,13 +48,6 @@ export const DispatchPage: React.FC = () => {
       setTrips(tData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
       setVehicles(vData);
       setDrivers(dData);
-
-      // Fetch tyre health for all vehicles
-      if (vData.length > 0) {
-        const vehicleIds = vData.map(v => v.vehicle_id);
-        const healthMap = await TyreAPI.getBulkTyreHealth(vehicleIds);
-        setVehicleTyreHealth(healthMap);
-      }
     } catch (error) {
       console.error("Failed to fetch data", error);
     } finally {
@@ -77,146 +55,91 @@ export const DispatchPage: React.FC = () => {
     }
   };
 
-  // Operational Guardrails Check
-  const checkGuardrails = async (vehicleId: string, driverId: string) => {
-      const warnings: string[] = [];
+  useEffect(() => { setPage(1) }, [searchTerm, activeFilter])
 
-      if (vehicleId) {
-          const confidence = await ConfidenceAPI.getVehicleConfidence(vehicleId);
-          if (confidence.score === 'Low') {
-              warnings.push(`Warning: Selected vehicle has LOW data confidence. Missing signals: ${confidence.details.join(', ')}.`);
-          }
-          const vehicle = vehicles.find(v => v.vehicle_id === vehicleId);
-          if (vehicle?.status === VehicleStatus.MAINTENANCE) {
-              warnings.push("Critical: Vehicle is marked for Maintenance.");
-          }
-
-          // NEW: Tyre Health Check
-          try {
-              const tyreHealth = await TyreAPI.getTyreHealth(vehicleId);
-
-              if (tyreHealth.overall === 'Critical') {
-                  warnings.push(`CRITICAL: Vehicle has ${tyreHealth.criticalCount} tyre(s) requiring immediate attention. ${tyreHealth.warnings.join(', ')}. [View Tyre Status →]`);
-              } else if (tyreHealth.overall === 'Warning') {
-                  warnings.push(`Warning: Vehicle has ${tyreHealth.criticalCount} tyre issue(s). ${tyreHealth.warnings.join(', ')}. [Check Tyre Status →]`);
-              }
-          } catch (error) {
-              console.error('Failed to check tyre health:', error);
-          }
-      }
-
-      if (driverId) {
-          const driver = drivers.find(d => d.driver_id === driverId);
-          if (driver?.status !== DriverStatus.ACTIVE) {
-              warnings.push(`Warning: Driver status is ${driver?.status}.`);
-          }
-      }
-
-      setGuardrailWarnings(warnings);
+  const getName = (id: string | null, list: any[], key: string) => {
+    if (!id) return '-';
+    return list.find(i => i[key === 'vehicle' ? 'vehicle_id' : 'driver_id'] === id)?.[key === 'vehicle' ? 'registration_number' : 'name'] || 'Unknown';
   };
 
-  useEffect(() => {
-    if (!isModalOpen) return;
-    checkGuardrails(formData.vehicle_id, formData.driver_id);
-  }, [formData.vehicle_id, formData.driver_id, isModalOpen]);
-
-  const handleOpenModal = (trip: Trip) => {
-    setGuardrailWarnings([]);
-    setEditingTrip(trip);
-    setFormData({
-      booking_reference: trip.booking_reference,
-      origin: trip.origin,
-      destination: trip.destination,
-      scheduled_start_time: trip.scheduled_start_time.slice(0, 16),
-      vehicle_id: trip.vehicle_id || '',
-      driver_id: trip.driver_id || ''
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    setIsSubmitting(true);
-    setModalError(null);
-    try {
-      const payload: any = {
-        booking_reference: formData.booking_reference,
-        origin: formData.origin,
-        destination: formData.destination,
-        scheduled_start_time: new Date(formData.scheduled_start_time).toISOString(),
-        vehicle_id: formData.vehicle_id || null,
-        driver_id: formData.driver_id || null,
-        status: editingTrip!.status
-      };
-
-      await TripAPI.update(editingTrip!.trip_id, payload);
-      setIsModalOpen(false);
-      fetchData();
-    } catch (error) {
-      setModalError("Error saving trip. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+  const getStatusBadge = (status: TripStatus) => {
+    switch(status) {
+      case TripStatus.PLANNED:    return 'bg-gray-100 text-gray-600';
+      case TripStatus.DISPATCHED: return 'bg-primary/10 text-primary';
+      case TripStatus.IN_TRANSIT: return 'bg-blue-100 text-blue-700';
+      case TripStatus.COMPLETED:  return 'bg-emerald-100 text-emerald-700';
+      case TripStatus.CANCELLED:  return 'bg-red-100 text-red-600';
+      default:                    return 'bg-gray-100 text-gray-500';
     }
-  };
-
-  const handleDispatch = async (trip: Trip) => {
-    if (!trip.vehicle_id || !trip.driver_id) {
-      handleOpenModal(trip);
-      return;
-    }
-
-    // Quick guardrail check before dispatch
-    const confidence = await ConfidenceAPI.getVehicleConfidence(trip.vehicle_id);
-    if (confidence.score === 'Low') {
-        setDispatchBanner({ type: 'warning', msg: `Warning: Vehicle for ${trip.booking_reference} has low data confidence. Dispatching anyway.` });
-        setTimeout(() => setDispatchBanner(null), 4000);
-    }
-
-    await TripAPI.update(trip.trip_id, { status: TripStatus.DISPATCHED });
-    fetchData();
   };
 
   const filteredTrips = useMemo(() => {
-    setPage(1)
     return trips.filter(t => {
-      const matchesSearch = t.booking_reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            t.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            t.destination.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesStatus = filterStatus ? t.status === filterStatus : true
-      return matchesSearch && matchesStatus
+      const term = searchTerm.toLowerCase()
+      const vehicleName = getName(t.vehicle_id, vehicles, 'vehicle').toLowerCase()
+      const matchesSearch = t.booking_reference.toLowerCase().includes(term) ||
+                            t.origin.toLowerCase().includes(term) ||
+                            t.destination.toLowerCase().includes(term) ||
+                            vehicleName.includes(term)
+
+      let matchesFilter = true
+      if (activeFilter === 'delayed') {
+        const at = activeTrips.find(at => at.id === t.trip_id)
+        matchesFilter = !!at && at.delayMinutes > 0
+      } else if (activeFilter === 'offline') {
+        const at = activeTrips.find(at => at.id === t.trip_id)
+        matchesFilter = !!at && at.isOffline
+      } else if (activeFilter) {
+        matchesFilter = t.status === activeFilter
+      }
+
+      return matchesSearch && matchesFilter
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trips, searchTerm, filterStatus])
+  }, [trips, vehicles, searchTerm, activeFilter, activeTrips])
 
   const totalPages = Math.max(1, Math.ceil(filteredTrips.length / PAGE_SIZE))
   const pagedTrips = filteredTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const getStatusColor = (status: TripStatus) => {
-    switch(status) {
-      case TripStatus.PLANNED: return 'blue';
-      case TripStatus.DISPATCHED: return 'yellow';
-      case TripStatus.IN_TRANSIT: return 'green';
-      case TripStatus.COMPLETED: return 'gray';
-      default: return 'gray';
-    }
-  };
-
-  const getName = (id: string | null, list: any[], key: string) => {
-      if (!id) return '-';
-      return list.find(i => i[key === 'vehicle' ? 'vehicle_id' : 'driver_id'] === id)?.[key === 'vehicle' ? 'registration_number' : 'name'] || 'Unknown';
-  };
-
   const stats = useMemo(() => {
     const unassigned = trips.filter(t => t.status === TripStatus.PLANNED && (!t.vehicle_id || !t.driver_id)).length
-    const enRoute = trips.filter(t => t.status === TripStatus.IN_TRANSIT || t.status === TripStatus.DISPATCHED).length
-    const delayed = trips.filter(t =>
-      (t.status === TripStatus.IN_TRANSIT || t.status === TripStatus.DISPATCHED) &&
-      new Date(t.scheduled_start_time) < new Date()
-    ).length
-    const completed = trips.filter(t => t.status === TripStatus.COMPLETED).length
-    return { unassigned, enRoute, delayed, completed }
-  }, [trips])
+    const dispatched = trips.filter(t => t.status === TripStatus.DISPATCHED).length
+    const enRoute = trips.filter(t => t.status === TripStatus.IN_TRANSIT).length
+    const delayed = activeTrips.filter(t => t.delayMinutes > 0 && !['Completed', 'Cancelled'].includes(t.status)).length
+    const offline = activeTrips.filter(t => t.isOffline).length
+    const openAlerts = alerts.filter(a => a.status !== 'Resolved').length
+    return { unassigned, dispatched, enRoute, delayed, offline, openAlerts }
+  }, [trips, activeTrips, alerts])
+
+  const alertsByTripId = useMemo(() => {
+    const severityOrder = ['Critical', 'High', 'Medium', 'Low']
+    const map: Record<string, { count: number; worst: string }> = {}
+    alerts.forEach((a) => {
+      if (a.status === 'Resolved') return
+      const existing = map[a.tripId]
+      if (!existing) {
+        map[a.tripId] = { count: 1, worst: a.severity }
+      } else {
+        existing.count += 1
+        if (severityOrder.indexOf(a.severity) < severityOrder.indexOf(existing.worst)) {
+          existing.worst = a.severity
+        }
+      }
+    })
+    return map
+  }, [alerts])
+
+  // DP1: geofence zone count per trip for badge in Trip ID cell
+  const geofencesByTripId = useMemo(() => {
+    const map: Record<string, { count: number }> = {}
+    geofences.forEach((g) => {
+      if (g.linkedEntityType !== 'TRIP') return
+      const existing = map[g.linkedEntityId]
+      if (!existing) map[g.linkedEntityId] = { count: 1 }
+      else existing.count += 1
+    })
+    return map
+  }, [geofences])
 
   if (selectedTripId) {
       return <TripDetailsPage tripId={selectedTripId} onBack={() => setSelectedTripId(null)} />;
@@ -227,27 +150,75 @@ export const DispatchPage: React.FC = () => {
 
       {/* ── Status strip ───────────────────────────────────────── */}
       <div className="mb-6 flex items-stretch overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        {/* Total Active — no dot, larger label */}
+        {/* Total Active */}
         <div className="flex min-w-0 flex-1 flex-col justify-center px-6 py-4">
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-gray-500">Total Active</p>
-          <p className="mt-1 text-3xl font-extrabold text-gray-900">{stats.enRoute + stats.unassigned}</p>
+          <p className="mt-1 text-3xl font-extrabold text-gray-900">{trips.length}</p>
         </div>
 
-        {[
-          { label: 'In Transit',  value: stats.enRoute,    dot: 'bg-blue-600'   },
-          { label: 'Delayed',     value: stats.delayed,    dot: 'bg-amber-400'  },
-          { label: 'Idle',        value: stats.unassigned, dot: 'bg-gray-400'   },
-          { label: 'Offline',     value: 0,                dot: 'bg-red-500'    },
-          { label: 'Completed',   value: stats.completed,  dot: 'bg-blue-400'   },
-        ].map(({ label, value, dot }) => (
-          <div key={label} className="flex min-w-0 flex-1 flex-col justify-center border-l border-gray-200 px-6 py-4">
-            <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-gray-500">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
-              {label}
-            </p>
-            <p className="mt-1 text-3xl font-extrabold text-gray-900">{value}</p>
-          </div>
-        ))}
+        {([
+          {
+            label: 'Planned',
+            value: stats.unassigned,
+            dot: 'bg-gray-400',
+            numColor: 'text-gray-900',
+            bg: '',
+            filter: TripStatus.PLANNED,
+          },
+          {
+            label: 'Dispatched',
+            value: stats.dispatched,
+            dot: 'bg-primary',
+            numColor: 'text-gray-900',
+            bg: '',
+            filter: TripStatus.DISPATCHED,
+          },
+          {
+            label: 'In Transit',
+            value: stats.enRoute,
+            dot: 'bg-blue-600',
+            numColor: 'text-blue-700',
+            bg: '',
+            filter: TripStatus.IN_TRANSIT,
+          },
+          {
+            label: 'Delayed',
+            value: stats.delayed,
+            dot: 'bg-amber-400',
+            numColor: stats.delayed > 0 ? 'text-amber-600' : 'text-gray-900',
+            bg: stats.delayed > 0 ? 'bg-amber-50' : '',
+            filter: 'delayed',
+          },
+          {
+            label: 'Offline',
+            value: stats.offline,
+            dot: 'bg-red-500',
+            numColor: stats.offline > 0 ? 'text-red-600' : 'text-gray-900',
+            bg: stats.offline > 0 ? 'bg-red-50' : '',
+            filter: 'offline',
+          },
+        ] as const).map(({ label, value, dot, numColor, bg, filter }) => {
+          const isActive = activeFilter === filter
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setActiveFilter(isActive ? '' : filter)}
+              className={[
+                'flex min-w-0 flex-1 flex-col justify-center border-l border-gray-200 px-5 py-4 text-left transition cursor-pointer',
+                bg,
+                isActive ? 'ring-2 ring-inset ring-primary/30' : 'hover:brightness-95',
+              ].filter(Boolean).join(' ')}
+            >
+              <p className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-gray-500">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} />
+                {label}
+                {isActive && <span className="ml-auto text-[10px] font-bold text-primary">× clear</span>}
+              </p>
+              <p className={`mt-1 text-3xl font-extrabold ${numColor}`}>{value}</p>
+            </button>
+          )
+        })}
       </div>
 
       <div className="mb-6">
@@ -257,87 +228,113 @@ export const DispatchPage: React.FC = () => {
             <input
               id="dispatch-search"
               type="text"
-              className="h-12 w-full rounded-2xl border border-gray-300 bg-white pl-12 pr-4 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
-              placeholder="Search by reference, origin or destination…"
+              className="h-12 w-full rounded-2xl border border-gray-300 bg-white pl-12 pr-10 text-sm text-text outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              placeholder="Search by trip ID, vehicle, origin or destination…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-          </label>
-          <Button
-            className="h-12 min-w-[140px] rounded-2xl px-5"
-            variant="secondary"
-            onClick={() => setShowFilters(f => !f)}
-          >
-            <Filter className="mr-2 h-4 w-4" />
-            Filter
-            {filterStatus && (
-              <span className="ml-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-white">1</span>
-            )}
-          </Button>
-        </div>
-
-        {showFilters && (
-          <div className="mt-4 border-t border-gray-200 pt-4">
-            <p className="mb-3 text-xs font-extrabold uppercase tracking-widest text-gray-500">Status</p>
-            <div className="flex flex-wrap gap-2">
+            {searchTerm && (
               <button
                 type="button"
-                onClick={() => setFilterStatus('')}
-                className={filterStatus === '' ? 'rounded-full border border-primary bg-primary/10 px-4 py-2 text-sm font-semibold text-primary' : 'rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-primary/40 hover:text-primary'}
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                All
+                <X className="h-4 w-4" />
               </button>
-              {Object.values(TripStatus).map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setFilterStatus(s === filterStatus ? '' : s)}
-                  className={filterStatus === s ? 'rounded-full border border-primary bg-primary/10 px-4 py-2 text-sm font-semibold text-primary' : 'rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-primary/40 hover:text-primary'}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+            )}
+          </label>
+        </div>
       </div>
 
-      {dispatchBanner && (
-        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${dispatchBanner.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-yellow-200 bg-yellow-50 text-yellow-700'}`}>
-          {dispatchBanner.msg}
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {isLoading ? (
-          <div className="p-12 text-center text-gray-500">Loading dispatch data...</div>
+          <div className="divide-y divide-gray-100">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <div className="h-4 w-24 animate-pulse rounded bg-gray-100" />
+                <div className="h-4 w-32 animate-pulse rounded bg-gray-100" />
+                <div className="h-4 w-40 animate-pulse rounded bg-gray-100" />
+                <div className="h-4 w-20 animate-pulse rounded bg-gray-100" />
+                <div className="ml-auto h-4 w-16 animate-pulse rounded bg-gray-100" />
+              </div>
+            ))}
+          </div>
         ) : filteredTrips.length === 0 ? (
           <div className="p-12 text-center text-gray-500">No trips found.</div>
         ) : (
           <table className="w-full table-fixed divide-y divide-gray-200">
             <colgroup>
               <col className="w-[130px]" />
-              <col className="w-auto" />
-              <col className="w-[130px]" />
-              <col className="w-[160px]" />
+              <col className="w-[150px]" />
+              <col className="w-[180px]" />
               <col className="w-[110px]" />
+              <col className="w-[150px]" />
               <col className="w-[120px]" />
+              <col className="w-[100px]" />
+              <col className="w-[110px]" />
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Reference</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Trip ID</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vehicle</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Route</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Schedule</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Vehicle / Driver</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">ETA / Delay</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Tracking</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
-              {pagedTrips.map((trip) => (
-                <tr key={trip.trip_id} className="hover:bg-gray-50">
+              {pagedTrips.map((trip) => {
+                const trackingTrip = activeTrips.find((t) => t.id === trip.trip_id)
+                const isOffline = trackingTrip?.isOffline ?? false
+                const hasGps  = trackingTrip?.primarySource === 'GPS_DEVICE' || trackingTrip?.activeSource === 'GPS_DEVICE'
+                const hasSim  = trackingTrip?.primarySource === 'FASTAG'     || trackingTrip?.activeSource === 'FASTAG'
+                const hasApp  = trackingTrip?.primarySource === 'DRIVER_APP' || trackingTrip?.activeSource === 'DRIVER_APP'
+                const hasAny  = hasGps || hasSim || hasApp
+                return (
+                <tr key={trip.trip_id} className="cursor-pointer hover:bg-gray-50" onClick={() => setSelectedTripId(trip.trip_id)}>
                   <td className="px-4 py-3">
-                    <span className="text-sm font-medium text-gray-900">{trip.booking_reference}</span>
+                    <span className="font-mono text-xs font-semibold text-text">{trip.booking_reference}</span>
+                    {/* Alert badge */}
+                    {(() => {
+                      const tripAlerts = alertsByTripId[trip.trip_id]
+                      if (!tripAlerts) return null
+                      const colors: Record<string, string> = {
+                        Critical: 'bg-red-100 text-red-700',
+                        High:     'bg-orange-100 text-orange-700',
+                        Medium:   'bg-amber-100 text-amber-700',
+                        Low:      'bg-blue-100 text-blue-700',
+                      }
+                      return (
+                        <Link
+                          to={scopedPath(`/alerts?tripId=${trip.trip_id}`)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold transition hover:opacity-80 ${colors[tripAlerts.worst]}`}
+                        >
+                          {tripAlerts.count} alert{tripAlerts.count > 1 ? 's' : ''} · {tripAlerts.worst}
+                        </Link>
+                      )
+                    })()}
+                    {/* DP1: geofence zone badge */}
+                    {(() => {
+                      const zones = geofencesByTripId[trip.trip_id]
+                      if (!zones) return null
+                      return (
+                        <Link
+                          to={scopedPath('/geofences') + '?search=' + encodeURIComponent(trip.trip_id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700 transition hover:opacity-80"
+                        >
+                          📍 {zones.count} zone{zones.count > 1 ? 's' : ''}
+                        </Link>
+                      )
+                    })()}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    <div className="truncate">{getName(trip.vehicle_id, vehicles, 'vehicle')}</div>
+                    <div className="truncate text-xs text-gray-400">{getName(trip.driver_id, drivers, 'driver')}</div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="truncate text-sm text-gray-900">{trip.origin}</div>
@@ -349,79 +346,85 @@ export const DispatchPage: React.FC = () => {
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {new Date(trip.scheduled_start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    <div className="truncate">{getName(trip.vehicle_id, vehicles, 'vehicle')}</div>
-                    <div className="truncate text-xs text-gray-400">{getName(trip.driver_id, drivers, 'driver')}</div>
+                  <td className="px-4 py-3">
+                    {trackingTrip ? (() => {
+                      const total = trackingTrip.distanceCoveredKm + trackingTrip.remainingDistanceKm
+                      const progress = total > 0 ? Math.round((trackingTrip.distanceCoveredKm / total) * 100) : 0
+                      const delayed = trackingTrip.delayMinutes > 0
+                      const offline = trackingTrip.isOffline
+                      return (
+                        <div>
+                          {offline ? (
+                            <span className="text-xs font-semibold text-gray-500">Offline</span>
+                          ) : delayed ? (
+                            <span className="text-xs font-bold text-red-600">+{trackingTrip.delayMinutes} min</span>
+                          ) : (
+                            <span className="text-xs font-semibold text-emerald-600">On time</span>
+                          )}
+                          <div className="mt-1 h-1 w-full rounded-full bg-gray-100">
+                            <div
+                              className={`h-1 rounded-full ${delayed ? 'bg-red-400' : 'bg-emerald-500'}`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="mt-0.5 text-[10px] text-gray-400">{progress}% · {trackingTrip.remainingDistanceKm} km left</p>
+                        </div>
+                      )
+                    })() : (
+                      <span className="text-xs text-gray-400">
+                        {[TripStatus.PLANNED, TripStatus.COMPLETED, TripStatus.CANCELLED].includes(trip.status) ? '—' : 'No tracking'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge color={getStatusColor(trip.status)}>{trip.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      {/* Dispatch */}
-                      {trip.status === TripStatus.PLANNED && (
-                        <button
-                          type="button"
-                          title="Dispatch"
-                          onClick={() => handleDispatch(trip)}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary transition hover:bg-primary hover:text-white"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </button>
+                    <div className="flex flex-wrap gap-1">
+                      {!hasAny ? (
+                        <span className="rounded px-1.5 py-0.5 text-xs font-bold uppercase bg-gray-100 text-gray-500">Manual</span>
+                      ) : (
+                        <>
+                          {hasGps && sourceTag('GPS', !isOffline, 'bg-emerald-100 text-emerald-700')}
+                          {hasSim  && sourceTag('SIM', !isOffline, 'bg-blue-100 text-blue-700')}
+                          {hasApp  && sourceTag('App', !isOffline, 'bg-violet-100 text-violet-700')}
+                        </>
                       )}
-
-                      {/* Cancel / confirm */}
-                      {(trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED) && (
-                        cancelConfirmId === trip.trip_id ? (
-                          <span className="flex items-center gap-1 text-xs">
-                            <span className="text-gray-400">Sure?</span>
-                            <button
-                              type="button"
-                              onClick={async () => { await TripAPI.update(trip.trip_id, { status: TripStatus.CANCELLED }); setCancelConfirmId(null); fetchData(); }}
-                              className="font-semibold text-red-600 hover:text-red-800"
-                            >Yes</button>
-                            <button type="button" onClick={() => setCancelConfirmId(null)} className="text-gray-400 hover:text-gray-600">No</button>
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            title="Cancel trip"
-                            onClick={() => setCancelConfirmId(trip.trip_id)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-red-50 hover:text-red-500"
-                          >
+                      {isOffline && <span className="rounded px-1.5 py-0.5 text-xs font-bold uppercase bg-red-100 text-red-600">Offline</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusBadge(trip.status)}`}>{trip.status}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-1">
+                        {trip.status === TripStatus.PLANNED && (
+                          <button type="button" disabled title="Dispatch" className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg bg-gray-100 text-gray-300">
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {(trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED) && (
+                          <button type="button" disabled title="Cancel" className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg bg-gray-100 text-gray-300">
                             <X className="h-3.5 w-3.5" />
                           </button>
-                        )
-                      )}
-
-                      {/* Edit */}
-                      <button
-                        title="Edit"
-                        onClick={() => handleOpenModal(trip)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
-                      >
-                        <IconEdit className="h-4 w-4" />
-                      </button>
-
-                      {/* View */}
-                      <button
-                        title="View details"
-                        onClick={() => setSelectedTripId(trip.trip_id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-primary"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
+                        )}
+                        <button disabled title="Edit" className="flex h-8 w-8 cursor-not-allowed items-center justify-center rounded-lg bg-gray-100 text-gray-300">
+                          <IconEdit className="h-4 w-4" />
+                        </button>
+                        <button title="View details" onClick={(e) => { e.stopPropagation(); setSelectedTripId(trip.trip_id) }} className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary transition hover:bg-primary hover:text-white">
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <span className="text-[10px] text-gray-400">Actions coming soon</span>
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         )}
       </div>
 
       {/* ── Pagination ─────────────────────────────────────────── */}
-      {!isLoading && (
+      {!isLoading && totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
           <p className="text-sm text-gray-500">
             Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredTrips.length)}–{Math.min(page * PAGE_SIZE, filteredTrips.length)} of {filteredTrips.length} trips
@@ -450,92 +453,6 @@ export const DispatchPage: React.FC = () => {
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Assign Vehicle & Driver">
-        <form onSubmit={handleSubmit}>
-          {(() => { return (
-          <>
-          {modalError && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{modalError}</div>
-          )}
-          {guardrailWarnings.length > 0 && (
-              <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-                  <div className="flex">
-                      <div className="flex-shrink-0">
-                          <IconShieldExclamation className="h-5 w-5 text-yellow-400" />
-                      </div>
-                      <div className="ml-3">
-                          <h3 className="text-sm font-medium text-yellow-800">Operational Guardrails Active</h3>
-                          <div className="mt-2 text-sm text-yellow-700">
-                              <ul className="list-disc list-inside space-y-1">
-                                  {guardrailWarnings.map((w, i) => <li key={i}>{w}</li>)}
-                              </ul>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Reference</span>
-              <span className="font-medium text-gray-900">{formData.booking_reference}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Origin</span>
-              <span className="font-medium text-gray-900">{formData.origin}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Destination</span>
-              <span className="font-medium text-gray-900">{formData.destination}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Scheduled</span>
-              <span className="font-medium text-gray-900">{formData.scheduled_start_time ? new Date(formData.scheduled_start_time).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-4 mt-2">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Resource Assignment</h4>
-              <Select
-                label="Vehicle"
-                options={[
-                  { label: 'Unassigned', value: '' },
-                  ...vehicles
-                    .filter(v => v.status === VehicleStatus.ACTIVE)
-                    .map(v => {
-                      const health = vehicleTyreHealth[v.vehicle_id];
-                      const healthIcon = health === 'Critical' ? '🔴' : health === 'Warning' ? '🟡' : '🟢';
-                      return {
-                        label: `${healthIcon} ${v.registration_number} (${v.vehicle_type})`,
-                        value: v.vehicle_id
-                      };
-                    })
-                ]}
-                value={formData.vehicle_id}
-                onChange={e => setFormData({...formData, vehicle_id: e.target.value})}
-              />
-              <Select
-                label="Driver"
-                options={[
-                  { label: 'Unassigned', value: '' },
-                  ...drivers
-                    .filter(d => d.status === DriverStatus.ACTIVE)
-                    .map(d => ({ label: d.name, value: d.driver_id }))
-                ]}
-                value={formData.driver_id}
-                onChange={e => setFormData({...formData, driver_id: e.target.value})}
-              />
-          </div>
-
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button type="submit" isLoading={isSubmitting} variant={guardrailWarnings.length > 0 ? "danger" : "primary"}>
-                {guardrailWarnings.length > 0 ? 'Accept Risk & Save' : 'Save Assignment'}
-            </Button>
-          </div>
-          </> ); })()}
-        </form>
-      </Modal>
     </div>
   );
 };

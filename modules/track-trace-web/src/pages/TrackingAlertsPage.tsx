@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTrackTraceRouting } from '../hooks/useTrackTraceRouting'
+import { getRoutePerformance } from '../services/analyticsApi'
+import type { RoutePerformance } from '../types/analytics.types'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,7 +18,7 @@ import { EmptyPlaceholder } from '../components/EmptyPlaceholder'
 import { ListPageSkeleton } from '../components/shared/ListPageSkeleton'
 import { useAuth } from '@shared-auth'
 import { useTrackingStore } from '../store/trackingStore'
-import type { AlertSeverity, AlertStatus, TrackingAlert } from '../types/tracking.types'
+import type { AlertSeverity, AlertStatus, TrackingAlert, TrackingTrip } from '../types/tracking.types'
 
 const PAGE_SIZE = 10
 
@@ -70,14 +73,93 @@ function timeAgo(iso: string) {
 }
 
 // ── Incident Detail Panel ─────────────────────────────────────────────────────
+function TripContextCard({ trip }: { trip: TrackingTrip }) {
+  const total = trip.distanceCoveredKm + trip.remainingDistanceKm
+  const progress = total > 0 ? Math.round((trip.distanceCoveredKm / total) * 100) : 0
+
+  const statusColors: Record<string, string> = {
+    'Delayed':        'bg-red-100 text-red-700',
+    'Route Deviated': 'bg-orange-100 text-orange-700',
+    'Offline':        'bg-gray-200 text-gray-600',
+    'In Transit':     'bg-emerald-100 text-emerald-700',
+    'At Checkpoint':  'bg-blue-100 text-blue-700',
+    'Near Destination': 'bg-teal-100 text-teal-700',
+    'Completed':      'bg-emerald-100 text-emerald-700',
+  }
+
+  const sourceLabels: Record<string, string> = {
+    GPS_DEVICE: 'GPS',
+    FASTAG:     'SIM',
+    DRIVER_APP: 'App',
+    ANPR:       'ANPR',
+    MANUAL:     'Manual',
+  }
+
+  const sourceHealth = trip.sourceHealth ?? 'Healthy'
+  const sourceHealthColor =
+    sourceHealth === 'Healthy'  ? 'bg-emerald-100 text-emerald-700' :
+    sourceHealth === 'Stale'    ? 'bg-amber-100 text-amber-700' :
+    sourceHealth === 'Fallback' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-200 text-gray-500'
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-2.5">
+      {/* Origin → Destination */}
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-text">
+        <span className="truncate">{trip.origin}</span>
+        <span className="shrink-0 text-gray-400">→</span>
+        <span className="truncate">{trip.destination}</span>
+      </div>
+
+      {/* Status + delay row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusColors[trip.status] ?? 'bg-gray-100 text-gray-600'}`}>
+          {trip.status}
+        </span>
+        {trip.delayMinutes > 0 && (
+          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">
+            +{trip.delayMinutes} min delay
+          </span>
+        )}
+        {trip.isOffline && (
+          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-bold text-gray-600">Offline</span>
+        )}
+        <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${sourceHealthColor}`}>
+          {sourceLabels[trip.activeSource ?? ''] ?? trip.activeSource ?? '—'} · {sourceHealth}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+          <div
+            className={`h-1.5 rounded-full transition-all ${trip.delayMinutes > 0 ? 'bg-red-400' : 'bg-emerald-500'}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <div className="mt-1 flex justify-between text-[11px] text-gray-400">
+          <span>{progress}% complete</span>
+          <span>{trip.remainingDistanceKm} km left</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function IncidentPanel({
   alert,
+  bookingId,
+  trip,
+  routeRows,
   onClose,
   onAcknowledge,
   onResolve,
   onRemark,
 }: {
   alert: TrackingAlert
+  bookingId: string
+  trip: TrackingTrip | null
+  routeRows: RoutePerformance[]
   onClose: () => void
   onAcknowledge: (remark: string) => void
   onResolve: (note: string) => void
@@ -85,6 +167,8 @@ function IncidentPanel({
 }) {
   const [remark, setRemark] = useState('')
   const sev = SEV[alert.severity]
+  const navigate = useNavigate()
+  const { scopedPath } = useTrackTraceRouting()
 
   const handleAcknowledge = () => {
     onAcknowledge(remark)
@@ -134,9 +218,31 @@ function IncidentPanel({
         {/* Trip context */}
         <div className="border-b border-gray-100 px-4 py-3">
           <p className="mb-2.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Trip Context</p>
+          {trip && <div className="mb-3"><TripContextCard trip={trip} /></div>}
+          {/* AL2: corridor performance context */}
+          {trip && (() => {
+            const laneId = (trip.origin + '-' + trip.destination).toLowerCase().replace(/\s+/g, '-')
+            const row = routeRows.find((r) => r.laneId === laneId)
+            if (!row) return null
+            const delayColor = row.averageDelayMinutes > 90 ? 'text-danger' : row.averageDelayMinutes > 30 ? 'text-warning' : 'text-success'
+            return (
+              <div className="mb-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 space-y-1">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-gray-400">Corridor context</p>
+                <p className="text-[11px] text-gray-500">
+                  Avg delay: <span className={`font-bold ${delayColor}`}>{row.averageDelayMinutes} min</span>
+                  {' · '}
+                  Efficiency: <span className="font-bold">{row.efficiencyScore}%</span>
+                </p>
+                <a href={scopedPath('/route-performance')} onClick={(e) => { e.preventDefault(); navigate(scopedPath('/route-performance')) }}
+                  className="text-[11px] font-semibold text-primary hover:underline">
+                  View corridor history →
+                </a>
+              </div>
+            )
+          })()}
           <div className="space-y-2">
             {[
-              { label: 'Trip ID',    value: alert.tripId },
+              { label: 'Booking Ref', value: bookingId },
               { label: 'Vehicle',    value: alert.vehicleNumber },
               { label: 'Location',   value: alert.location },
               ...(alert.assignedTo ? [{ label: 'Assigned To', value: alert.assignedTo }] : []),
@@ -198,7 +304,24 @@ function IncidentPanel({
       </div>
 
       {/* ── Sticky footer — always visible ── */}
-      <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3">
+      <div className="shrink-0 border-t border-gray-100 bg-white px-4 py-3 space-y-2">
+        <button
+          type="button"
+          onClick={() => navigate(scopedPath('/dispatch') + '?search=' + encodeURIComponent(bookingId))}
+          className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 text-[12px] font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-primary"
+        >
+          Open in Dispatch →
+        </button>
+        {/* AL1: View Trip Replay */}
+        {alert.tripId && (
+          <button
+            type="button"
+            onClick={() => navigate(scopedPath('/trips/' + alert.tripId + '/replay'))}
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 text-[12px] font-semibold text-gray-600 transition hover:bg-gray-100 hover:text-primary"
+          >
+            View Trip Replay →
+          </button>
+        )}
         {alert.status === 'Resolved' ? (
           <p className="text-center text-[12px] text-gray-400">This alert has been resolved.</p>
         ) : (
@@ -230,19 +353,30 @@ function IncidentPanel({
 export function TrackingAlertsPage() {
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
-  const { acknowledgeAlert, addRemark, alerts, error, loading, resolveAlert } = useTrackingStore()
+  const { acknowledgeAlert, addRemark, alerts, activeTrips, error, loading, resolveAlert } = useTrackingStore()
+
+  const bookingRef = (tripId: string) =>
+    activeTrips.find((t) => t.id === tripId)?.bookingId ?? tripId
 
   const initialSeverity = searchParams.get('severity')
   const resolvedInitialSeverity: AlertSeverity | 'All' =
     initialSeverity === 'Critical' || initialSeverity === 'High' || initialSeverity === 'Medium' || initialSeverity === 'Low'
       ? initialSeverity : 'All'
 
+  const initialAlertId = searchParams.get('alert')
+  const initialTripId = searchParams.get('tripId')
+
+  const [routeRows, setRouteRows] = useState<RoutePerformance[]>([])
+  useEffect(() => { void getRoutePerformance().then(setRouteRows).catch(() => {}) }, [])
+
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [severity, setSeverity] = useState<AlertSeverity | 'All'>(resolvedInitialSeverity)
-  const [status, setStatus] = useState<AlertStatus | 'All'>('Open')
+  // When deep-linking to a specific alert or trip, open all statuses so results are always visible
+  const [status, setStatus] = useState<AlertStatus | 'All'>(initialAlertId || initialTripId ? 'All' : 'Open')
   const [sortBy, setSortBy] = useState<'Newest' | 'Severity' | 'Unassigned First'>('Newest')
-  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null)
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(initialAlertId)
+  const [tripIdFilter, setTripIdFilter] = useState<string | null>(initialTripId)
   const [page, setPage] = useState(1)
 
   useEffect(() => { setSeverity(resolvedInitialSeverity) }, [resolvedInitialSeverity])
@@ -268,6 +402,7 @@ export function TrackingAlertsPage() {
     const matches = alerts.filter((a) => {
       if (status !== 'All' && a.status !== status) return false
       if (severity !== 'All' && a.severity !== severity) return false
+      if (tripIdFilter && a.tripId !== tripIdFilter) return false
       if (!normalized) return true
       return [a.tripId, a.vehicleNumber, a.location, a.type, a.message, a.assignedTo ?? '']
         .some(v => v.toLowerCase().includes(normalized))
@@ -283,13 +418,13 @@ export function TrackingAlertsPage() {
       }
       return new Date(r.createdAt).getTime() - new Date(l.createdAt).getTime()
     })
-  }, [alerts, search, severity, status, sortBy])
+  }, [alerts, search, severity, status, sortBy, tripIdFilter])
 
-  useEffect(() => { setPage(1) }, [search, severity, status, sortBy])
+  useEffect(() => { setPage(1) }, [search, severity, status, sortBy, tripIdFilter])
 
   const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE))
   const paged = filteredAlerts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const hasFilters = searchInput.trim().length > 0 || severity !== 'All' || status !== 'Open' || sortBy !== 'Newest'
+  const hasFilters = searchInput.trim().length > 0 || severity !== 'All' || status !== 'Open' || sortBy !== 'Newest' || tripIdFilter !== null
 
 
 
@@ -302,7 +437,19 @@ export function TrackingAlertsPage() {
       <div className="flex h-[calc(100vh-112px)] flex-col gap-3 overflow-hidden">
 
         {/* ── Severity stat cards — shrink-0 ─────────────────── */}
-        <div className="shrink-0 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="shrink-0 grid grid-cols-3 gap-3 lg:grid-cols-5">
+          {/* Total pill */}
+          <button
+            type="button"
+            onClick={() => setSeverity('All')}
+            className={`rounded-xl border border-gray-200 bg-white px-5 py-3 text-left shadow-sm transition hover:shadow-md ${severity === 'All' ? 'ring-2 ring-primary/20' : ''}`}
+          >
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Total</p>
+            <p className="mt-0.5 text-xl font-extrabold text-gray-800">
+              {globalCounts.Critical + globalCounts.High + globalCounts.Medium + globalCounts.Low}
+            </p>
+          </button>
+
           {(['Critical', 'High', 'Medium', 'Low'] as AlertSeverity[]).map((s) => {
             const cfg = SEV[s]
             return (
@@ -334,13 +481,26 @@ export function TrackingAlertsPage() {
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </label>
+            {tripIdFilter && (
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                Trip: {bookingRef(tripIdFilter)}
+                <button
+                  type="button"
+                  onClick={() => { setTripIdFilter(null); setStatus('Open') }}
+                  className="ml-0.5 rounded-full hover:text-primary/70"
+                  title="Clear trip filter"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
             <span className="ml-auto shrink-0 text-xs text-gray-400">
               {filteredAlerts.length} alert{filteredAlerts.length !== 1 ? 's' : ''}
             </span>
             {hasFilters && (
               <button
                 type="button"
-                onClick={() => { setSeverity('All'); setStatus('Open'); setSortBy('Newest'); setSearch(''); setSearchInput('') }}
+                onClick={() => { setSeverity('All'); setStatus('Open'); setSortBy('Newest'); setSearch(''); setSearchInput(''); setTripIdFilter(null) }}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
                 title="Reset filters"
               >
@@ -379,7 +539,7 @@ export function TrackingAlertsPage() {
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">Sort</span>
               <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-0.5">
-                {(['Newest', 'Severity', 'Unassigned First'] as const).map((s) => (
+                {(['Newest', 'Severity'] as const).map((s) => (
                   <button
                     key={s}
                     type="button"
@@ -437,7 +597,7 @@ export function TrackingAlertsPage() {
                           </span>
                           <p className="truncate text-[13px] font-medium text-gray-900">{alert.type}</p>
                           <div className="min-w-0">
-                            <p className="truncate text-[12px] font-semibold text-gray-800">{alert.tripId}</p>
+                            <p className="truncate text-[12px] font-semibold text-gray-800">{bookingRef(alert.tripId)}</p>
                             <p className="truncate text-[11px] text-gray-400">{alert.vehicleNumber}</p>
                           </div>
                           <div className="flex min-w-0 items-center gap-1">
@@ -498,6 +658,9 @@ export function TrackingAlertsPage() {
                 <div className="shrink-0 h-full">
                   <IncidentPanel
                     alert={selectedAlert}
+                    bookingId={bookingRef(selectedAlert.tripId)}
+                    trip={activeTrips.find((t) => t.id === selectedAlert.tripId) ?? null}
+                    routeRows={routeRows}
                     onClose={() => setSelectedAlertId(null)}
                     onAcknowledge={(remark) => void acknowledgeAlert(selectedAlert.id, remark, user?.email)}
                     onResolve={(note) => void resolveAlert(selectedAlert.id, { resolvedBy: user?.email ?? 'control.tower@optimile', resolutionNote: note })}

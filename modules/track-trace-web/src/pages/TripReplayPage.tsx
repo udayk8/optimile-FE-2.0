@@ -135,8 +135,19 @@ export function TripReplayPage() {
               </Card>
               <Card className="p-5">
                 <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Alert markers</p>
-                <p className="mt-2 text-2xl font-extrabold text-text">{replay.alerts.length}</p>
+                {replay.alerts.length > 0 ? (
+                  <Link className="mt-2 block text-2xl font-extrabold text-danger hover:underline" to={scopedPath('/alerts') + '?tripId=' + replay.tripId}>
+                    {replay.alerts.length}
+                  </Link>
+                ) : (
+                  <p className="mt-2 text-2xl font-extrabold text-text">0</p>
+                )}
                 <p className="mt-1 text-sm text-gray-600">Exceptions flagged during the replay window.</p>
+                {replay.alerts.length > 0 && (
+                  <Link className="mt-1 block text-xs font-semibold text-primary hover:underline" to={scopedPath('/alerts') + '?tripId=' + replay.tripId}>
+                    View alerts →
+                  </Link>
+                )}
               </Card>
             </section>
 

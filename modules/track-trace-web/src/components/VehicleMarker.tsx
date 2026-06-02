@@ -51,8 +51,6 @@ export function VehicleMarker({
       <div className="flex items-start justify-between gap-3">
         <div className="relative min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-            <span>{trip.id}</span>
-            <span className="text-gray-300">•</span>
             <span>{trip.bookingId}</span>
           </div>
           <button
@@ -73,11 +71,11 @@ export function VehicleMarker({
               onMouseLeave={() => setShowPreview(false)}
             >
               <p className="text-xs font-extrabold uppercase tracking-widest text-secondary">Booking preview</p>
-              <h4 className="mt-2 text-lg font-extrabold text-text">{trip.id}</h4>
+              <h4 className="mt-2 text-lg font-extrabold text-text">{trip.bookingId}</h4>
               <p className="mt-1 text-sm text-gray-600">{trip.customerName}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl bg-slate-50 px-3 py-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Booking</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Booking Ref</p>
                   <p className="mt-1 text-sm font-semibold text-text">{trip.bookingId}</p>
                 </div>
                 <div className="rounded-xl bg-slate-50 px-3 py-3">

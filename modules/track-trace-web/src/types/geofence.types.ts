@@ -25,6 +25,9 @@ export interface TrackingGeofence {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  dwellAlertMinutes?: number
+  entryAlertEnabled?: boolean
+  group?: string
 }
 
 export interface GeofenceEvent {
@@ -48,4 +51,7 @@ export interface GeofencePayload {
   linkedEntityType: LinkedEntityType
   linkedEntityId: string
   isActive?: boolean
+  dwellAlertMinutes?: number
+  entryAlertEnabled?: boolean
+  group?: string
 }

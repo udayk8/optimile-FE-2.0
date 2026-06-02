@@ -99,6 +99,11 @@ export function CustomerTrackingPreviewPage() {
               <Button asChild variant="outline">
                 <Link to={scopedPath(`/trips/${tripId}`)}>Back to trip detail</Link>
               </Button>
+              {tripId && (
+                <Button asChild variant="outline">
+                  <Link to={scopedPath('/alerts') + '?tripId=' + tripId}>View Alerts</Link>
+                </Button>
+              )}
             </div>
           }
         />

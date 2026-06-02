@@ -9,6 +9,8 @@ import { AnalyticsPageSkeleton } from '../components/shared/AnalyticsPageSkeleto
 
 const CustomerTrackingPreviewPage = lazy(() => import('../pages/CustomerTrackingPreviewPage').then(m => ({ default: m.CustomerTrackingPreviewPage })))
 const GeofenceManagementPage      = lazy(() => import('../pages/GeofenceManagementPage').then(m => ({ default: m.GeofenceManagementPage })))
+const GeofenceDetailPage          = lazy(() => import('../pages/GeofenceDetailPage').then(m => ({ default: m.GeofenceDetailPage })))
+const GeofenceFormPage            = lazy(() => import('../pages/GeofenceFormPage').then(m => ({ default: m.GeofenceFormPage })))
 const LiveMapPage                 = lazy(() => import('../pages/LiveMapPage').then(m => ({ default: m.LiveMapPage })))
 const RoutePerformancePage        = lazy(() => import('../pages/RoutePerformancePage').then(m => ({ default: m.RoutePerformancePage })))
 const TrackTraceDashboard         = lazy(() => import('../pages/TrackTraceDashboard').then(m => ({ default: m.TrackTraceDashboard })))
@@ -51,6 +53,9 @@ export function TrackingRoutes() {
         <Route path="live-map" element={<Suspense fallback={<MapPageSkeleton />}><LiveMapPage /></Suspense>} />
         <Route path="alerts" element={<Suspense fallback={<ListPageSkeleton />}><TrackingAlertsPage /></Suspense>} />
         <Route path="geofences" element={<Suspense fallback={<ListPageSkeleton />}><GeofenceManagementPage /></Suspense>} />
+        <Route path="geofences/new" element={<Suspense fallback={<ListPageSkeleton />}><GeofenceFormPage /></Suspense>} />
+        <Route path="geofences/:geofenceId" element={<Suspense fallback={<ListPageSkeleton />}><GeofenceDetailPage /></Suspense>} />
+        <Route path="geofences/:geofenceId/edit" element={<Suspense fallback={<ListPageSkeleton />}><GeofenceFormPage /></Suspense>} />
         <Route path="customer-preview/:tripId" element={<Suspense fallback={<MapPageSkeleton />}><CustomerTrackingPreviewPage /></Suspense>} />
         <Route path="analytics" element={<LegacyRedirect to="/route-performance" />} />
         <Route path="route-performance" element={<Suspense fallback={<AnalyticsPageSkeleton />}><RoutePerformancePage /></Suspense>} />

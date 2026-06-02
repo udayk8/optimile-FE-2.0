@@ -51,6 +51,9 @@ function resolveRouting(pathname: string): { basePath: string; currentPage: Trac
   if (path.endsWith('/route-performance')) {
     return { basePath: path.slice(0, -'/route-performance'.length), currentPage: 'route-performance' }
   }
+  if (path.includes('/geofences/')) {
+    return { basePath: path.split('/geofences/')[0], currentPage: 'geofences' }
+  }
   if (path.endsWith('/geofences')) {
     return { basePath: path.slice(0, -'/geofences'.length), currentPage: 'geofences' }
   }

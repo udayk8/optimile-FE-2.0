@@ -4,12 +4,13 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  BarChart2,
   CheckCircle2,
-  Clock,
   ExternalLink,
   MapPin,
   Navigation,
   Radio,
+  Shield,
   Truck,
   WifiOff,
 } from 'lucide-react'
@@ -50,6 +51,17 @@ function alertSeverityStyle(severity: TrackingAlert['severity']) {
   }
 }
 
+function formatAlertTime(isoString: string) {
+  const date = new Date(isoString)
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterdayStart = new Date(todayStart.getTime() - 86400000)
+  const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (date >= todayStart) return `Today ${time}`
+  if (date >= yesterdayStart) return `Yesterday ${time}`
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + time
+}
+
 // ── component ─────────────────────────────────────────────────────────────────
 
 export function TrackTraceDashboard() {
@@ -78,7 +90,7 @@ export function TrackTraceDashboard() {
     [alerts],
   )
 
-  const openAlerts = useMemo(() => alerts.filter((a) => a.status !== 'Resolved').slice(0, 6), [alerts])
+  const openAlerts = useMemo(() => alerts.filter((a) => a.status !== 'Resolved').slice(0, 7), [alerts])
 
   const tripAlertCounts = useMemo(
     () => alerts.reduce<Record<string, number>>((acc, a) => {
@@ -99,7 +111,7 @@ export function TrackTraceDashboard() {
   }
 
   const onTimePct = dashboardSummary.onTimePercentage ?? 0
-  const tableTrips = activeTripRows.slice(0, 8)
+  const tableTrips = activeTripRows.slice(0, 7)
 
   return (
     <div className="space-y-6">
@@ -107,8 +119,12 @@ export function TrackTraceDashboard() {
       {/* ── KPI cards ─────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
 
-        {/* Total active */}
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        {/* D1: Total active — navigates to /trips */}
+        <button
+          type="button"
+          onClick={() => navigate(scopedPath('/trips'))}
+          className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm text-left transition hover:bg-gray-50 hover:ring-2 hover:ring-primary/20 cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Active Trips</p>
@@ -122,10 +138,14 @@ export function TrackTraceDashboard() {
             <div className="h-1 rounded-full bg-primary" style={{ width: `${Math.min(100, onTimePct)}%` }} />
           </div>
           <p className="mt-1.5 text-xs text-gray-500">{onTimePct}% on time</p>
-        </div>
+        </button>
 
-        {/* In transit */}
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        {/* D1: In transit — navigates to /trips?status=In+Transit */}
+        <button
+          type="button"
+          onClick={() => navigate(scopedPath('/trips') + '?status=In+Transit')}
+          className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm text-left transition hover:bg-gray-50 hover:ring-2 hover:ring-emerald-300/50 cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">In Transit</p>
@@ -138,7 +158,7 @@ export function TrackTraceDashboard() {
           <div className="mt-3 h-1 w-full rounded-full bg-gray-100">
             <div
               className="h-1 rounded-full bg-emerald-500"
-              style={{ width: dashboardSummary.totalActiveTrips ? `${(dashboardSummary.inTransitTrips / dashboardSummary.totalActiveTrips) * 100}%` : '0%' }}
+              style={{ width: dashboardSummary.totalActiveTrips > 0 ? `${Math.round((dashboardSummary.inTransitTrips / dashboardSummary.totalActiveTrips) * 100)}%` : '0%' }}
             />
           </div>
           <p className="mt-1.5 text-xs text-gray-500">
@@ -146,15 +166,19 @@ export function TrackTraceDashboard() {
               ? Math.round((dashboardSummary.inTransitTrips / dashboardSummary.totalActiveTrips) * 100)
               : 0}% of active fleet
           </p>
-        </div>
+        </button>
 
-        {/* Delayed */}
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        {/* D1: Delayed — navigates to /trips?delay=Delayed */}
+        <button
+          type="button"
+          onClick={() => navigate(scopedPath('/trips') + '?delay=Delayed')}
+          className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm text-left transition hover:bg-gray-50 hover:ring-2 hover:ring-red-200 cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Delayed</p>
               <p className={`mt-1.5 text-2xl font-bold ${dashboardSummary.delayedTrips > 0 ? 'text-red-600' : 'text-text'}`}>
-                {String(dashboardSummary.delayedTrips).padStart(2, '0')}
+                {dashboardSummary.delayedTrips}
               </p>
             </div>
             <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${dashboardSummary.delayedTrips > 0 ? 'bg-red-50' : 'bg-gray-100'}`}>
@@ -167,15 +191,19 @@ export function TrackTraceDashboard() {
               ? `${dashboardSummary.averageEtaDelay} min`
               : 'all on schedule'}
           </p>
-        </div>
+        </button>
 
-        {/* Alerts / offline */}
-        <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        {/* D1: Open Alerts — navigates to /alerts */}
+        <button
+          type="button"
+          onClick={() => navigate(scopedPath('/alerts'))}
+          className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm text-left transition hover:bg-gray-50 hover:ring-2 hover:ring-red-200 cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">Open Alerts</p>
               <p className={`mt-1.5 text-2xl font-bold ${dashboardSummary.openAlerts > 0 ? 'text-red-600' : 'text-text'}`}>
-                {String(dashboardSummary.openAlerts).padStart(2, '0')}
+                {dashboardSummary.openAlerts}
               </p>
             </div>
             <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${dashboardSummary.openAlerts > 0 ? 'bg-red-50' : 'bg-gray-100'}`}>
@@ -189,7 +217,7 @@ export function TrackTraceDashboard() {
               <WifiOff className="h-3 w-3" />{dashboardSummary.offlineVehicles} offline
             </span>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* ── Alert severity strip ──────────────────────────────── */}
@@ -198,52 +226,51 @@ export function TrackTraceDashboard() {
           <span className={`h-1.5 w-1.5 rounded-full ${connectionLive ? 'bg-emerald-500' : 'bg-gray-400'}`} />
           {connectionLive ? 'Live' : socketConnectionState}
         </span>
-        <Link to={`${scopedPath('/alerts')}?severity=Critical`} className="rounded-full bg-red-600 px-3 py-1 text-xs font-bold text-white transition hover:opacity-80">
+        <Link to={`${scopedPath('/alerts')}?severity=Critical`} className={`rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80 ${alertSeverityCounts.Critical > 0 ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none'}`}>
           {alertSeverityCounts.Critical} Critical
         </Link>
-        <Link to={`${scopedPath('/alerts')}?severity=High`} className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold text-white transition hover:opacity-80">
+        <Link to={`${scopedPath('/alerts')}?severity=High`} className={`rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80 ${alertSeverityCounts.High > 0 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none'}`}>
           {alertSeverityCounts.High} High
         </Link>
-        <Link to={`${scopedPath('/alerts')}?severity=Medium`} className="rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-white transition hover:opacity-80">
+        <Link to={`${scopedPath('/alerts')}?severity=Medium`} className={`rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80 ${alertSeverityCounts.Medium > 0 ? 'bg-amber-400 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none'}`}>
           {alertSeverityCounts.Medium} Medium
         </Link>
-        <Link to={`${scopedPath('/alerts')}?severity=Low`} className="rounded-full bg-blue-400 px-3 py-1 text-xs font-bold text-white transition hover:opacity-80">
+        <Link to={`${scopedPath('/alerts')}?severity=Low`} className={`rounded-full px-3 py-1 text-xs font-bold transition hover:opacity-80 ${alertSeverityCounts.Low > 0 ? 'bg-blue-400 text-white' : 'bg-gray-100 text-gray-400 pointer-events-none'}`}>
           {alertSeverityCounts.Low} Low
         </Link>
         <span className="ml-auto text-xs text-gray-400">Last updated {lastUpdatedLabel}</span>
       </div>
 
       {/* ── Main content: trips table + alert center ──────────── */}
-      <div className="grid gap-6 xl:grid-cols-[1fr,360px]">
+      <div className="grid gap-6 xl:grid-cols-[1fr,360px] xl:items-start">
 
         {/* Active trips table */}
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" style={{ maxHeight: 520 }}>
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div>
               <h2 className="text-sm font-bold text-text">Active Trips</h2>
-              <p className="text-xs text-gray-500">Live updates · {tableTrips.length} of {activeTripRows.length} trips shown</p>
+              <p className="text-xs text-gray-500">Live updates</p>
             </div>
             <Link
               to={scopedPath('/dispatch')}
               className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
             >
-              View all <ExternalLink className="h-3 w-3" />
+              Go to Dispatch <ExternalLink className="h-3 w-3" />
             </Link>
           </div>
 
           {tableTrips.length === 0 ? (
-            <div className="p-10 text-center text-sm text-gray-500">No active trips right now.</div>
+            <div className="p-10 text-center text-sm text-gray-500">No trips in dispatch right now.</div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto flex-1">
               <table className="min-w-full">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
+                  <tr className="sticky top-0 border-b border-gray-100 bg-gray-50">
                     <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">Trip ID</th>
                     <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">Route</th>
                     <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">Vehicle</th>
-                    <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">Source</th>
+                    <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">Tracking</th>
                     <th className="px-5 py-3 text-left text-xs font-extrabold uppercase tracking-wider text-gray-400">ETA / Status</th>
-                    <th className="px-5 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -261,12 +288,12 @@ export function TrackTraceDashboard() {
                     return (
                       <tr
                         key={trip.id}
-                        className="group cursor-pointer transition hover:bg-primary/[0.03]"
-                        onClick={() => navigate(scopedPath('/dispatch'))}
+                        className="group cursor-pointer transition hover:bg-gray-50"
+                        onClick={() => navigate(`${scopedPath('/trips')}/${trip.id}`)}
                       >
                         {/* Trip ID */}
                         <td className="px-4 py-2.5">
-                          <p className="font-mono text-xs font-semibold text-text">{trip.id}</p>
+                          <p className="font-mono text-xs font-semibold text-text">{trip.bookingId}</p>
                           {alertCount > 0 && (
                             <span className="mt-0.5 inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
                               {alertCount} alert{alertCount > 1 ? 's' : ''}
@@ -289,12 +316,20 @@ export function TrackTraceDashboard() {
                           <p className="text-[11px] text-gray-500 truncate max-w-[120px]">{trip.driverName || 'Unassigned'}</p>
                         </td>
 
-                        {/* Source health tags */}
+                        {/* Tracking devices */}
                         <td className="px-4 py-2.5">
                           <div className="flex flex-wrap gap-1">
-                            {sourceTag('GPS', hasGps && !isOffline, 'bg-emerald-100 text-emerald-700')}
-                            {sourceTag('SIM', hasSim && !isOffline, 'bg-blue-100 text-blue-700')}
-                            {sourceTag('App', hasApp && !isOffline, 'bg-violet-100 text-violet-700')}
+                            {!hasGps && !hasSim && !hasApp ? (
+                              <span className="rounded px-1.5 py-0.5 text-xs font-bold uppercase bg-gray-100 text-gray-500">
+                                Manual
+                              </span>
+                            ) : (
+                              <>
+                                {hasGps && sourceTag('GPS', !isOffline, 'bg-emerald-100 text-emerald-700')}
+                                {hasSim  && sourceTag('SIM', !isOffline, 'bg-blue-100 text-blue-700')}
+                                {hasApp  && sourceTag('App', !isOffline, 'bg-violet-100 text-violet-700')}
+                              </>
+                            )}
                             {isOffline && (
                               <span className="rounded px-1.5 py-0.5 text-xs font-bold uppercase bg-red-100 text-red-600">
                                 Offline
@@ -318,16 +353,6 @@ export function TrackTraceDashboard() {
                           <p className="mt-0.5 text-[11px] text-gray-400">{trip.remainingDistanceKm} km left</p>
                         </td>
 
-                        {/* Action */}
-                        <td className="px-4 py-2.5 text-right">
-                          <Link
-                            to={`${scopedPath('/trips')}/${trip.id}`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold text-gray-600 opacity-0 transition group-hover:opacity-100 hover:border-primary hover:text-primary"
-                          >
-                            View <ArrowRight className="h-3 w-3" />
-                          </Link>
-                        </td>
                       </tr>
                     )
                   })}
@@ -336,25 +361,20 @@ export function TrackTraceDashboard() {
             </div>
           )}
 
-          {activeTripRows.length > 8 && (
+          {activeTripRows.length > 7 && (
             <div className="border-t border-gray-100 px-5 py-3">
               <Link to={scopedPath('/trips')} className="text-xs font-semibold text-primary hover:underline">
-                + {activeTripRows.length - 8} more trips — view all
+                + {activeTripRows.length - 7} more trips — view all
               </Link>
             </div>
           )}
         </div>
 
         {/* Alert center */}
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm" style={{ maxHeight: 520 }}>
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-text">Alert Center</h2>
-              {dashboardSummary.openAlerts > 0 && (
-                <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
-                  {dashboardSummary.openAlerts}
-                </span>
-              )}
+              <h2 className="text-sm font-bold text-text">Alerts</h2>
             </div>
             <Link
               to={scopedPath('/alerts')}
@@ -375,7 +395,11 @@ export function TrackTraceDashboard() {
               openAlerts.map((alert) => {
                 const style = alertSeverityStyle(alert.severity)
                 return (
-                  <div key={alert.id} className="flex gap-3 px-4 py-4 transition hover:bg-gray-50">
+                  <div
+                    key={alert.id}
+                    className="flex cursor-pointer items-start gap-3 px-4 py-3 transition hover:bg-primary/[0.04]"
+                    onClick={() => navigate(`${scopedPath('/alerts')}?alert=${alert.id}`)}
+                  >
                     <div className={`mt-1 h-full w-1 shrink-0 self-stretch rounded-full ${style.bar}`} style={{ minHeight: 32 }} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
@@ -383,50 +407,35 @@ export function TrackTraceDashboard() {
                           {alert.severity}
                         </span>
                         <span className="shrink-0 text-xs text-gray-400">
-                          {new Date(alert.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatAlertTime(alert.createdAt)}
                         </span>
                       </div>
                       <p className="mt-1.5 text-xs font-bold text-text leading-snug">{alert.type}</p>
                       <p className="mt-0.5 text-[11px] text-gray-500 leading-relaxed line-clamp-2">{alert.message}</p>
                       <div className="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
                         <MapPin className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{alert.tripId}</span>
+                        <span className="truncate">{activeTrips.find((t) => t.id === alert.tripId)?.bookingId ?? alert.tripId}</span>
                       </div>
                     </div>
+                    <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-gray-300" />
                   </div>
                 )
               })
             )}
           </div>
 
-          {/* Quick stats footer */}
-          <div className="border-t border-gray-100 px-5 py-3">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-sm font-bold text-text">{dashboardSummary.idleVehicles}</p>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Idle</p>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-red-600">{dashboardSummary.offlineVehicles}</p>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Offline</p>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-emerald-600">{onTimePct}%</p>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">On Time</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* ── Quick links ───────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* ── Quick links (D2: expanded to all pages) ───────────── */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {[
-          { to: scopedPath('/live-map'), icon: Navigation, label: 'Live Map', desc: 'Real-time vehicle positions', color: 'text-primary bg-primary/10' },
-          { to: scopedPath('/alerts'), icon: AlertTriangle, label: 'Alerts', desc: `${dashboardSummary.openAlerts} open`, color: 'text-red-600 bg-red-50' },
-          { to: scopedPath('/dispatch'), icon: Truck, label: 'Dispatch', desc: 'Assign & dispatch trips', color: 'text-emerald-600 bg-emerald-50' },
-          { to: scopedPath('/analytics'), icon: Clock, label: 'Analytics', desc: 'KPI & delay trends', color: 'text-violet-600 bg-violet-50' },
-        ].map(({ to, icon: Icon, label, desc, color }) => (
+          { to: scopedPath('/live-map'), icon: Navigation, label: 'Live Map', desc: 'Real-time positions', color: 'text-primary bg-primary/10', badge: null },
+          { to: scopedPath('/alerts'), icon: AlertTriangle, label: 'Alerts', desc: null, color: 'text-red-600 bg-red-50', badge: dashboardSummary.openAlerts },
+          { to: scopedPath('/dispatch'), icon: Truck, label: 'Dispatch', desc: 'Assign & dispatch', color: 'text-emerald-600 bg-emerald-50', badge: null },
+          { to: scopedPath('/geofences'), icon: Shield, label: 'Geofences', desc: 'Zone management', color: 'text-indigo-600 bg-indigo-50', badge: null },
+          { to: scopedPath('/route-performance'), icon: BarChart2, label: 'Route Perf.', desc: 'Corridor analytics', color: 'text-amber-600 bg-amber-50', badge: null },
+        ].map(({ to, icon: Icon, label, desc, color, badge }) => (
           <Link
             key={to}
             to={to}
@@ -437,7 +446,13 @@ export function TrackTraceDashboard() {
             </div>
             <div className="min-w-0">
               <p className="text-xs font-bold text-text">{label}</p>
-              <p className="truncate text-[11px] text-gray-500">{desc}</p>
+              {badge !== null ? (
+                <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${badge > 0 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>
+                  {badge} open
+                </span>
+              ) : (
+                <p className="truncate text-[11px] text-gray-500">{desc}</p>
+              )}
             </div>
             <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-gray-300" />
           </Link>

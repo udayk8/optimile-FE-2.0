@@ -155,7 +155,7 @@ export function LiveMapPanel({
       const marker = new googleMaps.Marker({
         map,
         position: { lat: trip.currentLocation.latitude, lng: trip.currentLocation.longitude },
-        title: `${trip.id} · ${trip.vehicleNumber}`,
+        title: `${trip.bookingId} · ${trip.vehicleNumber}`,
         label: trip.isOffline ? 'O' : trip.delayMinutes > 0 ? 'D' : 'A',
         icon: {
           path: googleMaps.SymbolPath.FORWARD_CLOSED_ARROW,
@@ -389,7 +389,7 @@ export function LiveMapPanel({
                     <div className="min-w-0">
                       <div className="mb-1 flex flex-wrap items-center gap-3">
                         <h3 className="text-[1.3rem] font-extrabold leading-none text-text 2xl:text-[1.5rem]">{selectedTrip.vehicleNumber}</h3>
-                        <span className="rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-gray-600">{selectedTrip.id}</span>
+                        <span className="rounded border border-gray-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-gray-600">{selectedTrip.bookingId}</span>
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${sourceHealthTone(selectedTrip)}`}>
                           {selectedTrip.sourceHealth ?? (selectedTrip.isOffline ? 'Offline' : 'Healthy')} source
                         </span>

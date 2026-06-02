@@ -25,7 +25,7 @@ export function SelectedTripInsightCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-extrabold uppercase tracking-widest text-secondary">Selected trip</p>
-          <h4 className="mt-2 text-lg font-extrabold text-text sm:text-xl">{trip.id}</h4>
+          <h4 className="mt-2 text-lg font-extrabold text-text sm:text-xl">{trip.bookingId}</h4>
           <p className="mt-1 text-sm leading-6 text-gray-600">
             {trip.customerName} · {trip.vehicleNumber} · {trip.driverName}
           </p>

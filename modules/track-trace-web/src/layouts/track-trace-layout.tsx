@@ -153,7 +153,7 @@ const SEV_COLOR: Record<AlertSeverity, string> = {
 
 function NotificationBell({ scopedPath }: { scopedPath: (to: string) => string }) {
   const navigate = useNavigate()
-  const { alerts } = useTrackingStore()
+  const { alerts, activeTrips } = useTrackingStore()
   const [open, setOpen] = useState(false)
   const [cleared, setCleared] = useState<Set<string>>(new Set())
   const ref = useRef<HTMLDivElement>(null)
@@ -264,7 +264,7 @@ function NotificationBell({ scopedPath }: { scopedPath: (to: string) => string }
                       <div className="mt-1 flex items-center gap-1.5">
                         <span className={`text-[10px] font-extrabold uppercase tracking-wide ${color}`}>{alert.severity}</span>
                         <span className="text-[10px] text-gray-300">·</span>
-                        <span className="text-[10px] text-gray-500">{alert.tripId}</span>
+                        <span className="text-[10px] text-gray-500">{activeTrips.find((t) => t.id === alert.tripId)?.bookingId ?? alert.tripId}</span>
                         <span className="text-[10px] text-gray-300">·</span>
                         <span className="text-[10px] text-gray-500">{alert.vehicleNumber}</span>
                       </div>

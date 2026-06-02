@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { MapPin } from 'lucide-react'
 import { Button, DataTable } from '@shared-ui'
 import type { TrackingTrip } from '../types/tracking.types'
 import { TrackingStatusBadge } from './TrackingStatusBadge'
@@ -27,15 +28,21 @@ export function ActiveTripsTable({
   tripBasePath,
   selectedTripId,
   onSelectTrip,
+  alertsByTripId,
+  alertsBasePath,
+  liveMapPath,
 }: {
   trips: TrackingTrip[]
   showMobileCards?: boolean
-  /** Limit to 5 rows — for dashboard preview only. */
   previewMode?: boolean
   tripBasePath: string
   selectedTripId?: string
   onSelectTrip?: (tripId: string) => void
+  alertsByTripId?: Record<string, { count: number; worst: string }>
+  alertsBasePath?: string
+  liveMapPath?: string
 }) {
+  const navigate = useNavigate()
   const rows = previewMode ? trips.slice(0, 5) : trips
   const hiddenCount = previewMode ? trips.length - rows.length : 0
 
@@ -52,13 +59,31 @@ export function ActiveTripsTable({
     {
       key: 'tripId',
       header: 'Trip ID',
-      render: (row: TrackingTrip) => (
-        <div className="space-y-1">
-          <p className="font-extrabold text-text">{row.id}</p>
-          <p className="text-xs font-semibold text-gray-500">{row.bookingId}</p>
-          <p className="text-xs text-gray-500">{row.lastLocationLabel}</p>
-        </div>
-      ),
+      render: (row: TrackingTrip) => {
+        const tripAlert = alertsByTripId?.[row.id]
+        const alertColors: Record<string, string> = {
+          Critical: 'bg-red-100 text-red-700',
+          High: 'bg-orange-100 text-orange-700',
+          Medium: 'bg-amber-100 text-amber-700',
+          Low: 'bg-blue-100 text-blue-700',
+        }
+        return (
+          <div className="space-y-1">
+            <p className="font-extrabold text-text">{row.bookingId}</p>
+            <p className="text-xs text-gray-500">{row.lastLocationLabel}</p>
+            {/* AT2: alert badge */}
+            {tripAlert && alertsBasePath && (
+              <a
+                href={`${alertsBasePath}?tripId=${row.id}`}
+                onClick={(e) => { e.stopPropagation(); navigate(`${alertsBasePath}?tripId=${row.id}`) }}
+                className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold transition hover:opacity-80 ${alertColors[tripAlert.worst] ?? 'bg-gray-100 text-gray-600'}`}
+              >
+                {tripAlert.count} alert{tripAlert.count > 1 ? 's' : ''} · {tripAlert.worst}
+              </a>
+            )}
+          </div>
+        )
+      },
     },
     {
       key: 'vehicleNumber',
@@ -141,6 +166,17 @@ export function ActiveTripsTable({
               Open trip
             </Link>
           </Button>
+          {/* AT5: View on Live Map */}
+          {liveMapPath && row.vehicleNumber && (
+            <button
+              type="button"
+              title="View on Live Map"
+              onClick={(e) => { e.stopPropagation(); navigate(`${liveMapPath}?vehicle=${encodeURIComponent(row.vehicleNumber)}`) }}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-600 transition hover:border-primary/40 hover:text-primary"
+            >
+              <MapPin className="h-3 w-3" /> Map
+            </button>
+          )}
         </div>
       ),
     },
@@ -159,8 +195,7 @@ export function ActiveTripsTable({
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-base font-extrabold text-text">{row.id}</p>
-                  <p className="mt-1 text-xs font-semibold text-gray-500">{row.bookingId}</p>
+                  <p className="text-base font-extrabold text-text">{row.bookingId}</p>
                   <p className="mt-2 text-sm text-gray-600">{row.customerName}</p>
                 </div>
                 <TrackingStatusBadge status={row.status} description={`${row.sourceHealth ?? 'Healthy'} source`} />

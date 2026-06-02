@@ -9,6 +9,7 @@ import {
 import {
   createGeofence,
   deleteGeofence,
+  getGeofenceEvents,
   getGeofences,
   toggleGeofenceStatus,
   updateGeofence,
@@ -95,12 +96,13 @@ export function TrackingStoreProvider({ children }: PropsWithChildren) {
     setLoading(true)
     setError(null)
     try {
-      const [summaryResponse, tripsResponse, alertsResponse, eventsResponse, geofencesResponse, trackingRulesResponse, alertRuleConfigResponse] = await Promise.all([
+      const [summaryResponse, tripsResponse, alertsResponse, eventsResponse, geofencesResponse, geofenceEventsResponse, trackingRulesResponse, alertRuleConfigResponse] = await Promise.all([
         getTrackingDashboardSummary(),
         getActiveTrips(),
         getTrackingAlertsApi(),
         getRecentTrackingEvents(),
         getGeofences(),
+        getGeofenceEvents(),
         getTrackingRules(),
         getTrackingAlertRulesConfig(),
       ])
@@ -115,6 +117,7 @@ export function TrackingStoreProvider({ children }: PropsWithChildren) {
       setAlerts(mergedAlerts)
       setEvents(eventsResponse)
       setGeofences(geofencesResponse)
+      setGeofenceEvents(geofenceEventsResponse)
       setSelectedTripId((current) => current ?? hydratedTrips[0]?.id)
       setLastUpdatedAt(new Date().toISOString())
     } catch {

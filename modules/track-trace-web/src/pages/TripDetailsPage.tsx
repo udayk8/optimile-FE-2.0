@@ -1,8 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Trip, TripStatus, Vehicle, Driver } from '../types/fleet.types';
-import { TripAPI, VehicleAPI, DriverAPI, ConfidenceAPI, TelematicsAPI } from '../services/mockDatabase';
-import { Button, Badge } from '../components/UI';
-import { IconTruck, IconUsers, IconCalendar, IconMap, IconClock, IconCheck, IconArrowRight, IconX } from '../components/Icons';
+import { TripAPI, VehicleAPI, DriverAPI, TelematicsAPI } from '../services/mockDatabase';
+import { Button } from '../components/UI';
+import { IconTruck, IconUsers, IconCalendar, IconMap, IconArrowRight } from '../components/Icons';
+import { useTrackingStore } from '../store/trackingStore';
+import { useTrackTraceRouting } from '../hooks/useTrackTraceRouting';
+import { getRoutePerformance } from '../services/analyticsApi';
+import type { RoutePerformance } from '../types/analytics.types';
+import { useAuth } from '@shared-auth';
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 interface TripDetailsPageProps {
@@ -11,18 +17,50 @@ interface TripDetailsPageProps {
 }
 
 export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack }) => {
+  const { activeTrips, alerts, geofences, switchTripTrackingSource } = useTrackingStore()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { scopedPath } = useTrackTraceRouting()
+  const trackingTrip = activeTrips.find((t) => t.id === tripId) ?? null
+
   const [trip, setTrip] = useState<Trip | null>(null);
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUpdating, setIsUpdating] = useState(false);
   const [actionError, setActionError] = useState<string|null>(null);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [trackedDistanceKm, setTrackedDistanceKm] = useState<number | null>(null);
+  const [routeRows, setRouteRows] = useState<RoutePerformance[]>([]);
 
   useEffect(() => {
     loadTripDetails();
   }, [tripId]);
+
+  // TD3: fetch corridor performance once trip loads (origin/destination available)
+  useEffect(() => {
+    if (!trip) return
+    let active = true
+    void getRoutePerformance({}).then((rows) => { if (active) setRouteRows(rows) }).catch(() => {})
+    return () => { active = false }
+  }, [trip?.origin, trip?.destination]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // TD1: open (non-Resolved) alerts for this trip
+  const tripAlerts = useMemo(
+    () => alerts.filter((a) => a.tripId === tripId && a.status !== 'Resolved'),
+    [alerts, tripId],
+  )
+
+  // TD2: geofence zones linked to this trip
+  const tripGeofences = useMemo(
+    () => geofences.filter((g) => g.linkedEntityId === tripId && g.linkedEntityType === 'TRIP'),
+    [geofences, tripId],
+  )
+
+  // TD3: find matching corridor row
+  const corridorRow = useMemo(() => {
+    if (!trip) return null
+    const key = trip.origin.toLowerCase() + '-' + trip.destination.toLowerCase()
+    return routeRows.find((r) => r.laneId === key) ?? null
+  }, [routeRows, trip])
 
   const loadTripDetails = async () => {
     setIsLoading(true);
@@ -51,34 +89,6 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
     }
   };
 
-  const handleStatusUpdate = async (newStatus: TripStatus) => {
-    if (!trip) return;
-    setIsUpdating(true);
-    try {
-      if (newStatus === TripStatus.DISPATCHED && (!trip.vehicle_id || !trip.driver_id)) {
-        setActionError("Assign a vehicle and driver before dispatching.");
-        setTimeout(() => setActionError(null), 4000);
-        setIsUpdating(false);
-        return;
-      }
-
-      if (newStatus === TripStatus.DISPATCHED && trip.vehicle_id) {
-        const confidence = await ConfidenceAPI.getVehicleConfidence(trip.vehicle_id);
-        if (confidence.score === 'Low') {
-          setActionError("Warning: Vehicle has low data confidence. Proceeding with dispatch.");
-          setTimeout(() => setActionError(null), 4000);
-        }
-      }
-
-      await TripAPI.update(trip.trip_id, { status: newStatus });
-      await loadTripDetails();
-    } catch {
-      setActionError("Failed to update status. Please try again.");
-      setTimeout(() => setActionError(null), 4000);
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading trip details...</div>;
   if (!trip) return (
@@ -123,36 +133,78 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
           </span>
 
           {(trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED) && (
-            showCancelConfirm ? (
-              <span className="flex items-center gap-2">
-                <Button variant="danger" onClick={() => { setShowCancelConfirm(false); handleStatusUpdate(TripStatus.CANCELLED); }} isLoading={isUpdating}>Confirm Cancel</Button>
-                <Button variant="secondary" onClick={() => setShowCancelConfirm(false)}>Keep Trip</Button>
-              </span>
-            ) : (
-              <Button variant="secondary" onClick={() => setShowCancelConfirm(true)}>Cancel Trip</Button>
-            )
+            <Button variant="secondary" disabled title="Coming soon" className="cursor-not-allowed opacity-40">Cancel Trip</Button>
           )}
 
           {trip.status === TripStatus.PLANNED && (
-             <Button onClick={() => handleStatusUpdate(TripStatus.DISPATCHED)} isLoading={isUpdating} disabled={!trip.vehicle_id || !trip.driver_id}>
-                Dispatch Trip
-             </Button>
+            <Button disabled title="Coming soon" className="cursor-not-allowed opacity-40">Dispatch Trip</Button>
           )}
           {trip.status === TripStatus.DISPATCHED && (
-             <Button onClick={() => handleStatusUpdate(TripStatus.IN_TRANSIT)} isLoading={isUpdating}>
-                Start Trip
-             </Button>
+            <Button disabled title="Coming soon" className="cursor-not-allowed opacity-40">Start Trip</Button>
           )}
           {trip.status === TripStatus.IN_TRANSIT && (
-             <Button onClick={() => handleStatusUpdate(TripStatus.COMPLETED)} isLoading={isUpdating} variant="primary">
-                Complete Trip
-             </Button>
+            <Button disabled title="Coming soon" variant="primary" className="cursor-not-allowed opacity-40">Complete Trip</Button>
+          )}
+          {/* TD5: View Replay for in-transit or completed trips */}
+          {(trip.status === TripStatus.IN_TRANSIT || trip.status === TripStatus.COMPLETED) && (
+            <Button variant="secondary" onClick={() => navigate(scopedPath('/trips/' + tripId + '/replay'))}>
+              View Replay →
+            </Button>
           )}
         </div>
       </div>
 
       {actionError && (
         <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">{actionError}</div>
+      )}
+
+      {/* Tracking device switcher */}
+      {trackingTrip?.trackingDevices && trackingTrip.trackingDevices.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Tracking Devices</p>
+          <div className="flex flex-wrap gap-2">
+            {trackingTrip.trackingDevices.map((device) => {
+              const isActive = device.id === trackingTrip.activeTrackingDeviceId
+              const sourceLabel: Record<string, string> = {
+                GPS_DEVICE: 'GPS', FASTAG: 'SIM', DRIVER_APP: 'App', ANPR: 'ANPR', MANUAL: 'Manual',
+              }
+              const sourceColor: Record<string, string> = {
+                GPS_DEVICE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+                FASTAG:     'bg-blue-100 text-blue-700 border-blue-200',
+                DRIVER_APP: 'bg-violet-100 text-violet-700 border-violet-200',
+                ANPR:       'bg-amber-100 text-amber-700 border-amber-200',
+                MANUAL:     'bg-gray-100 text-gray-600 border-gray-200',
+              }
+              const unavailable = device.status === 'Unavailable' || device.status === 'Faulted'
+              return (
+                <button
+                  key={device.id}
+                  type="button"
+                  disabled={unavailable}
+                  onClick={() => switchTripTrackingSource(trackingTrip.id, device.id, user?.email ?? 'operator')}
+                  title={unavailable ? `${device.label} — ${device.status}` : `Switch to ${device.label}`}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold transition
+                    ${unavailable ? 'cursor-not-allowed opacity-40 bg-gray-50 border-gray-200 text-gray-400' :
+                      isActive
+                        ? `${sourceColor[device.source] ?? 'bg-gray-100 text-gray-700 border-gray-200'} ring-2 ring-primary/30`
+                        : `${sourceColor[device.source] ?? 'bg-gray-100 text-gray-700 border-gray-200'} opacity-60 hover:opacity-100`
+                    }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${isActive && !unavailable ? 'bg-current animate-pulse' : 'bg-current opacity-40'}`} />
+                  <span>{sourceLabel[device.source] ?? device.source}</span>
+                  <span className="font-normal text-[11px] opacity-70">{device.label}</span>
+                  {isActive && <span className="ml-1 rounded-full bg-white/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Active</span>}
+                  {unavailable && <span className="ml-1 text-[10px] font-normal">{device.status}</span>}
+                </button>
+              )
+            })}
+          </div>
+          {trackingTrip.lastSourceSwitchedAt && (
+            <p className="mt-2.5 text-[11px] text-gray-400">
+              Last switched by <span className="font-semibold">{trackingTrip.lastSourceSwitchedBy}</span> at {new Date(trackingTrip.lastSourceSwitchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
+        </div>
       )}
 
       {/* Timeline */}
@@ -279,6 +331,88 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
         </div>
       )}
 
+      {/* TD1: Open alerts */}
+      {tripAlerts.length > 0 && (
+        <div className="rounded-xl border border-danger/30 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <p className="text-[13px] font-semibold text-text">
+              {tripAlerts.length} open alert{tripAlerts.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate(scopedPath('/alerts') + '?tripId=' + encodeURIComponent(tripId))}
+              className="text-[12px] font-semibold text-primary hover:underline"
+            >
+              View all →
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {tripAlerts.slice(0, 3).map((alert) => {
+              const severityColors: Record<string, string> = {
+                Critical: 'bg-red-100 text-red-700 border-red-200',
+                High: 'bg-orange-100 text-orange-700 border-orange-200',
+                Medium: 'bg-amber-100 text-amber-700 border-amber-200',
+                Low: 'bg-blue-100 text-blue-700 border-blue-200',
+              }
+              return (
+                <button
+                  key={alert.id}
+                  type="button"
+                  onClick={() => navigate(scopedPath('/alerts') + '?alert=' + encodeURIComponent(alert.id))}
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition hover:opacity-80 ${severityColors[alert.severity] ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}
+                >
+                  <span className="font-bold">{alert.severity}</span>
+                  <span className="opacity-70">·</span>
+                  <span>{alert.type}</span>
+                  <span className="max-w-[120px] truncate font-normal opacity-70">{alert.message}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* TD2: Geofence zones */}
+      {tripGeofences.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+            <p className="text-[13px] font-semibold text-text">
+              {tripGeofences.length} geofence zone{tripGeofences.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate(scopedPath('/geofences') + '?search=' + encodeURIComponent(tripId))}
+              className="text-[12px] font-semibold text-primary hover:underline"
+            >
+              View all →
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 px-4 py-3">
+            {tripGeofences.slice(0, 3).map((gf) => {
+              const typeColors: Record<string, string> = {
+                Pickup: 'bg-blue-100 text-blue-700',
+                Drop: 'bg-teal-100 text-teal-700',
+                Warehouse: 'bg-indigo-100 text-indigo-700',
+                Checkpoint: 'bg-purple-100 text-purple-700',
+                'Restricted Zone': 'bg-red-100 text-red-700',
+                Yard: 'bg-orange-100 text-orange-600',
+                'Customer Site': 'bg-green-100 text-green-700',
+                Custom: 'bg-gray-100 text-gray-600',
+              }
+              return (
+                <span
+                  key={gf.id}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold ${typeColors[gf.type] ?? 'bg-gray-100 text-gray-600'}`}
+                >
+                  <span>{gf.type}</span>
+                  <span className="font-normal opacity-70 max-w-[100px] truncate">{gf.name}</span>
+                </span>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Details */}
         <div className="lg:col-span-1 space-y-6">
@@ -309,6 +443,27 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                         </div>
                     </div>
                 </div>
+                {/* TD3: Corridor avg performance */}
+                {corridorRow && (
+                  <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 space-y-1.5">
+                    <p className="text-[10px] font-extrabold uppercase tracking-[0.12em] text-gray-400">Corridor Avg</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${corridorRow.averageDelayMinutes > 90 ? 'bg-red-100 text-red-700' : corridorRow.averageDelayMinutes > 30 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {corridorRow.averageDelayMinutes} min avg delay
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${corridorRow.efficiencyScore >= 95 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {corridorRow.efficiencyScore}% efficiency
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => navigate(scopedPath('/route-performance'))}
+                      className="text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      View corridor history →
+                    </button>
+                  </div>
+                )}
             </div>
 
             {/* Assignment Card */}

@@ -4,12 +4,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  ExternalLink,
   Settings2,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { TrackTraceAccessBoundary } from '../components/TrackTraceAccessBoundary'
 import { EmptyPlaceholder } from '../components/EmptyPlaceholder'
 import { FeatureAccessNotice } from '../components/shared/FeatureAccessNotice'
 import { useTrackTraceAccess } from '../hooks/useTrackTraceAccess'
+import { useTrackTraceRouting } from '../hooks/useTrackTraceRouting'
+import { useTrackingStore } from '../store/trackingStore'
 import { getRoutePerformance } from '../services/analyticsApi'
 import { AnalyticsPageSkeleton } from '../components/shared/AnalyticsPageSkeleton'
 import type { AnalyticsFilters, RoutePerformance } from '../types/analytics.types'
@@ -113,6 +117,9 @@ function CorridorMapPlaceholder({ rows }: { rows: RoutePerformance[] }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export function RoutePerformancePage() {
   const { canUseFeature, hasPermission } = useTrackTraceAccess()
+  const { scopedPath } = useTrackTraceRouting()
+  const navigate = useNavigate()
+  const { activeTrips, alerts } = useTrackingStore()
   const [view, setView] = useState<'Worst Delay' | 'Best Efficiency' | 'All Corridors'>('All Corridors')
   const [quickSelect, setQuickSelect] = useState<QuickSelect | null>('This Month')
   const [fromDate, setFromDate] = useState(() => getQuickSelectDates('This Month').from)
@@ -144,6 +151,44 @@ export function RoutePerformancePage() {
     setFromDate(from)
     setToDate(to)
   }
+
+  // RP2: live trip count per corridor — join on origin+destination slug
+  const activeTripsByLane = useMemo(() => {
+    const map: Record<string, { count: number; tripIds: string[] }> = {}
+    activeTrips.forEach((t) => {
+      if (t.status === 'Completed' || t.status === 'Cancelled') return
+      const key = t.origin.toLowerCase() + '-' + t.destination.toLowerCase()
+      if (!map[key]) map[key] = { count: 0, tripIds: [] }
+      map[key].count += 1
+      map[key].tripIds.push(t.id)
+    })
+    return map
+  }, [activeTrips])
+
+  // RP3: open alert count + worst severity per corridor
+  const openAlertsByLane = useMemo(() => {
+    const severityOrder = ['Critical', 'High', 'Medium', 'Low']
+    const tripById: Record<string, typeof activeTrips[number]> = {}
+    activeTrips.forEach((t) => { tripById[t.id] = t })
+    const map: Record<string, { count: number; worst: string; worstTripId: string }> = {}
+    alerts.forEach((a) => {
+      if (a.status === 'Resolved') return
+      const trip = tripById[a.tripId]
+      if (!trip) return
+      const key = trip.origin.toLowerCase() + '-' + trip.destination.toLowerCase()
+      const existing = map[key]
+      if (!existing) {
+        map[key] = { count: 1, worst: a.severity, worstTripId: a.tripId }
+      } else {
+        existing.count += 1
+        if (severityOrder.indexOf(a.severity) < severityOrder.indexOf(existing.worst)) {
+          existing.worst = a.severity
+          existing.worstTripId = a.tripId
+        }
+      }
+    })
+    return map
+  }, [alerts, activeTrips])
 
   const rankedRows = useMemo(() => {
     const next = [...rows]
@@ -181,17 +226,32 @@ export function RoutePerformancePage() {
 
         {/* ── KPI cards ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[
-            { label: 'Average Efficiency', value: `${averageEfficiency}%` },
-            { label: 'High-Delay Corridors', value: highDelayCorridors },
-            { label: 'Lanes Reviewed', value: rows.length },
-            { label: 'Deviation Count', value: deviationCount },
-          ].map((kpi) => (
-            <div key={kpi.label} className="rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">{kpi.label}</p>
-              <p className="mt-0.5 text-xl font-extrabold text-gray-900">{kpi.value}</p>
-            </div>
-          ))}
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Average Efficiency</p>
+            <p className="mt-0.5 text-xl font-extrabold text-gray-900">{averageEfficiency}%</p>
+          </div>
+
+          {/* RP1: High-Delay Corridors — clickable shortcut to Worst Delay view */}
+          <button
+            type="button"
+            onClick={() => { setView('Worst Delay'); setPage(1) }}
+            className={`rounded-xl border bg-white px-5 py-3 shadow-sm text-left transition hover:ring-2 hover:ring-primary/20 ${
+              view === 'Worst Delay' ? 'border-primary/40 ring-2 ring-primary/20' : 'border-gray-200'
+            }`}
+          >
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">High-Delay Corridors</p>
+            <p className="mt-0.5 text-xl font-extrabold text-gray-900">{highDelayCorridors}</p>
+            <p className="text-[10px] text-gray-400">click to rank corridors</p>
+          </button>
+
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Lanes Reviewed</p>
+            <p className="mt-0.5 text-xl font-extrabold text-gray-900">{rows.length}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500">Deviation Count</p>
+            <p className="mt-0.5 text-xl font-extrabold text-gray-900">{deviationCount}</p>
+          </div>
         </div>
 
         {/* ── Corridor comparison + map ──────────────────────────── */}
@@ -323,6 +383,7 @@ export function RoutePerformancePage() {
                         { label: 'Actual Dur.', align: 'text-right' },
                         { label: 'Avg. Delay', align: 'text-right' },
                         { label: 'Efficiency', align: 'text-center' },
+                        { label: 'Actions', align: 'text-center' },
                       ].map((col) => (
                         <th key={col.label} className={`px-4 py-2.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-500 ${col.align}`}>
                           {col.label}
@@ -337,9 +398,41 @@ export function RoutePerformancePage() {
                       const eff = row.efficiencyScore
                       const effColor = eff >= 110 ? 'bg-blue-50 text-primary' : eff >= 95 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
 
+                      // RP2: live trip count for this lane
+                      const liveData = activeTripsByLane[row.laneId]
+                      const liveCount = liveData?.count ?? 0
+
+                      // RP3: open alerts for this lane
+                      const alertData = openAlertsByLane[row.laneId]
+                      const alertSeverityColors: Record<string, string> = {
+                        Critical: 'bg-red-100 text-red-700',
+                        High:     'bg-orange-100 text-orange-700',
+                        Medium:   'bg-amber-100 text-amber-700',
+                        Low:      'bg-blue-100 text-blue-700',
+                      }
+
                       return (
                         <tr key={row.laneId} className={`transition hover:bg-gray-50/80 ${idx % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                          <td className="px-4 py-2 font-mono text-[12px] font-semibold text-primary">{row.laneId}</td>
+                          {/* Lane ID + RP2 live badge + RP3 alert badge */}
+                          <td className="px-4 py-2">
+                            <p className="font-mono text-[12px] font-semibold text-primary">{row.laneId}</p>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {liveCount > 0 && (
+                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                  {liveCount} live
+                                </span>
+                              )}
+                              {alertData && (
+                                <a
+                                  href={scopedPath('/alerts') + '?tripId=' + alertData.worstTripId}
+                                  onClick={(e) => { e.stopPropagation(); navigate(scopedPath('/alerts') + '?tripId=' + alertData.worstTripId) }}
+                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition hover:opacity-80 ${alertSeverityColors[alertData.worst] ?? 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  {alertData.count} alert · {alertData.worst}
+                                </a>
+                              )}
+                            </div>
+                          </td>
                           <td className="px-4 py-2">
                             <span className="flex items-center gap-1.5 text-[13px] font-medium text-text">
                               {row.origin}
@@ -356,6 +449,21 @@ export function RoutePerformancePage() {
                           </td>
                           <td className="px-4 py-2 text-center">
                             <span className={`inline-block rounded-md px-2.5 py-0.5 text-[12px] font-bold ${effColor}`}>{eff}%</span>
+                          </td>
+                          {/* RP4: View in Dispatch — only when corridor has live trips */}
+                          <td className="px-4 py-2 text-center">
+                            {liveCount > 0 ? (
+                              <button
+                                type="button"
+                                title="View live trips in Dispatch"
+                                onClick={() => navigate(scopedPath('/dispatch') + '?search=' + encodeURIComponent(row.origin))}
+                                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-semibold text-gray-600 transition hover:border-primary/40 hover:text-primary"
+                              >
+                                Dispatch <ExternalLink className="h-3 w-3" />
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-gray-300">—</span>
+                            )}
                           </td>
                         </tr>
                       )

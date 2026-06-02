@@ -240,9 +240,15 @@ export function TrackingAnalyticsPage() {
                       Score {risk.score} · Predicted delay {risk.predictedDelayMinutes} min · Confidence {risk.confidence}
                     </p>
                     <p className="mt-2 text-sm font-medium text-text">{risk.recommendedAction}</p>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap gap-3">
                       <Link className="text-sm font-semibold text-primary hover:underline" to={scopedPath(`/trips/${risk.tripId}`)}>
                         Open trip detail
+                      </Link>
+                      <Link className="text-sm font-semibold text-danger hover:underline" to={scopedPath('/alerts') + '?tripId=' + risk.tripId}>
+                        View alerts →
+                      </Link>
+                      <Link className="text-sm font-semibold text-primary hover:underline" to={scopedPath('/dispatch') + '?search=' + encodeURIComponent(risk.tripId)}>
+                        Open in Dispatch →
                       </Link>
                     </div>
                   </div>
