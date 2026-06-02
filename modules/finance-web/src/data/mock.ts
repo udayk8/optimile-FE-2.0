@@ -99,6 +99,17 @@ export const DISPUTES = [
   { id: "VB-8782", client: "Sharma Transport", amount: 61000, reason: "Detention charge not authorised by consignee", stage: "escalated", raised: "2026-05-17", slaHrs: -8, owner: "Finance Head", kind: "subvendor", notifiedAt: "2026-05-17", respondedAt: "2026-05-18", vendorResponseType: "reject", vendorResponse: "Detention was authorised verbally on site; awaiting written confirmation.", vendorDocs: ["Site-detention-log.pdf"] },
 ];
 
+/* ---------- Enterprise (buyer) invoice disputes ----------
+   An enterprise buyer disputes its VENDORS' invoices only — there are no
+   customer/receivable disputes. Every dispute is against a transporter's bill
+   (rate vs contract, unauthorised accessorial/detention, duplicate, etc.). */
+export const ENTERPRISE_DISPUTES = [
+  { id: "VB-8790", client: "Royal Carriers", amount: 96000, reason: "Billed above contract — accessorial added without authorisation", stage: "vendor-response", raised: "2026-05-21", slaHrs: 30, owner: "Royal Carriers", kind: "subvendor", notifiedAt: "2026-05-21", respondedAt: "2026-05-22", vendorResponseType: "reject", vendorResponse: "Accessorial reflects a documented multi-pickup; LR annexure attached. Requesting approval at the billed amount.", vendorDocs: ["Multi-pickup-LR-annexure.pdf"] },
+  { id: "VB-8782", client: "Sharma Transport", amount: 61000, reason: "Detention charge not authorised by consignee", stage: "raised", raised: "2026-05-20", slaHrs: 40, owner: "Priya Nair", kind: "subvendor" },
+  { id: "VB-8771", client: "Sharma Transport", amount: 145000, reason: "Rate mismatch — billed ₹1,45,000 vs contract ₹1,38,000", stage: "vendor-response", raised: "2026-05-19", slaHrs: 12, owner: "Priya Nair", kind: "subvendor", notifiedAt: "2026-05-19", respondedAt: "2026-05-20", vendorResponseType: "reject", vendorResponse: "Rate revised per fuel-surcharge clause 4.2 of the contract — the billed amount is correct.", vendorDocs: ["Signed-rate-annexure.pdf", "Fuel-surcharge-clause-4.2.pdf"] },
+  { id: "VB-8760", client: "(market hire)", amount: 54000, reason: "Duplicate invoice — trip already settled in April", stage: "escalated", raised: "2026-05-18", slaHrs: -6, owner: "Finance Head", kind: "subvendor" },
+];
+
 /* Canned vendor replies for disputes raised from Vendor Match (mock — finance-side only).
    Vendor either accepts (issues corrected invoice / credit note) or rejects with a
    counter-argument + supporting documents — BRD step 14. */
@@ -119,6 +130,12 @@ export const DEBIT_NOTES = [
 export const CREDIT_NOTES = [
   { id: "CN-2026-014", client: "Marico Limited", trip: "TR-4441", amount: 8000, reason: "Dispute resolved in client favour — rate correction", stage: "issued", raisedBy: "Finance — Priya Nair", approvedBy: "Finance Head" },
   { id: "CN-2026-015", client: "Britannia Industries", trip: "TR-4419", amount: 6000, reason: "Accessorial billed in error", stage: "pending-approval", raisedBy: "Finance — Priya Nair", approvedBy: null },
+];
+/* Enterprise (buyer) credit notes — issued BY the vendor to reduce a payable
+   (over-billing / accessorial reversed), not "to a client". */
+export const ENTERPRISE_CREDIT_NOTES = [
+  { id: "CN-2026-018", vendor: "Sharma Transport", trip: "TR-4452", amount: 8500, reason: "Vendor corrected over-billing — rate keyed in error", stage: "issued", raisedBy: "Sharma Transport", approvedBy: "Finance Head" },
+  { id: "CN-2026-019", vendor: "Royal Carriers", trip: "TR-4441", amount: 6000, reason: "Accessorial reversed — billed in error, credit applied to payable", stage: "pending-approval", raisedBy: "Royal Carriers", approvedBy: null },
 ];
 
 /* ---------- Sub-vendor / vehicle-number accounting (BRD 5.2) ---------- */

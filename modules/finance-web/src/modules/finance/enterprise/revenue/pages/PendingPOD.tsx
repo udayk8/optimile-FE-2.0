@@ -10,11 +10,11 @@ import { exportCsv } from "@finance/lib/csv";
 
 const POD_REPORT_COLUMNS = [
   { key: "id", label: "Trip" },
-  { key: "client", label: "Client" },
+  { key: "client", label: "Indent / Consignee" },
   { key: "lane", label: "Lane" },
   { key: "truck", label: "Truck" },
   { key: "daysPending", label: "Days Pending" },
-  { key: "revenue", label: "Revenue at Risk" },
+  { key: "revenue", label: "Payable Held" },
   { key: "vendor", label: "Vendor" },
   { key: "responsible", label: "Vehicle / Driver", value: (t: any) => t.vehicle || t.driver || "" },
 ];
@@ -58,7 +58,7 @@ function PodFollowUp({ trip, onBack, toast }: any) {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>{trip.id}</h1>
             <Pill tone={trip.daysPending >= 3 ? "red" : "amber"}>{trip.daysPending}d pending</Pill>
           </div>
-          <p className="mt-1 text-sm text-slate-500">{trip.client} · {trip.lane} · {trip.truck} · revenue at risk <Money value={trip.revenue} className="font-semibold text-red-600" /></p>
+          <p className="mt-1 text-sm text-slate-500">{trip.client} · {trip.lane} · {trip.truck} · vendor payable held <Money value={trip.revenue} className="font-semibold text-red-600" /></p>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export default function PendingPOD({ toast }: any) {
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <SectionTitle sub="Every trip without a POD is revenue you can't bill yet. Click a trip to trace it and follow up.">Pending POD Tracker</SectionTitle>
+        <SectionTitle sub="No vendor invoice is approved for payment until its POD is uploaded and verified. Each trip below is blocking a payable — click to trace it and chase the POD.">Pending POD Tracker</SectionTitle>
         <button onClick={downloadReport} disabled={trips.length === 0}
           className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
           <Download size={15} />Download report
@@ -131,7 +131,7 @@ export default function PendingPOD({ toast }: any) {
           <div className="grid h-12 w-12 place-items-center rounded-lg bg-red-50 text-red-600"><FileWarning size={24} /></div>
           <div>
             <div className="text-3xl font-bold text-red-600"><Money value={totalRisk} /></div>
-            <div className="text-sm text-slate-500">Total revenue at risk across {trips.length} trips</div>
+            <div className="text-sm text-slate-500">Total vendor payables blocked pending POD across {trips.length} trips</div>
           </div>
         </div>
       </Card>
@@ -140,7 +140,7 @@ export default function PendingPOD({ toast }: any) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
-              {["Trip", "Lane", "Days Pending", "Revenue", "Responsible"].map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
+              {["Trip", "Lane", "Days Pending", "Payable Held", "Responsible"].map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
               <th className="px-5 py-3 text-right font-semibold">Action</th>
             </tr>
           </thead>
@@ -160,7 +160,7 @@ export default function PendingPOD({ toast }: any) {
               </tr>
             ))}
             {trips.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">🎉 All PODs received. Nothing blocking revenue.</td></tr>
+              <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">🎉 All PODs received. No vendor invoices blocked.</td></tr>
             )}
           </tbody>
         </table>

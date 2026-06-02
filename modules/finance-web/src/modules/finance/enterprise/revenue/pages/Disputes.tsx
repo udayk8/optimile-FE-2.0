@@ -7,8 +7,8 @@ import { VendorBillDetail } from "@finance/modules/finance/enterprise/payables/p
 
 const STAGES = ["Raised", "Vendor Response", "Escalated (SLA)", "Resolved"];
 const STAGE_IDX = { raised: 0, "vendor-response": 1, escalated: 2, resolved: 3 };
-const KIND_LABEL = { customer: "Customer", subvendor: "Sub-vendor" };
-const TABS = [["all", "All"], ["customer", "Customer"], ["subvendor", "Sub-vendor"]];
+// Enterprise (buyer) only ever disputes a vendor's invoice — no customer disputes.
+const KIND_LABEL = { customer: "Vendor", subvendor: "Vendor" };
 
 // Conversation thread between admin and vendor on a disputed invoice (mock).
 function DisputeChatModal({ dispute, onClose, onSend }: any) {
@@ -62,7 +62,6 @@ const billFor = (d: any) =>
 
 export default function Disputes({ toast }: any) {
   const { disputes, resolveDispute, escalateDispute, replyToDispute } = useDisputes();
-  const [tab, setTab] = useState("all");
   const [viewing, setViewing] = useState<any>(null);
   const [chatId, setChatId] = useState<any>(null);
   const chatDispute = disputes.find((x) => x.id === chatId);
@@ -77,7 +76,7 @@ export default function Disputes({ toast }: any) {
     toast(`${id} escalated to finance heads (SLA breached)`);
   };
 
-  const items = disputes.filter((d) => tab === "all" || (d.kind || "customer") === tab);
+  const items = disputes;
 
   if (viewing) {
     const d = disputes.find((x) => x.id === viewing);
@@ -86,19 +85,13 @@ export default function Disputes({ toast }: any) {
 
   return (
     <div>
-      <SectionTitle sub="Resolve billing disputes without stalling the rest of the collection cycle. 48h SLA, then auto-escalation. Includes customer and sub-vendor disputes.">Invoice Disputes</SectionTitle>
-
-      <div className="mb-5 inline-flex rounded-lg bg-slate-100 p-1 text-sm">
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`rounded-md px-4 py-1.5 font-medium transition ${tab === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{l}</button>
-        ))}
-      </div>
+      <SectionTitle sub="Resolve vendor-invoice disputes before they stall a payment — rate mismatch vs contract, unauthorised detention/accessorials, wrong trip reference, duplicate bills. 48h SLA, then auto-escalation.">Invoice Disputes</SectionTitle>
 
       <div className="space-y-4">
         {items.map((d) => {
           const idx = STAGE_IDX[d.stage as keyof typeof STAGE_IDX];
           const overdue = d.slaHrs < 0;
-          const kind = d.kind || "customer";
+          const kind = d.kind || "subvendor";
           const hasDetail = !!(VENDOR_BILL_DETAILS as Record<string, any>)[d.id];
           return (
             <Card key={d.id} className={`p-5 ${overdue && d.stage !== "resolved" ? "ring-1 ring-red-200" : ""}`}>
@@ -106,7 +99,7 @@ export default function Disputes({ toast }: any) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-slate-800">{d.id}</span>
-                    <Pill tone={kind === "subvendor" ? "violet" : "blue"}>{KIND_LABEL[kind]}</Pill>
+                    <Pill tone="violet">{KIND_LABEL[kind]}</Pill>
                     <span className="text-sm text-slate-400">·</span>
                     <span className="text-sm text-slate-600">{d.client}</span>
                     <Money value={d.amount} className="text-sm font-semibold text-slate-800" />

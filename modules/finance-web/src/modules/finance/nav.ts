@@ -200,8 +200,7 @@ export const NAV: Record<FinanceMode, NavGroup[]> = {
   ],
   enterprise: [
     { group: null, items: ['dash'] },
-    { group: 'Payables', items: ['vendor', 'notes'] },
-    { group: 'Receivables', items: ['pod'] },
+    { group: 'Payables', items: ['vendor', 'notes', 'pod'] },
     { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract'] },
     { group: 'Reports', items: ['reports'] },

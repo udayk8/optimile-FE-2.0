@@ -24,7 +24,7 @@ export default function FinanceShell() {
   const Comp = page.comp
 
   return (
-    <DisputesProvider>
+    <DisputesProvider mode={mode}>
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* SIDEBAR */}
       <aside className="flex w-64 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-300">
