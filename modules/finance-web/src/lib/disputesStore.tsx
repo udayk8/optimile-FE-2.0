@@ -1,6 +1,7 @@
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react'
 import { DISPUTES, ENTERPRISE_DISPUTES } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
+import { logAudit } from '@finance/lib/auditStore'
 
 /* ============================================================
    Shared disputes store — PER-MODE MODULE SINGLETONS.
@@ -109,10 +110,18 @@ function storeFor(mode: FinanceMode): Store {
             }
           : d,
       )
+      {
+        const d0 = state.find((d) => d.id === id)
+        logAudit(mode, { user: 'Priya Nair', action: how === 'approve' ? 'Dispute resolved (approved)' : 'Dispute resolved (resubmit)', entity: id, type: 'Dispute', amount: d0?.amount, from: 'Open', to: 'Resolved' })
+      }
       emit()
     },
     escalateDispute: (id) => {
       state = state.map((d) => (d.id === id ? { ...d, stage: 'escalated', owner: 'Finance Head' } : d))
+      {
+        const d0 = state.find((d) => d.id === id)
+        logAudit(mode, { user: 'Finance Head', action: 'Dispute escalated', entity: id, type: 'Dispute', amount: d0?.amount, from: 'Open', to: 'Escalated' })
+      }
       emit()
     },
     replyToDispute: (id, text) => {

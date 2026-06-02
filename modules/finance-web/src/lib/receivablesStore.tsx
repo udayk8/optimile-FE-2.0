@@ -4,6 +4,7 @@ import {
   ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, contractRateFor,
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
+import { logAudit } from '@finance/lib/auditStore'
 
 /* ============================================================
    Shared receivables store — PER-MODE MODULE SINGLETONS.
@@ -246,6 +247,7 @@ function storeFor(mode: FinanceMode): Store {
         invoices: [inv, ...state.invoices],
         trips: state.trips.map((t) => (t.id === tripId ? { ...t, podStage: 'invoiced' } : t)),
       })
+      logAudit(mode, { user: 'Priya Nair', action: 'Invoice generated', entity: id, type: 'Invoice', amount: inv.base, from: 'POD validated', to: 'Draft' })
       return id
     },
 
@@ -266,18 +268,23 @@ function storeFor(mode: FinanceMode): Store {
         ),
       }),
 
-    submitInvoice: (invoiceId) =>
-      set({ invoices: state.invoices.map((inv) => (inv.id === invoiceId ? recompute({ ...inv, stage: 'submitted' }) : inv)) }),
+    submitInvoice: (invoiceId) => {
+      set({ invoices: state.invoices.map((inv) => (inv.id === invoiceId ? recompute({ ...inv, stage: 'submitted' }) : inv)) })
+      const inv = state.invoices.find((i) => i.id === invoiceId)
+      logAudit(mode, { user: 'Priya Nair', action: 'Invoice submitted', entity: invoiceId, type: 'Invoice', amount: inv?.invoiced, from: 'Draft', to: 'Submitted' })
+    },
 
     clientDecision: (invoiceId, decision) => {
       const inv = state.invoices.find((i) => i.id === invoiceId)
       if (!inv) return
       if (decision === 'dispute') {
         set({ invoices: state.invoices.map((i) => (i.id === invoiceId ? { ...i, stage: 'disputed' } : i)) })
+        logAudit(mode, { user: 'Priya Nair', action: 'Invoice disputed', entity: invoiceId, type: 'Invoice', amount: inv.invoiced, from: 'Submitted', to: 'Disputed' })
         return
       }
       if (decision === 'correction') {
         set({ invoices: state.invoices.map((i) => (i.id === invoiceId ? { ...i, stage: 'correction' } : i)) })
+        logAudit(mode, { user: 'Priya Nair', action: 'Correction requested', entity: invoiceId, type: 'Invoice', amount: inv.invoiced, from: 'Submitted', to: 'Correction' })
         return
       }
       // approve → compute due date from terms, post to AR ledger (BRD step 11)
@@ -299,6 +306,7 @@ function storeFor(mode: FinanceMode): Store {
         invoices: state.invoices.map((i) => (i.id === invoiceId ? approved : i)),
         arLedger: [...state.arLedger, ledgerEntry],
       })
+      logAudit(mode, { user: 'Priya Nair', action: 'Invoice approved', entity: inv.id, type: 'Invoice', amount: inv.invoiced, from: 'Submitted', to: 'Approved' })
     },
 
     allocate,

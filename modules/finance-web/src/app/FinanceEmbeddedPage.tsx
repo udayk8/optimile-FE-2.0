@@ -5,6 +5,8 @@ import { PAGES, modeIds, type FinanceMode } from '@finance/modules/finance/nav'
 import { DisputesProvider } from '@finance/lib/disputesStore'
 import { ReceivablesProvider } from '@finance/lib/receivablesStore'
 import { PayablesProvider } from '@finance/lib/payablesStore'
+import { AuditProvider } from '@finance/lib/auditStore'
+import { MonthCloseProvider } from '@finance/lib/monthCloseStore'
 
 // Embedded page renderer — used when a host (tenant-admin) mounts finance
 // inside its own shell. Renders ONE finance page with no internal sidebar /
@@ -34,15 +36,19 @@ export default function FinanceEmbeddedPage({
     <DisputesProvider mode={mode}>
       <ReceivablesProvider mode={mode}>
         <PayablesProvider mode={mode}>
-          <div
-            className="min-h-full bg-slate-50 px-8 py-7 text-slate-900"
-            style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
-          >
-            <div key={mode + resolvedId} className="animate-[fadeUp_.4s_ease]">
-              <Comp mode={mode} toast={toast} onNavigate={onNavigate} />
-            </div>
-            {toastMsg && <Toast msg={toastMsg} onClose={() => setToastMsg(null)} />}
-          </div>
+          <AuditProvider mode={mode}>
+            <MonthCloseProvider mode={mode}>
+              <div
+                className="min-h-full bg-slate-50 px-8 py-7 text-slate-900"
+                style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+              >
+                <div key={mode + resolvedId} className="animate-[fadeUp_.4s_ease]">
+                  <Comp mode={mode} toast={toast} onNavigate={onNavigate} />
+                </div>
+                {toastMsg && <Toast msg={toastMsg} onClose={() => setToastMsg(null)} />}
+              </div>
+            </MonthCloseProvider>
+          </AuditProvider>
         </PayablesProvider>
       </ReceivablesProvider>
     </DisputesProvider>

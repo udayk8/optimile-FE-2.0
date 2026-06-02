@@ -3,6 +3,7 @@ import {
   VENDOR_BILLS, SUBVENDOR_ROWS, RETENTION, VENDOR_LEDGER, INVOICE_SERIES, AP_TOLERANCE_PCT,
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
+import { logAudit } from '@finance/lib/auditStore'
 
 /* ============================================================
    Shared payables (AP) store — PER-MODE MODULE SINGLETONS.
@@ -183,7 +184,10 @@ function storeFor(mode: FinanceMode): Store {
       const bill = state.bills.find((b) => b.id === billId)
       if (!bill) return
       const next = approveOne(bill)
-      if (next) set(next)
+      if (next) {
+        set(next)
+        logAudit(mode, { user: 'Priya Nair', action: 'Bill approved', entity: bill.id, type: 'Payable', amount: bill.billed, from: 'Pending', to: 'Scheduled' })
+      }
     },
 
     autoApproveMatched: () => {
@@ -194,6 +198,7 @@ function storeFor(mode: FinanceMode): Store {
           const next = approveOne({ ...b })
           if (next) {
             state = { ...state, ...next }
+            logAudit(mode, { user: 'System (auto)', action: 'Bill auto-approved', entity: b.id, type: 'Payable', amount: b.billed, from: 'Pending', to: 'Scheduled' })
             count += 1
           }
         })
@@ -201,8 +206,11 @@ function storeFor(mode: FinanceMode): Store {
       return count
     },
 
-    disputeBill: (billId) =>
-      set({ bills: state.bills.map((b) => (b.id === billId ? { ...b, stage: 'disputed' } : b)) }),
+    disputeBill: (billId) => {
+      const bill = state.bills.find((b) => b.id === billId)
+      set({ bills: state.bills.map((b) => (b.id === billId ? { ...b, stage: 'disputed' } : b)) })
+      logAudit(mode, { user: 'Priya Nair', action: 'Vendor bill disputed', entity: billId, type: 'Payable', amount: bill?.billed, from: 'Pending', to: 'Disputed' })
+    },
 
     processBatch: (paymentIds) => {
       const ids = new Set(paymentIds)
@@ -214,12 +222,14 @@ function storeFor(mode: FinanceMode): Store {
       targets.forEach((t) => {
         ledger = [...ledger, { date: today(), type: 'Payment', ref: t.billId, amt: -t.amount, bal: (ledger.length ? ledger[ledger.length - 1].bal : 0) - t.amount }]
       })
+      const total = targets.reduce((s, t) => s + t.amount, 0)
       set({
         payments: state.payments.map((p) => (ids.has(p.id) && p.status === 'scheduled' ? { ...p, status: 'paid', batchId } : p)),
         bills: state.bills.map((b) => (paidBillIds.has(b.id) ? { ...b, stage: 'paid' } : b)),
         apLedger: ledger,
         batchSeq: state.batchSeq + 1,
       })
+      logAudit(mode, { user: 'Priya Nair', action: 'Payment processed', entity: batchId, type: 'Payment', amount: total, from: 'Scheduled', to: 'Paid' })
       return batchId
     },
 
@@ -231,6 +241,7 @@ function storeFor(mode: FinanceMode): Store {
         subvendorRows: state.subvendorRows.map((r) => (r.ref === ref ? { ...r, stage: 'paid' } : r)),
         apLedger: [...state.apLedger, post(type, row.ref, -row.payable)],
       })
+      logAudit(mode, { user: 'Priya Nair', action: type, entity: row.ref, type: 'Payment', amount: row.payable, from: 'Open', to: 'Paid' })
     },
 
     releaseRetention: (vendor) => {
@@ -241,6 +252,7 @@ function storeFor(mode: FinanceMode): Store {
         retention: state.retention.map((r) => (r.vendor === vendor ? { ...r, released: r.released + amount, retained: 0 } : r)),
         apLedger: [...state.apLedger, post('Retention released', vendor, -amount)],
       })
+      logAudit(mode, { user: 'Priya Nair', action: 'Retention released', entity: vendor, type: 'Retention', amount, from: 'Retained', to: 'Released' })
     },
 
     forfeitRetention: (vendor) => {
@@ -253,6 +265,7 @@ function storeFor(mode: FinanceMode): Store {
         apLedger: [...state.apLedger, post('Debit note (retention forfeited)', dnId, -amount)],
         dnNext: state.dnNext + 1,
       })
+      logAudit(mode, { user: 'Finance Head', action: 'Debit note issued (forfeiture)', entity: dnId, type: 'Debit Note', amount, from: 'Retained', to: 'Forfeited' })
     },
   }
 

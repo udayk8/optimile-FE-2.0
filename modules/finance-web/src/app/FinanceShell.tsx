@@ -5,6 +5,8 @@ import { MODES, NAV, PAGES, modeIds, type FinanceMode } from '@finance/modules/f
 import { DisputesProvider } from '@finance/lib/disputesStore'
 import { ReceivablesProvider } from '@finance/lib/receivablesStore'
 import { PayablesProvider } from '@finance/lib/payablesStore'
+import { AuditProvider } from '@finance/lib/auditStore'
+import { MonthCloseProvider } from '@finance/lib/monthCloseStore'
 
 // Standalone finance chrome — sidebar with mode switcher + grouped tab nav.
 // This component is now mounted ONLY in standalone (no embedded host); the
@@ -29,6 +31,8 @@ export default function FinanceShell() {
     <DisputesProvider mode={mode}>
     <ReceivablesProvider mode={mode}>
     <PayablesProvider mode={mode}>
+    <AuditProvider mode={mode}>
+    <MonthCloseProvider mode={mode}>
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
       {/* SIDEBAR */}
       <aside className="flex w-64 flex-shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-300">
@@ -116,6 +120,8 @@ export default function FinanceShell() {
 
       {toastMsg && <Toast msg={toastMsg} onClose={() => setToastMsg(null)} />}
     </div>
+    </MonthCloseProvider>
+    </AuditProvider>
     </PayablesProvider>
     </ReceivablesProvider>
     </DisputesProvider>
