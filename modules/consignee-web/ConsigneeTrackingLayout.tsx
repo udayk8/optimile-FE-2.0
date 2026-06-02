@@ -9,8 +9,8 @@ import {
     Ruler, LockOpen, PackageX, Timer, FileCheck, CircleCheck,
     StickyNote, GitBranch, Ban, ThumbsUp, ChevronRight, Maximize2, Minimize2, X, FileText
 } from "lucide-react"
-import { DriverVehicleModal, type DriverDetail, type VehicleDetail } from "./modals/DriverVehicleModal"
-import { PodUploadModal } from "./modals/PodUpload"
+import { DriverVehicleModal, type DriverDetail, type VehicleDetail } from "./DriverVehicleModal"
+import { PodUploadModal } from "./PodUpload"
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ""
 
@@ -1300,7 +1300,7 @@ function InvoicePreviewModal({
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function ConsigneeTrackingPage() {
+export default function ConsigneeTrackingLayout() {
     const [selectedPodName, setSelectedPodName] = useState("")
     const [podCompleted, setPodCompleted] = useState(false)
     const [showPodSuccess, setShowPodSuccess] = useState(false)
