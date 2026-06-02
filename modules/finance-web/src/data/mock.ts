@@ -11,13 +11,28 @@ export const CLIENTS = [
   { id: "C4", name: "Dabur India", limit: 2500000, used: 900000, status: "healthy" },
 ];
 
-/* ---------- Trips pending POD ---------- */
+/* ---------- Trips / drops awaiting POD → invoice ----------
+   Each row is one DROP (= one POD). Drops are grouped under a bookingId; a booking
+   can have several drops. `podStage` seeds the live pipeline ('pending' until POD
+   uploaded on the Pending POD page; 'uploaded' rows are billable on Generate Invoice). */
 export const TRIPS = [
-  { id: "TR-4471", client: "Britannia Industries", lane: "Mumbai → Delhi", truck: "32ft MXL", delivered: "2026-05-18", podStatus: "pending", daysPending: 3, revenue: 145000, vendor: "Sharma Transport", driver: "R. Yadav" },
-  { id: "TR-4468", client: "Asian Paints Ltd", lane: "Chennai → Bengaluru", truck: "20ft", delivered: "2026-05-19", podStatus: "pending", daysPending: 2, revenue: 38000, vendor: "(market hire)", vehicle: "TN-09-CD-4521", driver: "S. Kumar" },
-  { id: "TR-4465", client: "Marico Limited", lane: "Pune → Hyderabad", truck: "32ft SXL", delivered: "2026-05-20", podStatus: "pending", daysPending: 1, revenue: 92000, vendor: "Royal Carriers", driver: "M. Singh" },
-  { id: "TR-4460", client: "Dabur India", lane: "Delhi → Jaipur", truck: "14ft", delivered: "2026-05-17", podStatus: "pending", daysPending: 4, revenue: 24500, vendor: "(market hire)", vehicle: "RJ-14-GH-8890", driver: "A. Khan" },
-  { id: "TR-4455", client: "Asian Paints Ltd", lane: "Mumbai → Nagpur", truck: "32ft MXL", delivered: "2026-05-19", podStatus: "pending", daysPending: 2, revenue: 67000, vendor: "Sharma Transport", driver: "P. Patil" },
+  // BKG-7741 · Britannia — 2 drops (both POD uploaded)
+  { id: "TR-4471", bookingId: "BKG-7741", client: "Britannia Industries", consignee: "Britannia DC, Delhi", lane: "Mumbai → Delhi", truck: "32ft MXL", delivered: "2026-05-18", podStatus: "pending", podStage: "uploaded", daysPending: 3, revenue: 145000, expense: 118000, vendor: "Sharma Transport", driver: "R. Yadav" },
+  { id: "TR-4471B", bookingId: "BKG-7741", client: "Britannia Industries", consignee: "Britannia DC, Jaipur", lane: "Mumbai → Jaipur", truck: "32ft MXL", delivered: "2026-05-18", podStatus: "pending", podStage: "uploaded", daysPending: 3, revenue: 86000, expense: 69000, vendor: "Sharma Transport", driver: "R. Yadav" },
+  // BKG-7745 · Asian Paints — 2 drops (both POD uploaded)
+  { id: "TR-4468", bookingId: "BKG-7745", client: "Asian Paints Ltd", consignee: "Asian Paints, Bengaluru", lane: "Chennai → Bengaluru", truck: "20ft", delivered: "2026-05-19", podStatus: "pending", podStage: "uploaded", daysPending: 2, revenue: 38000, expense: 31500, vendor: "(market hire)", vehicle: "TN-09-CD-4521", driver: "S. Kumar" },
+  { id: "TR-4468B", bookingId: "BKG-7745", client: "Asian Paints Ltd", consignee: "Asian Paints, Mysuru", lane: "Chennai → Mysuru", truck: "20ft", delivered: "2026-05-19", podStatus: "pending", podStage: "uploaded", daysPending: 2, revenue: 22000, expense: 18000, vendor: "(market hire)", vehicle: "TN-09-CD-4521", driver: "S. Kumar" },
+  // BKG-7752 · Asian Paints — 1 drop (POD uploaded) — second booking for the same customer
+  { id: "TR-4455", bookingId: "BKG-7752", client: "Asian Paints Ltd", consignee: "Asian Paints, Nagpur", lane: "Mumbai → Nagpur", truck: "32ft MXL", delivered: "2026-05-19", podStatus: "pending", podStage: "uploaded", daysPending: 2, revenue: 67000, expense: 52000, vendor: "Sharma Transport", driver: "P. Patil" },
+  // BKG-7760 · Ultratech Cement — 2 drops (POD uploaded)
+  { id: "TR-4480", bookingId: "BKG-7760", client: "Ultratech Cement", consignee: "Ultratech, Mumbai", lane: "Ahmedabad → Mumbai", truck: "32ft MXL", delivered: "2026-05-20", podStatus: "pending", podStage: "uploaded", daysPending: 1, revenue: 128000, expense: 104000, vendor: "Royal Carriers", driver: "V. Rao" },
+  { id: "TR-4480B", bookingId: "BKG-7760", client: "Ultratech Cement", consignee: "Ultratech, Pune", lane: "Ahmedabad → Pune", truck: "32ft MXL", delivered: "2026-05-20", podStatus: "pending", podStage: "uploaded", daysPending: 1, revenue: 96000, expense: 78000, vendor: "Royal Carriers", driver: "V. Rao" },
+  // BKG-7762 · Ultratech Cement — 1 drop (POD uploaded) — second booking
+  { id: "TR-4482", bookingId: "BKG-7762", client: "Ultratech Cement", consignee: "Ultratech, Mumbai", lane: "Surat → Mumbai", truck: "20ft", delivered: "2026-05-19", podStatus: "pending", podStage: "uploaded", daysPending: 2, revenue: 54000, expense: 44000, vendor: "(market hire)", vehicle: "GJ-05-AB-7788", driver: "I. Shaikh" },
+  // BKG-7748 · Marico — 1 drop (POD still pending → only on Pending POD page)
+  { id: "TR-4465", bookingId: "BKG-7748", client: "Marico Limited", consignee: "Marico, Hyderabad", lane: "Pune → Hyderabad", truck: "32ft SXL", delivered: "2026-05-20", podStatus: "pending", podStage: "pending", daysPending: 1, revenue: 92000, expense: 74000, vendor: "Royal Carriers", driver: "M. Singh" },
+  // BKG-7750 · Dabur — 1 drop (POD still pending)
+  { id: "TR-4460", bookingId: "BKG-7750", client: "Dabur India", consignee: "Dabur, Jaipur", lane: "Delhi → Jaipur", truck: "14ft", delivered: "2026-05-17", podStatus: "pending", podStage: "pending", daysPending: 4, revenue: 24500, expense: 19000, vendor: "(market hire)", vehicle: "RJ-14-GH-8890", driver: "A. Khan" },
 ];
 
 /* ---------- Daily POD → invoice funnel (BRD 3.2) ---------- */

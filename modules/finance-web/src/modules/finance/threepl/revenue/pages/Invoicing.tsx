@@ -1,12 +1,12 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ReceiptIndianRupee, ArrowLeft, Plus, Send, Check, AlertTriangle,
-  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X,
+  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
-import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO } from "@finance/data/mock";
-import { useReceivables, type ARInvoice } from "@finance/lib/receivablesStore";
+import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor } from "@finance/data/mock";
+import { useReceivables, type ARInvoice, type ARTrip } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -181,6 +181,21 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         </Card>
       </div>
 
+      {/* Consolidated booking drops — BRD: a booking with multiple drops = multiple PODs */}
+      {inv.drops && inv.drops.length > 1 && (
+        <Card className="mt-6 p-5">
+          <div className="mb-3 flex items-center gap-2 font-semibold text-slate-800"><Package size={16} className="text-slate-400" />Drops / PODs on this invoice ({inv.drops.length})</div>
+          <div className="space-y-2">
+            {inv.drops.map((d, i) => (
+              <div key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <span className="text-slate-600"><span className="font-mono text-xs text-slate-500">{d.trip}</span> · {d.lane}</span>
+                <Money value={d.amount} className="font-semibold text-slate-800" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {/* Stage-driven actions */}
       <Card className="mt-6 p-5">
         {editable && (
@@ -231,69 +246,207 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
   );
 }
 
-export default function Invoicing({ toast }: any) {
-  const { invoices } = useReceivables();
-  const [openId, setOpenId] = useState<string | null>(null);
+/* Drop POD-stage chips (only uploaded/validated drops are billable here). */
+const POD_STAGE: Record<string, { label: string; tone: any }> = {
+  uploaded: { label: "POD uploaded", tone: "blue" },
+  validated: { label: "POD validated", tone: "green" },
+};
 
-  const working = useMemo(() => invoices.filter((i) => i.stage !== "approved"), [invoices]);
-  const counts = useMemo(() => ({
-    draft: invoices.filter((i) => i.stage === "draft" || i.stage === "correction").length,
-    submitted: invoices.filter((i) => i.stage === "submitted").length,
-    flagged: invoices.filter((i) => i.flagged && i.stage !== "approved").length,
-  }), [invoices]);
+interface BookingGroup { bookingId: string; customer: string; truck: string; drops: ARTrip[]; freight: number; expense: number }
+interface CustomerSummary { customer: string; bookings: BookingGroup[]; drops: number; freight: number; expense: number }
+
+/* Group billable drops (POD uploaded) into bookings, then by customer — KPIs from the booking module. */
+function buildCustomers(trips: ARTrip[]): CustomerSummary[] {
+  const eligible = trips.filter((t) => t.podStage === "uploaded" || t.podStage === "validated");
+  const byBooking = new Map<string, BookingGroup>();
+  eligible.forEach((t) => {
+    const bid = t.bookingId ?? t.id;
+    const g = byBooking.get(bid) ?? { bookingId: bid, customer: t.client, truck: t.truck, drops: [], freight: 0, expense: 0 };
+    g.drops.push(t);
+    g.freight += contractRateFor(t.lane, t.truck, t.client).base;
+    g.expense += t.expense ?? 0;
+    byBooking.set(bid, g);
+  });
+  const byCust = new Map<string, CustomerSummary>();
+  [...byBooking.values()].forEach((g) => {
+    const c = byCust.get(g.customer) ?? { customer: g.customer, bookings: [], drops: 0, freight: 0, expense: 0 };
+    c.bookings.push(g); c.drops += g.drops.length; c.freight += g.freight; c.expense += g.expense;
+    byCust.set(g.customer, c);
+  });
+  return [...byCust.values()].sort((a, b) => b.freight - a.freight);
+}
+
+/* The three booking-module KPIs the user asked for. */
+function Kpis({ freight, bookings, drops, expense }: { freight: number; bookings: number; drops: number; expense: number }) {
+  return (
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <Card className="p-5">
+        <div className="text-xs font-medium text-slate-500">Freight rate</div>
+        <Money value={freight} className="mt-1 block text-2xl font-bold text-slate-900" />
+        <div className="mt-0.5 text-xs text-emerald-600">Margin <Money value={freight - expense} /></div>
+      </Card>
+      <Card className="p-5">
+        <div className="text-xs font-medium text-slate-500">Booking details</div>
+        <div className="mt-1 text-2xl font-bold text-slate-900">{bookings}<span className="text-sm font-normal text-slate-400"> booking{bookings === 1 ? "" : "s"}</span></div>
+        <div className="mt-0.5 text-xs text-slate-400">{drops} drop{drops === 1 ? "" : "s"} (PODs)</div>
+      </Card>
+      <Card className="p-5">
+        <div className="text-xs font-medium text-slate-500">Expenses</div>
+        <Money value={expense} className="mt-1 block text-2xl font-bold text-slate-700" />
+        <div className="mt-0.5 text-xs text-slate-400">cost from booking module</div>
+      </Card>
+    </div>
+  );
+}
+
+function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string) => void }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Drafts &amp; in progress</div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
+            {["Invoice", "Customer", "Lane", "Invoiced", "Variance", "Stage", ""].map((h, i) => <th key={i} className="px-5 py-3 font-semibold">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((inv) => (
+            <tr key={inv.id} onClick={() => onOpen(inv.id)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+              <td className="px-5 py-3.5 font-mono text-xs font-medium text-slate-700">{inv.id}</td>
+              <td className="px-5 py-3.5 text-slate-700">{inv.client}</td>
+              <td className="px-5 py-3.5 text-slate-500">{inv.lane}</td>
+              <td className="px-5 py-3.5"><Money value={inv.invoiced} className="font-semibold text-slate-800" /></td>
+              <td className="px-5 py-3.5"><VariancePill inv={inv} /></td>
+              <td className="px-5 py-3.5"><Pill tone={STAGE_TONE[inv.stage]}>{STAGE_LABEL[inv.stage]}</Pill></td>
+              <td className="px-5 py-3.5 text-right">
+                <button onClick={() => onOpen(inv.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                  {inv.stage === "submitted" ? "Review" : "Open"}<ChevronRight size={12} />
+                </button>
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No drafts yet — generate one from a customer's bookings above.</td></tr>}
+        </tbody>
+      </table>
+    </Card>
+  );
+}
+
+export default function Invoicing({ toast }: any) {
+  const { trips, invoices, generateConsolidatedInvoice } = useReceivables();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [cust, setCust] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const open = openId ? invoices.find((i) => i.id === openId) : null;
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
 
+  const customers = buildCustomers(trips);
+  const working = invoices.filter((i) => i.stage !== "approved");
+  const c = cust ? customers.find((x) => x.customer === cust) : null;
+
+  // ---------- Customer drill: all bookings for one customer + KPIs + bill ----------
+  if (c) {
+    const toggle = (bid: string) => setSelected((s) => { const n = new Set(s); n.has(bid) ? n.delete(bid) : n.add(bid); return n; });
+    const genBooking = (g: BookingGroup) => {
+      const id = generateConsolidatedInvoice(g.drops.map((d) => d.id));
+      if (id) toast(`Draft ${id} generated for ${g.bookingId} (${g.drops.length} drop${g.drops.length > 1 ? "s" : ""})`);
+      setSelected((s) => { const n = new Set(s); n.delete(g.bookingId); return n; });
+    };
+    const genSelected = () => {
+      const chosen = c.bookings.filter((b) => selected.has(b.bookingId));
+      const ids = chosen.flatMap((b) => b.drops.map((d) => d.id));
+      const id = generateConsolidatedInvoice(ids);
+      if (id) toast(`One invoice ${id} for ${c.customer} across ${chosen.length} booking${chosen.length > 1 ? "s" : ""}`);
+      setSelected(new Set());
+    };
+    const custDrafts = working.filter((i) => i.client === c.customer);
+
+    return (
+      <div>
+        <button onClick={() => { setCust(null); setSelected(new Set()); }} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
+          <ArrowLeft size={15} />Back to customers
+        </button>
+        <SectionTitle sub="All booked freight with POD uploaded, ready to bill. Generate one invoice per booking, or select several and raise a single consolidated invoice.">{c.customer}</SectionTitle>
+
+        <Kpis freight={c.freight} bookings={c.bookings.length} drops={c.drops} expense={c.expense} />
+
+        {selected.size > 0 && (
+          <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 p-4 ring-1 ring-blue-200">
+            <div className="text-sm text-slate-600">{selected.size} booking{selected.size > 1 ? "s" : ""} selected</div>
+            <Btn onClick={genSelected}><Users size={14} />Generate one invoice for {c.customer}</Btn>
+          </Card>
+        )}
+
+        <div className="space-y-4">
+          {c.bookings.map((g) => (
+            <Card key={g.bookingId} className="p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <label className="flex items-center gap-3">
+                  <input type="checkbox" checked={selected.has(g.bookingId)} onChange={() => toggle(g.bookingId)} className="h-4 w-4 rounded border-slate-300" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Package size={14} className="text-slate-400" />
+                      <span className="font-mono text-sm font-semibold text-slate-800">{g.bookingId}</span>
+                      <Pill tone="slate">{g.drops.length} drop{g.drops.length > 1 ? "s" : ""}</Pill>
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-400">{g.truck} · freight <Money value={g.freight} /></div>
+                  </div>
+                </label>
+                <Btn onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
+              </div>
+              <div className="mt-3 space-y-1.5">
+                {g.drops.map((d) => (
+                  <div key={d.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <span className="text-slate-600"><span className="font-mono text-xs text-slate-500">{d.id}</span> · {d.lane}{d.consignee && <span className="text-slate-400"> → {d.consignee}</span>}</span>
+                    <span className="flex items-center gap-2">
+                      <Pill tone={POD_STAGE[d.podStage]?.tone ?? "blue"}>{POD_STAGE[d.podStage]?.label ?? "POD uploaded"}</Pill>
+                      <Money value={contractRateFor(d.lane, d.truck, d.client).base} className="font-semibold text-slate-800" />
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ))}
+          {c.bookings.length === 0 && <Card className="p-12 text-center text-slate-400">All bookings for {c.customer} have been invoiced.</Card>}
+        </div>
+
+        <div className="mt-6"><DraftsTable rows={custDrafts} onOpen={setOpenId} /></div>
+      </div>
+    );
+  }
+
+  // ---------- Customers list (default) ----------
   return (
     <div>
-      <SectionTitle sub="Drafts generated from validated PODs. Add accessorials, submit to the client, and approve to post to the AR ledger.">POD → Invoice</SectionTitle>
+      <SectionTitle sub="Customer-wise invoicing — pick a customer to see all their booked freight (POD uploaded) and bill it. Freight rate, bookings and expenses come from the booking module.">Generate Invoice</SectionTitle>
 
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        {[
-          { l: "Draft / correction", v: counts.draft, tone: "text-slate-800" },
-          { l: "Awaiting client", v: counts.submitted, tone: "text-blue-600" },
-          { l: "Flagged (variance)", v: counts.flagged, tone: "text-red-600" },
-        ].map((s) => (
-          <Card key={s.l} className="p-4">
-            <div className="text-xs text-slate-500">{s.l}</div>
-            <div className={`mt-1 text-2xl font-bold ${s.tone}`}>{s.v}</div>
-          </Card>
-        ))}
-      </div>
+      {customers.length === 0 ? (
+        <Card className="p-12 text-center text-slate-400">
+          <ReceiptIndianRupee size={28} className="mx-auto mb-2 text-slate-300" />
+          No bookings with uploaded PODs yet. Upload a POD on the Pending POD page and the customer appears here.
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {customers.map((cs) => (
+            <Card key={cs.customer} className="overflow-hidden transition hover:ring-slate-300">
+              <button onClick={() => { setCust(cs.customer); setSelected(new Set()); }} className="w-full p-5 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-slate-800">{cs.customer}</div>
+                  <ChevronRight size={16} className="text-slate-400" />
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <div><div className="text-[11px] text-slate-500">Freight rate</div><Money value={cs.freight} className="mt-0.5 block font-bold text-slate-800" /></div>
+                  <div><div className="text-[11px] text-slate-500">Bookings</div><div className="mt-0.5 font-bold text-slate-800">{cs.bookings.length}<span className="text-xs font-normal text-slate-400"> · {cs.drops}d</span></div></div>
+                  <div><div className="text-[11px] text-slate-500">Expenses</div><Money value={cs.expense} className="mt-0.5 block font-bold text-slate-600" /></div>
+                </div>
+              </button>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <Card className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
-              {["Invoice", "Customer", "Lane", "Invoiced", "Variance", "Stage", ""].map((h, i) => <th key={i} className="px-5 py-3 font-semibold">{h}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {working.map((inv) => (
-              <tr key={inv.id} onClick={() => setOpenId(inv.id)} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                <td className="px-5 py-3.5 font-mono text-xs font-medium text-slate-700">{inv.id}</td>
-                <td className="px-5 py-3.5 text-slate-700">{inv.client}</td>
-                <td className="px-5 py-3.5 text-slate-500">{inv.lane}</td>
-                <td className="px-5 py-3.5"><Money value={inv.invoiced} className="font-semibold text-slate-800" /></td>
-                <td className="px-5 py-3.5"><VariancePill inv={inv} /></td>
-                <td className="px-5 py-3.5"><Pill tone={STAGE_TONE[inv.stage]}>{STAGE_LABEL[inv.stage]}</Pill></td>
-                <td className="px-5 py-3.5 text-right">
-                  <button onClick={() => setOpenId(inv.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                    Open<ChevronRight size={12} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {working.length === 0 && (
-              <tr><td colSpan={7} className="px-5 py-12 text-center text-slate-400">
-                <ReceiptIndianRupee size={28} className="mx-auto mb-2 text-slate-300" />
-                No draft invoices. Validate a POD on the Pending POD page to generate one.
-              </td></tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
+      <div className="mt-6"><DraftsTable rows={working} onOpen={setOpenId} /></div>
     </div>
   );
 }

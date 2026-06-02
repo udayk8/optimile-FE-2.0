@@ -97,7 +97,7 @@ export const MODES: Record<FinanceMode, ModeMeta> = {
 const META: Record<string, { label: string; icon: LucideIcon }> = {
   dash: { label: 'Command Centre', icon: LayoutDashboard },
   pod: { label: 'Pending POD', icon: FileWarning },
-  invoicing: { label: 'POD → Invoice', icon: ReceiptIndianRupee },
+  invoicing: { label: 'Generate Invoice', icon: ReceiptIndianRupee },
   ar: { label: 'Debtors', icon: ReceiptText },
   series: { label: 'Invoice Series', icon: ListOrdered },
   disputes: { label: 'Disputes', icon: ScrollText },

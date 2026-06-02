@@ -36,12 +36,15 @@ export interface Accessorial {
 
 export interface ARTrip {
   id: string
+  bookingId?: string
+  consignee?: string
   client: string
   lane: string
   truck: string
   delivered: string
   daysPending: number
   revenue: number
+  expense?: number
   vendor: string
   driver?: string
   vehicle?: string
@@ -69,6 +72,8 @@ export interface ARInvoice {
   status?: 'overdue' | 'due-soon' | 'current'   // Collections display once approved
   daysOverdue?: number
   daysUntil?: number
+  drops?: { trip: string; lane: string; amount: number }[]   // consolidated multi-drop bookings
+  bookingIds?: string[]
 }
 
 export interface LedgerEntry {
@@ -120,7 +125,7 @@ const rollSeries = (s: SeriesRow): SeriesRow => {
 
 /* ---------- per-mode seeds ---------- */
 const seedTrips = (): ARTrip[] =>
-  TRIPS.map((t) => ({ ...t, podStage: 'pending' as PodStage }))
+  TRIPS.map((t) => ({ ...t, podStage: ((t as any).podStage ?? 'pending') as PodStage }))
 
 const seedInvoices = (): ARInvoice[] =>
   INVOICES.map((i) => ({
@@ -161,6 +166,7 @@ interface Store {
   uploadPod: (tripId: string) => void
   validatePod: (tripId: string, ok: boolean, reason?: string) => void
   generateDraftInvoice: (tripId: string) => string | null
+  generateConsolidatedInvoice: (tripIds: string[]) => string | null
   addAccessorial: (invoiceId: string, code: string) => void
   removeAccessorial: (invoiceId: string, index: number) => void
   submitInvoice: (invoiceId: string) => void
@@ -248,6 +254,48 @@ function storeFor(mode: FinanceMode): Store {
         trips: state.trips.map((t) => (t.id === tripId ? { ...t, podStage: 'invoiced' } : t)),
       })
       logAudit(mode, { user: 'Priya Nair', action: 'Invoice generated', entity: id, type: 'Invoice', amount: inv.base, from: 'POD validated', to: 'Draft' })
+      return id
+    },
+
+    // Consolidate several uploaded/validated drops (one customer) into a single draft —
+    // a booking with multiple drops, or a bulk run across a customer's bookings (BRD 4.1).
+    // POD is auto-validated on generation.
+    generateConsolidatedInvoice: (tripIds) => {
+      const drops = state.trips.filter(
+        (t) => tripIds.includes(t.id) && (t.podStage === 'uploaded' || t.podStage === 'validated'),
+      )
+      if (drops.length === 0) return null
+      const client = drops[0].client
+      if (drops.some((d) => d.client !== client)) return null // one invoice = one customer
+      const lines = drops.map((d) => ({ trip: d.id, lane: d.lane, amount: contractRateFor(d.lane, d.truck, d.client).base }))
+      const base = lines.reduce((s, l) => s + l.amount, 0)
+      const terms = contractRateFor(drops[0].lane, drops[0].truck, client).terms
+      const id = allocate('INV-')
+      const inv = recompute({
+        id,
+        tripId: drops[0].id,
+        client,
+        lane: drops.length > 1 ? `${drops[0].lane} +${drops.length - 1} drop${drops.length > 2 ? 's' : ''}` : drops[0].lane,
+        truck: drops[0].truck,
+        date: today(),
+        terms,
+        base,
+        accessorials: [],
+        contracted: base,
+        invoiced: base,
+        amount: base,
+        variancePct: 0,
+        flagged: false,
+        stage: 'draft',
+        drops: lines,
+        bookingIds: [...new Set(drops.map((d) => d.bookingId).filter(Boolean) as string[])],
+      })
+      const dropIds = new Set(drops.map((d) => d.id))
+      set({
+        invoices: [inv, ...state.invoices],
+        trips: state.trips.map((t) => (dropIds.has(t.id) ? { ...t, podStage: 'invoiced' } : t)),
+      })
+      logAudit(mode, { user: 'Priya Nair', action: 'Invoice generated', entity: id, type: 'Invoice', amount: base, from: `${drops.length} POD${drops.length > 1 ? 's' : ''}`, to: 'Draft' })
       return id
     },
 
@@ -341,6 +389,7 @@ export function useReceivables() {
     uploadPod: store.uploadPod,
     validatePod: store.validatePod,
     generateDraftInvoice: store.generateDraftInvoice,
+    generateConsolidatedInvoice: store.generateConsolidatedInvoice,
     addAccessorial: store.addAccessorial,
     removeAccessorial: store.removeAccessorial,
     submitInvoice: store.submitInvoice,
