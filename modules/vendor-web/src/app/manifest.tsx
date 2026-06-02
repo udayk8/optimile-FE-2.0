@@ -1,6 +1,5 @@
 import { Navigate } from 'react-router-dom'
 import {
-  Banknote,
   Briefcase,
   CreditCard,
   FileText,
@@ -30,9 +29,6 @@ import ProfilePage from '@vendor/features/profile/pages/ProfilePage'
 import NotificationsPage from '@vendor/features/notifications/pages/NotificationsPage'
 import LedgerPage from '@vendor/features/finance/pages/LedgerPage'
 import PaymentsPage from '@vendor/features/finance/pages/PaymentsPage'
-import BillDiscountingPage from '@vendor/features/finance/pages/BillDiscountingPage'
-import SelectNBFCPage from '@vendor/features/finance/pages/SelectNBFCPage'
-import DiscountingApplicationPage from '@vendor/features/finance/pages/DiscountingApplicationPage'
 import SupportHubPage from '@vendor/features/support/pages/SupportHubPage'
 import ReportExceptionPage from '@vendor/features/support/pages/ReportExceptionPage'
 import ExceptionTimelinePage from '@vendor/features/support/pages/ExceptionTimelinePage'
@@ -51,7 +47,6 @@ export const vendorManifest: ModuleManifest = {
     { label: 'Bookings', path: '/vendor/bookings', icon: Truck },
     { label: 'Fleet', path: '/vendor/fleet', icon: Ship },
     { label: 'Invoices', path: '/vendor/invoices', icon: CreditCard },
-    { label: 'Bill Discounting', path: '/vendor/receivables', icon: Banknote },
     { label: 'Record Payments', path: '/vendor/record-payments', icon: ReceiptText },
     { label: 'Ledger', path: '/vendor/ledger', icon: Wallet },
     { label: 'Exceptions', path: '/vendor/exceptions', icon: ShieldAlert },
@@ -112,11 +107,6 @@ export const vendorManifest: ModuleManifest = {
     { path: 'payments', element: <Navigate to="/vendor/record-payments" replace /> },
     { path: 'exceptions', element: <SupportHubPage /> },
     { path: 'exceptions/:exceptionId', element: <ExceptionTimelinePage /> },
-    { path: 'receivables', element: <BillDiscountingPage /> },
-    { path: 'nbfc', element: <Navigate to="/vendor/receivables" replace /> },
-    { path: 'nbfc/apply/:invoiceId/select-partner', element: <SelectNBFCPage /> },
-    { path: 'nbfc/apply/:invoiceId/view', element: <DiscountingApplicationPage /> },
-    { path: 'nbfc/apply/:invoiceId/:nbfcId', element: <DiscountingApplicationPage /> },
     { path: 'profile', element: <ProfilePage /> },
     { path: 'profile/company', element: <ProfilePage /> },
     { path: 'profile/bank', element: <ProfilePage /> },

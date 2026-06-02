@@ -317,14 +317,11 @@ const INITIAL_NBFC_APPLICATIONS: NBFCApplication[] = [
 
 const buildInitialPayments = (): PaymentRecord[] =>
   MOCK_LEDGER
-    .filter((entry) => ['CUSTOMER_PAYMENT', 'TDS_DEDUCTION', 'NBFC_DISBURSEMENT', 'NBFC_REPAYMENT', 'NBFC_CHARGE'].includes(entry.entryType))
+    .filter((entry) => ['CUSTOMER_PAYMENT', 'TDS_DEDUCTION'].includes(entry.entryType))
     .map((entry, index) => {
       const invoiceId = entry.invoiceId
       const paymentKind: PaymentKind =
         entry.entryType === 'TDS_DEDUCTION' ? 'TDS_DEDUCTION'
-          : entry.entryType === 'NBFC_DISBURSEMENT' ? 'NBFC_DISBURSEMENT'
-          : entry.entryType === 'NBFC_REPAYMENT' ? 'NBFC_REPAYMENT'
-          : entry.entryType === 'NBFC_CHARGE' ? 'NBFC_CHARGE'
           : 'CUSTOMER_PAYMENT'
       const amount = entry.credit > 0 ? entry.credit : entry.debit
       return {

@@ -5,12 +5,11 @@ import { Button } from '@shared-ui/button'
 import { Input } from '@shared-ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import type { CustomerLedgerEntryType, NbfcLedgerEntryType, PaymentKind } from '@vendor/types'
+import type { CustomerLedgerEntryType, PaymentKind } from '@vendor/types'
 
 const PAGE_SIZE = 8
 
-type Counterparty = 'CUSTOMER' | 'NBFC'
-type LedgerEntryInputType = CustomerLedgerEntryType | NbfcLedgerEntryType
+type LedgerEntryInputType = CustomerLedgerEntryType
 
 const KIND_LABEL: Record<PaymentKind, string> = {
   CUSTOMER_PAYMENT: 'Customer Payment',
@@ -25,18 +24,12 @@ const ENTRY_SIDE_LABEL: Record<LedgerEntryInputType, 'Debit' | 'Credit'> = {
   CUSTOMER_PAYMENT: 'Credit',
   TDS_DEDUCTION: 'Credit',
   CUSTOMER_ADJUSTMENT: 'Credit',
-  NBFC_FINANCING_APPROVED: 'Debit',
-  NBFC_DISBURSEMENT: 'Credit',
-  NBFC_CHARGE: 'Credit',
-  NBFC_REPAYMENT: 'Debit',
-  NBFC_ADJUSTMENT: 'Debit',
 }
 
 
-function getPendingAmount(invoiceId: string, ledger: { invoiceId: string; ledgerType: 'CUSTOMER' | 'NBFC'; runningBalance: number; date: string }[], counterparty: Counterparty) {
-  const ledgerType = counterparty === 'CUSTOMER' ? 'CUSTOMER' : 'NBFC'
+function getPendingAmount(invoiceId: string, ledger: { invoiceId: string; ledgerType: 'CUSTOMER' | 'NBFC'; runningBalance: number; date: string }[]) {
   const entries = ledger
-    .filter((e) => e.invoiceId === invoiceId && e.ledgerType === ledgerType)
+    .filter((e) => e.invoiceId === invoiceId && e.ledgerType === 'CUSTOMER')
     .sort((a, b) => a.date.localeCompare(b.date))
   if (entries.length === 0) return 0
   return entries[entries.length - 1].runningBalance
@@ -48,13 +41,11 @@ export default function PaymentsPage() {
     payments,
     ledger,
     postCustomerLedgerEntry,
-    postNbfcLedgerEntry,
   } = useAppStore()
 
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
-  const [counterparty, setCounterparty] = useState<Counterparty>('CUSTOMER')
   const [entryType, setEntryType] = useState<LedgerEntryInputType>('CUSTOMER_PAYMENT')
   const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10))
@@ -73,11 +64,10 @@ export default function PaymentsPage() {
   const pagedRows = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const enteredAmount = Number(amount) || 0
-  const pendingAmount = selectedInvoiceId ? getPendingAmount(selectedInvoiceId, ledger, counterparty) : 0
+  const pendingAmount = selectedInvoiceId ? getPendingAmount(selectedInvoiceId, ledger) : 0
 
   const openModal = () => {
     setSelectedInvoiceId('')
-    setCounterparty('CUSTOMER')
     setEntryType('CUSTOMER_PAYMENT')
     setAmount('')
     setPaymentDate(new Date().toISOString().slice(0, 10))
@@ -98,25 +88,14 @@ export default function PaymentsPage() {
       return
     }
 
-    if (counterparty === 'CUSTOMER') {
-      postCustomerLedgerEntry({
-        invoiceId: selectedInvoiceId,
-        entryType: entryType as CustomerLedgerEntryType,
-        amount: enteredAmount,
-        date: paymentDate,
-        description: description.trim(),
-        mode: 'BANK',
-      })
-    } else {
-      postNbfcLedgerEntry({
-        invoiceId: selectedInvoiceId,
-        entryType: entryType as NbfcLedgerEntryType,
-        amount: enteredAmount,
-        date: paymentDate,
-        description: description.trim(),
-        mode: 'BANK',
-      })
-    }
+    postCustomerLedgerEntry({
+      invoiceId: selectedInvoiceId,
+      entryType,
+      amount: enteredAmount,
+      date: paymentDate,
+      description: description.trim(),
+      mode: 'BANK',
+    })
 
     setOpen(false)
   }
@@ -194,40 +173,14 @@ export default function PaymentsPage() {
             </label>
 
             <label className="block text-sm font-medium text-text">
-              Party
-              <select
-                value={counterparty}
-                onChange={(e) => {
-                  const value = e.target.value as Counterparty
-                  setCounterparty(value)
-                  setEntryType(value === 'CUSTOMER' ? 'CUSTOMER_PAYMENT' : 'NBFC_DISBURSEMENT')
-                }}
-                className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
-              >
-                <option value="CUSTOMER">Customer</option>
-                <option value="NBFC">NBFC</option>
-              </select>
-            </label>
-
-            <label className="block text-sm font-medium text-text">
               Transaction Type
               <select
                 value={entryType}
                 onChange={(e) => setEntryType(e.target.value as LedgerEntryInputType)}
                 className="mt-1 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
               >
-                {counterparty === 'CUSTOMER' ? (
-                  <>
-                    <option value="CUSTOMER_PAYMENT">Customer Payment</option>
-                    <option value="TDS_DEDUCTION">TDS Deduction</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="NBFC_DISBURSEMENT">NBFC Advance</option>
-                    <option value="NBFC_CHARGE">NBFC Charges</option>
-                    <option value="NBFC_REPAYMENT">Repaid to NBFC</option>
-                  </>
-                )}
+                <option value="CUSTOMER_PAYMENT">Customer Payment</option>
+                <option value="TDS_DEDUCTION">TDS Deduction</option>
               </select>
               <div className="mt-1 text-xs text-gray-500">
                 Posting side: <span className="font-semibold text-text">{ENTRY_SIDE_LABEL[entryType]}</span>

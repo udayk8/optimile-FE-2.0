@@ -30,7 +30,7 @@ export default function LedgerPage() {
   const [toDate, setToDate] = useState('2026-05-31')
   const [invoiceFilter, setInvoiceFilter] = useState('ALL')
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState<LedgerTab>('CUSTOMER')
+  const activeTab: LedgerTab = 'CUSTOMER'
   const [page, setPage] = useState(1)
   const { ledger } = useAppStore()
 
@@ -66,7 +66,6 @@ export default function LedgerPage() {
     }
 
     let customerPending = 0
-    let nbfcPending = 0
     let customerSettledInvoices = 0
     let customerCollected = 0
     let tdsDeducted = 0
@@ -76,9 +75,6 @@ export default function LedgerPage() {
         customerPending += Math.max(0, entry.runningBalance)
         if (entry.runningBalance === 0) customerSettledInvoices += 1
       }
-      if (entry.ledgerType === 'NBFC') {
-        nbfcPending += Math.max(0, entry.runningBalance)
-      }
     }
 
     for (const entry of dateFilteredEntries) {
@@ -86,7 +82,7 @@ export default function LedgerPage() {
       if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'TDS_DEDUCTION') tdsDeducted += entry.credit
     }
 
-    return { customerPending, nbfcPending, customerSettledInvoices, customerCollected, tdsDeducted }
+    return { customerPending, customerSettledInvoices, customerCollected, tdsDeducted }
   }, [ledger, dateFilteredEntries])
 
   const totalPages = Math.max(1, Math.ceil(tabEntries.length / 10))
@@ -132,7 +128,7 @@ export default function LedgerPage() {
               <HeroCard
                 eyebrow="FINANCE"
                 title="Transaction Ledger"
-                subtitle="Customer ledger tracks receivable (Dr). NBFC ledger tracks loan outstanding (Cr)."
+                subtitle="Customer ledger tracks receivable (Dr) across invoices."
                 icon={<FileSpreadsheet className="h-6 w-6 text-primary" />}
               />
             </div>
@@ -155,16 +151,11 @@ export default function LedgerPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-4">
+        <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-3">
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Customer Pending</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.customerPending.toLocaleString('en-IN')} Dr</div>
             <div className="mt-2 text-xs text-gray-500">Amount customer still owes across invoices.</div>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">NBFC Pending</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.nbfcPending.toLocaleString('en-IN')} Cr</div>
-            <div className="mt-2 text-xs text-gray-500">Amount still payable to NBFC.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">TDS Deducted (Selected Range)</div>
@@ -187,27 +178,12 @@ export default function LedgerPage() {
               <p className="mt-1 text-sm text-gray-500">Clean statement view by ledger type.</p>
             </div>
             <Button onClick={handleExport}>
-              Export {activeTab === 'CUSTOMER' ? 'Customer' : 'NBFC'} Statement
+              Export Customer Statement
               <Download className="ml-2 h-4 w-4" />
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-              <button
-                onClick={() => { setActiveTab('CUSTOMER'); setPage(1) }}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${activeTab === 'CUSTOMER' ? 'bg-white text-primary shadow-sm' : 'text-gray-600'}`}
-              >
-                Customer Ledger
-              </button>
-              <button
-                onClick={() => { setActiveTab('NBFC'); setPage(1) }}
-                className={`rounded-md px-3 py-1.5 text-sm font-semibold ${activeTab === 'NBFC' ? 'bg-white text-primary shadow-sm' : 'text-gray-600'}`}
-              >
-                NBFC Loan Ledger
-              </button>
-            </div>
-
             <select
               value={invoiceFilter}
               onChange={(e) => { setInvoiceFilter(e.target.value); setPage(1) }}
