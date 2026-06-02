@@ -1,5 +1,6 @@
 import { useMemo, useState, type ComponentType } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useCustomerBridge } from '../integration/customer-data-bridge'
 import { ProtectedRoute, useAuth } from '@shared-auth'
 import { Badge } from '@shared-ui/badge'
 import { Button } from '@shared-ui/button'
@@ -450,15 +451,16 @@ function otdClass(value: number) {
   return 'text-danger'
 }
 
-function statusCount(statuses: BookingStatus[]) {
-  return BOOKINGS.filter((booking) => statuses.includes(booking.status)).length
+function statusCount(list: Booking[], statuses: BookingStatus[]) {
+  return list.filter((booking) => statuses.includes(booking.status)).length
 }
 
 export function CustomerDashboardShell({ embedded = false }: { embedded?: boolean } = {}) {
   const { logout, user } = useAuth()
+  const bridge = useCustomerBridge()
   const portalCustomer = useMemo(() => readPortalCustomerIdentity(), [])
-  const displayName = portalCustomer?.customerName ?? user?.name ?? 'Customer Booking Desk'
-  const displayRole = portalCustomer ? 'Customer' : user?.role ?? 'CBD'
+  const displayName = bridge?.customerName ?? portalCustomer?.customerName ?? user?.name ?? 'Customer Booking Desk'
+  const displayRole = bridge || portalCustomer ? 'Customer' : user?.role ?? 'CBD'
   const [searchParams, setSearchParams] = useSearchParams()
   const sectionParam = searchParams.get('section') as CustomerSection | null
   const activeSection: CustomerSection = (['overview', 'bookings', 'create', 'tracking', 'finance', 'reports'] as const).includes(
@@ -478,15 +480,32 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
   const [query, setQuery] = useState('')
   const [statusTab, setStatusTab] = useState('all')
   const [detailTab, setDetailTab] = useState<DetailTab>('freight')
-  const [selectedBookingId, setSelectedBookingId] = useState(BOOKINGS[0]!.id)
+  const [selectedBookingId, setSelectedBookingId] = useState('')
+  const [createForm, setCreateForm] = useState({
+    originAddressId: '',
+    destinationAddressId: '',
+    materialId: '',
+    quantity: '',
+    weight: '',
+    uom: '',
+    vehicleTypeId: '',
+    pickupDate: '',
+    goodsValue: '',
+    specialInstructions: '',
+  })
+  const [createMsg, setCreateMsg] = useState('')
 
-  const selectedBooking = BOOKINGS.find((booking) => booking.id === selectedBookingId) ?? BOOKINGS[0]!
-  const activeExceptions = BOOKINGS.filter((booking) => booking.status === 'IN_TRANSIT_DELAYED' || booking.status === 'IN_TRANSIT_EXCEPTION')
-  const activeBookings = BOOKINGS.filter((booking) => ['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION'].includes(booking.status))
+  // Live customer-scoped bookings from the shared store when embedded; demo data
+  // standalone. The cast is safe — CustomerBookingView matches the Booking shape.
+  const bookings: Booking[] = bridge ? (bridge.bookings as Booking[]) : BOOKINGS
+
+  const selectedBooking = bookings.find((booking) => booking.id === selectedBookingId) ?? bookings[0]
+  const activeExceptions = bookings.filter((booking) => booking.status === 'IN_TRANSIT_DELAYED' || booking.status === 'IN_TRANSIT_EXCEPTION')
+  const activeBookings = bookings.filter((booking) => ['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION'].includes(booking.status))
 
   const filteredBookings = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    return BOOKINGS.filter((booking) => {
+    return bookings.filter((booking) => {
       const matchesSearch =
         !normalizedQuery ||
         `${booking.id} ${booking.salesOrder} ${booking.consignee} ${booking.vehicle} ${booking.origin} ${booking.destination}`
@@ -501,21 +520,49 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
       if (statusTab === 'cancelled') return booking.status === 'CANCELLED'
       return true
     })
-  }, [query, statusTab])
+  }, [bookings, query, statusTab])
 
   const kpis = [
-    { label: 'Total Trips', value: BOOKINGS.length, detail: 'Date range: last 30 days', icon: ClipboardList, tone: 'text-primary' },
-    { label: 'Active Trips', value: statusCount(['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION']), detail: '1 delayed, 1 exception', icon: Truck, tone: 'text-success' },
-    { label: 'Pending POD', value: statusCount(['IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION']), detail: 'Awaiting delivery proof', icon: ClipboardCheck, tone: 'text-warning' },
-    { label: 'Completed', value: statusCount(['DELIVERED']), detail: '1 on-time delivery', icon: CheckCircle2, tone: 'text-success' },
-    { label: 'Delayed', value: statusCount(['IN_TRANSIT_DELAYED']), detail: '+1 vs yesterday', icon: Clock3, tone: 'text-danger' },
-    { label: 'Cancelled', value: statusCount(['CANCELLED']), detail: '0.0% cancellation rate', icon: AlertTriangle, tone: 'text-danger' },
+    { label: 'Total Trips', value: bookings.length, detail: 'Date range: last 30 days', icon: ClipboardList, tone: 'text-primary' },
+    { label: 'Active Trips', value: statusCount(bookings, ['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION']), detail: '1 delayed, 1 exception', icon: Truck, tone: 'text-success' },
+    { label: 'Pending POD', value: statusCount(bookings, ['IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION']), detail: 'Awaiting delivery proof', icon: ClipboardCheck, tone: 'text-warning' },
+    { label: 'Completed', value: statusCount(bookings, ['DELIVERED']), detail: '1 on-time delivery', icon: CheckCircle2, tone: 'text-success' },
+    { label: 'Delayed', value: statusCount(bookings, ['IN_TRANSIT_DELAYED']), detail: '+1 vs yesterday', icon: Clock3, tone: 'text-danger' },
+    { label: 'Cancelled', value: statusCount(bookings, ['CANCELLED']), detail: '0.0% cancellation rate', icon: AlertTriangle, tone: 'text-danger' },
     { label: 'SLA Score', value: '88%', detail: '+4% vs prior period', icon: ShieldCheck, tone: 'text-primary' },
   ]
 
   const handleLogout = () => {
     logout()
     window.location.assign('/login')
+  }
+
+  // Customer creates a booking AS themselves — no customer dropdown. Routes
+  // through the SAME shared store the internal Booking module uses, so it
+  // immediately appears in the internal Booking dashboard for operations.
+  const submitCustomerBooking = () => {
+    if (!bridge) return
+    if (!createForm.originAddressId || !createForm.destinationAddressId || !createForm.materialId || !createForm.quantity || !createForm.weight) {
+      setCreateMsg('Please complete origin, destination, material, quantity and weight.')
+      return
+    }
+    const material = bridge.materials.find((m) => m.id === createForm.materialId)
+    const newId = bridge.createBooking({
+      originAddressId: createForm.originAddressId,
+      destinationAddressId: createForm.destinationAddressId,
+      materialId: createForm.materialId,
+      quantity: Number(createForm.quantity) || 0,
+      weight: Number(createForm.weight) || 0,
+      uom: createForm.uom || material?.uom || 'NOS',
+      vehicleTypeId: createForm.vehicleTypeId || null,
+      pickupDate: createForm.pickupDate || null,
+      goodsValue: createForm.goodsValue ? Number(createForm.goodsValue) : null,
+      specialInstructions: createForm.specialInstructions || null,
+    })
+    setCreateForm({ originAddressId: '', destinationAddressId: '', materialId: '', quantity: '', weight: '', uom: '', vehicleTypeId: '', pickupDate: '', goodsValue: '', specialInstructions: '' })
+    setCreateMsg(`Booking ${newId} created and sent to operations.`)
+    setSelectedBookingId(newId)
+    setActiveSection('bookings')
   }
 
   return (
@@ -656,7 +703,7 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                         <div>
                           <p className="font-extrabold text-text">{activeExceptions.length} active customer-visible exceptions</p>
                           <p className="mt-1 text-sm text-gray-600">
-                            {statusCount(['IN_TRANSIT_DELAYED'])} delayed shipment and {statusCount(['IN_TRANSIT_EXCEPTION'])} operational exception require attention.
+                            {statusCount(bookings, ['IN_TRANSIT_DELAYED'])} delayed shipment and {statusCount(bookings, ['IN_TRANSIT_EXCEPTION'])} operational exception require attention.
                           </p>
                         </div>
                       </div>
@@ -803,12 +850,12 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
 
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {[
-                      ['all', 'All Bookings', BOOKINGS.length],
-                      ['active', 'Active', statusCount(['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION'])],
-                      ['pending', 'Pending', statusCount(['DRAFT', 'PENDING_RATE_APPROVAL', 'PENDING_AUCTION', 'PENDING_ASSIGNMENT', 'READY_FOR_DISPATCH'])],
-                      ['completed', 'Completed', statusCount(['DELIVERED'])],
+                      ['all', 'All Bookings', bookings.length],
+                      ['active', 'Active', statusCount(bookings, ['DISPATCHED', 'IN_TRANSIT', 'IN_TRANSIT_DELAYED', 'IN_TRANSIT_EXCEPTION'])],
+                      ['pending', 'Pending', statusCount(bookings, ['DRAFT', 'PENDING_RATE_APPROVAL', 'PENDING_AUCTION', 'PENDING_ASSIGNMENT', 'READY_FOR_DISPATCH'])],
+                      ['completed', 'Completed', statusCount(bookings, ['DELIVERED'])],
                       ['exceptions', 'Exceptions', activeExceptions.length],
-                      ['cancelled', 'Cancelled', statusCount(['CANCELLED'])],
+                      ['cancelled', 'Cancelled', statusCount(bookings, ['CANCELLED'])],
                     ].map(([key, label, count]) => (
                       <button
                         key={key}
@@ -871,42 +918,123 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                 </section>
               )}
 
-              {activeSection === 'create' && (
+              {activeSection === 'create' && bridge?.renderCreateBooking ? (
+                <section className="space-y-4">
+                  {bridge.renderCreateBooking((id) => { setSelectedBookingId(id); setActiveSection('bookings') })}
+                </section>
+              ) : activeSection === 'create' ? (
                 <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
                   <Card>
                     <CardHeader>
                       <CardTitle>Customer Booking Creation</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-5">
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {[
-                          ['Customer', displayName],
-                          ['Origin', 'Select from Location Master'],
-                          ['Destination', 'Select from Location Master'],
-                          ['Lane', 'Auto-derived from origin and destination'],
-                          ['Commodity Type', 'Select from Commodity Master'],
-                          ['Vehicle Type', 'Select from Vehicle Type Master'],
-                          ['Loading Date/Time', 'Future date-time picker'],
-                          ['Material Quantity & UOM', 'Numeric input with UOM'],
-                          ['Goods Value', 'E-way bill required above Rs 50,000'],
-                          ['Special Instructions', 'Hazmat, fragile, temperature-sensitive'],
-                        ].map(([label, placeholder]) => (
-                          <label key={label} className="space-y-2">
-                            <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>
-                            <input className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" placeholder={placeholder} />
-                          </label>
-                        ))}
-                      </div>
-                      <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
-                        <p className="text-sm font-bold text-text">Post-submission routing</p>
-                        <p className="mt-1 text-sm text-gray-600">
-                          Rate deviation sends the booking to Processing. Approved vendor sourcing moves to Vendor Selection. Own-fleet shipments move to Assigning Vehicle.
-                        </p>
-                      </div>
-                      <div className="flex justify-end gap-3">
-                        <Button variant="outline">Save Draft</Button>
-                        <Button><Send className="h-4 w-4" /> Submit Booking</Button>
-                      </div>
+                      {bridge ? (
+                        <>
+                          {createMsg && (
+                            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">{createMsg}</div>
+                          )}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Customer</span>
+                              <input disabled value={displayName} className="h-11 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600" />
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle Type</span>
+                              <select value={createForm.vehicleTypeId} onChange={(e) => setCreateForm((f) => ({ ...f, vehicleTypeId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
+                                <option value="">Select vehicle type</option>
+                                {bridge.vehicleTypes.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+                              </select>
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Origin</span>
+                              <select value={createForm.originAddressId} onChange={(e) => setCreateForm((f) => ({ ...f, originAddressId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
+                                <option value="">Select origin</option>
+                                {bridge.addresses.filter((a) => a.usage !== 'DESTINATION').map((a) => <option key={a.id} value={a.id}>{a.label} - {a.city}</option>)}
+                              </select>
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Destination</span>
+                              <select value={createForm.destinationAddressId} onChange={(e) => setCreateForm((f) => ({ ...f, destinationAddressId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
+                                <option value="">Select destination</option>
+                                {bridge.addresses.filter((a) => a.usage !== 'ORIGIN').map((a) => <option key={a.id} value={a.id}>{a.label} - {a.city}</option>)}
+                              </select>
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Commodity / Material</span>
+                              <select value={createForm.materialId} onChange={(e) => { const m = bridge.materials.find((x) => x.id === e.target.value); setCreateForm((f) => ({ ...f, materialId: e.target.value, uom: m?.uom ?? f.uom })) }} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
+                                <option value="">Select material</option>
+                                {bridge.materials.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                              </select>
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Loading Date</span>
+                              <input type="date" value={createForm.pickupDate} onChange={(e) => setCreateForm((f) => ({ ...f, pickupDate: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Quantity</span>
+                              <input type="number" min="0" value={createForm.quantity} onChange={(e) => setCreateForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="e.g. 980" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">UOM</span>
+                              <input value={createForm.uom} onChange={(e) => setCreateForm((f) => ({ ...f, uom: e.target.value }))} placeholder="e.g. NOS / bags" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Weight (MTS)</span>
+                              <input type="number" min="0" step="0.001" value={createForm.weight} onChange={(e) => setCreateForm((f) => ({ ...f, weight: e.target.value }))} placeholder="e.g. 24.5" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                            <label className="space-y-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Goods Value (Rs)</span>
+                              <input type="number" min="0" value={createForm.goodsValue} onChange={(e) => setCreateForm((f) => ({ ...f, goodsValue: e.target.value }))} placeholder="E-way bill required above Rs 50,000" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                            <label className="space-y-2 md:col-span-2">
+                              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Special Instructions</span>
+                              <input value={createForm.specialInstructions} onChange={(e) => setCreateForm((f) => ({ ...f, specialInstructions: e.target.value }))} placeholder="Hazmat, fragile, temperature-sensitive" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
+                            </label>
+                          </div>
+                          <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
+                            <p className="text-sm font-bold text-text">Post-submission routing</p>
+                            <p className="mt-1 text-sm text-gray-600">
+                              Your booking is sent to operations for rate approval, then enters the standard shipment lifecycle. Track it under My Trips / Shipments.
+                            </p>
+                          </div>
+                          <div className="flex justify-end gap-3">
+                            <Button onClick={submitCustomerBooking}><Send className="h-4 w-4" /> Submit Booking</Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {[
+                              ['Customer', displayName],
+                              ['Origin', 'Select from Location Master'],
+                              ['Destination', 'Select from Location Master'],
+                              ['Lane', 'Auto-derived from origin and destination'],
+                              ['Commodity Type', 'Select from Commodity Master'],
+                              ['Vehicle Type', 'Select from Vehicle Type Master'],
+                              ['Loading Date/Time', 'Future date-time picker'],
+                              ['Material Quantity & UOM', 'Numeric input with UOM'],
+                              ['Goods Value', 'E-way bill required above Rs 50,000'],
+                              ['Special Instructions', 'Hazmat, fragile, temperature-sensitive'],
+                            ].map(([label, placeholder]) => (
+                              <label key={label} className="space-y-2">
+                                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>
+                                <input className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" placeholder={placeholder} />
+                              </label>
+                            ))}
+                          </div>
+                          <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
+                            <p className="text-sm font-bold text-text">Post-submission routing</p>
+                            <p className="mt-1 text-sm text-gray-600">
+                              Rate deviation sends the booking to Processing. Approved vendor sourcing moves to Vendor Selection. Own-fleet shipments move to Assigning Vehicle.
+                            </p>
+                          </div>
+                          <div className="flex justify-end gap-3">
+                            <Button variant="outline">Save Draft</Button>
+                            <Button><Send className="h-4 w-4" /> Submit Booking</Button>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -924,9 +1052,18 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                     </CardContent>
                   </Card>
                 </section>
+              ) : null}
+
+              {activeSection === 'tracking' && !selectedBooking && (
+                <section className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+                  <Route className="mx-auto h-10 w-10 text-gray-400" />
+                  <p className="mt-3 font-extrabold text-text">No shipments to track yet</p>
+                  <p className="text-sm text-gray-500">Create a booking to see live tracking and ePOD here.</p>
+                  <Button className="mt-4" onClick={() => setActiveSection('create')}><Plus className="h-4 w-4" /> Create Booking</Button>
+                </section>
               )}
 
-              {(activeSection === 'tracking' || activeSection === 'finance' || activeSection === 'reports') && activeSection === 'tracking' && (
+              {activeSection === 'tracking' && selectedBooking && (
                 <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
                   <Card>
                     <CardHeader>
@@ -938,7 +1075,7 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                         onChange={(event) => setSelectedBookingId(event.target.value)}
                         className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
                       >
-                        {BOOKINGS.map((booking) => <option key={booking.id} value={booking.id}>{booking.id} - {booking.consignee}</option>)}
+                        {bookings.map((booking) => <option key={booking.id} value={booking.id}>{booking.id} - {booking.consignee}</option>)}
                       </select>
                       <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                         <div className="flex items-start justify-between gap-3">

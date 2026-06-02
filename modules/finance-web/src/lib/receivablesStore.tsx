@@ -5,6 +5,7 @@ import {
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
 import { logAudit } from '@finance/lib/auditStore'
+import { useFinanceBridge } from '@finance/integration/finance-data-bridge'
 
 /* ============================================================
    Shared receivables store — PER-MODE MODULE SINGLETONS.
@@ -384,6 +385,36 @@ export function useReceivables() {
   const mode = useContext(ReceivablesModeContext)
   const store = storeFor(mode)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const bridge = useFinanceBridge()
+
+  // Embedded in the tenant shell: serve REAL booking/POD/invoice data from the
+  // shared store. Trips + invoices come from the bridge; POD actions and invoice
+  // creation write back to the shared store (createTenantInvoice + booking.invoiceId),
+  // so the pages update automatically and bookings can't be invoiced twice.
+  // The series/accessorial/AR-decision helpers stay on the local pipeline (the
+  // advanced AR workflow isn't backed by the shared store yet). Standalone
+  // (bridge === null) keeps the existing mock behaviour unchanged.
+  if (bridge) {
+    return {
+      trips: bridge.trips,
+      invoices: bridge.invoices,
+      series: state.series,
+      arLedger: state.arLedger,
+      uploadPod: bridge.uploadPod,
+      validatePod: bridge.validatePod,
+      generateDraftInvoice: (tripId: string) => bridge.generateInvoice([tripId]),
+      generateConsolidatedInvoice: (tripIds: string[]) => bridge.generateInvoice(tripIds),
+      addAccessorial: store.addAccessorial,
+      removeAccessorial: store.removeAccessorial,
+      submitInvoice: store.submitInvoice,
+      clientDecision: store.clientDecision,
+      allocate: store.allocate,
+      addSeries: store.addSeries,
+      updateSeries: store.updateSeries,
+      resetFinancialYear: store.resetFinancialYear,
+    }
+  }
+
   return {
     ...state,
     uploadPod: store.uploadPod,

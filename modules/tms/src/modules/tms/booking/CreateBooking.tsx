@@ -120,14 +120,29 @@ const initialDraft: BookingDraft = {
 
 const PRICING_WEIGHT_UOM = "MT";
 
-export function CreateBookingPage() {
+export function CreateBookingPage({
+  lockedCustomerId,
+  createdByLabel,
+  onAfterSubmit,
+}: {
+  /** When set (Customer Portal embed), the customer is fixed and the selector is hidden. */
+  lockedCustomerId?: string;
+  /** Actor recorded as the booking creator (defaults to "Tenant Admin"). */
+  createdByLabel?: string;
+  /** Called after a successful create instead of navigating to the internal detail page. */
+  onAfterSubmit?: (bookingId: string) => void;
+} = {}) {
   const navigate = useNavigate();
   const { bookingId } = useParams();
   const { tenant } = useTenantRouteContext();
   const paths = useBookingPaths();
   const access = useTenantAccess();
   const isEditMode = Boolean(bookingId);
-  const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
+  // Customer Portal embeds this page with a fixed (logged-in) customer; such
+  // sessions have no TMS role, so the locked context authorizes creation and
+  // hides the customer selector. Internal flow (no lockedCustomerId) unchanged.
+  const customerLocked = Boolean(lockedCustomerId) || isDirectCustomerTenant(tenant);
+  const canCreateBooking = Boolean(lockedCustomerId) || access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
   const { getBookingById, createBooking, updateBooking } = useTenantBookings(tenant.id);
   const { createAddress } = useTenantCustomers(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
@@ -193,7 +208,15 @@ export function CreateBookingPage() {
   }, [adminSources.customerAddressMap, editingBooking]);
 
   useEffect(() => {
-    if (isEditMode || editingBooking || draft.customerId || !isDirectCustomerTenant(tenant)) {
+    if (isEditMode || editingBooking || draft.customerId) {
+      return;
+    }
+    // Customer Portal: lock to the logged-in customer.
+    if (lockedCustomerId) {
+      setDraft((current) => ({ ...current, customerId: lockedCustomerId }));
+      return;
+    }
+    if (!isDirectCustomerTenant(tenant)) {
       return;
     }
     const selfCustomer =
@@ -210,7 +233,7 @@ export function CreateBookingPage() {
       ...current,
       customerId: selfCustomer.id,
     }));
-  }, [adminSources.customers, draft.customerId, editingBooking, isEditMode, tenant]);
+  }, [adminSources.customers, draft.customerId, editingBooking, isEditMode, tenant, lockedCustomerId]);
 
   const selectedCustomer = draft.customerId ? adminSources.customerMap.get(draft.customerId) ?? null : null;
   const customerMaterials = useMemo(
@@ -693,11 +716,15 @@ export function CreateBookingPage() {
     const audit = buildRemarksAndTimeline(statusOverride);
     const created = createBooking({
       ...payload,
-      createdBy: "Tenant Admin",
+      createdBy: createdByLabel ?? "Tenant Admin",
       assignment: null,
       remarks: audit.remarks,
       statusTimeline: audit.statusTimeline,
     });
+    if (onAfterSubmit) {
+      onAfterSubmit(created.bookingId);
+      return;
+    }
     navigate(paths.booking(created.id));
   }
 
@@ -772,14 +799,18 @@ export function CreateBookingPage() {
           <SectionCard title="Booking Basics">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <Field label="Customer">
-                <Select value={draft.customerId} onChange={(event) => resetForCustomer(event.target.value)}>
-                  <option value="">Select customer</option>
-                  {adminSources.customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </Select>
+                {customerLocked ? (
+                  <Input value={selectedCustomer?.name ?? "—"} disabled />
+                ) : (
+                  <Select value={draft.customerId} onChange={(event) => resetForCustomer(event.target.value)}>
+                    <option value="">Select customer</option>
+                    {adminSources.customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
               </Field>
               <Field label="Booking Commercial Type">
                 <Select

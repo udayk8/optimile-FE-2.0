@@ -2,9 +2,11 @@ import { useMemo } from "react";
 import { financeManifest } from "@finance/app/manifest";
 import { FinancePermissionProvider } from "@finance/app/permission-context";
 import { FinanceEmbeddedModeProvider } from "@finance/app/embedded-mode-context";
+import { FinanceDataBridgeProvider } from "@finance/integration/finance-data-bridge";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { resolveFinanceMode } from "@/modules/tenant-admin/lib/finance-mode";
+import { useFinanceTenantDataBridge } from "@/modules/tenant-admin/integration/finance-bridge-adapter";
 import { ManifestEmbeddedApp } from "@/embedded-module";
 
 // Manifest-driven embed. The mounted route element (FinanceModeRouter) reads
@@ -32,6 +34,11 @@ export function FinanceEmbeddedApp() {
     [tenant.tenantType, tenant.customerPortalEnabled],
   );
 
+  // Bridge: real booking/POD/invoice data from the shared tenant store. The
+  // finance revenue pages (Pending POD, Invoicing, Collections) consume it via
+  // useReceivables; standalone Finance has no provider and keeps its demo data.
+  const financeBridge = useFinanceTenantDataBridge();
+
   return (
     <ManifestEmbeddedApp
       manifest={financeManifest}
@@ -39,7 +46,9 @@ export function FinanceEmbeddedApp() {
       standaloneLabel="Open standalone Finance Portal"
       extraWrapper={(children) => (
         <FinanceEmbeddedModeProvider mode={forcedMode}>
-          <FinancePermissionProvider value={permissions}>{children}</FinancePermissionProvider>
+          <FinancePermissionProvider value={permissions}>
+            <FinanceDataBridgeProvider value={financeBridge}>{children}</FinanceDataBridgeProvider>
+          </FinancePermissionProvider>
         </FinanceEmbeddedModeProvider>
       )}
     />
