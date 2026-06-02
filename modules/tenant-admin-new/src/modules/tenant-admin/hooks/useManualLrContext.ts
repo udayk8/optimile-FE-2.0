@@ -135,7 +135,11 @@ export function useManualLrContext() {
       action,
       currentLevelGovernanceRule,
       managedChildGovernanceRule,
-      isTenantRoot: !assignedLevel,
+      // Tenant root is either no assigned level OR the active place being the
+      // top of the hierarchy (Company Root has no parent). This lets a Company
+      // Root / CEO user generate/consume directly. Region/Branch users (whose
+      // active place has a parent) are unaffected.
+      isTenantRoot: !assignedLevel || Boolean(activeOrgUnit && !activeOrgUnit.parentOrgUnitId),
     });
     const allowedByGovernance = governedByConfig ?? allowedByWorkflow;
     return allowedByGovernance && (allowedByPageAction || hasWorkspaceAccess);

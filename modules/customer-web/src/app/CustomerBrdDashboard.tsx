@@ -1,4 +1,5 @@
 import { useMemo, useState, type ComponentType } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { ProtectedRoute, useAuth } from '@shared-auth'
 import { Badge } from '@shared-ui/badge'
 import { Button } from '@shared-ui/button'
@@ -453,12 +454,27 @@ function statusCount(statuses: BookingStatus[]) {
   return BOOKINGS.filter((booking) => statuses.includes(booking.status)).length
 }
 
-export function CustomerDashboardShell() {
+export function CustomerDashboardShell({ embedded = false }: { embedded?: boolean } = {}) {
   const { logout, user } = useAuth()
   const portalCustomer = useMemo(() => readPortalCustomerIdentity(), [])
   const displayName = portalCustomer?.customerName ?? user?.name ?? 'Customer Booking Desk'
   const displayRole = portalCustomer ? 'Customer' : user?.role ?? 'CBD'
-  const [activeSection, setActiveSection] = useState<CustomerSection>('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const sectionParam = searchParams.get('section') as CustomerSection | null
+  const activeSection: CustomerSection = (['overview', 'bookings', 'create', 'tracking', 'finance', 'reports'] as const).includes(
+    sectionParam as CustomerSection,
+  )
+    ? (sectionParam as CustomerSection)
+    : 'overview'
+  const setActiveSection = (id: CustomerSection) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('section', id)
+        return next
+      },
+      { replace: true },
+    )
   const [query, setQuery] = useState('')
   const [statusTab, setStatusTab] = useState('all')
   const [detailTab, setDetailTab] = useState<DetailTab>('freight')
@@ -505,6 +521,7 @@ export function CustomerDashboardShell() {
   return (
     <div className="optimile-customer-root min-h-screen bg-background text-text">
       <div className="flex min-h-screen">
+        {!embedded && (
         <aside className="hidden w-80 shrink-0 border-r border-gray-200 bg-white lg:flex lg:flex-col">
           <div className="flex items-center gap-3 border-b border-gray-200 px-5 py-5">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-lg font-extrabold text-white">O</div>
@@ -568,6 +585,7 @@ export function CustomerDashboardShell() {
             </div>
           </nav>
         </aside>
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">

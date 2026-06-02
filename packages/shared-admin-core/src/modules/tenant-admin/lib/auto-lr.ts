@@ -1,4 +1,4 @@
-import type { TenantLrRecord } from "@/modules/tms/booking/types";
+import type { TenantLrAllocationRequestRecord, TenantLrRecord } from "@/modules/tms/booking/types";
 import type { OrgUnit } from "@/types/access";
 import type {
   ManualLRChildFormatMode,
@@ -72,6 +72,57 @@ export function buildAutoLrRuntimePreview(params: {
   return {
     formatPreview: buildManualLrPreview(resolvedFormat),
     nextNumber: buildManualLrNumber(resolvedFormat, nextSequence),
+  };
+}
+
+export interface AutoLrPlaceInventory {
+  approvedCount: number;
+  generatedCount: number;
+  availableCount: number;
+  lastGenerated: string | null;
+  nextNumber: string;
+  formatPreview: string;
+  approverOrgUnitId: string | null;
+}
+
+// Count/quota inventory for ONE place, DERIVED (no separate storage):
+//   available = Σ approvedCount of APPROVED requests owned by the place
+//               − number of AUTO LR already generated for the place.
+// Generated AUTO LR records carry orgUnitId (set at generation time).
+export function computeAutoLrPlaceInventory(params: {
+  config: TenantLRConfig;
+  placeId: string | null;
+  orgUnits: OrgUnit[];
+  requests: TenantLrAllocationRequestRecord[];
+  generatedRecords: TenantLrRecord[];
+}): AutoLrPlaceInventory {
+  const { config, placeId, orgUnits, requests, generatedRecords } = params;
+  const approved = requests.filter(
+    (request) => request.status === "APPROVED" && (request.sourceOrgUnitId ?? null) === (placeId ?? null),
+  );
+  const approvedCount = approved.reduce((sum, request) => sum + (request.approvedCount || 0), 0);
+  const placeGenerated = generatedRecords.filter((record) => (record.orgUnitId ?? null) === (placeId ?? null));
+  const generatedCount = placeGenerated.length;
+  const availableCount = Math.max(0, approvedCount - generatedCount);
+  const resolvedFormat = resolveManualLrFormatForOrgUnit(config, placeId, orgUnits);
+  const lastSequence = placeGenerated
+    .map((record) => {
+      const match = record.lrNumber.match(/(\d+)(?!.*\d)/);
+      return match ? Number(match[1]) : 0;
+    })
+    .reduce((max, value) => Math.max(max, value), 0);
+  const sortedNumbers = placeGenerated.map((record) => record.lrNumber).sort();
+  const latestApproved = approved
+    .slice()
+    .sort((left, right) => (left.decidedAt ?? left.updatedAt).localeCompare(right.decidedAt ?? right.updatedAt));
+  return {
+    approvedCount,
+    generatedCount,
+    availableCount,
+    lastGenerated: sortedNumbers.length ? sortedNumbers[sortedNumbers.length - 1] : null,
+    nextNumber: buildManualLrNumber(resolvedFormat, lastSequence + 1),
+    formatPreview: buildManualLrPreview(resolvedFormat),
+    approverOrgUnitId: latestApproved.length ? latestApproved[latestApproved.length - 1].targetOrgUnitId ?? null : null,
   };
 }
 

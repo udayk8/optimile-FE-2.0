@@ -571,6 +571,9 @@ export interface TenantLrRecord {
   status: TenantLrStatus;
   type: TenantLrGenerationType;
   configId?: string | null;
+  // Owning place of the generated LR. Used by Auto LR to derive per-place
+  // generated counts (available = approved − generated). Set at generation time.
+  orgUnitId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

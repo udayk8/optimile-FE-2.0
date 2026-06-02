@@ -232,7 +232,12 @@ interface MockStoreValue {
     transition: BookingStatusTransitionInput,
   ) => BookingRecord;
   listBookingVendorIndents: (tenantId: string) => BookingVendorIndent[];
-  sendBookingVendorIndent: (bookingId: string, actor: string) => BookingVendorIndent[];
+  sendBookingVendorIndent: (
+    bookingId: string,
+    actor: string,
+    lrPlaceId?: string | null,
+    lrPlaceName?: string | null,
+  ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
     action: "ACCEPT" | "REJECT",
@@ -5008,7 +5013,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor) => {
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName) => {
         const booking = tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
@@ -5022,6 +5027,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         );
         if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
         const now = new Date().toISOString();
+        // Vendor assignment always uses Auto LR generated from the booking owner's
+        // place — captured here at send time so the vendor never picks LR.
         const created: BookingVendorIndent[] = eligibleVendors.map((vendor, index) => ({
           id: `indent-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
           tenantId: booking.tenantId,
@@ -5034,6 +5041,9 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           sentAt: now,
           respondedAt: null,
           rejectedReason: null,
+          lrModeForVendorAssignment: "AUTO",
+          lrPlaceId: lrPlaceId ?? null,
+          lrPlaceName: lrPlaceName ?? null,
         }));
         setBookingVendorIndents((current) => [...created, ...current]);
         setTenantBookings((current) =>
@@ -5144,6 +5154,32 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             manualLrPoolPreference:
               input.manualLrPoolPreference ?? existing.manualLrPoolPreference ?? "GENERAL",
           };
+        // Auto LR hard quota: available = Σ approved (APPROVED requests owned by
+        // the place) − already-generated AUTO LR at the place. Block at 0.
+        if (bookingForAssignment.lrType === "AUTO") {
+          const placeId = input.orgUnitId ?? null;
+          const approvedQuota = tenantLrRequests
+            .filter(
+              (request) =>
+                request.tenantId === existing.tenantId &&
+                request.status === "APPROVED" &&
+                request.lrType === "AUTO" &&
+                (request.sourceOrgUnitId ?? null) === placeId,
+            )
+            .reduce((sum, request) => sum + (request.approvedCount || 0), 0);
+          const generatedAtPlace = tenantLrs.filter(
+            (record) =>
+              record.tenantId === existing.tenantId &&
+              record.type === "AUTO" &&
+              (record.orgUnitId ?? null) === placeId,
+          ).length;
+          if (approvedQuota - generatedAtPlace <= 0) {
+            const placeName = orgUnits.find((unit) => unit.id === placeId)?.name ?? "this place";
+            throw new Error(
+              `Auto LR is not available for the booking place: ${placeName}. Please allocate Auto LR quota before assignment.`,
+            );
+          }
+        }
         const lrAssignment = buildTenantLrAssignmentsForBooking({
           tenantId: existing.tenantId,
           booking: bookingForAssignment,
@@ -5154,6 +5190,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           actorUserId: input.actorUserId ?? null,
           selectedConfigId: input.lrConfigId ?? null,
           preferredLrNumber: input.preferredLrNumber ?? null,
+          orgUnits,
           timestamp,
         });
         const nextLrIds = lrAssignment.bookingLrIds;

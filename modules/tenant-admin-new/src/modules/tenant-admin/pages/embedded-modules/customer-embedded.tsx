@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { Button } from "@/shared/components/ui/button";
 import { CustomerDashboardShell } from "@customer/app/CustomerBrdDashboard";
 
-// Renders the customer portal inside the tenant shell. The tenant route already
-// validates the external customer session, so avoid the standalone customer guard.
+// Renders the customer portal inside the tenant shell. We embed the dashboard
+// shell directly (not the standalone guarded app) because access is already
+// authorized by the route-level PermissionGate (moduleCode="CUSTOMER").
 
 export function CustomerEmbeddedApp() {
   return (
@@ -17,7 +18,7 @@ export function CustomerEmbeddedApp() {
           </Link>
         </Button>
       </div>
-      <CustomerDashboardShell />
+      <CustomerDashboardShell embedded />
     </div>
   );
 }

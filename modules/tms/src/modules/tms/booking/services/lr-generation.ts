@@ -8,6 +8,8 @@ import type {
   TenantLrStatus,
 } from "@/modules/tms/booking/types";
 import type { TenantLRConfig } from "@/types/master-data";
+import type { OrgUnit } from "@/types/access";
+import { resolveManualLrFormatForOrgUnit } from "@/modules/tenant-admin/lib/manual-lr";
 
 function isHierarchyManagedConfig(config: TenantLRConfig | null) {
   return Boolean(
@@ -122,6 +124,23 @@ function buildAutoLrNumber(
     .filter((value): value is number => Number.isFinite(value));
   const nextSequence = Math.max(...matchingSequences, 0) + 1 + sequenceOffset;
   return buildFormattedLrNumber(config, nextSequence);
+}
+
+// Auto LR number for a SPECIFIC place: uses the place-resolved format (child
+// prefix/code) and a per-place sequence so each place keeps its own series.
+function buildAutoLrNumberForPlace(
+  format: ReturnType<typeof resolveManualLrFormatForOrgUnit>,
+  placeRecords: TenantLrRecord[],
+  sequenceOffset: number,
+) {
+  const separator = format.numberSeparator ?? "-";
+  const yearToken = getYearToken(format.yearFormat);
+  const basePrefix = [format.prefix.trim().toUpperCase(), yearToken].filter(Boolean).join(separator).trim();
+  const matchingSequences = placeRecords
+    .map((record) => getSequenceMatch(record.lrNumber, basePrefix))
+    .filter((value): value is number => Number.isFinite(value));
+  const nextSequence = Math.max(...matchingSequences, 0) + 1 + sequenceOffset;
+  return buildFormattedLrNumber(format, nextSequence);
 }
 
 function buildGeneratedLrNumber(
@@ -273,6 +292,7 @@ export function buildTenantLrAssignmentsForBooking(input: {
   actorUserId?: string | null;
   selectedConfigId?: string | null;
   preferredLrNumber?: string | null;
+  orgUnits?: OrgUnit[];
   timestamp?: string;
 }) {
   const timestamp = input.timestamp ?? new Date().toISOString();
@@ -323,7 +343,15 @@ export function buildTenantLrAssignmentsForBooking(input: {
       selectedConfig?.lrType === "AUTO" ? null : availablePools[poolIndex++] ?? null;
     const lrNumber = poolRecord?.lrNumber ?? (
       selectedConfig
-        ? buildGeneratedLrNumber(selectedConfig, input.existingRecords, index)
+        ? selectedConfig.lrType === "AUTO" && input.orgUnits
+          ? buildAutoLrNumberForPlace(
+              resolveManualLrFormatForOrgUnit(selectedConfig, input.actorOrgUnitId ?? null, input.orgUnits),
+              input.existingRecords.filter(
+                (record) => record.type === "AUTO" && (record.orgUnitId ?? null) === (input.actorOrgUnitId ?? null),
+              ),
+              index,
+            )
+          : buildGeneratedLrNumber(selectedConfig, input.existingRecords, index)
         : `${buildMockLRNumber([input.booking], "LR")}-${String(index + 1).padStart(2, "0")}`
     );
     const type: TenantLrGenerationType =
@@ -351,6 +379,8 @@ export function buildTenantLrAssignmentsForBooking(input: {
       status: mapBookingStatusToLrStatus(input.booking.status),
       type,
       configId: selectedConfig?.id ?? null,
+      // Tag the owning place so Auto LR can derive per-place generated counts.
+      orgUnitId: input.actorOrgUnitId ?? null,
       createdAt: timestamp,
       updatedAt: timestamp,
     } satisfies TenantLrRecord;

@@ -100,6 +100,9 @@ export function TenantManualLrOperationsPage() {
       ? hierarchyLevels.find((level) => level.id === activeConfig.ownershipLevelId)?.name ?? activeConfig.ownershipLevelId
       : null;
   const orgUnitMap = useMemo(() => new Map(orgUnits.map((item) => [item.id, item])), [orgUnits]);
+  // Company Root = the active place at the top of the hierarchy (no parent).
+  // Company Root holds and consumes its own Manual LR stock directly.
+  const isCompanyRoot = Boolean(activeOrgUnit && !activeOrgUnit.parentOrgUnitId);
   const ownershipOrgUnits = useMemo(
     () =>
       activeConfig?.ownershipLevelId
@@ -1072,6 +1075,11 @@ export function TenantManualLrOperationsPage() {
                   </div>
                 }
               />
+              {isCompanyRoot ? (
+                <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                  <span className="font-medium">Company Root LR Inventory</span> — {activeOrgUnit?.name}. LR is generated and consumed directly at Company Root; no child request/approval is required.
+                </div>
+              ) : null}
               <div className="mt-4 rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <span className="font-medium">Visible LR scope:</span>{" "}
                 {inventoryView === "ACTIVE_PLACE"

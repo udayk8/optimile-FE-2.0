@@ -15,7 +15,7 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
 import { useTenantLrManagementService } from "@/modules/tenant-admin/hooks/useTenantLrManagementService";
 import { useAppStore } from "@/shared/store/useAppStore";
-import { autoLrTabDefinitions, type AutoLrTabKey, buildAutoLrRuntimePreview } from "@/modules/tenant-admin/lib/auto-lr";
+import { autoLrTabDefinitions, type AutoLrTabKey, buildAutoLrRuntimePreview, computeAutoLrPlaceInventory } from "@/modules/tenant-admin/lib/auto-lr";
 import { buildManualLrPreview, resolveManualLrFormatForOrgUnit } from "@/modules/tenant-admin/lib/manual-lr";
 import type { TenantLrAllocationRequestRecord } from "@/modules/tms/booking/types";
 import type { OrgUnit } from "@/types/access";
@@ -84,6 +84,43 @@ export function TenantAutoLrOperationsPage() {
   const activeFormat = autoConfig
     ? resolveManualLrFormatForOrgUnit(autoConfig, activeOrgUnit?.id ?? null, orgUnits)
     : null;
+  // Count/quota inventory across the user's place scope (active place + child
+  // places; all places when at Company Root / no active place).
+  const autoConfigRequests = autoConfig ? store.lrRequests.filter((request) => request.configId === autoConfig.id) : [];
+  const autoScopedPlaceIds = useMemo(() => {
+    if (!activeOrgUnit) return orgUnits.map((unit) => unit.id);
+    const childrenOf = new Map<string, typeof orgUnits>();
+    orgUnits.forEach((unit) => {
+      if (!unit.parentOrgUnitId) return;
+      const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+      list.push(unit);
+      childrenOf.set(unit.parentOrgUnitId, list);
+    });
+    const seen = new Set<string>();
+    const queue = [activeOrgUnit.id];
+    while (queue.length) {
+      const id = queue.shift();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      (childrenOf.get(id) ?? []).forEach((child) => queue.push(child.id));
+    }
+    return Array.from(seen);
+  }, [activeOrgUnit, orgUnits]);
+  const autoInventoryRows = autoConfig
+    ? autoScopedPlaceIds
+        .map((placeId) => ({
+          placeId,
+          placeName: orgUnitMap.get(placeId)?.name ?? placeId,
+          inventory: computeAutoLrPlaceInventory({
+            config: autoConfig,
+            placeId,
+            orgUnits,
+            requests: autoConfigRequests,
+            generatedRecords,
+          }),
+        }))
+        .filter((row) => row.inventory.approvedCount > 0 || row.inventory.generatedCount > 0)
+    : [];
   const canSubmitRequest = Boolean(currentLevel && currentRule?.childCanRequestLr);
   const canApprove = Boolean(childRule?.canApproveChildRequests);
   const canAllocate = Boolean(childRule?.parentCanGenerateLr);
@@ -286,11 +323,47 @@ export function TenantAutoLrOperationsPage() {
       ) : null}
 
       {activeTab === "runtime" ? (
-        <TenantPanel title="Runtime Preview" description="">
+        <TenantPanel title="Runtime Preview & Auto LR Inventory" description="">
           <div className="grid gap-3 lg:grid-cols-3">
             <TenantSummaryCard label="Current Context" value={activeOrgUnit?.name ?? "Tenant / Company Level"} />
             <TenantSummaryCard label="Resolved Pattern" value={runtimePreview?.formatPreview ?? buildManualLrPreview(activeFormat ?? autoConfig)} />
             <TenantSummaryCard label="Next Generated Number" value={runtimePreview?.nextNumber ?? buildManualLrPreview(activeFormat ?? autoConfig)} />
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-2xl border">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  {["Place", "Series / Format", "Approved", "Available", "Generated", "Next LR", "Last Generated", "Approved From", "Status"].map((label) => (
+                    <th key={label} className="px-4 py-3 text-left font-medium text-slate-600">{label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {autoInventoryRows.length ? (
+                  autoInventoryRows.map((row) => (
+                    <tr key={row.placeId}>
+                      <td className="px-4 py-3 font-medium text-slate-800">{row.placeName}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{row.inventory.formatPreview}</td>
+                      <td className="px-4 py-3">{row.inventory.approvedCount}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-900">{row.inventory.availableCount}</td>
+                      <td className="px-4 py-3">{row.inventory.generatedCount}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{row.inventory.nextNumber}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{row.inventory.lastGenerated ?? "—"}</td>
+                      <td className="px-4 py-3">{row.inventory.approverOrgUnitId ? orgUnitMap.get(row.inventory.approverOrgUnitId)?.name ?? "—" : "—"}</td>
+                      <td className="px-4 py-3">
+                        {row.inventory.availableCount > 0 ? "Available" : row.inventory.approvedCount > 0 ? "Exhausted" : "No quota"}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                      No Auto LR quota in this scope yet. Approve an Auto LR request to create available count.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </TenantPanel>
       ) : null}

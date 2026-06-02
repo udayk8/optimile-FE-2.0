@@ -56,6 +56,7 @@ export interface VendorBookingDetail {
 export interface TenantDataBridge {
   // Logged-in identity (from the shared session context).
   tenantId: string
+  tenantName: string | null
   vendorId: string | null
   vendorName: string | null
 

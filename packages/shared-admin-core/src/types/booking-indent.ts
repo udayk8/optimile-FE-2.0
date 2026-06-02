@@ -14,4 +14,10 @@ export interface BookingVendorIndent {
   sentAt: string;
   respondedAt?: string | null;
   rejectedReason?: string | null;
+  // Vendor-indent assignment ALWAYS uses Auto LR, generated from the booking
+  // owner's place (captured when the indent is sent). The vendor never picks
+  // an LR mode or number.
+  lrModeForVendorAssignment?: "AUTO";
+  lrPlaceId?: string | null;
+  lrPlaceName?: string | null;
 }

@@ -205,6 +205,32 @@ export function TenantAutoLRConfigPage() {
         generatedRecords: store.lrs.filter((record) => record.configId === autoConfig.id),
       })
     : null;
+  const CHILD_MODE_LABEL: Record<ManualLRChildFormatMode, string> = {
+    GLOBAL_PARENT_FORMAT: "Uses parent format",
+    PARENT_PREFIX_CHILD_SUFFIX: "Parent prefix + child code",
+    FULL_CHILD_FORMAT: "Independent child format",
+  };
+  // Sets the per-place child code (PARENT_PREFIX_CHILD_SUFFIX) / child prefix
+  // (FULL_CHILD_FORMAT) via the shared placeFormatOverrides the resolver reads.
+  const setPlaceCode = (orgUnitId: string, prefix: string) =>
+    setForm((current) => {
+      const overrides = current.placeFormatOverrides ?? [];
+      const exists = overrides.some((item) => item.orgUnitId === orgUnitId);
+      return {
+        ...current,
+        placeFormatOverrides: exists
+          ? overrides.map((item) => (item.orgUnitId === orgUnitId ? { ...item, prefix } : item))
+          : [...overrides, { orgUnitId, prefix }],
+      };
+    });
+  const previewForOrgUnit = (orgUnitId: string) =>
+    buildManualLrPreview(
+      resolveManualLrFormatForOrgUnit(
+        { ...buildAutoLrConfigInput(autoConfig), ...form, lrType: "AUTO" } as never,
+        orgUnitId,
+        orgUnits,
+      ),
+    );
 
   function saveConfig() {
     const payload = {
@@ -331,6 +357,39 @@ export function TenantAutoLRConfigPage() {
                     </label>
                   ))}
                 </div>
+                {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" || managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? (
+                  <div className="mt-3 rounded-xl border bg-white p-3">
+                    <div className="text-sm font-semibold">
+                      {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? `${childLevelLabel} code per place` : `${childLevelLabel} prefix per place`}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX"
+                        ? "Appended to the parent prefix at runtime (e.g. parent ELAUTO + code SOUTH)."
+                        : "Each place uses its own independent prefix."}
+                    </p>
+                    {ownershipOrgUnits.length ? (
+                      <div className="mt-3 grid gap-2">
+                        {ownershipOrgUnits.map((unit) => {
+                          const override = (form.placeFormatOverrides ?? []).find((item) => item.orgUnitId === unit.id);
+                          return (
+                            <div key={unit.id} className="grid items-center gap-2 md:grid-cols-[1fr_150px_1fr]">
+                              <div className="text-sm text-slate-700">{unit.name}</div>
+                              <Input
+                                value={override?.prefix ?? ""}
+                                placeholder={unit.name.toUpperCase().replace(/[^A-Z0-9]/g, "")}
+                                onChange={(event) => setPlaceCode(unit.id, event.target.value.toUpperCase())}
+                                disabled={!canEdit}
+                              />
+                              <div className="rounded-lg border bg-slate-50 px-2.5 py-1.5 font-mono text-[11px]">{previewForOrgUnit(unit.id)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-xs text-muted-foreground">No child places under the selected scope.</p>
+                    )}
+                  </div>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -366,7 +425,7 @@ export function TenantAutoLRConfigPage() {
           <CompactCard label="Current Assignment Context" value={currentScopeLabel} />
           <CompactCard label="Resolved Auto LR Pattern" value={runtimePreview?.formatPreview ?? buildManualLrPreview(currentFormat)} mono />
           <CompactCard label="Next Generated Number" value={runtimePreview?.nextNumber ?? buildManualLrPreview(currentFormat)} mono />
-          <CompactCard label="Child Sequence Scope" value={ownershipOrgUnits.map((unit) => unit.name).join(", ") || "No child scope selected"} />
+          <CompactCard label="Child Format Mode" value={managedChildRule ? CHILD_MODE_LABEL[managedChildRule.formatMode] : "No child rule configured"} />
         </div>
       </TenantPanel>
     </div>

@@ -10,6 +10,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { useSessionContext } from "@/shared/auth/session-context";
 import { useMockStore } from "@/shared/store/mock-store";
+import { computeAutoLrPlaceInventory } from "@/modules/tenant-admin/lib/auto-lr";
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { resolveManualLrScopedOrgUnits } from "@/shared/lib/manual-lr-scope";
@@ -37,7 +38,7 @@ export function AssignmentQueuePage() {
   const { data: bookings, assignBooking } = useTenantBookings(tenant.id);
   const { data: orgUnits } = useTenantOrgUnits(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
-  const { sendBookingVendorIndent, listBookingVendorIndents } = useMockStore();
+  const { sendBookingVendorIndent, listBookingVendorIndents, listTenantLrs, listTenantLrRequests } = useMockStore();
   const indents = listBookingVendorIndents(tenant.id);
   const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
   const vehicleMap = useMemo(() => buildVehicleLookup(adminSources.vehicles), [adminSources.vehicles]);
@@ -168,6 +169,18 @@ export function AssignmentQueuePage() {
   const activeLrOrgUnit = activeLrOrgUnitId
     ? availableLrOrgUnits.find((orgUnit) => orgUnit.id === activeLrOrgUnitId) ?? null
     : null;
+  // Auto LR derived inventory for the active place (available = approved − generated).
+  const autoLrInventory =
+    selectedAutoLrConfig && activeLrOrgUnitId
+      ? computeAutoLrPlaceInventory({
+          config: selectedAutoLrConfig,
+          placeId: activeLrOrgUnitId,
+          orgUnits,
+          requests: listTenantLrRequests(tenant.id).filter((request) => request.configId === selectedAutoLrConfig.id),
+          generatedRecords: listTenantLrs(tenant.id).filter((record) => record.configId === selectedAutoLrConfig.id),
+        })
+      : null;
+  const autoLrBlocked = selectedLrMode === "AUTO" && (autoLrInventory?.availableCount ?? 0) <= 0;
   const requiresActiveLrScope = availableLrOrgUnits.length > 1 && !activeLrOrgUnitId;
   const availableManualPools = useMemo(() => {
     if (!selectedLrConfig) {
@@ -401,7 +414,14 @@ export function AssignmentQueuePage() {
                 variant="outline"
                 onClick={() => {
                   try {
-                    sendBookingVendorIndent(booking.id, session.actorName || "Dispatcher");
+                    // Vendor assignment is Auto-LR-only, generated from the booking
+                    // owner's (sender's) active place — captured here.
+                    sendBookingVendorIndent(
+                      booking.id,
+                      session.actorName || "Dispatcher",
+                      activeLrOrgUnitId || null,
+                      activeLrOrgUnit?.name ?? null,
+                    );
                   } catch (error) {
                     window.alert((error as Error).message);
                   }
@@ -411,13 +431,15 @@ export function AssignmentQueuePage() {
               </Button>
             ) : null}
             {pendingIndentCount > 0 && !winnerIndent ? (
-              <Badge variant="accent">Indent sent · {pendingIndentCount} notified</Badge>
+              <Badge variant="accent">
+                Indent sent · {pendingIndentCount} notified · Auto LR{bookingIndents[0]?.lrPlaceName ? ` @ ${bookingIndents[0].lrPlaceName}` : ""}
+              </Badge>
             ) : null}
             {winnerIndent ? (
               <Badge variant={hasVehicle ? "success" : "warning"}>
                 {hasVehicle
                   ? `Assigned · ${winnerIndent.vendorName}`
-                  : `Accepted · ${winnerIndent.vendorName} · vehicle pending`}
+                  : `Accepted · ${winnerIndent.vendorName} · vehicle pending · Auto LR${winnerIndent.lrPlaceName ? ` @ ${winnerIndent.lrPlaceName}` : ""}`}
               </Badge>
             ) : null}
             <Button asChild size="sm" variant="ghost">
@@ -451,6 +473,7 @@ export function AssignmentQueuePage() {
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
                   (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  autoLrBlocked ||
                   !activeLrOrgUnitId
                 }
             >
@@ -640,8 +663,17 @@ export function AssignmentQueuePage() {
                 </div>
               </>
             ) : (
-            <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-              Auto LR will be generated during assignment for <span className="font-medium">{activeLrOrgUnit?.name ?? "the active place"}</span>.
+            <div className={`md:col-span-2 rounded-2xl border px-4 py-3 text-sm ${autoLrBlocked ? "border-rose-300 bg-rose-50 text-rose-900" : "border-sky-200 bg-sky-50 text-sky-900"}`}>
+              <div className="flex flex-wrap gap-x-6 gap-y-1">
+                <span><span className="font-medium">Auto LR Available:</span> {autoLrInventory?.availableCount ?? 0}</span>
+                <span><span className="font-medium">Next LR Preview:</span> {autoLrInventory?.nextNumber ?? "—"}</span>
+                {autoLrInventory ? <span className="text-slate-500">Approved {autoLrInventory.approvedCount} · Generated {autoLrInventory.generatedCount}</span> : null}
+              </div>
+              <p className="mt-1">
+                {autoLrBlocked
+                  ? `No Auto LR quota available at ${activeLrOrgUnit?.name ?? "this place"}. Request and approve Auto LR before assigning.`
+                  : `LR will be generated automatically after vehicle assignment for ${activeLrOrgUnit?.name ?? "the active place"}.`}
+              </p>
             </div>
           )}
             {selectedLrMode !== "AUTO" && !selectedLrConfig ? (

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@vendor/components/ui/button'
 import { useFleetData } from '@vendor/integration/useFleetData'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 
 interface AssignVehicleModalProps {
   isOpen: boolean
@@ -13,6 +14,8 @@ interface AssignVehicleModalProps {
 export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleModalProps) {
   const { vehicles, drivers } = useFleetData()
   const { assignVehicle: assignVehicleToTrip } = useVendorBookings()
+  const bridge = useTenantBridge()
+  const lrAuthorityName = bridge?.tenantName || 'the tenant'
   const [selectedVehicle, setSelectedVehicle] = useState<string>('')
   const [selectedDriver, setSelectedDriver] = useState<string>('')
 
@@ -67,6 +70,10 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
+            LR will be generated automatically by {lrAuthorityName} after vehicle assignment.
           </div>
         </div>
 

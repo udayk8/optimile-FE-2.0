@@ -120,12 +120,14 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     listBookingVendorIndents,
     respondBookingVendorIndent,
     assignTenantBooking,
+    getTenantById,
   } = useMockStore();
 
   const isVendorSession = session.loginType === "VENDOR" && Boolean(session.vendorId);
   const tenantId = session.tenantId ?? "";
   const vendorId = session.vendorId ?? null;
   const vendorName = session.vendorName ?? null;
+  const tenantName = (tenantId ? getTenantById(tenantId)?.name : null) ?? null;
 
   // Pull the raw shared collections (re-runs when the store changes).
   const vehicleTypes = isVendorSession ? listTenantVehicleTypes(tenantId) : [];
@@ -258,6 +260,13 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       const vehicle = tenantVehicles.find((v) => v.id === vehicleId);
       const driver = tenantDrivers.find((d) => d.id === driverId);
       if (!booking || !vehicle || !driver) return;
+      // Vendor assignment is ALWAYS Auto LR, generated from the booking owner's
+      // place (captured on the winning indent at send time). The vendor never
+      // chooses an LR mode/number or touches internal LR inventory.
+      const wonIndent = vendorIndents.find(
+        (indent) => indent.bookingId === booking.id && indent.vendorId === vendorId && indent.isWinner,
+      );
+      const lrPlaceId = wonIndent?.lrPlaceId ?? null;
       try {
         assignTenantBooking(booking.id, {
           vendorId,
@@ -269,6 +278,8 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
           vendorFreight: booking.assignment?.vendorFreight ?? booking.pricing?.calculatedFreight ?? 0,
           customerFreight: booking.pricing?.calculatedFreight ?? null,
           actor: vendorName ?? "Vendor",
+          lrType: "AUTO",
+          orgUnitId: lrPlaceId,
         });
       } catch (error) {
         window.alert((error as Error).message);
@@ -325,6 +336,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
 
     return {
       tenantId,
+      tenantName,
       vendorId,
       vendorName,
       vehicles,
@@ -345,6 +357,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
   }, [
     isVendorSession,
     tenantId,
+    tenantName,
     vendorId,
     vendorName,
     tenantVehicles,

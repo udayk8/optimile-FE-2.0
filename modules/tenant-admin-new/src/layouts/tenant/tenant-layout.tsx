@@ -81,16 +81,34 @@ export function TenantLayout() {
           },
         ]
       : portalModule === "CUSTOMER"
-        ? [
-            {
-              label: "Customer Portal",
-              icon: UserCog,
-              to: paths.customerPortal,
-              children: [
-                { label: "Customer Dashboard", to: paths.customerPortal, icon: UserCog },
-              ],
-            },
-          ]
+        ? (() => {
+            // Surface the Customer Dashboard's own sections as expandable
+            // submenu items in the main sidebar (same pattern as Vendor/Booking).
+            // Sections are addressed via ?section= so the embedded dashboard can
+            // deep-link and active-highlight while still sharing one pathname.
+            const customerSection = new URLSearchParams(location.search).get("section") ?? "overview";
+            const sectionItem = (id: string, label: string, icon: typeof UserCog) => ({
+              label,
+              icon,
+              to: id === "overview" ? paths.customerPortal : `${paths.customerPortal}?section=${id}`,
+              isActiveOverride: id === "overview" ? customerSection === "overview" : customerSection === id,
+            });
+            return [
+              {
+                label: "Customer Dashboard",
+                icon: UserCog,
+                to: paths.customerPortal,
+                children: [
+                  sectionItem("overview", "Overview", LayoutDashboard),
+                  sectionItem("bookings", "Bookings", Boxes),
+                  sectionItem("create", "Create Booking", Plus),
+                  sectionItem("tracking", "Track & ePOD", MapPin),
+                  sectionItem("finance", "Finance", Landmark),
+                  sectionItem("reports", "Reports", Building2),
+                ],
+              },
+            ];
+          })()
         : [];
 
   const showGovernanceDashboard = !portalModule && !!activeRole && isTenantAdminRole(activeRole);
@@ -197,8 +215,12 @@ export function TenantLayout() {
         // Optional `to` makes the group header itself navigable — clicking
         // "Auction / AMS" jumps to its dashboard. Children stay visible.
         to?: string;
-        children: Array<{ label: string; featureCode: string; to: string; icon: typeof Truck }>;
+        children: Array<{ label: string; featureCode: string; to: string; icon: typeof Truck; isActiveOverride?: boolean }>;
       };
+
+      // Active Customer Dashboard section (driven by ?section= on the embedded
+      // customer-portal route) so the sidebar submenu highlights correctly.
+      const customerSection = new URLSearchParams(location.search).get("section") ?? "overview";
 
       const portals: ModulePortal[] = [
         {
@@ -276,7 +298,12 @@ export function TenantLayout() {
           icon: UserCog,
           to: paths.customerPortal,
           children: [
-            { label: "Customer Dashboard", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: UserCog },
+            { label: "Overview", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: LayoutDashboard, isActiveOverride: customerSection === "overview" },
+            { label: "Bookings", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=bookings`, icon: Boxes, isActiveOverride: customerSection === "bookings" },
+            { label: "Create Booking", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=create`, icon: Plus, isActiveOverride: customerSection === "create" },
+            { label: "Track & ePOD", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=tracking`, icon: MapPin, isActiveOverride: customerSection === "tracking" },
+            { label: "Finance", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=finance`, icon: Landmark, isActiveOverride: customerSection === "finance" },
+            { label: "Reports", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=reports`, icon: Building2, isActiveOverride: customerSection === "reports" },
           ],
         },
         // Finance is intentionally NOT listed here — it renders as a flat

@@ -1889,7 +1889,12 @@ export function BookingDetailsPage() {
                         variant="outline"
                         onClick={() => {
                           try {
-                            sendBookingVendorIndent(bookingRecord.id, session.actorName || "Dispatcher");
+                            sendBookingVendorIndent(
+                              bookingRecord.id,
+                              session.actorName || "Dispatcher",
+                              session.activeTenantOrgUnitId ?? null,
+                              orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
+                            );
                           } catch (error) {
                             window.alert((error as Error).message);
                           }
