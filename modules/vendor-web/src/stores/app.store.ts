@@ -143,7 +143,9 @@ interface AppState {
 
 // Vendors (by name, case-insensitive) whose portal should appear empty — used
 // to demo a freshly onboarded vendor with no bookings/invoices/etc. yet.
-const BLANK_VENDOR_NAMES = new Set(['mahesh transport'])
+// Empty: every vendor (incl. Mahesh Transport and any vendor onboarded via
+// tenant-admin-new) now loads the full demo dataset on login.
+const BLANK_VENDOR_NAMES = new Set<string>([])
 
 function normalizeVendorName(name?: string): string {
   return (name ?? '').trim().toLowerCase()

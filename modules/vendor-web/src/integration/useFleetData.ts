@@ -30,7 +30,8 @@ export function useFleetData(): FleetData {
   const addDriver = useAppStore((state) => state.addDriver)
   const updateDriver = useAppStore((state) => state.updateDriver)
 
-  if (bridge) {
+  // Embedded with real tenant fleet for this vendor → use it.
+  if (bridge && (bridge.vehicles.length > 0 || bridge.drivers.length > 0)) {
     return {
       vehicles: bridge.vehicles,
       drivers: bridge.drivers,
@@ -42,6 +43,10 @@ export function useFleetData(): FleetData {
     }
   }
 
+  // Standalone, OR embedded for a vendor with no tenant fleet yet (freshly
+  // onboarded vendor, or a demo vendor like Mahesh Transport): fall back to the
+  // local demo fleet so the portal isn't empty. Uses local store actions + the
+  // local vehicle-type list (standalone behavior).
   return {
     vehicles,
     drivers,

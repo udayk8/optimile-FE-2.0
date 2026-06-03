@@ -25,7 +25,8 @@ export function useVendorBookings(): VendorBookingsData {
   const declineIndent = useAppStore((state) => state.declineIndent)
   const assignVehicleToTrip = useAppStore((state) => state.assignVehicleToTrip)
 
-  if (bridge) {
+  // Embedded with real tenant bookings assigned to this vendor → use them.
+  if (bridge && (bridge.bookingIndents.length > 0 || bridge.bookingTrips.length > 0)) {
     return {
       indents: bridge.bookingIndents,
       trips: bridge.bookingTrips,
@@ -36,5 +37,9 @@ export function useVendorBookings(): VendorBookingsData {
     }
   }
 
+  // Standalone, OR embedded for a vendor with no tenant bookings yet (freshly
+  // onboarded vendor, or a demo vendor like Mahesh Transport): fall back to the
+  // local demo dataset so the portal isn't empty. Mirrors the Sourcing page's
+  // bridge-empty fallback. Store-backed actions operate on the mock indents/trips.
   return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null }
 }
