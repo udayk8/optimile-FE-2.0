@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
+import { rowShadeClass } from '@vendor/components/shared/DataSourceLegend'
 import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
@@ -149,7 +150,7 @@ export default function SupportHubPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pageItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
+                <tr key={item.id} className={`hover:bg-gray-50 ${rowShadeClass('MOCK')}`}>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-red-500" />

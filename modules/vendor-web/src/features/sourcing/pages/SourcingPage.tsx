@@ -9,6 +9,7 @@ import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { rowShadeClass, DataSourceLegend } from '@vendor/components/shared/DataSourceLegend'
 import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AuctionState } from '@vendor/types'
 
@@ -32,6 +33,8 @@ export default function SourcingPage() {
   const { auctions: bridgeAuctions, hasShared } = useSourcingBridge()
   const { auctions: storeAuctions } = useAppStore()
   const auctions = hasShared ? bridgeAuctions : storeAuctions
+  // Whole list is one source: auction-web (cross-module) when present, else demo.
+  const auctionSource = hasShared ? 'CROSS_MODULE' : 'MOCK'
   const activeTab = getSourcingTab(location.search)
   const [page, setPage] = useState(1)
 
@@ -87,6 +90,7 @@ export default function SourcingPage() {
         ))}
       </div>
 
+      <DataSourceLegend className="mb-3" />
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {displayedAuctions.length === 0 ? (
           <div className="p-8">
@@ -139,7 +143,7 @@ export default function SourcingPage() {
                     const timingValue = auction.state === 'UPCOMING' ? auction.startTime : auction.endTime
 
                     return (
-                      <tr key={auction.id} className="align-top transition-colors hover:bg-gray-50">
+                      <tr key={auction.id} className={`align-top transition-colors hover:bg-gray-50 ${rowShadeClass(auctionSource)}`}>
                         <td className="px-5 py-4">
                           <div className="font-mono text-sm font-semibold text-text">{auction.id}</div>
                           <div className="mt-1 text-xs text-gray-500">{auction.type}</div>

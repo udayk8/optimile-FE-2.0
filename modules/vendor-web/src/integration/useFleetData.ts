@@ -38,9 +38,14 @@ export function useFleetData(): FleetData {
   if (bridge) {
     const bridgeVehicleIds = new Set(bridge.vehicles.map((v) => v.id))
     const bridgeDriverIds = new Set(bridge.drivers.map((d) => d.id))
+    // Tag each record with its origin so the UI can shade rows (real vs demo).
+    const realVehicles = bridge.vehicles.map((v) => ({ ...v, _source: 'CROSS_MODULE' as const }))
+    const realDrivers = bridge.drivers.map((d) => ({ ...d, _source: 'CROSS_MODULE' as const }))
+    const demoVehicles = vehicles.filter((v) => !bridgeVehicleIds.has(v.id)).map((v) => ({ ...v, _source: 'MOCK' as const }))
+    const demoDrivers = drivers.filter((d) => !bridgeDriverIds.has(d.id)).map((d) => ({ ...d, _source: 'MOCK' as const }))
     return {
-      vehicles: [...bridge.vehicles, ...vehicles.filter((v) => !bridgeVehicleIds.has(v.id))],
-      drivers: [...bridge.drivers, ...drivers.filter((d) => !bridgeDriverIds.has(d.id))],
+      vehicles: [...realVehicles, ...demoVehicles],
+      drivers: [...realDrivers, ...demoDrivers],
       addVehicle: bridge.addVehicle,
       updateVehicle: (vehicle) => (bridgeVehicleIds.has(vehicle.id) ? bridge.updateVehicle(vehicle) : updateVehicle(vehicle)),
       addDriver: bridge.addDriver,

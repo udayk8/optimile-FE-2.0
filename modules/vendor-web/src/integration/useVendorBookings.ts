@@ -32,9 +32,14 @@ export function useVendorBookings(): VendorBookingsData {
   if (bridge) {
     const mockIndentIds = new Set(indents.map((i) => i.id))
     const mockTripIds = new Set(trips.map((t) => t.id))
+    // Tag each record with its origin so the UI can shade rows (real vs demo).
+    const realIndents = bridge.bookingIndents.map((i) => ({ ...i, _source: 'CROSS_MODULE' as const }))
+    const realTrips = bridge.bookingTrips.map((t) => ({ ...t, _source: 'CROSS_MODULE' as const }))
+    const demoIndents = indents.map((i) => ({ ...i, _source: 'MOCK' as const }))
+    const demoTrips = trips.map((t) => ({ ...t, _source: 'MOCK' as const }))
     return {
-      indents: [...bridge.bookingIndents, ...indents],
-      trips: [...bridge.bookingTrips, ...trips],
+      indents: [...realIndents, ...demoIndents],
+      trips: [...realTrips, ...demoTrips],
       acceptIndent: (id) => (mockIndentIds.has(id) ? acceptIndent(id) : bridge.acceptBooking(id)),
       declineIndent: (id) => (mockIndentIds.has(id) ? declineIndent(id) : bridge.declineBooking(id)),
       assignVehicle: (tripId, vehicleId, driverId) =>

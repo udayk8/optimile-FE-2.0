@@ -4,6 +4,7 @@ import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
 import { useAppStore } from '@vendor/stores/app.store'
+import { rowShadeClass } from '@vendor/components/shared/DataSourceLegend'
 import type { LedgerEntry, LedgerType } from '@vendor/types'
 
 type LedgerTab = LedgerType
@@ -227,7 +228,7 @@ export default function LedgerPage() {
                 </tr>
               )}
               {pagedEntries.map((row) => (
-                <tr key={`${row.date}-${row.id}`} className="hover:bg-gray-50">
+                <tr key={`${row.date}-${row.id}`} className={`hover:bg-gray-50 ${rowShadeClass('MOCK')}`}>
                   <td className="p-4">{new Date(row.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                   <td className="p-4 font-mono text-xs font-semibold text-text">{ENTRY_TYPE_LABEL[row.entryType] ?? row.entryType.replace(/_/g, ' ')}</td>
                   <td className="p-4 font-mono text-xs text-gray-500">{row.referenceNumber ?? row.id}</td>

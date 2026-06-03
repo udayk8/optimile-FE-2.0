@@ -7,6 +7,7 @@ import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useAuctionContractsBridge } from '@vendor/integration/auctionBridge'
+import { rowShadeClass, DataSourceLegend } from '@vendor/components/shared/DataSourceLegend'
 import { FileText, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { ContractStatus } from '@vendor/types'
 
@@ -35,7 +36,11 @@ export default function ContractsPage() {
   // Cross-module: contracts awarded to this vendor via auction-web, surfaced
   // alongside the local demo contracts.
   const auctionContracts = useAuctionContractsBridge()
-  const contracts = [...auctionContracts, ...storeContracts]
+  // Tag origin for row shading: auction-web (cross-module) vs local demo.
+  const contracts = [
+    ...auctionContracts.map((c) => ({ ...c, _source: 'CROSS_MODULE' as const })),
+    ...storeContracts.map((c) => ({ ...c, _source: 'MOCK' as const })),
+  ]
 
   const filtered = contracts.filter((c) => {
     if (c.status === 'DRAFT') return false
@@ -72,6 +77,7 @@ export default function ContractsPage() {
         </div>
       </div>
 
+      <DataSourceLegend className="mb-3" />
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {filtered.length === 0 ? (
           <div className="p-8">
@@ -94,7 +100,7 @@ export default function ContractsPage() {
                 {pagedContracts.map((contract) => (
                   <tr
                   key={contract.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className={`cursor-pointer hover:bg-gray-50 ${rowShadeClass(contract._source)}`}
                   onClick={() => navigate(`/vendor/contracts/${contract.id}`)}
                 >
                   <td className="px-5 py-4 font-mono text-sm font-semibold text-text">{contract.id}</td>

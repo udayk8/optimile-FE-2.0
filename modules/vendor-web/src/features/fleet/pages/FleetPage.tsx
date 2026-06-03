@@ -8,6 +8,7 @@ import { formatDate } from '@vendor/lib/date-utils'
 import { useFleetData } from '@vendor/integration/useFleetData'
 import { AddVehicleModal } from '@vendor/components/shared/AddVehicleModal'
 import { AddDriverModal } from '@vendor/components/shared/AddDriverModal'
+import { rowShadeClass, DataSourceLegend } from '@vendor/components/shared/DataSourceLegend'
 import type { Driver, Vehicle } from '@vendor/types'
 import { Ship, Truck, Users, Plus, AlertTriangle, ShieldCheck, ShieldX, Edit3, PowerOff } from 'lucide-react'
 
@@ -169,7 +170,8 @@ export default function FleetPage() {
         }
       />
 
-      <div className="mt-6 mb-6 flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mt-6 mb-6 flex items-center justify-between gap-4">
+      <div className="flex w-fit gap-1 rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -182,6 +184,8 @@ export default function FleetPage() {
             <span className="bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded-full">{tab.count}</span>
           </button>
         ))}
+      </div>
+        <DataSourceLegend className="shrink-0" />
       </div>
 
       {activeTab === 'vehicles' && (
@@ -198,7 +202,7 @@ export default function FleetPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {vehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className="hover:bg-gray-50">
+                  <tr key={vehicle.id} className={`hover:bg-gray-50 ${rowShadeClass(vehicle._source)}`}>
                     <td className="p-4 align-top">
                       <div className="flex items-center gap-3">
                         <ComplianceIcon status={vehicle.complianceStatus} />
@@ -270,7 +274,7 @@ export default function FleetPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {drivers.map((driver) => (
-                  <tr key={driver.id} className="hover:bg-gray-50">
+                  <tr key={driver.id} className={`hover:bg-gray-50 ${rowShadeClass(driver._source)}`}>
                     <td className="p-4 align-top">
                       <div className="flex items-center gap-3">
                         <ComplianceIcon status={driver.complianceStatus} />

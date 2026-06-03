@@ -7,6 +7,7 @@ import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
+import { rowShadeClass } from '@vendor/components/shared/DataSourceLegend'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
@@ -264,7 +265,7 @@ export default function InvoicesPage() {
                 {pagedInvoices.map((invoice) => {
                   const dispute = disputeByInvoice[invoice.id]
                   return (
-                    <tr key={invoice.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
+                    <tr key={invoice.id} className={`cursor-pointer hover:bg-gray-50 ${rowShadeClass('MOCK')}`} onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
                       <td className="p-4 font-mono font-semibold">{invoice.invoiceNumber || invoice.id}</td>
                       <td className="p-4">{formatDate(invoice.invoiceDate)}</td>
                       <td className="p-4">

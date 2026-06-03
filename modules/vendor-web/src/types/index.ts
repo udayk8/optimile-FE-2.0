@@ -189,6 +189,7 @@ export interface Contract {
   signedAt?: string
   pdfUrl: string
   createdAt: string
+  _source?: DataSource
 }
 
 export interface RateCardEntry {
@@ -218,6 +219,11 @@ export interface IndentSummary {
   status: IndentStatus
 }
 
+// Where a record came from in the embedded (merged) portal: CROSS_MODULE = real
+// tenant data via the bridge; MOCK = local demo dataset. Used only for visual
+// shading in the UI — never persisted. Optional/undefined when standalone.
+export type DataSource = 'CROSS_MODULE' | 'MOCK'
+
 export interface Indent {
   id: string
   contractId: string
@@ -232,6 +238,7 @@ export interface Indent {
   assignedDriverId?: string
   rejectionReason?: string
   createdAt: string
+  _source?: DataSource
 }
 
 export type BookingState =
@@ -280,6 +287,7 @@ export interface Trip {
   expenseSummary: { total: number }
   isInvoiced: boolean
   createdAt: string
+  _source?: DataSource
 }
 
 export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'LR_COPY' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
@@ -360,6 +368,7 @@ export interface Vehicle {
   trackingSelections?: VehicleTrackingSelection[]
   additionalDocuments?: VehicleAdditionalDocument[]
   gpsDeviceId?: string
+  _source?: DataSource
 }
 
 export interface Driver {
@@ -383,6 +392,7 @@ export interface Driver {
   dlValidTillDate?: string
   dlCopyFileName?: string
   trackingSelections?: DriverTrackingSelection[]
+  _source?: DataSource
 }
 
 export interface VehicleTrackingSelection {

@@ -5,6 +5,7 @@ import { Button } from '@shared-ui/button'
 import { Input } from '@shared-ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
 import { useAppStore } from '@vendor/stores/app.store'
+import { rowShadeClass } from '@vendor/components/shared/DataSourceLegend'
 import type { CustomerLedgerEntryType, PaymentKind } from '@vendor/types'
 
 const PAGE_SIZE = 8
@@ -129,7 +130,7 @@ export default function PaymentsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {pagedRows.map(({ payment }) => (
-                <tr key={payment.id} className="hover:bg-gray-50">
+                <tr key={payment.id} className={`hover:bg-gray-50 ${rowShadeClass('MOCK')}`}>
                   <td className="px-5 py-4 font-mono text-sm font-semibold text-text">{payment.id}</td>
                   <td className="px-5 py-4 font-mono text-sm text-gray-700">{payment.invoiceId}</td>
                   <td className="px-5 py-4 text-sm text-gray-700">{payment.paymentKind === 'NBFC_REPAYMENT' || payment.paymentKind === 'NBFC_CHARGE' || payment.paymentKind === 'NBFC_DISBURSEMENT' ? 'NBFC' : 'Customer'}</td>

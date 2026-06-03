@@ -11,6 +11,7 @@ import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { Truck, MapPin, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
+import { rowShadeClass, DataSourceLegend } from '@vendor/components/shared/DataSourceLegend'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
 import type { Trip } from '@vendor/types'
@@ -117,6 +118,7 @@ export default function TripsPage() {
     cancelledBy: 'Vendor',
     reason: 'Booking cancelled',
     detailsPath: `/vendor/bookings/cancelled/${trip.id}`,
+    _source: trip._source,
   }))
   const rejectedIndentBookings = indents.filter((indent) => indent.status === 'DECLINED')
   const rejectedBookings = rejectedIndentBookings.map((indent) => ({
@@ -126,6 +128,7 @@ export default function TripsPage() {
     rejectedBy: 'Vendor',
     reason: indent.rejectionReason ?? 'Declined before allocation',
     detailsPath: `/vendor/bookings/rejected/${indent.id}`,
+    _source: indent._source,
   }))
 
   const tabs: { key: BookingsTab; label: string; count: number }[] = [
@@ -160,6 +163,7 @@ export default function TripsPage() {
             />
           ))}
         </div>
+        <DataSourceLegend className="shrink-0" />
       </div>
 
       {activeTab === 'pending-allocation' && (
@@ -181,7 +185,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pendingAllocation.map((indent) => (
-                    <tr key={indent.id} className="hover:bg-gray-50">
+                    <tr key={indent.id} className={`hover:bg-gray-50 ${rowShadeClass(indent._source)}`}>
                       <td className="px-5 py-4"><StatusBadge status={indent.status} label="Pending Allocation" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{indent.id}</div>
@@ -236,7 +240,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {assignmentBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={`hover:bg-gray-50 ${rowShadeClass(trip._source)}`}>
                       <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -289,7 +293,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {inTransitBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={`hover:bg-gray-50 ${rowShadeClass(trip._source)}`}>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-1.5">
                           <StatusBadge status={trip.status} />
@@ -340,7 +344,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pendingPodBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={`hover:bg-gray-50 ${rowShadeClass(trip._source)}`}>
                       <td className="px-5 py-4"><StatusBadge status="POD_PENDING" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -392,7 +396,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {completedBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={`hover:bg-gray-50 ${rowShadeClass(trip._source)}`}>
                       <td className="px-5 py-4">
                         <StatusBadge status="COMPLETED" />
                       </td>
@@ -437,7 +441,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {cancelledBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                    <tr key={booking.id} className={`hover:bg-gray-50 ${rowShadeClass(booking._source)}`}>
                       <td className="px-5 py-4"><StatusBadge status="CANCELLED" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
@@ -480,7 +484,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {rejectedBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                    <tr key={booking.id} className={`hover:bg-gray-50 ${rowShadeClass(booking._source)}`}>
                       <td className="px-5 py-4"><StatusBadge status="REJECTED" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
@@ -522,7 +526,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {exceptionBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={`hover:bg-gray-50 ${rowShadeClass(trip._source)}`}>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-1.5">
                           <StatusBadge status={trip.status} />
