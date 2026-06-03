@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@vendor/components/ui/dialog'
 import { Button } from '@vendor/components/ui/button'
 import { useFleetData } from '@vendor/integration/useFleetData'
-import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useAppStore } from '@vendor/stores/app.store'
 
 interface AssignVehicleModalProps {
   isOpen: boolean
@@ -13,8 +13,10 @@ interface AssignVehicleModalProps {
 
 export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleModalProps) {
   const { vehicles, drivers } = useFleetData()
-  const { assignVehicle: assignVehicleToTrip } = useVendorBookings()
   const bridge = useTenantBridge()
+  // Mock/demo trips live in the local store; real bookings come from the bridge.
+  const mockTrips = useAppStore((state) => state.trips)
+  const assignResolved = useAppStore((state) => state.assignVehicleToTripResolved)
   const lrAuthorityName = bridge?.tenantName || 'the tenant'
   const [selectedVehicle, setSelectedVehicle] = useState<string>('')
   const [selectedDriver, setSelectedDriver] = useState<string>('')
@@ -25,7 +27,18 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
 
   const handleAssign = () => {
     if (!selectedVehicle || !selectedDriver) return
-    assignVehicleToTrip(tripId, selectedVehicle, selectedDriver)
+    const isMockTrip = mockTrips.some((t) => t.id === tripId)
+    if (isMockTrip) {
+      // Object-based assign so a real (bridge) vehicle/driver — whose id isn't in
+      // the local store — can still be attached to a demo trip.
+      const vehicle = vehicles.find((v) => v.id === selectedVehicle)
+      const driver = drivers.find((d) => d.id === selectedDriver)
+      if (!vehicle || !driver) return
+      assignResolved(tripId, vehicle, driver)
+    } else {
+      // Real booking → persist through the bridge (needs a real tenant vehicle).
+      bridge?.assignVehicle(tripId, selectedVehicle, selectedDriver)
+    }
     onClose()
   }
 

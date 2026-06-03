@@ -1,5 +1,5 @@
 import { useAppStore } from '@vendor/stores/app.store'
-import { useTenantBridge, shouldUseDemoData, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
+import { useTenantBridge, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
 import type { Indent, Trip } from '@vendor/types'
 
 export interface VendorBookingsData {
@@ -25,21 +25,28 @@ export function useVendorBookings(): VendorBookingsData {
   const declineIndent = useAppStore((state) => state.declineIndent)
   const assignVehicleToTrip = useAppStore((state) => state.assignVehicleToTrip)
 
-  // Embedded vendor with real tenant data → use the bridge bookings.
-  if (bridge && !shouldUseDemoData(bridge)) {
+  // Embedded → MERGE the vendor's real tenant bookings (bridge) with the local
+  // mock demo dataset, so a freshly onboarded / demo vendor like Mahesh sees the
+  // demo baseline AND any real indents/bookings created for them later. Real
+  // records come first. Accept/decline/assign route by which set owns the id.
+  if (bridge) {
+    const mockIndentIds = new Set(indents.map((i) => i.id))
+    const mockTripIds = new Set(trips.map((t) => t.id))
     return {
-      indents: bridge.bookingIndents,
-      trips: bridge.bookingTrips,
-      acceptIndent: bridge.acceptBooking,
-      declineIndent: bridge.declineBooking,
-      assignVehicle: bridge.assignVehicle,
+      indents: [...bridge.bookingIndents, ...indents],
+      trips: [...bridge.bookingTrips, ...trips],
+      acceptIndent: (id) => (mockIndentIds.has(id) ? acceptIndent(id) : bridge.acceptBooking(id)),
+      declineIndent: (id) => (mockIndentIds.has(id) ? declineIndent(id) : bridge.declineBooking(id)),
+      assignVehicle: (tripId, vehicleId, driverId) =>
+        mockTripIds.has(tripId)
+          ? assignVehicleToTrip(tripId, vehicleId, driverId)
+          : bridge.assignVehicle(tripId, vehicleId, driverId),
+      // Mock trips have no rich detail; bridge.getBookingDetail returns null for
+      // any ref it doesn't own, so this is safe for both.
       getBookingDetail: bridge.getBookingDetail,
     }
   }
 
-  // Standalone, OR embedded for a vendor with no tenant data yet (freshly
-  // onboarded vendor, or a demo vendor like Mahesh Transport): fall back to the
-  // local demo dataset so the portal isn't empty. useFleetData uses the SAME
-  // predicate so vehicles/drivers and trips stay on one source and assign works.
+  // Standalone (no bridge): local mock demo dataset only.
   return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null }
 }

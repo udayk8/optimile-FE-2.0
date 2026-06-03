@@ -1,5 +1,5 @@
 import { useAppStore } from '@vendor/stores/app.store'
-import { useTenantBridge, shouldUseDemoData } from '@vendor/integration/tenant-data-bridge'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import type { Driver, Vehicle } from '@vendor/types'
 
 export interface FleetData {
@@ -30,24 +30,27 @@ export function useFleetData(): FleetData {
   const addDriver = useAppStore((state) => state.addDriver)
   const updateDriver = useAppStore((state) => state.updateDriver)
 
-  // Embedded vendor with real tenant data → use the bridge fleet.
-  if (bridge && !shouldUseDemoData(bridge)) {
+  // Embedded → MERGE the vendor's real onboarded fleet (bridge) with the local
+  // mock demo fleet, so both show and either can be picked when assigning a demo
+  // trip. Real records come first. New fleet persists to the tenant (bridge) so
+  // it also appears under administration; updates route to whichever source owns
+  // the id.
+  if (bridge) {
+    const bridgeVehicleIds = new Set(bridge.vehicles.map((v) => v.id))
+    const bridgeDriverIds = new Set(bridge.drivers.map((d) => d.id))
     return {
-      vehicles: bridge.vehicles,
-      drivers: bridge.drivers,
+      vehicles: [...bridge.vehicles, ...vehicles.filter((v) => !bridgeVehicleIds.has(v.id))],
+      drivers: [...bridge.drivers, ...drivers.filter((d) => !bridgeDriverIds.has(d.id))],
       addVehicle: bridge.addVehicle,
-      updateVehicle: bridge.updateVehicle,
+      updateVehicle: (vehicle) => (bridgeVehicleIds.has(vehicle.id) ? bridge.updateVehicle(vehicle) : updateVehicle(vehicle)),
       addDriver: bridge.addDriver,
-      updateDriver: bridge.updateDriver,
+      updateDriver: (driver) => (bridgeDriverIds.has(driver.id) ? bridge.updateDriver(driver) : updateDriver(driver)),
       vehicleTypeOptions: bridge.vehicleTypeOptions,
     }
   }
 
-  // Standalone, OR embedded for a vendor with no tenant data yet (freshly
-  // onboarded vendor, or a demo vendor like Mahesh Transport): fall back to the
-  // local demo fleet so the portal isn't empty. Same predicate as
-  // useVendorBookings so trips + fleet share one source and assign works.
-  // Uses local store actions + the local vehicle-type list (standalone behavior).
+  // Standalone (no bridge): local mock demo fleet only, with the local
+  // vehicle-type list.
   return {
     vehicles,
     drivers,

@@ -71,6 +71,11 @@ interface AppState {
   // Actions
   acceptIndent: (indentId: string) => void
   assignVehicleToTrip: (tripId: string, vehicleId: string, driverId: string) => void
+  // Like assignVehicleToTrip but takes already-resolved vehicle/driver objects
+  // instead of ids. Used by the embedded "merge" mode where the fleet list mixes
+  // local mock vehicles with the vendor's real (bridge) vehicles, whose ids do
+  // not exist in this store — so an id lookup here would miss them.
+  assignVehicleToTripResolved: (tripId: string, vehicle: Vehicle, driver: Driver) => void
   declineIndent: (indentId: string) => void
   submitBid: (auctionId: string, laneId: string, amount: number) => void
   addVehicle: (vehicle: Vehicle) => void
@@ -394,6 +399,26 @@ export const useAppStore = create<AppState>((set) => ({
       const vehicle = state.vehicles.find((v) => v.id === vehicleId)
       const driver = state.drivers.find((d) => d.id === driverId)
       if (!vehicle || !driver) return state
+
+      const updatedTrips = [...state.trips]
+      updatedTrips[tripIndex] = {
+        ...trip,
+        assignedVehicle: { id: vehicle.id, registrationNumber: vehicle.registrationNumber, type: vehicle.vehicleType },
+        assignedDriver: { id: driver.id, name: driver.name, mobile: driver.mobile },
+        status: 'ASSIGNED',
+      }
+
+      return { trips: updatedTrips }
+    })
+  },
+
+  assignVehicleToTripResolved: (tripId, vehicle, driver) => {
+    set((state) => {
+      const tripIndex = state.trips.findIndex((t) => t.id === tripId)
+      if (tripIndex === -1) return state
+
+      const trip = state.trips[tripIndex] as Trip
+      if (trip.status !== 'ACCEPTED') return state
 
       const updatedTrips = [...state.trips]
       updatedTrips[tripIndex] = {
