@@ -1,5 +1,5 @@
 import { useAppStore } from '@vendor/stores/app.store'
-import { useTenantBridge, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
+import { useTenantBridge, shouldUseDemoData, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
 import type { Indent, Trip } from '@vendor/types'
 
 export interface VendorBookingsData {
@@ -25,8 +25,8 @@ export function useVendorBookings(): VendorBookingsData {
   const declineIndent = useAppStore((state) => state.declineIndent)
   const assignVehicleToTrip = useAppStore((state) => state.assignVehicleToTrip)
 
-  // Embedded with real tenant bookings assigned to this vendor → use them.
-  if (bridge && (bridge.bookingIndents.length > 0 || bridge.bookingTrips.length > 0)) {
+  // Embedded vendor with real tenant data → use the bridge bookings.
+  if (bridge && !shouldUseDemoData(bridge)) {
     return {
       indents: bridge.bookingIndents,
       trips: bridge.bookingTrips,
@@ -37,9 +37,9 @@ export function useVendorBookings(): VendorBookingsData {
     }
   }
 
-  // Standalone, OR embedded for a vendor with no tenant bookings yet (freshly
+  // Standalone, OR embedded for a vendor with no tenant data yet (freshly
   // onboarded vendor, or a demo vendor like Mahesh Transport): fall back to the
-  // local demo dataset so the portal isn't empty. Mirrors the Sourcing page's
-  // bridge-empty fallback. Store-backed actions operate on the mock indents/trips.
+  // local demo dataset so the portal isn't empty. useFleetData uses the SAME
+  // predicate so vehicles/drivers and trips stay on one source and assign works.
   return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null }
 }

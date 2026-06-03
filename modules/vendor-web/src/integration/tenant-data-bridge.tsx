@@ -101,3 +101,22 @@ export function TenantDataBridgeProvider({
 export function useTenantBridge(): TenantDataBridge | null {
   return useContext(TenantDataBridgeContext)
 }
+
+/**
+ * True when the portal should render the LOCAL DEMO dataset instead of the
+ * bridge: either standalone (no bridge) or embedded for a vendor that has no
+ * real tenant data yet (freshly onboarded vendor, or a demo vendor like Mahesh
+ * Transport). Both bookings AND fleet are checked together so every consumer
+ * (useVendorBookings, useFleetData, AssignVehicleModal) reads from the SAME
+ * source — otherwise assign would mix bridge trips with store vehicles (or vice
+ * versa) and silently fail on id lookup.
+ */
+export function shouldUseDemoData(bridge: TenantDataBridge | null): boolean {
+  if (!bridge) return true
+  return (
+    bridge.bookingIndents.length === 0 &&
+    bridge.bookingTrips.length === 0 &&
+    bridge.vehicles.length === 0 &&
+    bridge.drivers.length === 0
+  )
+}
