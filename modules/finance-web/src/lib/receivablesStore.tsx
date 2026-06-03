@@ -394,7 +394,9 @@ export function useReceivables() {
   // The series/accessorial/AR-decision helpers stay on the local pipeline (the
   // advanced AR workflow isn't backed by the shared store yet). Standalone
   // (bridge === null) keeps the existing mock behaviour unchanged.
-  if (bridge) {
+  // Use bridge only when the tenant has real bookings. If empty, fall through
+  // to the mock store so the embedded UI shows test data rather than a blank page.
+  if (bridge && bridge.trips.length > 0) {
     return {
       trips: bridge.trips,
       invoices: bridge.invoices,

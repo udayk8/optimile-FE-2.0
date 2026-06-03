@@ -1,14 +1,15 @@
 import React, { useRef, useState } from "react";
 import {
   ReceiptIndianRupee, ArrowLeft, Plus, Send, Check, AlertTriangle,
-  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users,
+  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
-import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor } from "@finance/data/mock";
+import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta } from "@finance/data/mock";
 import { useReceivables, type ARInvoice, type ARTrip } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
+import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -66,7 +67,40 @@ function VariancePill({ inv }: { inv: ARInvoice }) {
 
 function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => void; toast: (m: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { trips } = useReceivables();
   const doc = toInvoiceDoc(inv);
+
+  // Find the associated trip for the POD — use first drop for consolidated invoices
+  const tripId = inv.tripId ?? inv.drops?.[0]?.trip;
+  const trip = tripId ? trips.find((t) => t.id === tripId) : null;
+
+  let podSection: React.ReactNode = null;
+  if (trip) {
+    const meta = TRIP_POD_META[trip.id];
+    const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
+    const vm = vendorMeta(trip.vendor);
+    const podInv = {
+      lrNo: meta?.lrNo ?? `LR-${trip.id.replace("TR-", "")}`,
+      bookingId: trip.bookingId ?? trip.id,
+      truckNo: meta?.truckNo ?? (trip as any).vehicle ?? "—",
+      shippingDate: meta?.shippingDate ?? trip.delivered,
+      deliveryDate: trip.delivered,
+      qty: 1,
+      origin,
+      destination,
+    };
+    const podSeller = { name: trip.vendor, address: vm.address, gstin: vm.gstin, pan: vm.pan };
+    const podBillTo = { name: (trip as any).consignee ?? trip.client, address: "—" };
+    podSection = (
+      <div style={{ marginTop: 24 }}>
+        <div className="mb-3 flex items-center gap-2 font-semibold text-slate-700">
+          <PackageCheck size={16} className="text-emerald-600" />Proof of Delivery
+        </div>
+        <PodDocument invoice={podInv} seller={podSeller} billTo={podBillTo} />
+      </div>
+    );
+  }
+
   const download = async () => {
     await downloadElementAsPdf(ref.current, `${inv.id}.pdf`);
     toast(`Downloaded ${inv.id}.pdf`);
@@ -75,8 +109,9 @@ function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => 
     <Modal onClose={onClose} maxW="max-w-4xl">
       <ModalHeader title={`Draft invoice ${inv.id}`} tone="blue" icon={FileText} onClose={onClose} />
       <div className="max-h-[70vh] overflow-auto bg-slate-100 p-6">
-        <div className="mx-auto w-fit">
-          <InvoiceDocument ref={ref} invoice={doc.invoice} seller={SELLER} billTo={doc.billTo} />
+        <div ref={ref} className="mx-auto w-fit">
+          <InvoiceDocument invoice={doc.invoice} seller={SELLER} billTo={doc.billTo} />
+          {podSection}
         </div>
       </div>
       <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
