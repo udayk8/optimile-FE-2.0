@@ -22,6 +22,8 @@ import {
   mockTenantCustomerAddresses,
   mockTenantCustomerRateCards,
   mockTenantBookings,
+  mockTenantLRConfigs,
+  mockTenantLrPools,
   mockTenantMaterials,
   mockTenantUOMDefinitions,
   mockTenantUOMMappings,
@@ -609,13 +611,27 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // onboarded via the wizard. If the user's localStorage exists but doesn't
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v4";
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v5";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
+    const demoTenantIds = new Set(DEMO_TENANT_IDS);
+    const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
+      const storedRaw = window.localStorage.getItem(key);
+      const stored: T[] = storedRaw ? JSON.parse(storedRaw) : [];
+      const existingIds = new Set(stored.map((item) => item.id));
+      const missing = seed.filter(
+        (item) =>
+          demoTenantIds.has(item.tenantId as (typeof DEMO_TENANT_IDS)[number]) &&
+          !existingIds.has(item.id),
+      );
+      if (missing.length > 0) {
+        window.localStorage.setItem(key, JSON.stringify([...stored, ...missing]));
+      }
+    };
 
     // Tenants
     const storedTenantsRaw = window.localStorage.getItem(storageKeys.platformTenants);
@@ -697,6 +713,22 @@ function ensureDemoTenantsRehydrated(): void {
     // ADD module/feature/action entries that are missing; never overwrite a
     // toggle the user already set. This lets new seed features (e.g. extra
     // Auction pages) reach a demo role that already exists in the matrix.
+    mergeDemoArray(storageKeys.tenantOrgUnits, mockOrgUnits);
+    mergeDemoArray(storageKeys.tenantCustomers, mockTenantCustomers);
+    mergeDemoArray(storageKeys.tenantCustomerAddresses, mockTenantCustomerAddresses);
+    mergeDemoArray(storageKeys.tenantCustomerRateCards, mockTenantCustomerRateCards);
+    mergeDemoArray(storageKeys.tenantVendors, mockTenantVendors);
+    mergeDemoArray(storageKeys.tenantVendorRateCards, mockTenantVendorRateCards);
+    mergeDemoArray(storageKeys.tenantVehicleTypes, mockTenantVehicleTypes);
+    mergeDemoArray(storageKeys.tenantVehicles, mockTenantVehicles);
+    mergeDemoArray(storageKeys.tenantDrivers, mockTenantDrivers);
+    mergeDemoArray(storageKeys.tenantMaterials, mockTenantMaterials);
+    mergeDemoArray(storageKeys.tenantUOMDefinitions, mockTenantUOMDefinitions);
+    mergeDemoArray(storageKeys.tenantUOMMappings, mockTenantUOMMappings);
+    mergeDemoArray(storageKeys.tenantBookings, mockTenantBookings);
+    mergeDemoArray(storageKeys.tenantLRConfigs, mockTenantLRConfigs);
+    mergeDemoArray(storageKeys.tenantLrPools, mockTenantLrPools);
+
     const storedMatrixRaw = window.localStorage.getItem("optimile.tenant.rolePermissionMatrix");
     const storedMatrix: Record<string, Record<string, Record<string, Record<string, boolean>>>> =
       storedMatrixRaw ? JSON.parse(storedMatrixRaw) : {};
@@ -3410,7 +3442,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
     platformTenants: enterpriseTenantEl001.platformTenants,
     workspaces: seededWorkspaces,
     roles: enterpriseTenantEl001.roles,
-    configs: normalizeStoredTenantLRConfigs(loadSeededState(storageKeys.tenantLRConfigs, [])),
+    configs: normalizeStoredTenantLRConfigs(loadSeededState(storageKeys.tenantLRConfigs, mockTenantLRConfigs)),
   });
   const [platformTenants, setPlatformTenants] = useState<TenantRecord[]>(() =>
     enterpriseTenantEl001.platformTenants,
@@ -3483,7 +3515,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
     normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, [])),
   );
   const [tenantLrPools, setTenantLrPools] = useState<TenantLrPoolRecord[]>(() =>
-    normalizeStoredTenantLrPools(loadSeededState(storageKeys.tenantLrPools, [])),
+    normalizeStoredTenantLrPools(loadSeededState(storageKeys.tenantLrPools, mockTenantLrPools)),
   );
   const [tenantLrRequests, setTenantLrRequests] = useState<TenantLrAllocationRequestRecord[]>(() =>
     normalizeStoredTenantLrRequests(loadSeededState(storageKeys.tenantLrRequests, [])),
