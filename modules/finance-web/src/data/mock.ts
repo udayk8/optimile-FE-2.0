@@ -338,13 +338,25 @@ export const AUDIT_LOG = [
   { ts: "2026-05-20 11:20", user: "Priya Nair", action: "Payment scheduled", entity: "VB-8801", from: "Approved", to: "Scheduled" },
 ];
 
-/* ---------- Client ledger (sample, append-only) ---------- */
+/* ---------- Client ledger (sample, append-only) ----------
+   Each row is tagged with its client; `bal` is that client's running balance.
+   The Ledgers page can filter by client and recomputes balances per selection. */
 export const CLIENT_LEDGER = [
-  { date: "2026-04-12", type: "Invoice", ref: "INV-2026-0142", amt: 145000, bal: 145000 },
-  { date: "2026-04-20", type: "Invoice", ref: "INV-2026-0151", amt: 132000, bal: 277000 },
-  { date: "2026-05-02", type: "Payment", ref: "RCPT-3301", amt: -100000, bal: 177000 },
-  { date: "2026-05-10", type: "Credit Note", ref: "CN-2026-014", amt: -8000, bal: 169000 },
-  { date: "2026-05-15", type: "Debit Note", ref: "DN-2026-009", amt: 12000, bal: 181000 },
+  // Britannia Industries — net ₹1,81,000 (drives the own-fleet client ledger)
+  { date: "2026-04-12", type: "Invoice", ref: "INV-2026-0142", client: "Britannia Industries", amt: 145000, bal: 145000 },
+  { date: "2026-04-20", type: "Invoice", ref: "INV-2026-0151", client: "Britannia Industries", amt: 132000, bal: 277000 },
+  { date: "2026-05-02", type: "Payment", ref: "RCPT-3301", client: "Britannia Industries", amt: -100000, bal: 177000 },
+  { date: "2026-05-10", type: "Credit Note", ref: "CN-2026-014", client: "Britannia Industries", amt: -8000, bal: 169000 },
+  { date: "2026-05-15", type: "Debit Note", ref: "DN-2026-009", client: "Britannia Industries", amt: 12000, bal: 181000 },
+  // Asian Paints Ltd — net ₹67,000
+  { date: "2026-04-28", type: "Invoice", ref: "INV-2026-0158", client: "Asian Paints Ltd", amt: 38000, bal: 38000 },
+  { date: "2026-05-08", type: "Invoice", ref: "INV-2026-0170", client: "Asian Paints Ltd", amt: 67000, bal: 105000 },
+  { date: "2026-05-18", type: "Payment", ref: "RCPT-3312", client: "Asian Paints Ltd", amt: -38000, bal: 67000 },
+  // Marico Limited — net ₹42,000
+  { date: "2026-05-02", type: "Invoice", ref: "INV-2026-0163", client: "Marico Limited", amt: 92000, bal: 92000 },
+  { date: "2026-05-20", type: "Payment", ref: "RCPT-3320", client: "Marico Limited", amt: -50000, bal: 42000 },
+  // Dabur India — net ₹24,500
+  { date: "2026-05-05", type: "Invoice", ref: "INV-2026-0166", client: "Dabur India", amt: 24500, bal: 24500 },
 ];
 
 /* ---------- Vendor (AP) ledger (sample, append-only) ----------

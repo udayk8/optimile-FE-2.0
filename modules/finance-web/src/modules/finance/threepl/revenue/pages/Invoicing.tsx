@@ -1,13 +1,14 @@
 import React, { useRef, useState } from "react";
 import {
   ReceiptIndianRupee, ArrowLeft, Plus, Send, Check, AlertTriangle,
-  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck,
+  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck, Loader2,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
-import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta } from "@finance/data/mock";
+import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
 import { useReceivables, type ARInvoice, type ARTrip } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
+import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -55,6 +56,84 @@ function toInvoiceDoc(inv: ARInvoice) {
   };
 }
 
+/* Build the PodDocument props for one trip (shared by preview + download). */
+function podDocProps(trip: ARTrip) {
+  const meta = TRIP_POD_META[trip.id];
+  const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
+  const vm = vendorMeta(trip.vendor);
+  const invoice = {
+    lrNo: meta?.lrNo ?? `LR-${trip.id.replace("TR-", "")}`,
+    bookingId: trip.bookingId ?? trip.id,
+    truckNo: meta?.truckNo ?? (trip as any).vehicle ?? trip.truck ?? "—",
+    shippingDate: meta?.shippingDate ?? trip.delivered,
+    deliveryDate: trip.delivered,
+    qty: 1,
+    origin,
+    destination,
+  };
+  const seller = { name: trip.vendor, address: vm.address, gstin: vm.gstin, pan: vm.pan };
+  const billTo = { name: (trip as any).consignee ?? trip.client, address: "—" };
+  return { invoice, seller, billTo };
+}
+
+/* Resolve every trip behind an invoice — consolidated invoices carry many drops. */
+function invoiceTrips(inv: ARInvoice, trips: ARTrip[]): ARTrip[] {
+  const ids = inv.drops?.length ? inv.drops.map((d) => d.trip) : inv.tripId ? [inv.tripId] : [];
+  return ids.map((id) => trips.find((t) => t.id === id)).filter(Boolean) as ARTrip[];
+}
+
+type TraceStep = { label: string; ts: string; actor: string; done: boolean; warn?: boolean };
+
+/* Customer-side shipment trace: booking → delivery → POD → invoice lifecycle.
+   Reuses the AR-side seeded timeline (PENDING_POD_DETAILS) for accurate timestamps
+   up to delivery when available, else synthesises from the trip; always works for
+   generated/bridged invoices that have no seeded data. */
+function buildArTrace(inv: ARInvoice, trip?: ARTrip | null): TraceStep[] {
+  const steps: TraceStep[] = [];
+  const seeded = trip ? (PENDING_POD_DETAILS as Record<string, any>)[trip.id]?.trace : null;
+
+  if (seeded) {
+    const idx = seeded.findIndex((s: any) => /delivered/i.test(s.label));
+    const upstream = idx >= 0 ? seeded.slice(0, idx + 1) : seeded.filter((s: any) => s.done);
+    steps.push(...upstream.map((s: any) => ({ label: s.label, ts: s.ts, actor: s.actor, done: true })));
+  } else if (trip) {
+    const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
+    const veh = (trip as any).vehicle ?? trip.truck;
+    const driver = trip.driver ? ` · ${trip.driver}` : "";
+    steps.push(
+      { label: "Booking created", ts: "—", actor: `TMS · ${trip.bookingId ?? trip.id}`, done: true },
+      { label: "Indent assigned to vendor", ts: "—", actor: trip.vendor, done: true },
+      { label: "Dispatched from origin", ts: "—", actor: `${origin} hub`, done: true },
+      { label: "In transit", ts: "—", actor: `${veh}${driver}`, done: true },
+      { label: "Delivered at destination", ts: trip.delivered, actor: `${destination}${trip.consignee ? ` · ${trip.consignee}` : ""} · consignee signed`, done: true },
+    );
+  } else {
+    const [, destination] = inv.lane.split("→").map((s) => s.trim());
+    steps.push(
+      { label: "Booking created", ts: inv.date ?? "—", actor: `TMS · ${inv.tripId ?? inv.client}`, done: true },
+      { label: "Delivered at destination", ts: inv.date ?? "—", actor: destination, done: true },
+    );
+  }
+
+  const podDone = !trip || trip.podStage === "uploaded" || trip.podStage === "validated";
+  steps.push(
+    { label: "POD uploaded", ts: trip?.delivered ?? inv.date ?? "—", actor: "e-POD via driver app", done: podDone },
+    { label: "POD verified", ts: "—", actor: "Ops desk", done: !trip || trip.podStage === "validated" },
+    { label: "Invoice raised", ts: inv.date ?? "—", actor: `${inv.id} · ${fmtINR(inv.invoiced)}`, done: true },
+  );
+
+  const submitted = inv.stage !== "draft" && inv.stage !== "correction";
+  steps.push({ label: "Submitted to client", ts: "—", actor: inv.client, done: submitted });
+  if (inv.stage === "disputed") {
+    steps.push({ label: "Disputed by client", ts: "—", actor: "Tracked on Disputes", done: true, warn: true });
+  } else if (inv.stage === "correction") {
+    steps.push({ label: "Correction requested", ts: "—", actor: inv.client, done: true, warn: true });
+  } else {
+    steps.push({ label: "Approved · posted to AR ledger", ts: inv.due ? `due ${inv.due}` : "—", actor: "Client finance", done: inv.stage === "approved" });
+  }
+  return steps;
+}
+
 function VariancePill({ inv }: { inv: ARInvoice }) {
   if (inv.contracted === inv.invoiced) return <Pill tone="green"><Check size={11} />Matches contract</Pill>;
   const sign = inv.variancePct > 0 ? "+" : "";
@@ -70,36 +149,22 @@ function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => 
   const { trips } = useReceivables();
   const doc = toInvoiceDoc(inv);
 
-  // Find the associated trip for the POD — use first drop for consolidated invoices
-  const tripId = inv.tripId ?? inv.drops?.[0]?.trip;
-  const trip = tripId ? trips.find((t) => t.id === tripId) : null;
+  // Every POD behind this invoice — a consolidated invoice carries one per drop.
+  const podTrips = invoiceTrips(inv, trips);
 
-  let podSection: React.ReactNode = null;
-  if (trip) {
-    const meta = TRIP_POD_META[trip.id];
-    const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
-    const vm = vendorMeta(trip.vendor);
-    const podInv = {
-      lrNo: meta?.lrNo ?? `LR-${trip.id.replace("TR-", "")}`,
-      bookingId: trip.bookingId ?? trip.id,
-      truckNo: meta?.truckNo ?? (trip as any).vehicle ?? "—",
-      shippingDate: meta?.shippingDate ?? trip.delivered,
-      deliveryDate: trip.delivered,
-      qty: 1,
-      origin,
-      destination,
-    };
-    const podSeller = { name: trip.vendor, address: vm.address, gstin: vm.gstin, pan: vm.pan };
-    const podBillTo = { name: (trip as any).consignee ?? trip.client, address: "—" };
-    podSection = (
-      <div style={{ marginTop: 24 }}>
-        <div className="mb-3 flex items-center gap-2 font-semibold text-slate-700">
-          <PackageCheck size={16} className="text-emerald-600" />Proof of Delivery
-        </div>
-        <PodDocument invoice={podInv} seller={podSeller} billTo={podBillTo} />
+  const podSection: React.ReactNode = podTrips.length ? (
+    <div style={{ marginTop: 24 }}>
+      <div className="mb-3 flex items-center gap-2 font-semibold text-slate-700">
+        <PackageCheck size={16} className="text-emerald-600" />Proof of Delivery
       </div>
-    );
-  }
+      <div className="space-y-6">
+        {podTrips.map((t) => {
+          const p = podDocProps(t);
+          return <PodDocument key={t.id} invoice={p.invoice} seller={p.seller} billTo={p.billTo} />;
+        })}
+      </div>
+    </div>
+  ) : null;
 
   const download = async () => {
     await downloadElementAsPdf(ref.current, `${inv.id}.pdf`);
@@ -123,11 +188,42 @@ function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => 
 }
 
 function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
-  const { addAccessorial, removeAccessorial, submitInvoice, clientDecision } = useReceivables();
+  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision } = useReceivables();
   const { addDispute } = useDisputes();
   const [adding, setAdding] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [dl, setDl] = useState(false);
+  const [dlPod, setDlPod] = useState(false);
+  const invoiceRef = useRef<HTMLDivElement>(null);
+  const podRef = useRef<HTMLDivElement>(null);
   const editable = inv.stage === "draft" || inv.stage === "correction";
+
+  const doc = toInvoiceDoc(inv);
+  const podTrips = invoiceTrips(inv, trips);
+  const trace = buildArTrace(inv, podTrips[0]);
+
+  const download = async () => {
+    setDl(true);
+    try {
+      await downloadElementAsPdf(invoiceRef.current, `${inv.id}.pdf`);
+      toast(`Downloaded ${inv.id}.pdf`);
+    } catch {
+      toast("Could not generate PDF");
+    } finally {
+      setDl(false);
+    }
+  };
+  const downloadPod = async () => {
+    setDlPod(true);
+    try {
+      await downloadElementAsPdf(podRef.current, `POD-${inv.id}.pdf`);
+      toast(`Downloaded POD-${inv.id}.pdf`);
+    } catch {
+      toast("Could not generate PDF");
+    } finally {
+      setDlPod(false);
+    }
+  };
 
   const submit = () => { submitInvoice(inv.id); toast(`${inv.id} submitted to ${inv.client} for approval`); };
   const approve = () => { clientDecision(inv.id, "approve"); toast(`${inv.id} approved — posted to AR ledger`); onBack(); };
@@ -159,7 +255,17 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
           </div>
           <p className="mt-1 text-sm text-slate-500">{inv.client} · {inv.lane} · {inv.truck} {inv.tripId && <>· trip {inv.tripId}</>}</p>
         </div>
-        <Btn variant="ghost" onClick={() => setPreview(true)}><FileText size={14} />Preview invoice</Btn>
+        <div className="flex flex-wrap gap-2">
+          <Btn variant="ghost" onClick={() => setPreview(true)}><FileText size={14} />Preview invoice</Btn>
+          <Btn variant="ghost" onClick={download} disabled={dl}>
+            {dl ? <><Loader2 size={14} className="animate-spin" />Generating…</> : <><Download size={14} />Download invoice</>}
+          </Btn>
+          {podTrips.length > 0 && (
+            <Btn variant="ghost" onClick={downloadPod} disabled={dlPod}>
+              {dlPod ? <><Loader2 size={14} className="animate-spin" />Generating…</> : <><Download size={14} />Download POD</>}
+            </Btn>
+          )}
+        </div>
       </div>
 
       <Card className="mb-6 p-5">
@@ -216,6 +322,12 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         </Card>
       </div>
 
+      {/* Shipment trace — customer-side lineage, mirrors the vendor-bill match view */}
+      <Card className="mt-6 p-5">
+        <div className="mb-4 font-semibold text-slate-800">Shipment trace</div>
+        <Trace steps={trace} />
+      </Card>
+
       {/* Consolidated booking drops — BRD: a booking with multiple drops = multiple PODs */}
       {inv.drops && inv.drops.length > 1 && (
         <Card className="mt-6 p-5">
@@ -257,6 +369,17 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
           <div className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle size={16} />Disputed — tracked on the Disputes page.</div>
         )}
       </Card>
+
+      {/* Off-screen source documents captured by the Download buttons (laid out, not display:none, so html2canvas can render them) */}
+      <div aria-hidden style={{ position: "fixed", left: -9999, top: 0, pointerEvents: "none", opacity: 0 }}>
+        <InvoiceDocument ref={invoiceRef} invoice={doc.invoice} seller={SELLER} billTo={doc.billTo} />
+        <div ref={podRef}>
+          {podTrips.map((t) => {
+            const p = podDocProps(t);
+            return <PodDocument key={t.id} invoice={p.invoice} seller={p.seller} billTo={p.billTo} />;
+          })}
+        </div>
+      </div>
 
       {preview && <PreviewModal inv={inv} onClose={() => setPreview(false)} toast={toast} />}
 
@@ -312,7 +435,7 @@ function buildCustomers(trips: ARTrip[]): CustomerSummary[] {
 }
 
 /* The three booking-module KPIs the user asked for. */
-function Kpis({ freight, bookings, drops, expense }: { freight: number; bookings: number; drops: number; expense: number }) {
+export function Kpis({ freight, bookings, drops, expense }: { freight: number; bookings: number; drops: number; expense: number }) {
   return (
     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
       <Card className="p-5">

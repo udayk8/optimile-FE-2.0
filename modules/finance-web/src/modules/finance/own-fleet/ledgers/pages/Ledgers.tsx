@@ -13,7 +13,7 @@ export default function Ledgers() {
             {["Date", "Type", "Reference", "Amount", "Running Balance"].map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
           </tr></thead>
           <tbody>
-            {CLIENT_LEDGER.map((r, i) => (
+            {CLIENT_LEDGER.filter((r) => r.client === "Britannia Industries").map((r, i) => (
               <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                 <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{r.date}</td>
                 <td className="px-5 py-3.5"><Pill tone={typeTone[r.type as keyof typeof typeTone] as any}>{r.type}</Pill></td>

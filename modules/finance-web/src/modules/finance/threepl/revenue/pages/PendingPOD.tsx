@@ -4,8 +4,9 @@ import {
   Phone, Mail, User, Truck, Building2, Bell, AlertTriangle, Check, X,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finance/components/primitives";
-import { PENDING_POD_DETAILS } from "@finance/data/mock";
+import { PENDING_POD_DETAILS, contractRateFor } from "@finance/data/mock";
 import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
+import { Kpis } from "@finance/modules/finance/threepl/revenue/pages/Invoicing";
 import { useReceivables, type ARTrip, type PodStage } from "@finance/lib/receivablesStore";
 import { exportCsv } from "@finance/lib/csv";
 
@@ -201,6 +202,12 @@ export default function PendingPOD({ toast, onNavigate }: any) {
   );
   const totalRisk = pending.reduce((s, t) => s + t.revenue, 0);
 
+  // Same booking-module KPIs as Generate Invoice, over the filtered pending set.
+  const kpiFreight = pending.reduce((s, t) => s + contractRateFor(t.lane, t.truck, t.client).base, 0);
+  const kpiExpense = pending.reduce((s, t) => s + (t.expense ?? 0), 0);
+  const kpiDrops = pending.length;
+  const kpiBookings = new Set(pending.map((t) => t.bookingId ?? t.id)).size;
+
   const downloadReport = () => {
     exportCsv("pending-pod-report.csv", POD_REPORT_COLUMNS, pending);
     toast(`Downloaded pending-pod-report.csv (${pending.length} trips)`);
@@ -242,6 +249,8 @@ export default function PendingPOD({ toast, onNavigate }: any) {
           </div>
         </div>
       </Card>
+
+      <Kpis freight={kpiFreight} bookings={kpiBookings} drops={kpiDrops} expense={kpiExpense} />
 
       <Card className="overflow-hidden">
         <table className="w-full text-sm">

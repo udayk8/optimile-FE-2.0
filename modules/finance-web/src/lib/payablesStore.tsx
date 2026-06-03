@@ -81,6 +81,7 @@ export interface LedgerEntry {
   ref: string
   amt: number
   bal: number
+  client?: string   // AR rows carry their client; AP/vendor rows omit it
 }
 
 /* ---------- pure helpers ---------- */
