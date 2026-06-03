@@ -199,6 +199,29 @@ export const mockPlatformTenants: TenantRecord[] = [
       auditEvents24h: 0,
     },
   },
+  {
+    id: "tenant-bl001",
+    name: "Bluedart",
+    code: "BL001",
+    region: "Pending Region",
+    industry: "Logistics",
+    planId: "plan-growth",
+    status: "active",
+    tenantType: "LOGISTICS_PROVIDER_3PL",
+    customerPortalEnabled: false,
+    assignmentMode: "CONTROLLED_3PL_FLOW",
+    commercialMode: "BUY_SELL_MARGIN",
+    enabledModuleCodes: ["ADMIN", "TMS", "FLEET", "AUCTION", "CUSTOMER", "VENDOR", "TRACKING", "FINANCE"],
+    initialHierarchyTemplate: "region-branch",
+    primaryAdminUserId: "user-bl001-admin",
+    createdAt: "2026-05-30T18:17:02.591Z",
+    health: {
+      activeUsers: 7,
+      monthlyBookings: 0,
+      policyCount: 0,
+      auditEvents24h: 0,
+    },
+  },
 ];
 
 export const mockPlatformAuditLogs: PlatformAuditEvent[] = [
@@ -256,6 +279,8 @@ export const mockHierarchyLevels: HierarchyLevel[] = [
   { id: "level-elcs-company", tenantId: "tenant-easylane-cargo", order: 1, name: "Company", active: true },
   { id: "level-elcs-region", tenantId: "tenant-easylane-cargo", order: 2, name: "Region", active: true },
   { id: "level-elcs-branch", tenantId: "tenant-easylane-cargo", order: 3, name: "Branch", active: true },
+  { id: "level-region-bl001", tenantId: "tenant-bl001", order: 1, name: "Region", active: true },
+  { id: "level-branch-bl001", tenantId: "tenant-bl001", order: 2, name: "Branch", active: true },
 ];
 
 export const mockOrgUnits: OrgUnit[] = [
@@ -268,6 +293,8 @@ export const mockOrgUnits: OrgUnit[] = [
   // Easylane Cargo Solutions org units
   { id: "ou-elcs-region", tenantId: "tenant-easylane-cargo", name: "Central Region", hierarchyLevelId: "level-elcs-region", parentOrgUnitId: null, status: "active" },
   { id: "ou-elcs-branch", tenantId: "tenant-easylane-cargo", name: "Central Branch", hierarchyLevelId: "level-elcs-branch", parentOrgUnitId: "ou-elcs-region", status: "active" },
+  { id: "ou-bl001-south-region", tenantId: "tenant-bl001", name: "South-Region", hierarchyLevelId: "level-region-bl001", parentOrgUnitId: null, status: "active" },
+  { id: "ou-bl001-bangalore-branch", tenantId: "tenant-bl001", name: "Bangalore-Branch", hierarchyLevelId: "level-branch-bl001", parentOrgUnitId: "ou-bl001-south-region", status: "active" },
 ];
 
 export const mockRoles: RoleDefinition[] = [
@@ -288,6 +315,7 @@ export const mockRoles: RoleDefinition[] = [
   { id: "role-elcs-ceo", tenantId: "tenant-easylane-cargo", name: "CEO", description: "Full tenant oversight across all enabled modules.", hierarchyLevelId: "level-elcs-company", moduleCodes: ["ADMIN", "TMS", "FLEET", "AUCTION", "CUSTOMER", "VENDOR", "TRACKING"], dataScope: "ALL_TENANT", active: true },
   { id: "role-elcs-regional", tenantId: "tenant-easylane-cargo", name: "Regional Manager", description: "Operational visibility across booking, tracking, and fleet for the region.", hierarchyLevelId: "level-elcs-region", moduleCodes: ["TMS", "TRACKING", "FLEET"], dataScope: "OWN_RECORDS", active: true },
   { id: "role-elcs-ops", tenantId: "tenant-easylane-cargo", name: "Operations Manager", description: "Booking operations for the branch.", hierarchyLevelId: "level-elcs-branch", moduleCodes: ["TMS"], dataScope: "OWN_RECORDS", active: true },
+  { id: "role-tenant-admin-tenant-bl001-tenant-admin", tenantId: "tenant-bl001", name: "Tenant Admin", description: "Bootstrap tenant administrator.", hierarchyLevelId: "level-region-bl001", moduleCodes: ["ADMIN", "TMS", "FLEET", "AUCTION", "CUSTOMER", "VENDOR", "TRACKING", "FINANCE"], dataScope: "ALL_TENANT", active: true },
 ];
 
 export const mockRolePermissions: RolePermission[] = [
@@ -441,6 +469,18 @@ export const mockUsers: UserRecord[] = [
     lastActive: "2026-05-27T10:00:00Z",
     password: "Admin@123",
   },
+  {
+    id: "user-bl001-admin",
+    tenantId: "tenant-bl001",
+    name: "Jack",
+    email: "jack@gmail.com",
+    userType: "INTERNAL",
+    roleId: "role-tenant-admin-tenant-bl001-tenant-admin",
+    orgUnitIds: ["ou-bl001-south-region"],
+    status: "active",
+    lastActive: "2026-06-02T08:31:11.563Z",
+    password: "Admin@123",
+  },
 ];
 
 export const mockCapabilities: Capability[] = [
@@ -549,6 +589,18 @@ export const mockTenantCustomers: TenantCustomer[] = [
     createdAt: "2026-02-16T09:30:00Z",
     updatedAt: "2026-02-28T06:10:00Z",
   },
+  {
+    id: "tenant-customer-bl001-acc",
+    tenantId: "tenant-bl001",
+    name: "ACC cement",
+    legalName: "ACC cement",
+    code: "ACCCEMENT",
+    gstNumber: "GHST2300001",
+    rateMatchingBasis: "ADDRESS_TO_ADDRESS",
+    status: "active",
+    createdAt: "2026-05-30T19:42:32.090Z",
+    updatedAt: "2026-05-30T19:49:44.066Z",
+  },
 ];
 
 export const mockTenantCustomerAddresses: TenantCustomerAddress[] = [
@@ -589,6 +641,42 @@ export const mockTenantCustomerAddresses: TenantCustomerAddress[] = [
     status: "active",
     createdAt: "2026-02-17T10:00:00Z",
     updatedAt: "2026-02-17T10:00:00Z",
+  },
+  {
+    id: "customer-address-bl001-consignor",
+    tenantId: "tenant-bl001",
+    tenantCustomerId: "tenant-customer-bl001-acc",
+    addressType: "consignor",
+    addressName: "ACC Consignor",
+    contactPerson: "Umesh",
+    contactNumber: "9900154391",
+    addressLine1: "GM Palya",
+    city: "Bengaluru",
+    state: "Karnataka",
+    country: "India",
+    pincode: "560075",
+    isDefault: true,
+    status: "active",
+    createdAt: "2026-05-30T19:42:32.090Z",
+    updatedAt: "2026-05-30T19:42:32.090Z",
+  },
+  {
+    id: "customer-address-bl001-consignee",
+    tenantId: "tenant-bl001",
+    tenantCustomerId: "tenant-customer-bl001-acc",
+    addressType: "consignee",
+    addressName: "MIN Gateway 13",
+    contactPerson: "Kartik Pawar",
+    contactNumber: "9900154373",
+    addressLine1: "Uma Maheshwari Park, Banashankari Stage 2",
+    city: "Bengaluru",
+    state: "Karnataka",
+    country: "India",
+    pincode: "560070",
+    isDefault: false,
+    status: "active",
+    createdAt: "2026-05-30T19:49:44.066Z",
+    updatedAt: "2026-05-30T19:49:44.066Z",
   },
 ];
 
@@ -829,6 +917,71 @@ export const mockTenantBookings: BookingRecord[] = [
     updatedAt: "2026-04-19T10:45:00Z",
     createdBy: "Aditi Narang",
   },
+  {
+    id: "booking-bl001-1",
+    bookingId: "BKG-2026-0007",
+    tenantId: "tenant-bl001",
+    customerId: "tenant-customer-bl001-acc",
+    materialIds: ["material-bl001-cement"],
+    sourceAddressId: "customer-address-bl001-consignor",
+    destinationAddressId: "customer-address-bl001-consignee",
+    consignorAddressId: "customer-address-bl001-consignor",
+    consigneeAddressId: "customer-address-bl001-consignee",
+    laneKey: "560075-560070",
+    laneFound: false,
+    modeOfTransport: "ROAD",
+    numberOfDeliveries: 1,
+    pickupDate: "2026-06-03",
+    serviceType: "FTL",
+    commercialType: "SPOT",
+    pricing: {
+      rateType: "PER_TRIP",
+      contractRateCardId: null,
+      l1Rate: null,
+      enteredRate: 15000,
+      calculatedFreight: 15000,
+      deviationPercent: 0,
+      approvalLevel: null,
+      deviationRemark: null,
+      isAutoApproved: true,
+    },
+    quantity: 300,
+    weight: 15,
+    uom: "BAG",
+    weightUom: "MT",
+    vehicleTypeId: "vehicle-type-bl001-mgv",
+    lrType: "MANUAL",
+    manualLrPoolPreference: "GENERAL",
+    status: "PENDING_ASSIGNMENT",
+    opsRemark: "Bluedart seeded booking from local working tenant data.",
+    remarks: [
+      {
+        id: "booking-bl001-1-remark-1",
+        timestamp: "2026-06-03T11:27:00Z",
+        actor: "Jack",
+        type: "OPS_REMARK",
+        message: "Bluedart seeded booking from local working tenant data.",
+      },
+    ],
+    statusTimeline: [
+      {
+        id: "booking-bl001-1-status-1",
+        status: "DRAFT",
+        timestamp: "2026-06-03T11:25:00Z",
+        actor: "Jack",
+      },
+      {
+        id: "booking-bl001-1-status-2",
+        status: "PENDING_ASSIGNMENT",
+        timestamp: "2026-06-03T11:27:00Z",
+        actor: "System",
+        note: "Booking moved to assignment queue.",
+      },
+    ],
+    createdAt: "2026-06-03T11:25:00Z",
+    updatedAt: "2026-06-03T11:27:00Z",
+    createdBy: "Jack",
+  },
 ];
 
 export const mockTenantVendors: TenantVendor[] = [
@@ -873,6 +1026,27 @@ export const mockTenantVendors: TenantVendor[] = [
     status: "active",
     createdAt: "2026-02-18T09:00:00Z",
     updatedAt: "2026-02-26T12:00:00Z",
+  },
+  {
+    id: "tenant-vendor-bl001-mahesh",
+    tenantId: "tenant-bl001",
+    name: "Mahesh Transport",
+    legalName: "Mahesh Transport",
+    code: "VND-0003",
+    gstin: "GSTN0001",
+    gstNumber: "GSTN0001",
+    pan: "PAN88282",
+    address: "Uma Maheshwari Park, Banashankari Stage 2, Bengaluru, Karnataka, 560070",
+    vendorType: "Fleet Partner",
+    contactPerson: "Haris",
+    phone: "9878001234",
+    contactNumber: "9878001234",
+    email: "haris@gmail.com",
+    serviceableLocations: ["Bengaluru, Karnataka"],
+    supportedVehicleTypes: ["vehicle-type-bl001-mgv"],
+    status: "active",
+    createdAt: "2026-06-01T09:07:26.077Z",
+    updatedAt: "2026-06-01T09:07:26.077Z",
   },
 ];
 
@@ -926,6 +1100,16 @@ export const mockTenantVehicleTypes: TenantVehicleType[] = [
     createdAt: "2026-02-20T07:30:00Z",
     updatedAt: "2026-02-28T10:00:00Z",
   },
+  {
+    id: "vehicle-type-bl001-mgv",
+    tenantId: "tenant-bl001",
+    typeCode: "MGV",
+    capacity: "10MT",
+    dimensions: "32*4*4",
+    status: "active",
+    createdAt: "2026-05-31T13:29:38.469Z",
+    updatedAt: "2026-05-31T13:29:38.469Z",
+  },
 ];
 
 export const mockTenantVehicles: TenantVehicle[] = [
@@ -971,6 +1155,27 @@ export const mockTenantVehicles: TenantVehicle[] = [
     createdAt: "2026-04-06T09:30:00Z",
     updatedAt: "2026-04-06T09:30:00Z",
   },
+  {
+    id: "vehicle-bl001-ka01jj9012",
+    tenantId: "tenant-bl001",
+    registrationNumber: "KA01JJ9012",
+    make: "TATA",
+    model: "Signa",
+    year: "2018",
+    vehicleTypeId: "vehicle-type-bl001-mgv",
+    fuelType: "DIESEL",
+    ownershipType: "VENDOR",
+    vendorId: "tenant-vendor-bl001-mahesh",
+    chassisNo: "12321edwdewd",
+    insurance: { number: "HDSGSGHG7233", expiry: "2026-05-26" },
+    fitness: { number: "JGf873687q", expiry: "2026-11-30" },
+    puc: { number: "DASFD", expiry: "2026-09-30" },
+    permit: { type: "State Permit", expiry: "2026-12-15" },
+    odometer: "45000",
+    isActive: true,
+    createdAt: "2026-05-31T14:34:10.910Z",
+    updatedAt: "2026-05-31T14:34:10.910Z",
+  },
 ];
 
 export const mockTenantDrivers: TenantDriver[] = [
@@ -1014,6 +1219,26 @@ export const mockTenantDrivers: TenantDriver[] = [
     createdAt: "2026-04-06T10:00:00Z",
     updatedAt: "2026-04-06T10:00:00Z",
   },
+  {
+    id: "driver-bl001-kartik",
+    tenantId: "tenant-bl001",
+    name: "Kartik Pawar",
+    dob: "1997-01-01",
+    phone: "9900154373",
+    address: "Bengaluru, Karnataka",
+    bloodGroup: "",
+    licenseNumber: "DL00232",
+    licenseType: "HMV",
+    licenseExpiry: "2027-02-17",
+    medicalExpiry: "2026-12-16",
+    drugTestStatus: "CLEAR",
+    endorsements: [],
+    assignedVehicleId: "vehicle-bl001-ka01jj9012",
+    vendorId: "tenant-vendor-bl001-mahesh",
+    isActive: true,
+    createdAt: "2026-05-31T14:40:05.461Z",
+    updatedAt: "2026-05-31T14:40:05.461Z",
+  },
 ];
 
 export const mockTenantMaterials: TenantMaterial[] = [
@@ -1044,6 +1269,20 @@ export const mockTenantMaterials: TenantMaterial[] = [
     status: "active",
     createdAt: "2026-02-21T08:30:00Z",
     updatedAt: "2026-02-27T09:20:00Z",
+  },
+  {
+    id: "material-bl001-cement",
+    tenantId: "tenant-bl001",
+    materialCode: "CEMENT",
+    description: "Cement",
+    uom: "BAG",
+    quantityUOM: "BAG",
+    defaultWeightUOM: "MT",
+    conversionValue: 0.05,
+    mappedCustomerIds: ["tenant-customer-bl001-acc"],
+    status: "active",
+    createdAt: "2026-05-31T13:31:41.452Z",
+    updatedAt: "2026-05-31T13:31:41.452Z",
   },
 ];
 
