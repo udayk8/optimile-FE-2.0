@@ -14,6 +14,7 @@ import type {
   TrackingTrip,
 } from '../types/tracking.types'
 import { getCustomerSafeTracking as getCustomerSafeTrackingFromService, toCustomerTrackingView } from './customerTrackingApi'
+import { findBookingTrip, getBookingResolvableTrips } from '../integration/bookingTrackingBridge'
 
 const USE_MOCK_TRACKING = import.meta.env.VITE_USE_MOCK_TRACKING !== 'false'
 const TRACKING_API_BASE_URL = import.meta.env.VITE_TRACKING_API_BASE_URL ?? '/api/tracking'
@@ -91,7 +92,8 @@ export async function getActiveTrips(filters?: {
   }
 
   const normalizedSearch = filters?.search?.trim().toLowerCase()
-  const rows = trackingTrips
+  // Bridge: real tenant booking/delivery trips (empty when standalone).
+  const rows = [...getBookingResolvableTrips(), ...trackingTrips]
     .map(normalizeTrip)
     .filter((trip) => {
       if (filters?.status && filters.status !== 'All' && trip.status !== filters.status) return false
@@ -117,7 +119,7 @@ export async function getTripById(tripId: string): Promise<TrackingTrip | undefi
   if (!USE_MOCK_TRACKING) {
     return fetchJson<TrackingTrip>(`/trips/${tripId}`).then(normalizeTrip)
   }
-  const trip = trackingTrips.find((item) => item.id === tripId)
+  const trip = trackingTrips.find((item) => item.id === tripId) ?? findBookingTrip(tripId)
   return resolveAfter(trip ? normalizeTrip(trip) : undefined)
 }
 

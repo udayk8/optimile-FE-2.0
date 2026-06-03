@@ -333,8 +333,18 @@ export const DispatchPage: React.FC = () => {
                     })()}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    <div className="truncate">{getName(trip.vehicle_id, vehicles, 'vehicle')}</div>
-                    <div className="truncate text-xs text-gray-400">{getName(trip.driver_id, drivers, 'driver')}</div>
+                    {(() => {
+                      // Booking-derived trips have no fleet vehicle/driver record —
+                      // fall back to the tracking trip's labels.
+                      const vehicleName = getName(trip.vehicle_id, vehicles, 'vehicle')
+                      const driverName = getName(trip.driver_id, drivers, 'driver')
+                      return (
+                        <>
+                          <div className="truncate">{vehicleName !== '-' ? vehicleName : trackingTrip?.vehicleNumber ?? '-'}</div>
+                          <div className="truncate text-xs text-gray-400">{driverName !== '-' ? driverName : trackingTrip?.driverName ?? '-'}</div>
+                        </>
+                      )
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="truncate text-sm text-gray-900">{trip.origin}</div>

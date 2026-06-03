@@ -2290,6 +2290,12 @@ export function BookingDetailsPage() {
                             <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}/lr`}>View LR</Link>
                           </Button>
                         ) : null}
+                        {bookingRecord.status === "IN_TRANSIT" && delivery.lrNumber?.trim() ? (
+                          // Delivery-wise Track → Track-and-Trace trip keyed by LR number.
+                          <Button asChild size="sm" variant="outline">
+                            <Link to={`/tenant/${tenant.id}/track-and-trace/trips/${encodeURIComponent(delivery.lrNumber.trim())}`}>Track</Link>
+                          </Button>
+                        ) : null}
                         <Button size="sm" variant="outline" onClick={() => setRemarkDeliveryId(delivery.id)}>Add Remark</Button>
                         {["IN_TRANSIT", "ARRIVED", "DELAYED", "EXCEPTION"].includes(bookingRecord.status) && delivery.status !== "COMPLETED" ? (
                           <Button size="sm" onClick={() => markDeliveryCompleted(delivery.id)}>Mark Delivery Completed</Button>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, MapPin, Plus } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -256,6 +256,11 @@ export function BookingListPage() {
 
   function openBooking(bookingId: string) {
     navigate(`/tenant/${tenant.id}/bookings/${bookingId}`);
+  }
+
+  // Track-and-Trace: open the trip for this booking number (booking-wise).
+  function openTrack(bookingNo: string) {
+    navigate(`/tenant/${tenant.id}/track-and-trace/trips/${encodeURIComponent(bookingNo)}`);
   }
 
   function togglePipelineKey(key: string) {
@@ -545,6 +550,7 @@ export function BookingListPage() {
                   driverName={booking.assignment?.driverName ?? (booking.assignment?.driverId ? driverMap.get(booking.assignment.driverId)?.name ?? "Unassigned" : "Unassigned")}
                   lrNumbersLabel={getLrNumbersLabel(booking)}
                   onOpen={() => openBooking(booking.id)}
+                  onTrack={() => openTrack(booking.bookingId)}
                 />
               ))}
             </div>
@@ -658,6 +664,7 @@ function BookingSummaryRow({
   driverName,
   lrNumbersLabel,
   onOpen,
+  onTrack,
 }: {
   booking: BookingRecord;
   customerName: string;
@@ -668,6 +675,7 @@ function BookingSummaryRow({
   driverName: string;
   lrNumbersLabel: string;
   onOpen: () => void;
+  onTrack: () => void;
 }) {
   const hasRevisionPending = (booking.destinationChangeRequests ?? []).some((request) =>
     ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(request.status),
@@ -717,7 +725,29 @@ function BookingSummaryRow({
         <BookingStatusBadge status={booking.status} />
       </div>
 
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {booking.status === "IN_TRANSIT" ? (
+          // Non-button (row is itself a <button>): avoids invalid nested buttons.
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTrack();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                onTrack();
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
+          >
+            <MapPin className="size-3" />
+            Track
+          </span>
+        ) : null}
         <ArrowRight className="size-4 text-slate-400" />
       </div>
     </button>

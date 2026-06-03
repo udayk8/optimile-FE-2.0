@@ -17,6 +17,7 @@ import {
   VehicleTrackingDevice, TrackerProtocol, TrackerPowerSource, TrackerStatus, TrackerDeviceKind,
   MarketplaceProvider
 } from '../types/fleet.types';
+import { bookingTrackingTripToFleetTrip, findBookingTrip, getBookingDispatchTrips } from '../integration/bookingTrackingBridge';
 
 // --- SEED DATA ---
 
@@ -1717,13 +1718,19 @@ export const TripAPI = {
             trips = seedTrips();
             db.saveTrips(trips);
         }
-        return trips.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        // Bridge: real tenant In-Transit bookings (empty when standalone).
+        const bookingTrips = getBookingDispatchTrips().map(bookingTrackingTripToFleetTrip);
+        return [...bookingTrips, ...trips].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
     getById: async (id: string): Promise<Trip | undefined> => {
         await delay(200);
         let trips = db.getTrips();
         if (trips.length === 0) { trips = seedTrips(); db.saveTrips(trips); }
-        return trips.find(t => t.trip_id === id);
+        const mockTrip = trips.find(t => t.trip_id === id);
+        if (mockTrip) return mockTrip;
+        // Bridge: resolve a real booking/delivery trip by bookingId or LR number.
+        const bookingTrip = findBookingTrip(id);
+        return bookingTrip ? bookingTrackingTripToFleetTrip(bookingTrip) : undefined;
     },
     create: async (trip: any): Promise<Trip> => {
         await delay(500);

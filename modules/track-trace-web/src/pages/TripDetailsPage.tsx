@@ -484,6 +484,14 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                                     <p className="text-xs text-gray-500">{vehicle.vehicle_type}</p>
                                 </div>
                             </div>
+                        ) : trackingTrip?.vehicleNumber ? (
+                            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                                <IconTruck className="w-8 h-8 text-primary mr-3" />
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">{trackingTrip.vehicleNumber}</p>
+                                    {trackingTrip.vehicleType && <p className="text-xs text-gray-500">{trackingTrip.vehicleType}</p>}
+                                </div>
+                            </div>
                         ) : (
                             <div className="p-3 bg-warning/10 text-warning rounded-lg text-sm">
                               No vehicle assigned
@@ -501,6 +509,14 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                                 <div>
                                     <p className="text-sm font-medium text-gray-900">{driver.name}</p>
                                     <p className="text-xs text-gray-500">{driver.phone}</p>
+                                </div>
+                            </div>
+                        ) : trackingTrip?.driverName ? (
+                            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                                <IconUsers className="w-8 h-8 text-primary mr-3" />
+                                <div>
+                                    <p className="text-sm font-medium text-gray-900">{trackingTrip.driverName}</p>
+                                    {trackingTrip.driverMobile && <p className="text-xs text-gray-500">{trackingTrip.driverMobile}</p>}
                                 </div>
                             </div>
                         ) : (
