@@ -33,6 +33,12 @@ export const TRIPS = [
   { id: "TR-4465", bookingId: "BKG-7748", client: "Marico Limited", consignee: "Marico, Hyderabad", lane: "Pune → Hyderabad", truck: "32ft SXL", delivered: "2026-05-20", podStatus: "pending", podStage: "pending", daysPending: 1, revenue: 92000, expense: 74000, vendor: "Royal Carriers", driver: "M. Singh" },
   // BKG-7750 · Dabur — 1 drop (POD still pending)
   { id: "TR-4460", bookingId: "BKG-7750", client: "Dabur India", consignee: "Dabur, Jaipur", lane: "Delhi → Jaipur", truck: "14ft", delivered: "2026-05-17", podStatus: "pending", podStage: "pending", daysPending: 4, revenue: 24500, expense: 19000, vendor: "(market hire)", vehicle: "RJ-14-GH-8890", driver: "A. Khan" },
+  // BKG-7770 · Ultratech Cement — 1 drop (POD still pending)
+  { id: "TR-4490", bookingId: "BKG-7770", client: "Ultratech Cement", consignee: "Ultratech DC, Ahmedabad", lane: "Surat → Ahmedabad", truck: "32ft MXL", delivered: "2026-05-31", podStatus: "pending", podStage: "pending", daysPending: 3, revenue: 76000, expense: 62000, vendor: "Royal Carriers", vehicle: "GJ-05-RC-4411", driver: "V. Rao" },
+  // BKG-7772 · Marico — 1 drop (POD still pending, different lane)
+  { id: "TR-4492", bookingId: "BKG-7772", client: "Marico Limited", consignee: "Marico DC, Chennai", lane: "Bengaluru → Chennai", truck: "20ft", delivered: "2026-05-30", podStatus: "pending", podStage: "pending", daysPending: 4, revenue: 34000, expense: 28000, vendor: "Sharma Transport", vehicle: "KA-01-ST-8822", driver: "S. Narayanan" },
+  // BKG-7774 · Dabur — 1 drop (POD still pending, market hire)
+  { id: "TR-4494", bookingId: "BKG-7774", client: "Dabur India", consignee: "Dabur, Baroda", lane: "Mumbai → Baroda", truck: "14ft", delivered: "2026-06-01", podStatus: "pending", podStage: "pending", daysPending: 2, revenue: 21000, expense: 17000, vendor: "(market hire)", vehicle: "GJ-06-CD-9912", driver: "K. Patel" },
 ];
 
 /* ---------- Daily POD → invoice funnel (BRD 3.2) ---------- */
@@ -64,6 +70,7 @@ const TERMS_BY_CLIENT: Record<string, string> = {
   "Asian Paints Ltd": "Net 20",
   "Marico Limited": "Net 30",
   "Dabur India": "Net 20",
+  "Ultratech Cement": "Net 30",
 };
 export const contractTermsFor = (client: string): string => TERMS_BY_CLIENT[client] || "Net 30";
 
@@ -667,6 +674,24 @@ export const VENDOR_BILL_DETAILS = {
 
 export const vendorMeta = (vendor: string) => (_VENDOR_META as Record<string, any>)[vendor] || { address: "—", gstin: "—", pan: "—", bank: { holder: vendor, acc: "—", branch: "—", ifsc: "—", type: "Current" } };
 
+/* ---------- Per-trip POD metadata (LR number, shipping date, truck registration)
+   Used by the Generate Invoice preview to render the PodDocument alongside the invoice. */
+export const TRIP_POD_META: Record<string, { lrNo: string; shippingDate: string; truckNo: string }> = {
+  "TR-4471":  { lrNo: "LR-77421", shippingDate: "2026-05-16", truckNo: "MH-04-KL-2231" },
+  "TR-4471B": { lrNo: "LR-77422", shippingDate: "2026-05-16", truckNo: "MH-04-KL-2231" },
+  "TR-4468":  { lrNo: "LR-77418", shippingDate: "2026-05-17", truckNo: "TN-09-CD-4521" },
+  "TR-4468B": { lrNo: "LR-77419", shippingDate: "2026-05-17", truckNo: "TN-09-CD-4521" },
+  "TR-4455":  { lrNo: "LR-77405", shippingDate: "2026-05-17", truckNo: "MH-04-AB-9087" },
+  "TR-4480":  { lrNo: "LR-77430", shippingDate: "2026-05-19", truckNo: "GJ-05-RC-7781" },
+  "TR-4480B": { lrNo: "LR-77431", shippingDate: "2026-05-19", truckNo: "GJ-05-RC-7781" },
+  "TR-4482":  { lrNo: "LR-77432", shippingDate: "2026-05-18", truckNo: "GJ-05-AB-7788" },
+  "TR-4465":  { lrNo: "LR-77415", shippingDate: "2026-05-19", truckNo: "MH-12-GH-7781" },
+  "TR-4460":  { lrNo: "LR-77410", shippingDate: "2026-05-16", truckNo: "RJ-14-GH-8890" },
+  "TR-4490":  { lrNo: "LR-77490", shippingDate: "2026-05-28", truckNo: "GJ-05-RC-4411" },
+  "TR-4492":  { lrNo: "LR-77492", shippingDate: "2026-05-26", truckNo: "KA-01-ST-8822" },
+  "TR-4494":  { lrNo: "LR-77494", shippingDate: "2026-05-30", truckNo: "GJ-06-CD-9912" },
+};
+
 /* ---------- Pending POD follow-up: trace + whom-to-contact ---------- */
 export const PENDING_POD_DETAILS = {
   "TR-4471": {
@@ -764,6 +789,151 @@ export const PENDING_POD_DETAILS = {
     ],
     followUps: [
       { ts: "2026-05-20 14:40", note: "POD reminder emailed to Sharma Transport." },
+    ],
+  },
+  "TR-4471B": {
+    contacts: {
+      vendorDispatcher: { name: "Rakesh Sharma", role: "Sharma Transport · Dispatch", phone: "+91 98200 11223", email: "dispatch@sharmatransport.in" },
+      driver: { name: "R. Yadav", role: "Driver · MH-04-KL-2231", phone: "+91 99300 55102" },
+      owner: { name: "Anil Mehta", role: "Ops Coordinator (internal)", phone: "+91 80471 20001" },
+      consignee: { name: "Britannia DC, Jaipur", role: "Consignee receiving desk", phone: "+91 141 261 9900" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-15 10:12", actor: "TMS · IND-4471B", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-15 14:40", actor: "Sharma Transport", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-16 07:30", actor: "Mumbai hub", done: true },
+      { label: "In transit", ts: "2026-05-16 → 05-18", actor: "MH-04-KL-2231 · R. Yadav", done: true },
+      { label: "Delivered at destination", ts: "2026-05-18 17:20", actor: "Jaipur · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-18 19:00", actor: "e-POD via driver app", done: true },
+    ],
+    followUps: [],
+  },
+  "TR-4468B": {
+    contacts: {
+      vendorDispatcher: { name: "Spot Market Desk", role: "Market hire · broker", phone: "+91 98400 77881", email: "spot@optimile.co" },
+      driver: { name: "S. Kumar", role: "Driver · TN-09-CD-4521", phone: "+91 95000 23145" },
+      owner: { name: "Anil Mehta", role: "Ops Coordinator (internal)", phone: "+91 80471 20001" },
+      consignee: { name: "Asian Paints, Mysuru", role: "Consignee receiving desk", phone: "+91 821 244 5500" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-16 09:20", actor: "TMS · IND-4468B", done: true },
+      { label: "Market vehicle hired", ts: "2026-05-16 12:10", actor: "Spot · TN-09-CD-4521", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-17 06:50", actor: "Chennai hub", done: true },
+      { label: "In transit", ts: "2026-05-17 → 05-19", actor: "TN-09-CD-4521 · S. Kumar", done: true },
+      { label: "Delivered at destination", ts: "2026-05-19 20:05", actor: "Mysuru · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-19 21:30", actor: "e-POD via driver app", done: true },
+    ],
+    followUps: [],
+  },
+  "TR-4480": {
+    contacts: {
+      vendorDispatcher: { name: "Vijay Rao", role: "Royal Carriers · Dispatch", phone: "+91 98220 44556", email: "ops@royalcarriers.in" },
+      driver: { name: "V. Rao", role: "Driver · GJ-05-RC-7781", phone: "+91 99220 77010" },
+      owner: { name: "Sneha Iyer", role: "Ops Coordinator (internal)", phone: "+91 80471 20002" },
+      consignee: { name: "Ultratech, Mumbai", role: "Consignee receiving desk", phone: "+91 22 6633 4400" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-17 09:00", actor: "TMS · IND-4480", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-17 12:30", actor: "Royal Carriers", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-19 06:00", actor: "Ahmedabad hub", done: true },
+      { label: "In transit", ts: "2026-05-19 → 05-20", actor: "GJ-05-RC-7781 · V. Rao", done: true },
+      { label: "Delivered at destination", ts: "2026-05-20 15:40", actor: "Mumbai · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-20 17:10", actor: "e-POD via driver app", done: true },
+    ],
+    followUps: [],
+  },
+  "TR-4480B": {
+    contacts: {
+      vendorDispatcher: { name: "Vijay Rao", role: "Royal Carriers · Dispatch", phone: "+91 98220 44556", email: "ops@royalcarriers.in" },
+      driver: { name: "V. Rao", role: "Driver · GJ-05-RC-7781", phone: "+91 99220 77010" },
+      owner: { name: "Sneha Iyer", role: "Ops Coordinator (internal)", phone: "+91 80471 20002" },
+      consignee: { name: "Ultratech, Pune", role: "Consignee receiving desk", phone: "+91 20 6612 3300" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-17 09:00", actor: "TMS · IND-4480B", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-17 12:30", actor: "Royal Carriers", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-19 06:00", actor: "Ahmedabad hub", done: true },
+      { label: "In transit", ts: "2026-05-19 → 05-20", actor: "GJ-05-RC-7781 · V. Rao", done: true },
+      { label: "Delivered at destination", ts: "2026-05-20 18:20", actor: "Pune · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-20 19:45", actor: "e-POD via driver app", done: true },
+    ],
+    followUps: [],
+  },
+  "TR-4482": {
+    contacts: {
+      vendorDispatcher: { name: "Spot Market Desk", role: "Market hire · broker", phone: "+91 98400 77881", email: "spot@optimile.co" },
+      driver: { name: "I. Shaikh", role: "Driver · GJ-05-AB-7788", phone: "+91 97200 11098" },
+      owner: { name: "Anil Mehta", role: "Ops Coordinator (internal)", phone: "+91 80471 20001" },
+      consignee: { name: "Ultratech, Mumbai", role: "Consignee receiving desk", phone: "+91 22 6633 4400" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-16 11:00", actor: "TMS · IND-4482", done: true },
+      { label: "Market vehicle hired", ts: "2026-05-16 14:20", actor: "Spot · GJ-05-AB-7788", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-18 07:40", actor: "Surat hub", done: true },
+      { label: "In transit", ts: "2026-05-18 → 05-19", actor: "GJ-05-AB-7788 · I. Shaikh", done: true },
+      { label: "Delivered at destination", ts: "2026-05-19 16:10", actor: "Mumbai · consignee signed", done: true },
+      { label: "POD uploaded", ts: "2026-05-19 17:50", actor: "e-POD via driver app", done: true },
+    ],
+    followUps: [],
+  },
+  "TR-4490": {
+    contacts: {
+      vendorDispatcher: { name: "Vijay Rao", role: "Royal Carriers · Dispatch", phone: "+91 98220 44556", email: "ops@royalcarriers.in" },
+      driver: { name: "V. Rao", role: "Driver · GJ-05-RC-4411", phone: "+91 99220 88901" },
+      owner: { name: "Sneha Iyer", role: "Ops Coordinator (internal)", phone: "+91 80471 20002" },
+      consignee: { name: "Ultratech DC, Ahmedabad", role: "Consignee receiving desk", phone: "+91 79 6690 1100" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-27 10:30", actor: "TMS · IND-4490", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-27 14:00", actor: "Royal Carriers", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-28 06:45", actor: "Surat hub", done: true },
+      { label: "In transit", ts: "2026-05-28 → 05-31", actor: "GJ-05-RC-4411 · V. Rao", done: true },
+      { label: "Delivered at destination", ts: "2026-05-31 14:00", actor: "Ahmedabad · consignee signed", done: true },
+      { label: "POD pending upload", ts: "3 days overdue", actor: "Awaiting e-POD from vendor", done: false, warn: true },
+    ],
+    followUps: [
+      { ts: "2026-06-02 11:00", note: "Reminder sent to Royal Carriers ops portal." },
+      { ts: "2026-06-01 16:20", note: "Called V. Rao — confirmed delivery, POD upload pending from their side." },
+    ],
+  },
+  "TR-4492": {
+    contacts: {
+      vendorDispatcher: { name: "Rakesh Sharma", role: "Sharma Transport · Dispatch", phone: "+91 98200 11223", email: "dispatch@sharmatransport.in" },
+      driver: { name: "S. Narayanan", role: "Driver · KA-01-ST-8822", phone: "+91 94400 22310" },
+      owner: { name: "Anil Mehta", role: "Ops Coordinator (internal)", phone: "+91 80471 20001" },
+      consignee: { name: "Marico DC, Chennai", role: "Consignee receiving desk", phone: "+91 44 6688 2200" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-25 09:15", actor: "TMS · IND-4492", done: true },
+      { label: "Indent assigned to vendor", ts: "2026-05-25 12:40", actor: "Sharma Transport", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-26 07:20", actor: "Bengaluru hub", done: true },
+      { label: "In transit", ts: "2026-05-26 → 05-30", actor: "KA-01-ST-8822 · S. Narayanan", done: true },
+      { label: "Delivered at destination", ts: "2026-05-30 11:50", actor: "Chennai · consignee signed", done: true },
+      { label: "POD pending upload", ts: "4 days overdue", actor: "Awaiting e-POD from vendor", done: false, warn: true },
+    ],
+    followUps: [
+      { ts: "2026-06-02 10:00", note: "Escalated to ops — 4 days without POD upload from Sharma Transport." },
+      { ts: "2026-06-01 14:30", note: "Called S. Narayanan; driver states POD was handed to dispatcher." },
+      { ts: "2026-05-31 10:15", note: "Email reminder sent to Sharma Transport dispatch." },
+    ],
+  },
+  "TR-4494": {
+    contacts: {
+      vendorDispatcher: { name: "Spot Market Desk", role: "Market hire · broker", phone: "+91 98400 77881", email: "spot@optimile.co" },
+      driver: { name: "K. Patel", role: "Driver · GJ-06-CD-9912", phone: "+91 93700 55421" },
+      owner: { name: "Sneha Iyer", role: "Ops Coordinator (internal)", phone: "+91 80471 20002" },
+      consignee: { name: "Dabur, Baroda", role: "Consignee receiving desk", phone: "+91 265 233 4400" },
+    },
+    trace: [
+      { label: "Booking created", ts: "2026-05-29 11:00", actor: "TMS · IND-4494", done: true },
+      { label: "Market vehicle hired", ts: "2026-05-29 14:30", actor: "Spot · GJ-06-CD-9912", done: true },
+      { label: "Dispatched from origin", ts: "2026-05-30 06:10", actor: "Mumbai hub", done: true },
+      { label: "In transit", ts: "2026-05-30 → 06-01", actor: "GJ-06-CD-9912 · K. Patel", done: true },
+      { label: "Delivered at destination", ts: "2026-06-01 13:25", actor: "Baroda · consignee signed", done: true },
+      { label: "POD pending upload", ts: "2 days overdue", actor: "Informal transporter — no portal", done: false, warn: true },
+    ],
+    followUps: [
+      { ts: "2026-06-02 15:00", note: "Driver asked to share POD photo on WhatsApp — pending response." },
     ],
   },
 };
