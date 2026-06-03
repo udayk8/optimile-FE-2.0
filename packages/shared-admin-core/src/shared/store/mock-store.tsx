@@ -34,6 +34,11 @@ import {
   mockTenantVendorRateCards,
   mockTenantAuditLogs,
   mockUsers,
+  mockTenantLrs,
+  mockTenantLrRequests,
+  mockTenantLrTransfers,
+  mockTenantInvoices,
+  mockTenantBookingVendorIndents,
 } from "@/shared/mocks/data";
 import { buildHierarchyConfigForTemplate } from "@/shared/lib/hierarchy-templates";
 import {
@@ -754,6 +759,91 @@ function ensureDemoTenantsRehydrated(): void {
     }
 
     window.localStorage.setItem(DEMO_REHYDRATION_KEY, "1");
+  } catch {
+    /* best-effort — never break boot on rehydration */
+  }
+}
+
+// One-time reconciliation of the Bluedart (tenant-bl001) snapshot. The earlier
+// rehydration baked a partial, hand-built bl001 slice (6 roles, stale ids).
+// The real working tenant — recovered from the source localStorage and now in
+// the seed (13 roles, full users / LR / auto-LR / requests / vendors /
+// customers / bookings / indents / invoices) — uses a different id-space, so a
+// plain add-missing merge would leave duplicates. This pass REPLACES every
+// bl001-tenant row in each seed-managed collection with the seed snapshot.
+// Gated by its own version key so it runs once and never clobbers later edits.
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v1";
+const BL001_TENANT = "tenant-bl001";
+
+function ensureBl001SnapshotSeeded(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.localStorage.getItem(BL001_SNAPSHOT_KEY) === "1") return;
+
+    const replaceBl001 = <T extends { tenantId?: string }>(key: string, seed: T[]) => {
+      const raw = window.localStorage.getItem(key);
+      const stored: T[] = raw ? JSON.parse(raw) : [];
+      const others = stored.filter((item) => item?.tenantId !== BL001_TENANT);
+      const seeded = seed.filter((item) => item?.tenantId === BL001_TENANT);
+      window.localStorage.setItem(key, JSON.stringify([...others, ...seeded]));
+    };
+
+    replaceBl001(storageKeys.tenantRoles, mockRoles);
+    replaceBl001(storageKeys.tenantRolePermissions, mockRolePermissions);
+    replaceBl001(storageKeys.tenantUsers, mockUsers);
+    replaceBl001(storageKeys.tenantOrgUnits, mockOrgUnits);
+    replaceBl001(storageKeys.tenantCustomers, mockTenantCustomers);
+    replaceBl001(storageKeys.tenantCustomerAddresses, mockTenantCustomerAddresses);
+    replaceBl001(storageKeys.tenantCustomerRateCards, mockTenantCustomerRateCards);
+    replaceBl001(storageKeys.tenantVendors, mockTenantVendors);
+    replaceBl001(storageKeys.tenantVendorRateCards, mockTenantVendorRateCards);
+    replaceBl001(storageKeys.tenantVehicleTypes, mockTenantVehicleTypes);
+    replaceBl001(storageKeys.tenantVehicles, mockTenantVehicles);
+    replaceBl001(storageKeys.tenantDrivers, mockTenantDrivers);
+    replaceBl001(storageKeys.tenantMaterials, mockTenantMaterials);
+    replaceBl001(storageKeys.tenantUOMDefinitions, mockTenantUOMDefinitions);
+    replaceBl001(storageKeys.tenantUOMMappings, mockTenantUOMMappings);
+    replaceBl001(storageKeys.tenantBookings, mockTenantBookings);
+    replaceBl001(storageKeys.tenantLRConfigs, mockTenantLRConfigs);
+    replaceBl001(storageKeys.tenantLrPools, mockTenantLrPools);
+    replaceBl001(storageKeys.tenantLrs, mockTenantLrs);
+    replaceBl001(storageKeys.tenantLrRequests, mockTenantLrRequests);
+    replaceBl001(storageKeys.tenantLrTransfers, mockTenantLrTransfers);
+    replaceBl001(storageKeys.tenantInvoices, mockTenantInvoices);
+    replaceBl001(BOOKING_VENDOR_INDENTS_KEY, mockTenantBookingVendorIndents);
+
+    // Hierarchy levels live inside the workspace blob — rebuild the bl001 entry
+    // from the seed levels so the recovered Region/Branch hierarchy is present.
+    const wsRaw = window.localStorage.getItem(storageKeys.tenantWorkspaces);
+    const workspaceMap: Record<string, TenantWorkspaceState> = wsRaw ? JSON.parse(wsRaw) : {};
+    const tenant = mockPlatformTenants.find((item) => item.id === BL001_TENANT);
+    const levels = mockHierarchyLevels
+      .filter((level) => level.tenantId === BL001_TENANT)
+      .sort((a, b) => a.order - b.order);
+    if (tenant) {
+      workspaceMap[BL001_TENANT] = {
+        tenantId: BL001_TENANT,
+        startingBlueprint: tenant.initialHierarchyTemplate as HierarchyTemplateCode,
+        hierarchy: {
+          tenantId: BL001_TENANT,
+          startingBlueprint: tenant.initialHierarchyTemplate as HierarchyTemplateCode,
+          levels,
+          lastUpdated: new Date().toISOString(),
+        },
+      };
+      window.localStorage.setItem(storageKeys.tenantWorkspaces, JSON.stringify(workspaceMap));
+    }
+
+    // Role-permission matrix — set the bl001 role entries from the seed.
+    const matrixRaw = window.localStorage.getItem("optimile.tenant.rolePermissionMatrix");
+    const matrix: Record<string, unknown> = matrixRaw ? JSON.parse(matrixRaw) : {};
+    const bl001RoleIds = new Set(mockRoles.filter((role) => role.tenantId === BL001_TENANT).map((role) => role.id));
+    Object.entries(mockRolePermissionMatrixSeed).forEach(([roleId, value]) => {
+      if (bl001RoleIds.has(roleId)) matrix[roleId] = value;
+    });
+    window.localStorage.setItem("optimile.tenant.rolePermissionMatrix", JSON.stringify(matrix));
+
+    window.localStorage.setItem(BL001_SNAPSHOT_KEY, "1");
   } catch {
     /* best-effort — never break boot on rehydration */
   }
@@ -3399,6 +3489,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   ensureBootstrapOrgUnitCleanupOnce();
   ensureStarterCeoRoleCleanupOnce();
   ensureDemoTenantsRehydrated();
+  ensureBl001SnapshotSeeded();
   const seededWorkspaces = loadSeededState(storageKeys.tenantWorkspaces, buildSeedWorkspaces());
   const seededPlatformTenants = normalizeStoredPlatformTenants(
     loadSeededState(storageKeys.platformTenants, mockPlatformTenants),
@@ -3506,22 +3597,22 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   // Vendor indents (multi-vendor "send indent" flow). Persisted under a plain
   // key (no legacy-recovery machinery needed).
   const [bookingVendorIndents, setBookingVendorIndents] = useState<BookingVendorIndent[]>(() =>
-    loadSeededState(BOOKING_VENDOR_INDENTS_KEY, [] as BookingVendorIndent[]),
+    loadSeededState(BOOKING_VENDOR_INDENTS_KEY, mockTenantBookingVendorIndents),
   );
   const [tenantInvoices, setTenantInvoices] = useState<TenantInvoiceRecord[]>(() =>
-    loadSeededState(storageKeys.tenantInvoices, []),
+    loadSeededState(storageKeys.tenantInvoices, mockTenantInvoices),
   );
   const [tenantLrs, setTenantLrs] = useState<TenantLrRecord[]>(() =>
-    normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, [])),
+    normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, mockTenantLrs)),
   );
   const [tenantLrPools, setTenantLrPools] = useState<TenantLrPoolRecord[]>(() =>
     normalizeStoredTenantLrPools(loadSeededState(storageKeys.tenantLrPools, mockTenantLrPools)),
   );
   const [tenantLrRequests, setTenantLrRequests] = useState<TenantLrAllocationRequestRecord[]>(() =>
-    normalizeStoredTenantLrRequests(loadSeededState(storageKeys.tenantLrRequests, [])),
+    normalizeStoredTenantLrRequests(loadSeededState(storageKeys.tenantLrRequests, mockTenantLrRequests)),
   );
   const [tenantLrTransfers, setTenantLrTransfers] = useState<TenantLrTransferRecord[]>(() =>
-    normalizeStoredTenantLrTransfers(loadSeededState(storageKeys.tenantLrTransfers, [])),
+    normalizeStoredTenantLrTransfers(loadSeededState(storageKeys.tenantLrTransfers, mockTenantLrTransfers)),
   );
   const [workspaces, setWorkspaces] = useState<Record<string, TenantWorkspaceState>>(() => seededWorkspaces);
   const [orgUnits, setOrgUnits] = useState<OrgUnit[]>(() =>

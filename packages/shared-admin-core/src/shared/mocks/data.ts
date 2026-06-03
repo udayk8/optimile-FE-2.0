@@ -35,6 +35,15 @@ import type {
   TenantVendor,
   TenantVendorRateCard,
 } from "@/types/vendor";
+import {
+  BL001_TENANT_ID,
+  bl001HierarchyLevels, bl001OrgUnits, bl001Roles, bl001RolePermissions, bl001Users,
+  bl001Customers, bl001CustomerAddresses, bl001CustomerRateCards,
+  bl001Vendors, bl001VendorRateCards, bl001VehicleTypes, bl001Vehicles, bl001Drivers,
+  bl001Materials, bl001UOMDefinitions, bl001UOMMappings,
+  bl001LRConfigs, bl001LrPools, bl001Lrs, bl001LrRequests, bl001LrTransfers,
+  bl001Bookings, bl001BookingVendorIndents, bl001Invoices, bl001RolePermissionMatrix,
+} from "./bl001-seed";
 
 export const mockPlans: TenantPlan[] = [
   {
@@ -266,7 +275,7 @@ export const mockTenantSummaries: TenantSummary[] = mockPlatformTenants.map((ten
   region: tenant.region,
 }));
 
-export const mockHierarchyLevels: HierarchyLevel[] = [
+const mockHierarchyLevelsBase: HierarchyLevel[] = [
   { id: "level-region-nsl", tenantId: "tenant-northstar", order: 1, name: "Region", active: true },
   { id: "level-zone-nsl", tenantId: "tenant-northstar", order: 2, name: "Zone", active: true },
   { id: "level-branch-nsl", tenantId: "tenant-northstar", order: 3, name: "Branch", active: true },
@@ -286,7 +295,7 @@ export const mockHierarchyLevels: HierarchyLevel[] = [
   { id: "level-branch-bl001", tenantId: "tenant-bl001", order: 2, name: "Branch", active: true },
 ];
 
-export const mockOrgUnits: OrgUnit[] = [
+const mockOrgUnitsBase: OrgUnit[] = [
   { id: "ou-1", tenantId: "tenant-northstar", name: "North Region", hierarchyLevelId: "level-region-nsl", parentOrgUnitId: null, status: "active" },
   { id: "ou-2", tenantId: "tenant-northstar", name: "North-East Zone", hierarchyLevelId: "level-zone-nsl", parentOrgUnitId: "ou-1", status: "active" },
   { id: "ou-3", tenantId: "tenant-northstar", name: "Delhi Branch", hierarchyLevelId: "level-branch-nsl", parentOrgUnitId: "ou-2", status: "active" },
@@ -300,7 +309,7 @@ export const mockOrgUnits: OrgUnit[] = [
   { id: "ou-bl001-bangalore-branch", tenantId: "tenant-bl001", name: "Bangalore-Branch", hierarchyLevelId: "level-branch-bl001", parentOrgUnitId: "ou-bl001-south-region", status: "active" },
 ];
 
-export const mockRoles: RoleDefinition[] = [
+const mockRolesBase: RoleDefinition[] = [
   { id: "role-tenant-admin-nsl", tenantId: "tenant-northstar", name: "Tenant Admin", description: "Bootstrap tenant administrator.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["TMS", "FLEET", "FINANCE"], active: true },
   { id: "role-ceo-nsl", tenantId: "tenant-northstar", name: "CEO", description: "Full tenant oversight.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["TMS", "FLEET", "FINANCE"], active: true },
   { id: "role-finance-user-nsl", tenantId: "tenant-northstar", name: "FINANCE_USER", description: "Finance-only tenant user for customer invoicing.", hierarchyLevelId: "level-region-nsl", moduleCodes: ["FINANCE"], active: true },
@@ -326,7 +335,7 @@ export const mockRoles: RoleDefinition[] = [
   { id: "role-bl001-branch-head", tenantId: "tenant-bl001", name: "Branch Head", description: "Branch oversight across admin, operations, and finance visibility.", hierarchyLevelId: "level-branch-bl001", moduleCodes: ["ADMIN", "TMS", "FLEET", "TRACKING", "FINANCE"], dataScope: "OWN_RECORDS", active: true },
 ];
 
-export const mockRolePermissions: RolePermission[] = [
+const mockRolePermissionsBase: RolePermission[] = [
   { id: "perm-0", tenantId: "tenant-northstar", roleId: "role-tenant-admin-nsl", moduleCode: "TMS", featureCode: "bookings", canView: true, canCreate: true, canEdit: true, canDelete: true, canApprove: true },
   { id: "perm-0a", tenantId: "tenant-northstar", roleId: "role-tenant-admin-nsl", moduleCode: "TMS", featureCode: "dispatch", canView: true, canCreate: true, canEdit: true, canDelete: true, canApprove: true },
   { id: "perm-0b", tenantId: "tenant-northstar", roleId: "role-tenant-admin-nsl", moduleCode: "FLEET", featureCode: "vehicles", canView: true, canCreate: true, canEdit: true, canDelete: true, canApprove: true },
@@ -344,7 +353,7 @@ export const mockRolePermissions: RolePermission[] = [
   { id: "perm-9", tenantId: "tenant-polar", roleId: "role-branch-manager-pfn", moduleCode: "TMS", featureCode: "dispatch", canView: true, canCreate: false, canEdit: false, canDelete: false, canApprove: false },
 ];
 
-export const mockUsers: UserRecord[] = [
+const mockUsersBase: UserRecord[] = [
   {
     id: "user-1",
     tenantId: "tenant-northstar",
@@ -632,7 +641,7 @@ export const mockTenantAuditLogs: AuditLogRecord[] = [
   },
 ];
 
-export const mockTenantCustomers: TenantCustomer[] = [
+const mockTenantCustomersBase: TenantCustomer[] = [
   {
     id: "tenant-customer-1",
     tenantId: "tenant-northstar",
@@ -671,7 +680,7 @@ export const mockTenantCustomers: TenantCustomer[] = [
   },
 ];
 
-export const mockTenantCustomerAddresses: TenantCustomerAddress[] = [
+const mockTenantCustomerAddressesBase: TenantCustomerAddress[] = [
   {
     id: "customer-address-1",
     tenantId: "tenant-northstar",
@@ -748,7 +757,7 @@ export const mockTenantCustomerAddresses: TenantCustomerAddress[] = [
   },
 ];
 
-export const mockTenantCustomerRateCards: TenantCustomerRateCard[] = [
+const mockTenantCustomerRateCardsBase: TenantCustomerRateCard[] = [
   {
     id: "rate-card-1",
     tenantId: "tenant-northstar",
@@ -795,7 +804,7 @@ export const mockTenantCustomerRateCards: TenantCustomerRateCard[] = [
   },
 ];
 
-export const mockTenantBookings: BookingRecord[] = [
+const mockTenantBookingsBase: BookingRecord[] = [
   {
     id: "booking-1",
     bookingId: "BKG-2026-0001",
@@ -1052,7 +1061,7 @@ export const mockTenantBookings: BookingRecord[] = [
   },
 ];
 
-export const mockTenantVendors: TenantVendor[] = [
+const mockTenantVendorsBase: TenantVendor[] = [
   {
     id: "tenant-vendor-1",
     tenantId: "tenant-northstar",
@@ -1118,7 +1127,7 @@ export const mockTenantVendors: TenantVendor[] = [
   },
 ];
 
-export const mockTenantVendorRateCards: TenantVendorRateCard[] = [
+const mockTenantVendorRateCardsBase: TenantVendorRateCard[] = [
   {
     id: "vendor-rate-card-1",
     tenantId: "tenant-northstar",
@@ -1147,7 +1156,7 @@ export const mockTenantVendorRateCards: TenantVendorRateCard[] = [
   },
 ];
 
-export const mockTenantVehicleTypes: TenantVehicleType[] = [
+const mockTenantVehicleTypesBase: TenantVehicleType[] = [
   {
     id: "vehicle-type-1",
     tenantId: "tenant-northstar",
@@ -1180,7 +1189,7 @@ export const mockTenantVehicleTypes: TenantVehicleType[] = [
   },
 ];
 
-export const mockTenantVehicles: TenantVehicle[] = [
+const mockTenantVehiclesBase: TenantVehicle[] = [
   {
     id: "vehicle-1",
     tenantId: "tenant-northstar",
@@ -1246,7 +1255,7 @@ export const mockTenantVehicles: TenantVehicle[] = [
   },
 ];
 
-export const mockTenantDrivers: TenantDriver[] = [
+const mockTenantDriversBase: TenantDriver[] = [
   {
     id: "driver-1",
     tenantId: "tenant-northstar",
@@ -1309,7 +1318,7 @@ export const mockTenantDrivers: TenantDriver[] = [
   },
 ];
 
-export const mockTenantMaterials: TenantMaterial[] = [
+const mockTenantMaterialsBase: TenantMaterial[] = [
   {
     id: "material-1",
     tenantId: "tenant-northstar",
@@ -1354,7 +1363,7 @@ export const mockTenantMaterials: TenantMaterial[] = [
   },
 ];
 
-export const mockTenantUOMDefinitions: TenantUOMDefinition[] = [
+const mockTenantUOMDefinitionsBase: TenantUOMDefinition[] = [
   {
     id: "uom-qty-bag-northstar",
     tenantId: "tenant-northstar",
@@ -1478,7 +1487,7 @@ export const mockTenantUOMDefinitions: TenantUOMDefinition[] = [
   },
 ];
 
-export const mockTenantUOMMappings: TenantUOMMapping[] = [
+const mockTenantUOMMappingsBase: TenantUOMMapping[] = [
   {
     id: "uom-mapping-bag-mt-northstar",
     tenantId: "tenant-northstar",
@@ -1541,7 +1550,7 @@ export const mockTenantUOMMappings: TenantUOMMapping[] = [
   },
 ];
 
-export const mockTenantLRConfigs: TenantLRConfig[] = [
+const mockTenantLRConfigsBase: TenantLRConfig[] = [
   {
     id: "lr-config-bl001-auto",
     tenantId: "tenant-bl001",
@@ -1627,7 +1636,7 @@ export const mockTenantLRConfigs: TenantLRConfig[] = [
   },
 ];
 
-export const mockTenantLrPools: TenantLrPoolRecord[] = [
+const mockTenantLrPoolsBase: TenantLrPoolRecord[] = [
   {
     id: "lr-pool-bl001-manual-1",
     tenantId: "tenant-bl001",
@@ -1735,7 +1744,7 @@ const ELCS_TRACKING_ALL = [
   "TRACKING_DASHBOARD", "TRACKING_TRIPS", "TRACKING_LIVE_MAP", "TRACKING_ALERTS", "TRACKING_GEOFENCES", "TRACKING_ANALYTICS",
 ];
 
-export const mockRolePermissionMatrixSeed: Record<string, SeedModuleMap> = {
+const mockRolePermissionMatrixSeedBase: Record<string, SeedModuleMap> = {
   // CEO — full view/create/edit/approve across every enabled module.
   "role-elcs-ceo": {
     ADMIN: seedFeatures(["ORG_UNITS", "USERS", "ROLES", "PERMISSIONS"], { view: true, create: true, edit: true }),
@@ -1763,3 +1772,35 @@ export const mockRolePermissionMatrixSeed: Record<string, SeedModuleMap> = {
     },
   },
 };
+
+
+// >>> BL001 REAL SEED WIRING (auto-generated; recovered from working localStorage)
+// The bl001 entries inside each *Base array above are stale placeholders;
+// they are filtered out and replaced with the real recovered Bluedart
+// snapshot. LR / indent / invoice collections that previously seeded
+// empty are also exposed here.
+export const mockHierarchyLevels: HierarchyLevel[] = [...mockHierarchyLevelsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001HierarchyLevels];
+export const mockOrgUnits: OrgUnit[] = [...mockOrgUnitsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001OrgUnits];
+export const mockRoles: RoleDefinition[] = [...mockRolesBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Roles];
+export const mockRolePermissions: RolePermission[] = [...mockRolePermissionsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001RolePermissions];
+export const mockUsers: UserRecord[] = [...mockUsersBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Users];
+export const mockTenantCustomers: TenantCustomer[] = [...mockTenantCustomersBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Customers];
+export const mockTenantCustomerAddresses: TenantCustomerAddress[] = [...mockTenantCustomerAddressesBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001CustomerAddresses];
+export const mockTenantCustomerRateCards: TenantCustomerRateCard[] = [...mockTenantCustomerRateCardsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001CustomerRateCards];
+export const mockTenantVendors: TenantVendor[] = [...mockTenantVendorsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Vendors];
+export const mockTenantVendorRateCards: TenantVendorRateCard[] = [...mockTenantVendorRateCardsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001VendorRateCards];
+export const mockTenantVehicleTypes: TenantVehicleType[] = [...mockTenantVehicleTypesBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001VehicleTypes];
+export const mockTenantVehicles: TenantVehicle[] = [...mockTenantVehiclesBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Vehicles];
+export const mockTenantDrivers: TenantDriver[] = [...mockTenantDriversBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Drivers];
+export const mockTenantMaterials: TenantMaterial[] = [...mockTenantMaterialsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Materials];
+export const mockTenantUOMDefinitions: TenantUOMDefinition[] = [...mockTenantUOMDefinitionsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001UOMDefinitions];
+export const mockTenantUOMMappings: TenantUOMMapping[] = [...mockTenantUOMMappingsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001UOMMappings];
+export const mockTenantBookings: BookingRecord[] = [...mockTenantBookingsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001Bookings];
+export const mockTenantLRConfigs: TenantLRConfig[] = [...mockTenantLRConfigsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001LRConfigs];
+export const mockTenantLrPools: TenantLrPoolRecord[] = [...mockTenantLrPoolsBase.filter((item) => item.tenantId !== BL001_TENANT_ID), ...bl001LrPools];
+export const mockRolePermissionMatrixSeed: Record<string, Record<string, Record<string, Record<string, boolean>>>> = { ...mockRolePermissionMatrixSeedBase, ...bl001RolePermissionMatrix };
+export const mockTenantLrs = bl001Lrs;
+export const mockTenantLrRequests = bl001LrRequests;
+export const mockTenantLrTransfers = bl001LrTransfers;
+export const mockTenantInvoices = bl001Invoices;
+export const mockTenantBookingVendorIndents = bl001BookingVendorIndents;
