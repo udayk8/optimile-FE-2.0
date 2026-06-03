@@ -104,19 +104,18 @@ export function useTenantBridge(): TenantDataBridge | null {
 
 /**
  * True when the portal should render the LOCAL DEMO dataset instead of the
- * bridge: either standalone (no bridge) or embedded for a vendor that has no
- * real tenant data yet (freshly onboarded vendor, or a demo vendor like Mahesh
- * Transport). Both bookings AND fleet are checked together so every consumer
- * (useVendorBookings, useFleetData, AssignVehicleModal) reads from the SAME
- * source — otherwise assign would mix bridge trips with store vehicles (or vice
- * versa) and silently fail on id lookup.
+ * bridge: either standalone (no bridge) or embedded for a vendor with no
+ * bookings assigned yet (freshly onboarded vendor, or a demo vendor like Mahesh
+ * Transport — who may carry a stray seeded vehicle/driver but no actual trips).
+ *
+ * Keyed on BOOKINGS only — bookings are the portal's core activity, so a vendor
+ * with none has an empty working portal and should see the demo data. Fleet is
+ * intentionally NOT part of the test: a couple of seeded vehicles shouldn't keep
+ * the portal in real-mode-but-empty. Every consumer (useVendorBookings,
+ * useFleetData, AssignVehicleModal) calls THIS function, so trips + fleet always
+ * resolve to the same source and assign never mixes bridge ids with store ids.
  */
 export function shouldUseDemoData(bridge: TenantDataBridge | null): boolean {
   if (!bridge) return true
-  return (
-    bridge.bookingIndents.length === 0 &&
-    bridge.bookingTrips.length === 0 &&
-    bridge.vehicles.length === 0 &&
-    bridge.drivers.length === 0
-  )
+  return bridge.bookingIndents.length === 0 && bridge.bookingTrips.length === 0
 }
