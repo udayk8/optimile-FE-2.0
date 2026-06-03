@@ -226,7 +226,11 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       else if (status === "POD_PENDING") bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "POD_PENDING"));
       else if (COMPLETED_STATUSES.has(status)) bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "COMPLETED"));
       else if (status === "CANCELLED") bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "CANCELLED"));
-      else if (status === "VEHICLE_ASSIGNED" || ACTIVE_STATUSES.has(status))
+      // Vehicle just assigned, transit not started → vendor "ASSIGNED" (shows in
+      // the Assignment tab), matching the local/mock assign flow. Only once the
+      // booking actually moves (loading/dispatch/transit) does it become IN_TRANSIT.
+      else if (status === "VEHICLE_ASSIGNED") bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "ASSIGNED"));
+      else if (ACTIVE_STATUSES.has(status))
         bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "IN_TRANSIT"));
     }
 
