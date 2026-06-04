@@ -14,7 +14,6 @@ import {
 } from 'lucide-react'
 import type { ModuleManifest } from '@shared-ui'
 import { VendorRouteWrapper } from './VendorRouteWrapper'
-import OnboardingPage from '@vendor/features/auth/pages/OnboardingPage'
 import DashboardPage from '@vendor/features/home/pages/DashboardPage'
 import SourcingPage from '@vendor/features/sourcing/pages/SourcingPage'
 import AuctionDetailPage from '@vendor/features/sourcing/pages/AuctionDetailPage'
@@ -53,7 +52,7 @@ export const vendorManifest: ModuleManifest = {
   ],
   wrapper: VendorRouteWrapper,
   routes: [
-    { path: 'onboarding', element: <OnboardingPage /> },
+    { path: 'onboarding', element: <Navigate to="/vendor/profile" replace /> },
     { index: true, element: <DashboardPage /> },
     { path: 'home', element: <Navigate to="/vendor" replace /> },
     { path: 'sourcing', element: <SourcingPage /> },

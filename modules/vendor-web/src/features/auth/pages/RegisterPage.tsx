@@ -17,7 +17,7 @@ export default function RegisterPage() {
             <p className="text-sm font-bold uppercase tracking-wide text-accent">Vendor Portal</p>
             <h1 className="mt-2 text-3xl font-extrabold text-text">Vendor Registration Disabled</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Vendors are pre-registered by operations. Use login and then complete onboarding in the portal.
+              Vendors are pre-registered by operations. Use login to access the portal.
             </p>
           </div>
 

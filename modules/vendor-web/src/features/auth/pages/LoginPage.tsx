@@ -11,46 +11,26 @@ export default function LoginPage() {
   const [mobile, setMobile] = useState('9876543210')
   const [otp, setOtp] = useState('123456')
   const [otpSent, setOtpSent] = useState(false)
-  const { setAuth, vendor, setOnboardingDraft } = useAuthStore()
+  const { setAuth, vendor } = useAuthStore()
   const navigate = useNavigate()
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     if (otp !== '123456') return
-    setOnboardingDraft({
-      companyName: MOCK_VENDOR.tradingName,
-      legalName: MOCK_VENDOR.legalName,
-      gstin: MOCK_VENDOR.gstin,
-      pan: MOCK_VENDOR.pan,
-      registeredAddress: {
-        street: '45, Transport Nagar',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        pincode: '400001',
-      },
-      primaryContact: { ...MOCK_VENDOR.primaryContact },
-      serviceRegions: ['Maharashtra', 'Gujarat'],
-      supportedVehicleTypes: ['20ft Container', 'Flatbed'],
-      bankName: 'HDFC Bank',
-      branch: 'Andheri East, Mumbai',
-      accountNumber: '50100123456789',
-      ifscCode: 'HDFC0001234',
-      accountType: 'CURRENT',
-    })
     setAuth(
       {
         ...MOCK_VENDOR,
         ...(vendor ?? {}),
         primaryContact: vendor?.primaryContact ?? MOCK_VENDOR.primaryContact,
-        status: 'ONBOARDING_INCOMPLETE',
-        onboardingStep: 'SETUP',
-        kycStatus: 'DRAFT',
-        profileCompletion: 25,
-        bankStatus: 'PENDING',
+        status: 'ACTIVE',
+        onboardingStep: 'COMPLETE',
+        kycStatus: 'APPROVED',
+        profileCompletion: 100,
+        bankStatus: 'VERIFIED',
       },
       'mock-jwt-token-xyz'
     )
-    navigate('/vendor/onboarding')
+    navigate('/vendor')
   }
 
   return (
@@ -62,7 +42,7 @@ export default function LoginPage() {
           </div>
           <p className="text-sm font-bold uppercase tracking-wide text-accent">Vendor Portal</p>
           <h1 className="mt-2 text-3xl font-extrabold text-text">Sign in to continue</h1>
-          <p className="mt-2 text-sm text-gray-600">Use mobile number and OTP to continue to onboarding or the vendor workspace.</p>
+          <p className="mt-2 text-sm text-gray-600">Use mobile number and OTP to continue to the vendor workspace.</p>
         </div>
 
         <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
@@ -99,7 +79,7 @@ export default function LoginPage() {
               <LogIn className="h-4 w-4 mr-2" /> Verify OTP and Sign In
             </Button>
             <div className="rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
-              Vendor users are pre-registered. Use OTP login to continue to onboarding or the portal.
+              Vendor users are pre-registered. Use OTP login to continue to the portal.
             </div>
           </form>
           <p className="mt-4 text-center text-xs text-gray-500">

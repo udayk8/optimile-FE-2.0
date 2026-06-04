@@ -366,7 +366,9 @@ export const useAppStore = create<AppState>((set) => ({
         contractId: indent.contractId,
         indentId: indent.id,
         laneDetails: indent.laneDetails,
-        assignedVehicle: { id: '', registrationNumber: '—', type: '—' },
+        // Carry the booking's expected vehicle type so the assign modal can
+        // filter the fleet before a vehicle is attached.
+        assignedVehicle: { id: '', registrationNumber: '—', type: indent.vehicleTypeRequired || '—' },
         assignedDriver: { id: '', name: '—', mobile: '—' },
         status: 'ACCEPTED',
         slaFlag: 'ON_TIME',
@@ -504,9 +506,10 @@ export const useAppStore = create<AppState>((set) => ({
       const { tripIds, invoiceDate = new Date().toISOString(), dueDate, gstRate = 12, invoiceNumber } = payload
       if (tripIds.length === 0) return state
 
+      // Only COMPLETED, not-yet-invoiced bookings are billable.
       const selectedTrips = tripIds
         .map((id) => state.trips.find((trip) => trip.id === id))
-        .filter((trip): trip is Trip => Boolean(trip))
+        .filter((trip): trip is Trip => Boolean(trip && trip.status === 'COMPLETED' && !trip.isInvoiced))
 
       if (selectedTrips.length === 0) return state
 
@@ -553,9 +556,10 @@ export const useAppStore = create<AppState>((set) => ({
         createdAt: invoiceDate,
       } as unknown as Invoice
 
-      // Mark trips as invoiced
-      const updatedTrips = state.trips.map(t => 
-        tripIds.includes(t.id) ? { ...t, isInvoiced: true } : t
+      // Mark only the actually-billed trips as invoiced
+      const billedIds = new Set(selectedTrips.map((trip) => trip.id))
+      const updatedTrips = state.trips.map(t =>
+        billedIds.has(t.id) ? { ...t, isInvoiced: true } : t
       )
 
       return {

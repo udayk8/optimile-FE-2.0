@@ -50,7 +50,9 @@ function buildCompanyForm(vendor: ReturnType<typeof useAuthStore.getState>['vend
 }
 
 function getProfileTab(pathname: string): ProfileTab {
-  const tab = pathname.split('/')[3]
+  // Use the last path segment — the module can be mounted at /vendor/profile/*
+  // (standalone) or /tenant/<id>/vendor-portal/profile/* (embedded shell).
+  const tab = pathname.split('/').filter(Boolean).pop()
   return PROFILE_TABS.some((item) => item.key === tab) ? (tab as ProfileTab) : 'company'
 }
 
@@ -63,7 +65,7 @@ export default function ProfilePage() {
   const completion = vendor?.profileCompletion ?? 0
 
   useEffect(() => {
-    if (location.pathname === '/vendor/profile' || location.pathname === '/vendor/profile/verification') {
+    if (location.pathname.endsWith('/profile') || location.pathname.endsWith('/profile/verification')) {
       navigate('/vendor/profile/company', { replace: true })
     }
   }, [location.pathname, navigate])
@@ -86,8 +88,6 @@ export default function ProfilePage() {
       serviceRegions: companyForm.serviceRegions.split(',').map((value) => value.trim()).filter(Boolean),
       supportedVehicleTypes: companyForm.supportedVehicleTypes.split(',').map((value) => value.trim()).filter(Boolean),
       profileCompletion: Math.max(completion, 60),
-      onboardingStep: 'DOCUMENTS',
-      status: vendor?.status === 'ACTIVE' ? 'ACTIVE' : 'ONBOARDING_INCOMPLETE',
     })
     window.alert('Company profile saved in mock state.')
   }
@@ -158,7 +158,7 @@ export default function ProfilePage() {
 
             <div>
               <h4 className="mb-2 text-base font-bold text-text">Primary Contact</h4>
-              <p className="mb-3 text-sm text-gray-500">Primary contact name and phone are locked after onboarding. Contact support if they need to change.</p>
+              <p className="mb-3 text-sm text-gray-500">Primary contact name and phone are locked. Contact support if they need to change.</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Name</label><Input value={companyForm.contactName} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
                 <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Phone</label><Input value={companyForm.contactPhone} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>

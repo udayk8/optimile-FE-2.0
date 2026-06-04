@@ -10,11 +10,18 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
+import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
+import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import type { Invoice } from '@vendor/types'
 
 type Step = 'select' | 'review'
 
 const PAGE_SIZE = 5
 const GST_RATE = 12
+const CUSTOMER_ADDRESS =
+  '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
@@ -45,6 +52,36 @@ export default function CreateInvoicePage() {
       bookingCount: selectedTrips.length,
     }
   }, [selectedTrips])
+
+  const bridge = useTenantBridge()
+  const { getBookingDetail } = useVendorBookings()
+  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
+  const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
+
+  // Draft invoice mirroring what generateInvoice() will create — drives the PDF preview.
+  const draftInvoice = useMemo((): Invoice => {
+    const now = new Date().toISOString()
+    return {
+      id: 'DRAFT',
+      invoiceNumber: 'DRAFT (assigned on submit)',
+      invoiceDate: now,
+      paymentDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      subtotal: totals.subtotal,
+      gstAmount: totals.gstAmount,
+      grandTotal: totals.grandTotal,
+      status: 'PENDING',
+      lineItems: selectedTrips.map((trip) => ({
+        tripId: trip.id,
+        tripReference: trip.id,
+        freightCharge: trip.freightRate || 0,
+        lineTotal: trip.freightRate || 0,
+      })),
+      vendorGstin: '29AABCF1234M1ZP',
+      customerGstin: '27AABCU9603R1ZM',
+      createdAt: now,
+    } as unknown as Invoice
+  }, [selectedTrips, totals])
 
   const totalPages = Math.max(1, Math.ceil(eligibleTrips.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -273,6 +310,7 @@ export default function CreateInvoicePage() {
       )}
 
       {step === 'review' && (
+        <>
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 p-6">
@@ -346,6 +384,38 @@ export default function CreateInvoicePage() {
             </div>
           </div>
         </div>
+
+        {/* ── Invoice preview — exact document that the PDF download produces ── */}
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-text">Invoice preview</h3>
+            <p className="mt-1 text-sm text-gray-500">This is exactly how the invoice PDF will look. The invoice number is assigned on submit.</p>
+          </div>
+          <div className="overflow-x-auto bg-gray-100 p-6">
+            <div className="mx-auto w-fit shadow-lg">
+              <InvoicePdfDocument
+                invoice={draftInvoice}
+                trips={selectedTrips}
+                companyName={companyName}
+                companyInfo={MOCK_COMPANY_INFO}
+                bank={MOCK_BANK}
+                customerName={customerName}
+                customerAddress={CUSTOMER_ADDRESS}
+                getLrNumber={getLrNumber}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 p-6">
+            <Button variant="outline" onClick={() => setStep('select')}>
+              Back to selection
+            </Button>
+            <Button onClick={handleSubmit}>
+              Submit invoice
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        </>
       )}
     </div>
   )
