@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, type ReactNode } from "react";
 import {
-  FileWarning, ArrowLeft, Download, Upload, ShieldCheck, ReceiptIndianRupee,
-  Phone, Mail, User, Truck, Building2, Bell, AlertTriangle, Check, X,
+  FileWarning, ArrowLeft, Download, Upload,
+  Phone, Mail, User, Truck, Building2, Bell, AlertTriangle,
 } from "lucide-react";
-import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finance/components/primitives";
+import { Card, Pill, Money, SectionTitle, Btn } from "@finance/components/primitives";
 import { PENDING_POD_DETAILS } from "@finance/data/mock";
 import { Trace } from "@finance/modules/finance/own-fleet/payables/pages/VendorMatch";
-import { useReceivables, type ARTrip, type PodStage } from "@finance/lib/receivablesStore";
+import { useReceivables, type PodStage } from "@finance/lib/receivablesStore";
 import { exportCsv } from "@finance/lib/csv";
 
 const POD_REPORT_COLUMNS = [
@@ -49,49 +49,6 @@ function ContactCard({ kind, c, toast }: any) {
         {c.email && <button onClick={() => toast(`Email drafted to ${c.email}`)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><Mail size={12} />Email</button>}
       </div>
     </Card>
-  );
-}
-
-/* POD validation — BRD step: confirm origin / destination / date / consignee match the trip. */
-function ValidateModal({ trip, onClose, onValidate }: { trip: ARTrip; onClose: () => void; onValidate: (ok: boolean) => void }) {
-  const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
-  const [mismatch, setMismatch] = useState(false);
-  const checks = [
-    { label: "Origin", value: origin },
-    { label: "Destination", value: destination },
-    { label: "Delivery date", value: trip.delivered },
-    { label: "Consignee", value: trip.client },
-  ];
-  return (
-    <Modal onClose={onClose}>
-      <ModalHeader title={`Validate POD · ${trip.id}`} tone="blue" icon={ShieldCheck} onClose={onClose} />
-      <div className="p-6">
-        <p className="mb-3 text-xs text-slate-500">The system checks the uploaded POD against the trip. A mismatch is rejected and flagged for review.</p>
-        <div className="space-y-2">
-          {checks.map((c) => (
-            <div key={c.label} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              <span className="text-slate-500">{c.label}</span>
-              <span className={`flex items-center gap-1.5 ${mismatch && c.label === "Consignee" ? "text-red-600" : "text-slate-800"}`}>
-                {mismatch && c.label === "Consignee" ? <X size={13} className="text-red-500" /> : <Check size={13} className="text-emerald-500" />}
-                {c.value}
-              </span>
-            </div>
-          ))}
-        </div>
-        <label className="mt-4 flex items-center gap-2 text-xs text-slate-500">
-          <input type="checkbox" checked={mismatch} onChange={(e) => setMismatch(e.target.checked)} className="rounded border-slate-300" />
-          Simulate a mismatch (consignee on POD differs)
-        </label>
-        <div className="mt-5 flex gap-3">
-          <Btn variant="ghost" className="flex-1 py-2.5" onClick={onClose}>Cancel</Btn>
-          {mismatch ? (
-            <Btn variant="danger" className="flex-1 py-2.5" onClick={() => onValidate(false)}><AlertTriangle size={14} />Reject & flag</Btn>
-          ) : (
-            <Btn className="flex-1 py-2.5" onClick={() => onValidate(true)}><Check size={14} />Confirm match</Btn>
-          )}
-        </div>
-      </div>
-    </Modal>
   );
 }
 
@@ -153,48 +110,33 @@ function PodFollowUp({ trip, onBack, toast }: any) {
   );
 }
 
-/* Per-row POD → invoice controls (BRD 4.1 steps: upload → validate → draft invoice). */
-function PodActions({ trip, onValidate, toast, onNavigate }: any) {
-  const { uploadPod, generateDraftInvoice } = useReceivables();
+/* Per-row action — upload the POD. Once uploaded, the trip leaves this pending
+   list and surfaces on the "Ready to invoice" side (same receivables store). */
+function PodActions({ trip, toast }: any) {
+  const { uploadPod } = useReceivables();
   const stop = (e: React.MouseEvent) => e.stopPropagation();
-  if (trip.podStage === "pending" || trip.podStage === "rejected") {
-    return (
-      <div onClick={stop} className="flex items-center justify-end gap-2">
-        {trip.podStage === "rejected" && <Pill tone="red"><AlertTriangle size={11} />Flagged</Pill>}
-        <Btn onClick={() => { uploadPod(trip.id); toast(`POD uploaded for ${trip.id}`); }}><Upload size={13} />Upload POD</Btn>
-      </div>
-    );
-  }
-  if (trip.podStage === "uploaded") {
-    return <div onClick={stop} className="flex justify-end"><Btn onClick={() => onValidate(trip)}><ShieldCheck size={13} />Validate POD</Btn></div>;
-  }
-  if (trip.podStage === "validated") {
-    return (
-      <div onClick={stop} className="flex justify-end">
-        <Btn onClick={() => {
-          const id = generateDraftInvoice(trip.id);
-          if (id) { toast(`Draft ${id} generated from contract rate`); onNavigate?.("invoicing"); }
-        }}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
-      </div>
-    );
-  }
-  return null;
+  return (
+    <div onClick={stop} className="flex items-center justify-end gap-2">
+      {trip.podStage === "rejected" && <Pill tone="red"><AlertTriangle size={11} />Flagged</Pill>}
+      <Btn onClick={() => { uploadPod(trip.id); toast(`POD uploaded for ${trip.id} — now under Ready to invoice`); }}><Upload size={13} />Upload POD</Btn>
+    </div>
+  );
 }
 
-export default function PendingPOD({ toast, onNavigate }: any) {
+export default function PendingPOD({ toast, toggle }: { toast: (m: string) => void; toggle?: ReactNode }) {
   const { trips } = useReceivables();
   const [open, setOpen] = useState<string | null>(null);
-  const [validating, setValidating] = useState<ARTrip | null>(null);
-  const { validatePod } = useReceivables();
 
   const [client, setClient] = useState("all");
   const [vendor, setVendor] = useState("all");
   const [minDays, setMinDays] = useState(0);
 
-  const activeTrips = trips.filter((t) => t.podStage !== "invoiced");
-  const clients = [...new Set(activeTrips.map((t) => t.client))];
-  const vendors = [...new Set(activeTrips.map((t) => t.vendor))];
-  const pending = activeTrips.filter((t) =>
+  // Only PODs not yet uploaded — pending or rejected. Uploaded/validated trips
+  // have moved to the Ready-to-invoice side.
+  const awaitingPod = trips.filter((t) => t.podStage === "pending" || t.podStage === "rejected");
+  const clients = [...new Set(awaitingPod.map((t) => t.client))];
+  const vendors = [...new Set(awaitingPod.map((t) => t.vendor))];
+  const pending = awaitingPod.filter((t) =>
     (client === "all" || t.client === client) &&
     (vendor === "all" || t.vendor === vendor) &&
     t.daysPending >= minDays,
@@ -211,8 +153,9 @@ export default function PendingPOD({ toast, onNavigate }: any) {
 
   return (
     <div>
+      {toggle}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <SectionTitle sub="Every trip without a verified POD is revenue you can't bill yet. Upload and validate the POD to generate the draft invoice.">Pending POD Tracker</SectionTitle>
+        <SectionTitle sub="Every trip without an uploaded POD is revenue you can't bill yet. Upload the POD and it moves straight to Ready to invoice.">Pending POD Tracker</SectionTitle>
         <button onClick={downloadReport} disabled={pending.length === 0}
           className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
           <Download size={15} />Download report
@@ -260,25 +203,16 @@ export default function PendingPOD({ toast, onNavigate }: any) {
                 <td className="px-5 py-3.5"><Money value={t.revenue} className="font-semibold text-slate-800" /></td>
                 <td className="px-5 py-3.5"><Pill tone={POD_STAGE[t.podStage].tone}>{POD_STAGE[t.podStage].label}</Pill></td>
                 <td className="px-5 py-3.5 text-right">
-                  <PodActions trip={t} onValidate={setValidating} toast={toast} onNavigate={onNavigate} />
+                  <PodActions trip={t} toast={toast} />
                 </td>
               </tr>
             ))}
             {pending.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">🎉 All PODs verified and invoiced. Nothing blocking revenue.</td></tr>
+              <tr><td colSpan={6} className="px-5 py-12 text-center text-slate-400">🎉 Every POD is uploaded. Head to Ready to invoice to bill them.</td></tr>
             )}
           </tbody>
         </table>
       </Card>
-
-      {validating && (
-        <ValidateModal trip={validating} onClose={() => setValidating(null)}
-          onValidate={(ok) => {
-            validatePod(validating.id, ok);
-            toast(ok ? `POD validated for ${validating.id}` : `POD rejected for ${validating.id} — flagged for review`);
-            setValidating(null);
-          }} />
-      )}
     </div>
   );
 }

@@ -13,8 +13,7 @@ import Tp_Dashboard from '@finance/modules/finance/threepl/analytics/pages/Dashb
 import Tp_Margins from '@finance/modules/finance/threepl/analytics/pages/Margins'
 import Tp_Profitability from '@finance/modules/finance/threepl/analytics/pages/Profitability'
 import Tp_CashFlow from '@finance/modules/finance/threepl/analytics/pages/CashFlow'
-import Tp_PendingPOD from '@finance/modules/finance/threepl/revenue/pages/PendingPOD'
-import Tp_Invoicing from '@finance/modules/finance/threepl/revenue/pages/Invoicing'
+import Tp_Receivables from '@finance/modules/finance/threepl/revenue/pages/Receivables'
 import Tp_InvoiceSeries from '@finance/modules/finance/threepl/revenue/pages/InvoiceSeries'
 import Tp_Collections from '@finance/modules/finance/threepl/revenue/pages/Collections'
 import Tp_Disputes from '@finance/modules/finance/threepl/revenue/pages/Disputes'
@@ -44,7 +43,7 @@ import Of_DriverAdvances from '@finance/modules/finance/own-fleet/fleet/pages/Dr
 import Of_Lifecycle from '@finance/modules/finance/own-fleet/fleet/pages/Lifecycle'
 import Of_FleetLedgers from '@finance/modules/finance/own-fleet/fleet/pages/FleetLedgers'
 import Of_FuelReport from '@finance/modules/finance/own-fleet/fleet/pages/FuelReport'
-import Of_PendingPOD from '@finance/modules/finance/own-fleet/revenue/pages/PendingPOD'
+import Of_Receivables from '@finance/modules/finance/own-fleet/revenue/pages/Receivables'
 import Of_Collections from '@finance/modules/finance/own-fleet/revenue/pages/Collections'
 import Of_Notes from '@finance/modules/finance/own-fleet/revenue/pages/Notes'
 import Of_Reconciliation from '@finance/modules/finance/own-fleet/revenue/pages/Reconciliation'
@@ -98,6 +97,7 @@ const META: Record<string, { label: string; icon: LucideIcon }> = {
   dash: { label: 'Command Centre', icon: LayoutDashboard },
   pod: { label: 'Pending POD', icon: FileWarning },
   invoicing: { label: 'Generate Invoice', icon: ReceiptIndianRupee },
+  receivables: { label: 'POD & Invoicing', icon: ReceiptIndianRupee },
   ar: { label: 'Debtors', icon: ReceiptText },
   series: { label: 'Invoice Series', icon: ListOrdered },
   disputes: { label: 'Disputes', icon: ScrollText },
@@ -138,8 +138,7 @@ const meta = (id: string, comp: ComponentType<any>): PageMeta => ({
 export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
   aggregator: {
     dash: meta('dash', Tp_Dashboard),
-    pod: meta('pod', Tp_PendingPOD),
-    invoicing: meta('invoicing', Tp_Invoicing),
+    receivables: meta('receivables', Tp_Receivables),
     ar: meta('ar', Tp_Collections),
     series: meta('series', Tp_InvoiceSeries),
     disputes: meta('disputes', Tp_Disputes),
@@ -168,8 +167,7 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
     maint: meta('maint', Of_Maintenance),
     advances: meta('advances', Of_DriverAdvances),
     lifecycle: meta('lifecycle', Of_Lifecycle),
-    pod: meta('pod', Of_PendingPOD),
-    invoicing: meta('invoicing', Tp_Invoicing),
+    receivables: meta('receivables', Of_Receivables),
     ar: meta('ar', Of_Collections),
     series: meta('series', Tp_InvoiceSeries),
     notes: meta('notes', Of_Notes),
@@ -206,7 +204,7 @@ export const PAGES: Record<FinanceMode, Record<string, PageMeta>> = {
 export const NAV: Record<FinanceMode, NavGroup[]> = {
   aggregator: [
     { group: null, items: ['dash'] },
-    { group: 'Receivables', items: ['pod', 'invoicing', 'ar', 'series', 'notes'] },
+    { group: 'Receivables', items: ['receivables', 'ar', 'series', 'notes'] },
     { group: 'Payables', items: ['vendor', 'subvendor', 'retention', 'payments'] },
     { group: null, items: ['disputes'] },
     { group: 'Controls', items: ['credit', 'contract', 'margin'] },
@@ -217,7 +215,7 @@ export const NAV: Record<FinanceMode, NavGroup[]> = {
   fleet: [
     { group: null, items: ['dash'] },
     { group: 'Fleet', items: ['fleet', 'maint', 'advances', 'lifecycle'] },
-    { group: 'Revenue', items: ['pod', 'invoicing', 'ar', 'series', 'notes'] },
+    { group: 'Revenue', items: ['receivables', 'ar', 'series', 'notes'] },
     { group: 'Reports', items: ['arreport', 'fuelreport', 'profit', 'cash', 'recon'] },
     { group: 'Compliance & Close', items: ['tax', 'audit', 'close'] },
     { group: 'Ledgers', items: ['fleetledger', 'ledger'] },

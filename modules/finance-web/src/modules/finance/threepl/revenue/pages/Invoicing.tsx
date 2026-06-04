@@ -1,7 +1,7 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, type ReactNode } from "react";
 import {
   ReceiptIndianRupee, ArrowLeft, Plus, Send, Check, AlertTriangle,
-  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck, Loader2,
+  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck, Loader2, ShieldCheck,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
@@ -410,6 +410,51 @@ const POD_STAGE: Record<string, { label: string; tone: any }> = {
   validated: { label: "POD validated", tone: "green" },
 };
 
+/* Optional POD validation on the Ready-to-invoice side — confirm origin /
+   destination / date / consignee match the trip. Uploaded drops are already
+   billable; validating just stamps them green (a mismatch flags for review). */
+function ValidateModal({ trip, onClose, onValidate }: { trip: ARTrip; onClose: () => void; onValidate: (ok: boolean) => void }) {
+  const [origin, destination] = trip.lane.split("→").map((s) => s.trim());
+  const [mismatch, setMismatch] = useState(false);
+  const checks = [
+    { label: "Origin", value: origin },
+    { label: "Destination", value: destination },
+    { label: "Delivery date", value: trip.delivered },
+    { label: "Consignee", value: trip.client },
+  ];
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title={`Validate POD · ${trip.id}`} tone="blue" icon={ShieldCheck} onClose={onClose} />
+      <div className="p-6">
+        <p className="mb-3 text-xs text-slate-500">The system checks the uploaded POD against the trip. A mismatch is rejected and flagged for review.</p>
+        <div className="space-y-2">
+          {checks.map((c) => (
+            <div key={c.label} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+              <span className="text-slate-500">{c.label}</span>
+              <span className={`flex items-center gap-1.5 ${mismatch && c.label === "Consignee" ? "text-red-600" : "text-slate-800"}`}>
+                {mismatch && c.label === "Consignee" ? <X size={13} className="text-red-500" /> : <Check size={13} className="text-emerald-500" />}
+                {c.value}
+              </span>
+            </div>
+          ))}
+        </div>
+        <label className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+          <input type="checkbox" checked={mismatch} onChange={(e) => setMismatch(e.target.checked)} className="rounded border-slate-300" />
+          Simulate a mismatch (consignee on POD differs)
+        </label>
+        <div className="mt-5 flex gap-3">
+          <Btn variant="ghost" className="flex-1 py-2.5" onClick={onClose}>Cancel</Btn>
+          {mismatch ? (
+            <Btn variant="danger" className="flex-1 py-2.5" onClick={() => onValidate(false)}><AlertTriangle size={14} />Reject & flag</Btn>
+          ) : (
+            <Btn className="flex-1 py-2.5" onClick={() => onValidate(true)}><Check size={14} />Confirm match</Btn>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 interface BookingGroup { bookingId: string; customer: string; truck: string; drops: ARTrip[]; freight: number; expense: number }
 interface CustomerSummary { customer: string; bookings: BookingGroup[]; drops: number; freight: number; expense: number }
 
@@ -490,11 +535,12 @@ function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string)
   );
 }
 
-export default function Invoicing({ toast }: any) {
-  const { trips, invoices, generateConsolidatedInvoice } = useReceivables();
+export default function Invoicing({ toast, toggle }: { toast: (m: string) => void; toggle?: ReactNode }) {
+  const { trips, invoices, generateConsolidatedInvoice, validatePod } = useReceivables();
   const [openId, setOpenId] = useState<string | null>(null);
   const [cust, setCust] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [validating, setValidating] = useState<ARTrip | null>(null);
 
   const open = openId ? invoices.find((i) => i.id === openId) : null;
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
@@ -558,6 +604,9 @@ export default function Invoicing({ toast }: any) {
                   <div key={d.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
                     <span className="text-slate-600"><span className="font-mono text-xs text-slate-500">{d.id}</span> · {d.lane}{d.consignee && <span className="text-slate-400"> → {d.consignee}</span>}</span>
                     <span className="flex items-center gap-2">
+                      {d.podStage === "uploaded" && (
+                        <button onClick={() => setValidating(d)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><ShieldCheck size={12} />Validate</button>
+                      )}
                       <Pill tone={POD_STAGE[d.podStage]?.tone ?? "blue"}>{POD_STAGE[d.podStage]?.label ?? "POD uploaded"}</Pill>
                       <Money value={contractRateFor(d.lane, d.truck, d.client).base} className="font-semibold text-slate-800" />
                     </span>
@@ -570,6 +619,15 @@ export default function Invoicing({ toast }: any) {
         </div>
 
         <div className="mt-6"><DraftsTable rows={custDrafts} onOpen={setOpenId} /></div>
+
+        {validating && (
+          <ValidateModal trip={validating} onClose={() => setValidating(null)}
+            onValidate={(ok) => {
+              validatePod(validating.id, ok);
+              toast(ok ? `POD validated for ${validating.id}` : `POD rejected for ${validating.id} — flagged for review`);
+              setValidating(null);
+            }} />
+        )}
       </div>
     );
   }
@@ -577,6 +635,7 @@ export default function Invoicing({ toast }: any) {
   // ---------- Customers list (default) ----------
   return (
     <div>
+      {toggle}
       <SectionTitle sub="Customer-wise invoicing — pick a customer to see all their booked freight (POD uploaded) and bill it. Freight rate, bookings and expenses come from the booking module.">Generate Invoice</SectionTitle>
 
       {customers.length === 0 ? (
