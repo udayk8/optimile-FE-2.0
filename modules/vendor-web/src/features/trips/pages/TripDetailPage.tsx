@@ -10,6 +10,8 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import type { VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
+import { MOCK_BOOKING_PARTIES } from '@vendor/lib/mock-data'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
@@ -42,12 +44,15 @@ export default function TripDetailPage() {
 
   const trip = useMemo(() => trips.find((item) => item.id === id), [id, trips])
   const indent = useMemo(() => indents.find((item) => item.id === id || item.id === trip?.indentId), [id, indents, trip])
+  const contracts = useAppStore((state) => state.contracts)
   const allExpenses = useAppStore((state) => state.expenses)
   const expenses = useMemo(() => allExpenses.filter((expense) => expense.tripId === id), [allExpenses, id])
   const mode = getBookingMode(location.pathname)
   const booking = indent ?? trip
-  // Embedded: rich shared-booking detail (consignor/consignee, docs, LR). Null standalone.
-  const detail = getBookingDetail(id)
+  // Embedded: rich shared-booking detail (consignor/consignee, docs, LR). Null
+  // for mock/demo bookings and standalone — synthesized below so both sources
+  // render the exact same detail UI.
+  const bridgeDetail = getBookingDetail(id)
   const ASSIGNMENT_STATES: Trip['status'][] = ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED']
   const IN_TRANSIT_STATES: Trip['status'][] = ['IN_TRANSIT', 'DESTINATION_REACHED']
   const resolvedMode: BookingMode =
@@ -84,6 +89,41 @@ export default function TripDetailPage() {
   })()
   const visibleTabs: DetailTab[] = resolvedMode === 'completed' ? ['freight', 'documents', 'expenses'] : ['freight', 'documents']
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
+
+  // Mock/demo bookings have no shared-booking record, so build the same
+  // VendorBookingDetail shape from local data — identical format and UI for
+  // cross-module and mock bookings.
+  const detail: VendorBookingDetail | null = bridgeDetail ?? (() => {
+    if (!booking) return null
+    const lane = booking.laneDetails
+    const contract = contracts.find((c) => c.id === booking.contractId)
+    const customerName =
+      contract?.customerName ?? indent?.contractReference.split('/').pop()?.trim() ?? 'Customer'
+    // Same party shape the bridge resolves from shared customer addresses.
+    const party = (point: typeof lane.origin) =>
+      MOCK_BOOKING_PARTIES[point.city] ?? {
+        name: customerName,
+        address: [point.name, point.city, point.state].filter(Boolean).join(', '),
+      }
+    const postAccept = trip ? POST_ACCEPT_STATUSES.includes(trip.status) : false
+    return {
+      bookingRef: booking.id,
+      customerName,
+      origin: lane.origin.city || lane.origin.name,
+      destination: lane.destination.city || lane.destination.name,
+      consignor: party(lane.origin),
+      consignee: party(lane.destination),
+      qty: indent ? `${indent.loadDetails.volumeCbm} CBM` : '—',
+      weight: indent ? `${indent.loadDetails.weightKg / 1000} MT` : '—',
+      pickup: formatDate(indent?.reportingDateTime ?? trip?.createdAt ?? ''),
+      vehicle: trip?.assignedVehicle.registrationNumber ?? '—',
+      driver: trip?.assignedDriver.name ?? '—',
+      status: booking.status,
+      freight: trip?.freightRate ?? 0,
+      lrNumbers: postAccept ? [`LR-${booking.id}`] : [],
+      documents: docs.map((doc) => ({ id: doc.id, title: doc.title, fileName: doc.fileName, url: doc.fileUrl ?? `/docs/${doc.fileName}` })),
+    }
+  })()
 
   if (!indent && !trip) {
     return <EmptyState title="Booking not found" description="The selected booking no longer exists in mock data." />

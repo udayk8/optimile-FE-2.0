@@ -30,21 +30,17 @@ export function useFleetData(): FleetData {
   const addDriver = useAppStore((state) => state.addDriver)
   const updateDriver = useAppStore((state) => state.updateDriver)
 
-  // Embedded → MERGE the vendor's real onboarded fleet (bridge) with the local
-  // mock demo fleet, so both show and either can be picked when assigning a demo
-  // trip. Real records come first. New fleet persists to the tenant (bridge) so
-  // it also appears under administration; updates route to whichever source owns
-  // the id.
+  // Embedded → ONLY the vendor's real onboarded fleet (bridge / shared tenant
+  // master data). No local mock fleet is mixed in. New fleet persists to the
+  // tenant so it also appears under administration.
   if (bridge) {
-    const bridgeVehicleIds = new Set(bridge.vehicles.map((v) => v.id))
-    const bridgeDriverIds = new Set(bridge.drivers.map((d) => d.id))
     return {
-      vehicles: [...bridge.vehicles, ...vehicles.filter((v) => !bridgeVehicleIds.has(v.id))],
-      drivers: [...bridge.drivers, ...drivers.filter((d) => !bridgeDriverIds.has(d.id))],
+      vehicles: bridge.vehicles,
+      drivers: bridge.drivers,
       addVehicle: bridge.addVehicle,
-      updateVehicle: (vehicle) => (bridgeVehicleIds.has(vehicle.id) ? bridge.updateVehicle(vehicle) : updateVehicle(vehicle)),
+      updateVehicle: bridge.updateVehicle,
       addDriver: bridge.addDriver,
-      updateDriver: (driver) => (bridgeDriverIds.has(driver.id) ? bridge.updateDriver(driver) : updateDriver(driver)),
+      updateDriver: bridge.updateDriver,
       vehicleTypeOptions: bridge.vehicleTypeOptions,
     }
   }
