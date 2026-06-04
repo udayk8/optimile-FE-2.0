@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trip, TripStatus, Vehicle, Driver } from '../types/fleet.types';
-import { TripAPI, VehicleAPI, DriverAPI, TelematicsAPI } from '../services/mockDatabase';
+import { Phone } from 'lucide-react';
+import { Trip, TripStatus, Vehicle, Driver, TrackerDeviceKind, TrackerStatus } from '../types/fleet.types';
+import type { VehicleTrackingDevice } from '../types/fleet.types';
+import type { TrackingSource } from '../types/tracking.types';
+import { TripAPI, VehicleAPI, DriverAPI, TelematicsAPI, TrackingDeviceAPI } from '../services/mockDatabase';
 import { Button } from '../components/UI';
 import { IconTruck, IconUsers, IconCalendar, IconMap, IconArrowRight } from '../components/Icons';
 import { useTrackingStore } from '../store/trackingStore';
@@ -10,6 +13,30 @@ import { getRoutePerformance } from '../services/analyticsApi';
 import type { RoutePerformance } from '../types/analytics.types';
 import { useAuth } from '@shared-auth';
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+
+// Map a vehicle's installed device kind to the tracking source it feeds.
+function deviceKindToSource(kind: TrackerDeviceKind): TrackingSource {
+  switch (kind) {
+    case TrackerDeviceKind.GPS_TRACKING: return 'GPS_DEVICE';
+    case TrackerDeviceKind.SIM_TRACKING: return 'FASTAG';
+    case TrackerDeviceKind.DRIVER_APP:   return 'DRIVER_APP';
+    case TrackerDeviceKind.MANUAL:       return 'MANUAL';
+    default:                             return 'GPS_DEVICE';
+  }
+}
+
+// Short pill label for an installed device. `hasMultipleGps` distinguishes
+// primary/secondary GPS units when a vehicle carries more than one.
+function installedDeviceLabel(d: VehicleTrackingDevice, hasMultipleGps: boolean): string {
+  switch (d.device_kind) {
+    case TrackerDeviceKind.GPS_TRACKING:
+      return hasMultipleGps ? (d.is_primary ? 'GPS Primary' : 'GPS Secondary') : 'GPS';
+    case TrackerDeviceKind.SIM_TRACKING: return 'SIM';
+    case TrackerDeviceKind.DRIVER_APP:   return 'App';
+    case TrackerDeviceKind.MANUAL:       return 'Manual';
+    default:                             return 'GPS';
+  }
+}
 
 interface TripDetailsPageProps {
   tripId: string;
@@ -30,6 +57,8 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
   const [actionError, setActionError] = useState<string|null>(null);
   const [trackedDistanceKm, setTrackedDistanceKm] = useState<number | null>(null);
   const [routeRows, setRouteRows] = useState<RoutePerformance[]>([]);
+  // Tracking devices actually installed on this trip's vehicle (real inventory).
+  const [installedDevices, setInstalledDevices] = useState<VehicleTrackingDevice[]>([]);
 
   useEffect(() => {
     loadTripDetails();
@@ -64,6 +93,7 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
 
   const loadTripDetails = async () => {
     setIsLoading(true);
+    setInstalledDevices([]);
     try {
       const tripData = await TripAPI.getById(tripId);
       if (tripData) {
@@ -75,6 +105,9 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
             const dist = await TelematicsAPI.getTripDistance(tripData.vehicle_id);
             setTrackedDistanceKm(dist);
           }
+          // Tracking sources available to this booking = devices fitted to its vehicle.
+          const installed = await TrackingDeviceAPI.getAllByVehicleId(tripData.vehicle_id);
+          setInstalledDevices(installed);
         }
         if (tripData.driver_id) {
           const dData = await DriverAPI.getById(tripData.driver_id);
@@ -99,16 +132,52 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
   );
 
   const STATUS_STYLE: Record<TripStatus, { dot: string; bg: string; text: string; label: string }> = {
-    [TripStatus.PLANNED]:    { dot: 'bg-primary',  bg: 'bg-primary/10',  text: 'text-primary',  label: 'Planned' },
-    [TripStatus.DISPATCHED]: { dot: 'bg-warning',  bg: 'bg-warning/10',  text: 'text-warning',  label: 'Dispatched' },
+    [TripStatus.PLANNED]:    { dot: 'bg-primary',  bg: 'bg-primary/10',  text: 'text-primary',  label: 'Booked' },
+    [TripStatus.DISPATCHED]: { dot: 'bg-primary',  bg: 'bg-primary/10',  text: 'text-primary',  label: 'Booked' },
     [TripStatus.IN_TRANSIT]: { dot: 'bg-success',  bg: 'bg-success/10',  text: 'text-success',  label: 'In Transit' },
     [TripStatus.COMPLETED]:  { dot: 'bg-gray-400', bg: 'bg-gray-100',    text: 'text-gray-600', label: 'Completed' },
     [TripStatus.CANCELLED]:  { dot: 'bg-danger',   bg: 'bg-danger/10',   text: 'text-danger',   label: 'Cancelled' },
   };
   const statusStyle = STATUS_STYLE[trip.status] ?? STATUS_STYLE[TripStatus.PLANNED];
 
-  const steps = [TripStatus.PLANNED, TripStatus.DISPATCHED, TripStatus.IN_TRANSIT, TripStatus.COMPLETED];
-  const currentStepIndex = steps.indexOf(trip.status);
+  // Compact "last ping" string for the tracking control (e.g. "2m", "5h", "29d")
+  const pingAgo = (iso?: string): string => {
+    if (!iso) return '—';
+    const diffMs = Date.now() - new Date(iso).getTime();
+    if (diffMs < 0) return 'now';
+    const mins = Math.round(diffMs / 60000);
+    if (mins < 1) return 'now';
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.round(hrs / 24)}d`;
+  };
+
+  // The tracking control is driven by the vehicle's real device inventory, sorted
+  // primary-first, so only the devices actually fitted to this booking show.
+  const trackingDevices = [...installedDevices].sort((a, b) => Number(b.is_primary) - Number(a.is_primary));
+  const hasMultipleGps = installedDevices.filter((d) => d.device_kind === TrackerDeviceKind.GPS_TRACKING).length > 1;
+
+  // Resolve which installed device is currently the live source: match the active
+  // tracking source, preferring the primary device; otherwise fall back to primary.
+  const activeSource = trackingTrip?.activeSource ?? trackingTrip?.primarySource;
+  const activeDeviceId = (() => {
+    if (trackingDevices.length === 0) return null;
+    if (activeSource) {
+      const matches = trackingDevices.filter((d) => deviceKindToSource(d.device_kind) === activeSource);
+      if (matches.length) return (matches.find((d) => d.is_primary) ?? matches[0]).tracker_id;
+    }
+    return (trackingDevices.find((d) => d.is_primary) ?? trackingDevices[0]).tracker_id;
+  })();
+
+  // Switch the live source to the chosen installed device by matching it to the
+  // tracking-store device of the same source.
+  const selectDevice = (d: VehicleTrackingDevice) => {
+    if (!trackingTrip) return;
+    const targetSource = deviceKindToSource(d.device_kind);
+    const synthetic = trackingTrip.trackingDevices?.find((td) => td.source === targetSource);
+    if (synthetic) switchTripTrackingSource(trackingTrip.id, synthetic.id, user?.email ?? 'operator');
+  };
 
   return (
     <div className="space-y-6">
@@ -145,190 +214,11 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
           {trip.status === TripStatus.IN_TRANSIT && (
             <Button disabled title="Coming soon" variant="primary" className="cursor-not-allowed opacity-40">Complete Trip</Button>
           )}
-          {/* TD5: View Replay for in-transit or completed trips */}
-          {(trip.status === TripStatus.IN_TRANSIT || trip.status === TripStatus.COMPLETED) && (
-            <Button variant="secondary" onClick={() => navigate(scopedPath('/trips/' + tripId + '/replay'))}>
-              View Replay →
-            </Button>
-          )}
         </div>
       </div>
 
       {actionError && (
         <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">{actionError}</div>
-      )}
-
-      {/* Tracking device switcher */}
-      {trackingTrip?.trackingDevices && trackingTrip.trackingDevices.length > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="mb-3 text-[11px] font-extrabold uppercase tracking-[0.14em] text-gray-400">Tracking Devices</p>
-          <div className="flex flex-wrap gap-2">
-            {trackingTrip.trackingDevices.map((device) => {
-              const isActive = device.id === trackingTrip.activeTrackingDeviceId
-              const sourceLabel: Record<string, string> = {
-                GPS_DEVICE: 'GPS', FASTAG: 'SIM', DRIVER_APP: 'App', ANPR: 'ANPR', MANUAL: 'Manual',
-              }
-              const sourceColor: Record<string, string> = {
-                GPS_DEVICE: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-                FASTAG:     'bg-blue-100 text-blue-700 border-blue-200',
-                DRIVER_APP: 'bg-violet-100 text-violet-700 border-violet-200',
-                ANPR:       'bg-amber-100 text-amber-700 border-amber-200',
-                MANUAL:     'bg-gray-100 text-gray-600 border-gray-200',
-              }
-              const unavailable = device.status === 'Unavailable' || device.status === 'Faulted'
-              return (
-                <button
-                  key={device.id}
-                  type="button"
-                  disabled={unavailable}
-                  onClick={() => switchTripTrackingSource(trackingTrip.id, device.id, user?.email ?? 'operator')}
-                  title={unavailable ? `${device.label} — ${device.status}` : `Switch to ${device.label}`}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-semibold transition
-                    ${unavailable ? 'cursor-not-allowed opacity-40 bg-gray-50 border-gray-200 text-gray-400' :
-                      isActive
-                        ? `${sourceColor[device.source] ?? 'bg-gray-100 text-gray-700 border-gray-200'} ring-2 ring-primary/30`
-                        : `${sourceColor[device.source] ?? 'bg-gray-100 text-gray-700 border-gray-200'} opacity-60 hover:opacity-100`
-                    }`}
-                >
-                  <span className={`h-2 w-2 rounded-full ${isActive && !unavailable ? 'bg-current animate-pulse' : 'bg-current opacity-40'}`} />
-                  <span>{sourceLabel[device.source] ?? device.source}</span>
-                  <span className="font-normal text-[11px] opacity-70">{device.label}</span>
-                  {isActive && <span className="ml-1 rounded-full bg-white/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide">Active</span>}
-                  {unavailable && <span className="ml-1 text-[10px] font-normal">{device.status}</span>}
-                </button>
-              )
-            })}
-          </div>
-          {trackingTrip.lastSourceSwitchedAt && (
-            <p className="mt-2.5 text-[11px] text-gray-400">
-              Last switched by <span className="font-semibold">{trackingTrip.lastSourceSwitchedBy}</span> at {new Date(trackingTrip.lastSourceSwitchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Timeline */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        {trip.status === TripStatus.CANCELLED ? (
-          <div className="rounded-lg border border-danger/20 bg-danger/10 px-4 py-3 text-sm font-medium text-danger">Trip Cancelled</div>
-        ) : (
-          <div className="relative flex items-center justify-between w-full">
-              <div className="absolute left-0 top-4 h-0.5 w-full bg-gray-200" />
-              <div
-                className={`absolute left-0 top-4 h-0.5 transition-all ${statusStyle.dot}`}
-                style={{ width: currentStepIndex >= 0 ? `${(currentStepIndex / (steps.length - 1)) * 100}%` : '0%' }}
-              />
-              {steps.map((step, index) => {
-                  const isCompleted = index <= currentStepIndex;
-                  const isCurrent = index === currentStepIndex;
-                  const stepStyle = STATUS_STYLE[step];
-                  return (
-                      <div key={step} className="relative flex flex-col items-center bg-white px-2 z-10">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${
-                            isCompleted
-                              ? `${stepStyle.bg} ${stepStyle.text} border-current`
-                              : 'bg-white border-gray-300 text-gray-300'
-                          }`}>
-                              {isCompleted
-                                ? <span className={`h-2.5 w-2.5 rounded-full ${stepStyle.dot}`} />
-                                : <div className="w-2 h-2 bg-gray-300 rounded-full" />
-                              }
-                          </div>
-                          <span className={`mt-2 text-xs ${isCurrent ? `font-bold ${stepStyle.text}` : isCompleted ? 'font-medium text-gray-700' : 'font-normal text-gray-400'}`}>
-                            {step}
-                          </span>
-                      </div>
-                  );
-              })}
-          </div>
-        )}
-      </div>
-
-      {/* Distance metrics strip */}
-      {(trip.estimated_distance_km || trackedDistanceKm !== null) && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Expected Distance</p>
-            {trip.estimated_distance_km ? (
-              <>
-                <p className="text-2xl font-bold text-gray-900">
-                  {trip.estimated_distance_km.toLocaleString()}
-                  <span className="ml-1 text-sm font-medium text-gray-400">km</span>
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Planned route estimate</p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-400">Not set</p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
-              {trip.status === TripStatus.IN_TRANSIT ? 'Tracked So Far' : 'Actual Distance'}
-            </p>
-            {trackedDistanceKm !== null ? (
-              <>
-                <p className="text-2xl font-bold text-gray-900">
-                  {trackedDistanceKm.toLocaleString()}
-                  <span className="ml-1 text-sm font-medium text-gray-400">km</span>
-                </p>
-                <p className="text-xs text-gray-400 mt-1">Via GPS tracking device</p>
-              </>
-            ) : (
-              <p className="text-sm text-gray-400">
-                {trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED
-                  ? 'Trip not started'
-                  : 'No telemetry data'}
-              </p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
-              {trip.status === TripStatus.COMPLETED ? 'Distance Variance' : 'Progress'}
-            </p>
-            {trip.estimated_distance_km && trackedDistanceKm !== null ? (() => {
-              const pct = Math.min(100, Math.round((trackedDistanceKm / trip.estimated_distance_km) * 100));
-              const remaining = trip.estimated_distance_km - trackedDistanceKm;
-              const isCompleted = trip.status === TripStatus.COMPLETED;
-              return (
-                <>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {isCompleted
-                      ? `${remaining >= 0 ? '+' : ''}${Math.abs(Math.round(remaining))} km`
-                      : `${pct}%`}
-                  </p>
-                  {!isCompleted && (
-                    <>
-                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                        <div
-                          className="h-full rounded-full bg-success transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {remaining > 0 ? `${Math.round(remaining).toLocaleString()} km remaining` : 'Route completed'}
-                      </p>
-                    </>
-                  )}
-                  {isCompleted && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {remaining >= 0 ? 'Over estimated by' : 'Under estimated by'} {Math.abs(Math.round(remaining))} km
-                    </p>
-                  )}
-                </>
-              );
-            })() : (
-              <p className="text-sm text-gray-400">
-                {trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED
-                  ? 'Awaiting departure'
-                  : 'Insufficient data'}
-              </p>
-            )}
-          </div>
-
-        </div>
       )}
 
       {/* TD1: Open alerts */}
@@ -504,20 +394,38 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                     <div>
                         <p className="text-xs text-gray-500 uppercase mb-1">Driver</p>
                         {driver ? (
-                            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                                <IconUsers className="w-8 h-8 text-primary mr-3" />
-                                <div>
-                                    <p className="text-sm font-medium text-gray-900">{driver.name}</p>
-                                    <p className="text-xs text-gray-500">{driver.phone}</p>
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <IconUsers className="w-8 h-8 text-primary" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{driver.name}</p>
+                                    <p className="text-xs text-gray-500 truncate">{driver.phone}</p>
                                 </div>
+                                {driver.phone && (
+                                    <a
+                                        href={`tel:${driver.phone}`}
+                                        title={`Call ${driver.name}`}
+                                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:brightness-110"
+                                    >
+                                        <Phone className="h-4 w-4" />
+                                    </a>
+                                )}
                             </div>
                         ) : trackingTrip?.driverName ? (
-                            <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-                                <IconUsers className="w-8 h-8 text-primary mr-3" />
-                                <div>
-                                    <p className="text-sm font-medium text-gray-900">{trackingTrip.driverName}</p>
-                                    {trackingTrip.driverMobile && <p className="text-xs text-gray-500">{trackingTrip.driverMobile}</p>}
+                            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                                <IconUsers className="w-8 h-8 text-primary" />
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{trackingTrip.driverName}</p>
+                                    {trackingTrip.driverMobile && <p className="text-xs text-gray-500 truncate">{trackingTrip.driverMobile}</p>}
                                 </div>
+                                {trackingTrip.driverMobile && (
+                                    <a
+                                        href={`tel:${trackingTrip.driverMobile}`}
+                                        title={`Call ${trackingTrip.driverName}`}
+                                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary text-white transition hover:brightness-110"
+                                    >
+                                        <Phone className="h-4 w-4" />
+                                    </a>
+                                )}
                             </div>
                         ) : (
                             <div className="p-3 bg-warning/10 text-warning rounded-lg text-sm">
@@ -534,16 +442,47 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
         {/* Right Column: Map */}
         <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-full min-h-[400px] flex flex-col">
-                <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center flex-shrink-0">
+                <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap justify-between items-center gap-3 flex-shrink-0">
                     <h3 className="font-medium text-gray-900">Route Map</h3>
-                    {trip.status === TripStatus.IN_TRANSIT && (
-                        <span className="flex items-center text-xs text-success bg-success/10 px-2 py-1 rounded-full">
-                            <span className="w-2 h-2 bg-success rounded-full animate-pulse mr-2"></span>
-                            Live
-                        </span>
+                    {trackingDevices.length > 0 && (
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">Tracking Devices</span>
+                        <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+                          {trackingDevices.map((device) => {
+                            const isActive = device.tracker_id === activeDeviceId
+                            const unavailable = device.status !== TrackerStatus.ACTIVE
+                            const label = installedDeviceLabel(device, hasMultipleGps)
+                            return (
+                              <button
+                                key={device.tracker_id}
+                                type="button"
+                                disabled={unavailable || !trackingTrip}
+                                onClick={() => selectDevice(device)}
+                                title={unavailable ? `${device.model} — ${device.status}` : `${device.manufacturer} ${device.model} · last ping ${pingAgo(device.last_ping)} ago`}
+                                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold transition
+                                  ${unavailable
+                                    ? 'cursor-not-allowed text-gray-300'
+                                    : isActive
+                                      ? 'bg-primary text-white shadow-sm'
+                                      : 'text-gray-500 hover:bg-gray-100'
+                                  }`}
+                              >
+                                {isActive && !unavailable && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                                <span className="flex flex-col items-start leading-tight">
+                                  <span>{label}</span>
+                                  <span className={`text-[9px] font-medium ${unavailable ? 'text-gray-300' : isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                                    {unavailable ? device.status : `${pingAgo(device.last_ping)} ago`}
+                                  </span>
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                 </div>
-                <div className="flex-1 min-h-0">
+
+                <div className="relative flex-1 min-h-0">
                     {!GOOGLE_MAPS_API_KEY ? (
                         <div className="flex h-full items-center justify-center bg-gray-50 p-6 text-center">
                             <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8">
@@ -564,6 +503,127 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                         />
                     )}
                 </div>
+
+                {/* Trip progress + metrics — compact, below map */}
+                {(() => {
+                  const isBooked    = trip.status === TripStatus.PLANNED || trip.status === TripStatus.DISPATCHED
+                  const isInTransit = trip.status === TripStatus.IN_TRANSIT
+                  const isCompleted = trip.status === TripStatus.COMPLETED
+                  const isCancelled = trip.status === TripStatus.CANCELLED
+                  const activeStep  = isBooked ? 0 : isInTransit ? 1 : isCompleted || isCancelled ? 2 : 0
+                  const eta   = trackingTrip?.currentEta ?? trackingTrip?.plannedEta
+                  const delay = trackingTrip?.delayMinutes ?? 0
+                  const pct   = trip.estimated_distance_km && trackedDistanceKm !== null
+                    ? Math.min(100, Math.round((trackedDistanceKm / trip.estimated_distance_km) * 100))
+                    : null
+
+                  const stages = [
+                    {
+                      key: 'booked', label: 'Booked',
+                      icon: (active: boolean, done: boolean) => (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                          {done || active
+                            ? <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            : <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />}
+                        </svg>
+                      ),
+                    },
+                    {
+                      key: 'in-transit', label: 'In Transit',
+                      icon: () => (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                          <path d="M8 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM15 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                          <path d="M3 4a1 1 0 00-1 1v7a1 1 0 001 1h1.05a2.5 2.5 0 014.9 0H10a1 1 0 001-1v-1h3a1 1 0 00.8-.4l2-2.667A1 1 0 0017 7h-4V5a1 1 0 00-1-1H3z" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      key: 'completed', label: 'Completed',
+                      icon: () => (
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                          <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
+                        </svg>
+                      ),
+                    },
+                  ]
+
+                  return (
+                    <div className="flex-shrink-0 border-t border-gray-100 bg-gray-50/60 px-4 py-3">
+
+                      {/* Stage timeline — small */}
+                      <div className="flex items-center mb-3">
+                        {stages.map((stage, idx) => {
+                          const done   = idx < activeStep
+                          const active = idx === activeStep
+                          const iconBg = done
+                            ? 'bg-primary text-white'
+                            : active
+                              ? 'bg-primary text-white ring-2 ring-primary/15'
+                              : 'bg-gray-200 text-gray-400'
+                          return (
+                            <React.Fragment key={stage.key}>
+                              <div className="flex flex-col items-center gap-1 min-w-0">
+                                <div className={`flex h-7 w-7 items-center justify-center rounded-lg transition-all ${iconBg}`}>
+                                  {stage.icon(active, done)}
+                                </div>
+                                <span className={`text-[10px] font-semibold whitespace-nowrap ${active ? 'text-primary' : done ? 'text-gray-600' : 'text-gray-400'}`}>
+                                  {stage.label}
+                                </span>
+                              </div>
+                              {idx < stages.length - 1 && (
+                                <div className="relative mx-2 h-0.5 flex-1 mb-3">
+                                  <div className="absolute inset-0 rounded-full bg-gray-200" />
+                                  <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all" style={{ width: idx < activeStep ? '100%' : '0%' }} />
+                                </div>
+                              )}
+                            </React.Fragment>
+                          )
+                        })}
+                      </div>
+
+                      {/* Metrics row */}
+                      <div className="flex items-start divide-x divide-gray-200">
+                        <div className="flex-1 pr-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Expected</p>
+                          <p className="mt-0.5 text-2xl font-extrabold leading-none text-gray-900">
+                            {trip.estimated_distance_km ? trip.estimated_distance_km.toLocaleString() : '—'}
+                            <span className="ml-1 text-[11px] font-medium text-gray-400">km</span>
+                          </p>
+                        </div>
+                        <div className="flex-1 px-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">{isInTransit ? 'Tracked' : 'Actual'}</p>
+                          <p className="mt-0.5 text-2xl font-extrabold leading-none text-gray-900">
+                            {trackedDistanceKm !== null ? trackedDistanceKm.toLocaleString() : '—'}
+                            <span className="ml-1 text-[11px] font-medium text-gray-400">km</span>
+                          </p>
+                        </div>
+                        <div className="flex-1 px-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ETA</p>
+                          <div className="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                            <p className="text-2xl font-extrabold leading-none text-gray-900">
+                              {trackingTrip?.remainingDistanceKm === 0 ? 'Arrived' : eta ? new Date(eta).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </p>
+                            {delay > 0 && (
+                              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 leading-none">+{delay}m</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex-1 pl-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Progress</p>
+                          <p className={`mt-0.5 text-2xl font-extrabold leading-none ${pct !== null ? 'text-blue-600' : 'text-gray-900'}`}>
+                            {pct !== null ? `${pct}%` : '—'}
+                          </p>
+                          {pct !== null && !isCompleted && (
+                            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                              <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  )
+                })()}
             </div>
         </div>
       </div>

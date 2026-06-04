@@ -64,13 +64,18 @@ export const DispatchPage: React.FC = () => {
 
   const getStatusBadge = (status: TripStatus) => {
     switch(status) {
-      case TripStatus.PLANNED:    return 'bg-gray-100 text-gray-600';
+      case TripStatus.PLANNED:
       case TripStatus.DISPATCHED: return 'bg-primary/10 text-primary';
       case TripStatus.IN_TRANSIT: return 'bg-blue-100 text-blue-700';
       case TripStatus.COMPLETED:  return 'bg-emerald-100 text-emerald-700';
       case TripStatus.CANCELLED:  return 'bg-red-100 text-red-600';
       default:                    return 'bg-gray-100 text-gray-500';
     }
+  };
+
+  const getStatusLabel = (status: TripStatus) => {
+    if (status === TripStatus.PLANNED || status === TripStatus.DISPATCHED) return 'Booked';
+    return status;
   };
 
   const filteredTrips = useMemo(() => {
@@ -83,7 +88,9 @@ export const DispatchPage: React.FC = () => {
                             vehicleName.includes(term)
 
       let matchesFilter = true
-      if (activeFilter === 'delayed') {
+      if (activeFilter === 'booked') {
+        matchesFilter = t.status === TripStatus.PLANNED || t.status === TripStatus.DISPATCHED
+      } else if (activeFilter === 'delayed') {
         const at = activeTrips.find(at => at.id === t.trip_id)
         matchesFilter = !!at && at.delayMinutes > 0
       } else if (activeFilter === 'offline') {
@@ -102,13 +109,12 @@ export const DispatchPage: React.FC = () => {
   const pagedTrips = filteredTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const stats = useMemo(() => {
-    const unassigned = trips.filter(t => t.status === TripStatus.PLANNED && (!t.vehicle_id || !t.driver_id)).length
-    const dispatched = trips.filter(t => t.status === TripStatus.DISPATCHED).length
+    const booked = trips.filter(t => t.status === TripStatus.PLANNED || t.status === TripStatus.DISPATCHED).length
     const enRoute = trips.filter(t => t.status === TripStatus.IN_TRANSIT).length
     const delayed = activeTrips.filter(t => t.delayMinutes > 0 && !['Completed', 'Cancelled'].includes(t.status)).length
     const offline = activeTrips.filter(t => t.isOffline).length
     const openAlerts = alerts.filter(a => a.status !== 'Resolved').length
-    return { unassigned, dispatched, enRoute, delayed, offline, openAlerts }
+    return { booked, enRoute, delayed, offline, openAlerts }
   }, [trips, activeTrips, alerts])
 
   const alertsByTripId = useMemo(() => {
@@ -158,20 +164,12 @@ export const DispatchPage: React.FC = () => {
 
         {([
           {
-            label: 'Planned',
-            value: stats.unassigned,
-            dot: 'bg-gray-400',
-            numColor: 'text-gray-900',
-            bg: '',
-            filter: TripStatus.PLANNED,
-          },
-          {
-            label: 'Dispatched',
-            value: stats.dispatched,
+            label: 'Booked',
+            value: stats.booked,
             dot: 'bg-primary',
             numColor: 'text-gray-900',
             bg: '',
-            filter: TripStatus.DISPATCHED,
+            filter: 'booked',
           },
           {
             label: 'In Transit',
@@ -401,7 +399,7 @@ export const DispatchPage: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusBadge(trip.status)}`}>{trip.status}</span>
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusBadge(trip.status)}`}>{getStatusLabel(trip.status)}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-end gap-1">
