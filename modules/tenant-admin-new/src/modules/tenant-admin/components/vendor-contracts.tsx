@@ -144,6 +144,120 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
   );
 }
 
+const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
+  laneCode: "",
+  vehicleType: "",
+  rate: 0,
+  rateType: "PER_TRIP",
+  startDate: "",
+  endDate: "",
+};
+
+/** Validates a contract row; returns an error message or null when valid. */
+function validateContractRow(form: VendorContractCsvRow): string | null {
+  const laneError = getLaneCodeError(normalizeLaneCode(form.laneCode));
+  if (laneError) return laneError;
+  if (!form.vehicleType.trim()) return "Vehicle type is required.";
+  if (!Number.isFinite(form.rate) || form.rate <= 0) return "Rate must be greater than zero.";
+  if (!isValidRateType(form.rateType)) return "Rate type must be PER_TRIP, PER_MT, or PER_KM.";
+  if (!form.startDate || !form.endDate) return "Start and end dates are required.";
+  if (form.endDate < form.startDate) return "End date must not be before start date.";
+  return null;
+}
+
+/** Shared add/edit form for one contract row (manual entry). */
+export function VendorContractFormDialog({
+  open,
+  onOpenChange,
+  title,
+  initial,
+  saveLabel = "Save Contract",
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  initial?: VendorContractCsvRow | null;
+  saveLabel?: string;
+  onSave: (row: VendorContractCsvRow) => void;
+}) {
+  const [form, setForm] = useState<VendorContractCsvRow>(EMPTY_CONTRACT_ROW);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setForm(initial ? { ...initial } : EMPTY_CONTRACT_ROW);
+    setError("");
+  }, [open, initial]);
+
+  function save() {
+    const validationError = validateContractRow(form);
+    if (validationError) return setError(validationError);
+    onSave({ ...form, laneCode: normalizeLaneCode(form.laneCode) });
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description="Lane must be AAA-BBB; rate type must be PER_TRIP, PER_MT, or PER_KM."
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={save}>{saveLabel}</Button>
+        </div>
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        {error ? (
+          <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        ) : null}
+        <ContractField label="Lane">
+          <Input
+            value={form.laneCode}
+            onChange={(event) => setForm((current) => ({ ...current, laneCode: event.target.value.toUpperCase() }))}
+            placeholder="MUM-BLR"
+            className="font-mono"
+          />
+        </ContractField>
+        <ContractField label="Vehicle Type">
+          <Input
+            value={form.vehicleType}
+            onChange={(event) => setForm((current) => ({ ...current, vehicleType: event.target.value }))}
+            placeholder="32FT"
+          />
+        </ContractField>
+        <ContractField label="Rate">
+          <Input
+            type="number"
+            value={form.rate ? String(form.rate) : ""}
+            onChange={(event) => setForm((current) => ({ ...current, rate: Number(event.target.value) }))}
+            placeholder="45000"
+          />
+        </ContractField>
+        <ContractField label="Rate Type">
+          <Select
+            value={form.rateType}
+            onChange={(event) => setForm((current) => ({ ...current, rateType: event.target.value as RateType }))}
+          >
+            {RATE_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </Select>
+        </ContractField>
+        <ContractField label="Start Date">
+          <Input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} />
+        </ContractField>
+        <ContractField label="End Date">
+          <Input type="date" value={form.endDate} onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))} />
+        </ContractField>
+      </div>
+    </Dialog>
+  );
+}
+
 /**
  * Editable list of parsed contract rows — used during vendor onboarding so the
  * admin can fix or drop individual CSV rows before the vendor is submitted.
@@ -156,28 +270,6 @@ export function EditableVendorContractRows({
   onChange: (rows: VendorContractCsvRow[]) => void;
 }) {
   const [editIndex, setEditIndex] = useState<number | null>(null);
-  const [form, setForm] = useState<VendorContractCsvRow | null>(null);
-  const [error, setError] = useState("");
-
-  function openEdit(index: number) {
-    setForm({ ...rows[index] });
-    setEditIndex(index);
-    setError("");
-  }
-
-  function saveEdit() {
-    if (editIndex === null || !form) return;
-    const laneCode = normalizeLaneCode(form.laneCode);
-    const laneError = getLaneCodeError(laneCode);
-    if (laneError) return setError(laneError);
-    if (!form.vehicleType.trim()) return setError("Vehicle type is required.");
-    if (!Number.isFinite(form.rate) || form.rate <= 0) return setError("Rate must be greater than zero.");
-    if (!isValidRateType(form.rateType)) return setError("Rate type must be PER_TRIP, PER_MT, or PER_KM.");
-    if (!form.startDate || !form.endDate) return setError("Start and end dates are required.");
-    if (form.endDate < form.startDate) return setError("End date must not be before start date.");
-    onChange(rows.map((row, index) => (index === editIndex ? { ...form, laneCode } : row)));
-    setEditIndex(null);
-  }
 
   return (
     <>
@@ -193,7 +285,7 @@ export function EditableVendorContractRows({
           row.startDate,
           row.endDate,
           <div key={`pending-${index}-actions`} className="flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => openEdit(index)}>
+            <Button size="sm" variant="ghost" onClick={() => setEditIndex(index)}>
               <PencilLine className="size-4" />
               Edit
             </Button>
@@ -207,60 +299,17 @@ export function EditableVendorContractRows({
         pageSize={10}
       />
 
-      <Dialog
+      <VendorContractFormDialog
         open={editIndex !== null}
         onOpenChange={(open) => { if (!open) setEditIndex(null); }}
         title="Edit Contract Row"
-        description="Lane must be AAA-BBB; rate type must be PER_TRIP, PER_MT, or PER_KM."
-        footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setEditIndex(null)}>Cancel</Button>
-            <Button onClick={saveEdit}>Save Row</Button>
-          </div>
-        }
-      >
-        {form ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {error ? (
-              <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-            ) : null}
-            <ContractField label="Lane">
-              <Input
-                value={form.laneCode}
-                onChange={(event) => setForm((current) => current && { ...current, laneCode: event.target.value.toUpperCase() })}
-                placeholder="MUM-BLR"
-                className="font-mono"
-              />
-            </ContractField>
-            <ContractField label="Vehicle Type">
-              <Input value={form.vehicleType} onChange={(event) => setForm((current) => current && { ...current, vehicleType: event.target.value })} />
-            </ContractField>
-            <ContractField label="Rate">
-              <Input
-                type="number"
-                value={String(form.rate)}
-                onChange={(event) => setForm((current) => current && { ...current, rate: Number(event.target.value) })}
-              />
-            </ContractField>
-            <ContractField label="Rate Type">
-              <Select
-                value={form.rateType}
-                onChange={(event) => setForm((current) => current && { ...current, rateType: event.target.value as RateType })}
-              >
-                {RATE_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </Select>
-            </ContractField>
-            <ContractField label="Start Date">
-              <Input type="date" value={form.startDate} onChange={(event) => setForm((current) => current && { ...current, startDate: event.target.value })} />
-            </ContractField>
-            <ContractField label="End Date">
-              <Input type="date" value={form.endDate} onChange={(event) => setForm((current) => current && { ...current, endDate: event.target.value })} />
-            </ContractField>
-          </div>
-        ) : null}
-      </Dialog>
+        initial={editIndex !== null ? rows[editIndex] : null}
+        saveLabel="Save Row"
+        onSave={(row) => {
+          if (editIndex === null) return;
+          onChange(rows.map((current, index) => (index === editIndex ? row : current)));
+        }}
+      />
     </>
   );
 }

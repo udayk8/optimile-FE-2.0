@@ -14,6 +14,7 @@ import { Switch } from "@/shared/components/ui/switch";
 import {
   EditableVendorContractRows,
   VendorContractCsvUpload,
+  VendorContractFormDialog,
   VendorContractsTable,
   useVendorContracts,
 } from "@/modules/tenant-admin/components/vendor-contracts";
@@ -272,9 +273,10 @@ export function TenantVendorOnboardingPage() {
     status: initialForm.status,
   };
   const [error, setError] = useState("");
-  // Contract rows parsed from uploaded CSVs — editable per row and persisted
-  // once the vendor record is saved.
+  // Contract rows parsed from uploaded CSVs or added manually — editable per
+  // row and persisted once the vendor record is saved.
   const [pendingContractRows, setPendingContractRows] = useState<VendorContractCsvRow[]>([]);
+  const [addContractOpen, setAddContractOpen] = useState(false);
 
   if (isEdit && !editingVendor) {
     return (
@@ -350,15 +352,28 @@ export function TenantVendorOnboardingPage() {
             content: (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Bulk upload the vendor's contract CSVs (optional). Rows can be edited or removed below and are
-                  saved together with the vendor on submit.
+                  Bulk upload the vendor's contract CSVs or add contracts manually (optional). Rows can be edited
+                  or removed below and are saved together with the vendor on submit.
                 </p>
-                <VendorContractCsvUpload
-                  onRowsParsed={(_file, result) =>
-                    setPendingContractRows((current) => [...current, ...result.validRows])
-                  }
-                />
+                <div className="flex flex-wrap gap-2">
+                  <VendorContractCsvUpload
+                    onRowsParsed={(_file, result) =>
+                      setPendingContractRows((current) => [...current, ...result.validRows])
+                    }
+                  />
+                  <Button onClick={() => setAddContractOpen(true)}>
+                    <Plus className="size-4" />
+                    Add Contract
+                  </Button>
+                </div>
                 <EditableVendorContractRows rows={pendingContractRows} onChange={setPendingContractRows} />
+                <VendorContractFormDialog
+                  open={addContractOpen}
+                  onOpenChange={setAddContractOpen}
+                  title="Add Contract"
+                  saveLabel="Add Contract"
+                  onSave={(row) => setPendingContractRows((current) => [...current, row])}
+                />
               </div>
             ),
           },
@@ -422,15 +437,36 @@ function TenantVendorContractsSection({
   onUploaded: (count: number) => void;
 }) {
   const contracts = useVendorContracts(vendor);
+  const [addOpen, setAddOpen] = useState(false);
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {contracts.length} contract{contracts.length === 1 ? "" : "s"} — manual uploads and auction wins.
         </p>
-        <VendorContractCsvUpload vendor={vendor} onUploaded={(created) => onUploaded(created.length)} />
+        <div className="flex flex-wrap gap-2">
+          <VendorContractCsvUpload vendor={vendor} onUploaded={(created) => onUploaded(created.length)} />
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="size-4" />
+            Add Contract
+          </Button>
+        </div>
       </div>
       <VendorContractsTable contracts={contracts} />
+
+      <VendorContractFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        title="Add Contract"
+        saveLabel="Add Contract"
+        onSave={(row) => {
+          createVendorContracts(
+            { vendorId: vendor.id, vendorName: vendor.name, tenantId: vendor.tenantId },
+            [row],
+          );
+          onUploaded(1);
+        }}
+      />
     </div>
   );
 }
