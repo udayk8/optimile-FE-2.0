@@ -165,11 +165,15 @@ function mapState(source: SourceAuction, won: boolean): AuctionState {
   }
 }
 
-function mapLane(lane: SourceLane): AuctionLane {
+function mapLane(lane: SourceLane, identity: VendorIdentity): AuctionLane {
   const [origin, destination] = splitLane(lane.lane)
   const best = lane.ranking.length
     ? Math.min(...lane.ranking.map((b) => b.amount))
     : undefined
+  const myName = identity.vendorName.toLowerCase()
+  const myBid = lane.ranking.find(
+    (b) => b.vendorId === identity.vendorId || b.vendorName.toLowerCase() === myName,
+  )
   return {
     id: lane.id,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
@@ -178,6 +182,8 @@ function mapLane(lane: SourceLane): AuctionLane {
       : undefined,
     basePrice: lane.ceilingRate || undefined,
     currentBestBid: best,
+    bidCount: lane.ranking.length,
+    myRank: myBid?.rank,
   }
 }
 
@@ -208,7 +214,7 @@ function mapAuction(source: SourceAuction, identity: VendorIdentity): Auction {
     endTime: firstLane?.timerEndsAt ?? source.awardDeadline,
     state: mapState(source, won),
     lanes: source.lanes.map((lane) => ({
-      ...mapLane(lane),
+      ...mapLane(lane, identity),
       minBidDecrement: source.minBidDecrement,
     })),
     vendorBids,

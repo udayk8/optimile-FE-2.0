@@ -172,8 +172,16 @@ export default function AuctionDetailPage() {
             <tbody className="divide-y divide-gray-200">
               {auction.lanes.map((lane) => {
                 const activeBid = auction.vendorBids.find(b => b.laneId === lane.id && b.status === 'ACTIVE')
-                const isWinning = activeBid && lane.currentBestBid ? activeBid.amount <= lane.currentBestBid : false
-                const rank = activeBid ? (isWinning ? 'Winning' : 'Outbid') : '-'
+                const isWinning = activeBid
+                  ? lane.myRank != null
+                    ? lane.myRank === 1
+                    : lane.currentBestBid != null && activeBid.amount <= lane.currentBestBid
+                  : false
+                // Live rank from the shared store (L1 = lowest bid); falls back to
+                // Winning/Outbid when running off the local demo store.
+                const rank = activeBid
+                  ? lane.myRank != null ? `L${lane.myRank}` : (isWinning ? 'Winning' : 'Outbid')
+                  : '-'
 
                 return (
                   <tr key={lane.id} className="transition-colors hover:bg-gray-50">
@@ -228,9 +236,14 @@ export default function AuctionDetailPage() {
                     </td>
                     <td className="px-4 py-4">
                       {activeBid ? (
-                        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isWinning ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}>
-                          {rank}
-                        </span>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isWinning ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            {rank}{isWinning && lane.myRank != null ? ' · Leading' : ''}
+                          </span>
+                          {lane.bidCount != null && lane.bidCount > 0 && (
+                            <span className="text-[11px] text-gray-500">of {lane.bidCount} bid{lane.bidCount > 1 ? 's' : ''}</span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-gray-500">-</span>
                       )}

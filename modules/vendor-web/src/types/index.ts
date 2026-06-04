@@ -142,6 +142,10 @@ export interface AuctionLane {
   basePrice?: number
   currentBestBid?: number
   minBidDecrement?: number
+  /** Total bids currently ranked on this lane (live, from the shared store). */
+  bidCount?: number
+  /** This vendor's live rank on the lane (1 = L1/lowest); undefined if no bid. */
+  myRank?: number
 }
 
 export interface Auction {

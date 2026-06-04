@@ -22,6 +22,7 @@ import {
   rejectAuction,
 } from '@auction/lib/mock-services'
 import { fetchContracts } from '@auction/lib/mock-services'
+import { AUCTION_STORE_KEY } from '@auction/lib/auction-store'
 import type { Auction, BookingReference, Contract } from '@auction/types'
 
 const TABS = ['overview', 'lanes', 'ranking', 'award'] as const
@@ -80,6 +81,28 @@ export default function AuctionDetailPage() {
   useEffect(() => {
     setLoading(true)
     Promise.all([loadAuction(), loadContracts()]).finally(() => setLoading(false))
+  }, [id])
+
+  // Live ranking: vendor-web writes bids into the shared store from the same
+  // shell (custom event) or another tab (native storage event). Re-read the
+  // auction whenever the store changes so the ranking/award tabs stay current.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const refresh = () => {
+      void loadAuction()
+      void loadContracts()
+    }
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === AUCTION_STORE_KEY) refresh()
+    }
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('optimile-auction-store', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('optimile-auction-store', refresh)
+      window.removeEventListener('focus', refresh)
+    }
   }, [id])
 
   const spotLane = auction?.lanes[0]
@@ -418,17 +441,37 @@ export default function AuctionDetailPage() {
 
       {activeTab === 'ranking' && (
         <div className="space-y-4">
+          {auction.status === 'LIVE' && (
+            <div className="flex items-center gap-2 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-2.5 text-xs font-medium text-[#15803D]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22C55E] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22C55E]" />
+              </span>
+              Live ranking — updates automatically as vendors place bids.
+            </div>
+          )}
           {auction.lanes.map((lane) => (
             <Card key={lane.id}>
-              <CardHeader>
+              <CardHeader className="flex-row items-center justify-between space-y-0">
                 <CardTitle>{lane.lane} Ranking</CardTitle>
+                <span className="text-xs text-[#64748B]">{lane.ranking.length} bid{lane.ranking.length === 1 ? '' : 's'}</span>
               </CardHeader>
               <CardContent className="space-y-3">
                 {lane.ranking.length === 0 && <p className="text-sm text-[#64748B]">No valid bids recorded on this lane.</p>}
                 {lane.ranking.map((bid) => (
-                  <div key={`${lane.id}-${bid.vendorId}`} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] p-4">
+                  <div
+                    key={`${lane.id}-${bid.vendorId}`}
+                    className={`flex items-center justify-between rounded-xl border p-4 ${
+                      bid.rank === 1 ? 'border-[#BBF7D0] bg-[#F0FDF4]' : 'border-[#E5E7EB]'
+                    }`}
+                  >
                     <div>
-                      <p className="text-sm font-semibold text-[#0F172A]">L{bid.rank} · {bid.vendorName}</p>
+                      <p className="text-sm font-semibold text-[#0F172A]">
+                        L{bid.rank} · {bid.vendorName}
+                        {bid.rank === 1 && (
+                          <span className="ml-2 rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#15803D]">Lowest</span>
+                        )}
+                      </p>
                       <p className="mt-1 text-xs text-[#64748B]">{formatDateTime(bid.timestamp)}</p>
                     </div>
                     <CurrencyDisplay amount={bid.amount} className="text-base" />
