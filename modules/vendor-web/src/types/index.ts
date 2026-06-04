@@ -88,7 +88,7 @@ export interface AuthState {
 }
 
 // ==================== NOTIFICATION TYPES ====================
-export type NotificationCategory = 'ONBOARDING' | 'SOURCING' | 'CONTRACTS' | 'TRIPS' | 'EXPENSES' | 'INVOICES'
+export type NotificationCategory = 'ONBOARDING' | 'SOURCING' | 'CONTRACTS' | 'TRIPS' | 'INVOICES'
 
 export interface Notification {
   id: string
@@ -281,7 +281,6 @@ export interface Trip {
   documents?: TripDocument[]
   timeline?: TripTimelineEvent[]
   freightRate: number
-  expenseSummary: { total: number }
   isInvoiced: boolean
   createdAt: string
 }
@@ -305,26 +304,6 @@ export interface TripTimelineEvent {
   description: string
   timestamp: string
   status?: string
-}
-
-// ==================== EXPENSE TYPES ====================
-export type ExpenseType = 'EXPENSE' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
-
-export interface ExpenseLineItem {
-  id: string
-  expenseType: ExpenseType
-  amount: number
-  description?: string
-  supportingDocumentUrl?: string
-}
-
-export interface Expense {
-  id: string
-  tripId: string
-  tripReference: string
-  lineItems: ExpenseLineItem[]
-  amount: number
-  submittedAt: string
 }
 
 // ==================== FLEET TYPES ====================
@@ -470,7 +449,6 @@ export interface InvoiceLineItem {
   tripId: string
   tripReference: string
   freightCharge: number
-  expenses: { type: ExpenseType; amount: number }[]
   lineTotal: number
 }
 

@@ -10,7 +10,7 @@
  *   if (canCreate('fleet', 'vehicle')) { ... }
  */
 
-export type Module = 'dashboard' | 'sourcing' | 'contracts' | 'trips' | 'expenses' | 'fleet' | 'invoices' | 'profile'
+export type Module = 'dashboard' | 'sourcing' | 'contracts' | 'trips' | 'fleet' | 'invoices' | 'profile'
 export type Feature = string
 
 /**

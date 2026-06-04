@@ -19,7 +19,6 @@ const TYPE_LABELS: Record<NotificationCategory, string> = {
   SOURCING: 'Sourcing',
   CONTRACTS: 'Contracts',
   TRIPS: 'Trips',
-  EXPENSES: 'Expenses',
   INVOICES: 'Invoices',
 }
 

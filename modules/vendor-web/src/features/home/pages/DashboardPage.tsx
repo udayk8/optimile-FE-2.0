@@ -24,8 +24,8 @@ export default function DashboardPage() {
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
-  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.total > 0))
-  const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0) + (booking.expenseSummary.total || 0), 0)
+  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && t.freightRate > 0)
+  const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0), 0)
 
   const activeBookings = vendorTrips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
   

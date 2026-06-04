@@ -13,14 +13,13 @@ import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import type { VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
 import { MOCK_BOOKING_PARTIES } from '@vendor/lib/mock-data'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
-import { AddExpenseModal } from '@vendor/components/shared/AddExpenseModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { PageHero } from '@shared-ui/page-hero'
-import { ArrowLeft, CheckCircle, Download, ExternalLink, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange, ReceiptText } from 'lucide-react'
+import { ArrowLeft, CheckCircle, Download, ExternalLink, FileText, MapPin, Package, Route, Truck, Clock3, CalendarRange } from 'lucide-react'
 import type { Trip, TripDocument } from '@vendor/types'
 
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
-type DetailTab = 'freight' | 'documents' | 'expenses'
+type DetailTab = 'freight' | 'documents'
 
 function getBookingMode(pathname: string) {
   const rawMode = pathname.split('/')[3]
@@ -39,14 +38,11 @@ export default function TripDetailPage() {
   // back to app.store standalone.
   const { indents, trips, acceptIndent, declineIndent, getBookingDetail } = useVendorBookings()
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
-  const [selectedTripForExpense, setSelectedTripForExpense] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
 
   const trip = useMemo(() => trips.find((item) => item.id === id), [id, trips])
   const indent = useMemo(() => indents.find((item) => item.id === id || item.id === trip?.indentId), [id, indents, trip])
   const contracts = useAppStore((state) => state.contracts)
-  const allExpenses = useAppStore((state) => state.expenses)
-  const expenses = useMemo(() => allExpenses.filter((expense) => expense.tripId === id), [allExpenses, id])
   const mode = getBookingMode(location.pathname)
   const booking = indent ?? trip
   // Embedded: rich shared-booking detail (consignor/consignee, docs, LR). Null
@@ -87,7 +83,7 @@ export default function TripDetailPage() {
     if (!haveType.has('INVOICE_COPY')) defaults.push({ id: `${trip.id}-inv`, type: 'INVOICE_COPY', title: 'Invoice copy', fileName: `invoice-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/invoice-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
     return [...defaults, ...tripDocs]
   })()
-  const visibleTabs: DetailTab[] = resolvedMode === 'completed' ? ['freight', 'documents', 'expenses'] : ['freight', 'documents']
+  const visibleTabs: DetailTab[] = ['freight', 'documents']
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   // Mock/demo bookings have no shared-booking record, so build the same
@@ -264,7 +260,6 @@ export default function TripDetailPage() {
           >
             {tab === 'freight' && 'Freight details'}
             {tab === 'documents' && 'Documents'}
-            {tab === 'expenses' && 'Expenses'}
           </button>
         ))}
       </div>
@@ -337,73 +332,6 @@ export default function TripDetailPage() {
             </Card>
           )}
 
-          {effectiveDetailTab === 'expenses' && trip && (
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <ReceiptText className="h-5 w-5 text-primary" /> Expenses
-                  </CardTitle>
-                  <div className="flex flex-wrap items-center gap-3">
-                    {trip && !trip.isInvoiced && (
-                      <Button size="sm" onClick={() => setSelectedTripForExpense(trip.id)}>
-                        {expenses.length > 0 ? 'Edit Expense' : 'Add Expense'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 md:grid-cols-1">
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total expenses</div>
-                    <div className="mt-1 text-sm font-bold text-text"><CurrencyDisplay amount={trip.expenseSummary.total} /></div>
-                  </div>
-                </div>
-
-                {expenses.length === 0 ? (
-                  <EmptyState title="No expense claims" description="Expense claims for this booking will appear here." />
-                ) : (
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[700px] text-left">
-                        <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                          <tr>
-                            <th className="px-5 py-3 font-bold">Expense</th>
-                            <th className="px-5 py-3 font-bold">Updated</th>
-                            <th className="px-5 py-3 font-bold">Line Items</th>
-                            <th className="px-5 py-3 font-bold text-right">Amount</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {expenses.map((expense) => (
-                            <tr key={expense.id} className="hover:bg-gray-50">
-                              <td className="px-5 py-4">
-                                <div className="font-mono text-sm font-semibold text-text">{expense.id}</div>
-                              </td>
-                              <td className="px-5 py-4 text-sm text-text">{formatDateTime(expense.submittedAt)}</td>
-                              <td className="px-5 py-4">
-                                <div className="flex flex-wrap gap-1">
-                                  {expense.lineItems.map((line) => (
-                                    <span key={line.id} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
-                                      {line.expenseType}
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                              <td className="px-5 py-4 text-right">
-                                <CurrencyDisplay amount={expense.amount} className="text-sm font-semibold text-text" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         <div className="space-y-6">
@@ -418,7 +346,6 @@ export default function TripDetailPage() {
                 <div><span className="text-gray-500">Vehicle: </span>{trip.assignedVehicle?.registrationNumber ?? '—'}</div>
                 <div><span className="text-gray-500">Driver: </span>{trip.assignedDriver?.name ?? '—'}</div>
                 <div><span className="text-gray-500">Freight: </span><CurrencyDisplay amount={trip.freightRate} /></div>
-                <div><span className="text-gray-500">Expenses: </span><CurrencyDisplay amount={trip.expenseSummary.total} /></div>
               </CardContent>
             </Card>
           )}
@@ -442,14 +369,6 @@ export default function TripDetailPage() {
 
       {assignTripId && (
         <AssignVehicleModal isOpen={!!assignTripId} onClose={() => setAssignTripId(null)} tripId={assignTripId} />
-      )}
-
-      {selectedTripForExpense && trip && (
-        <AddExpenseModal
-          isOpen={true}
-          onClose={() => setSelectedTripForExpense(null)}
-          initialTripId={trip.id}
-        />
       )}
 
       <ConfirmDialog

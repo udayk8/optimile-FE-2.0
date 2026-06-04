@@ -119,24 +119,8 @@ export default function InvoicesPage() {
   const openEditModal = (invoiceId: string) => {
     const invoice = invoices.find((item) => item.id === invoiceId)
     if (!invoice) return
-    setEditedItems(invoice.lineItems.map((item) => ({ ...item, expenses: item.expenses.map((expense) => ({ ...expense })) })))
+    setEditedItems(invoice.lineItems.map((item) => ({ ...item })))
     setEditModalInvoiceId(invoiceId)
-  }
-
-  const handleExpenseChange = (lineIdx: number, expIdx: number, value: number) => {
-    setEditedItems((prev) =>
-      prev.map((item, index) => {
-        if (index !== lineIdx) return item
-        const nextExpenses = item.expenses.map((expense, expenseIndex) =>
-          expenseIndex !== expIdx ? expense : { ...expense, amount: Math.max(0, value) },
-        )
-        return {
-          ...item,
-          expenses: nextExpenses,
-          lineTotal: item.freightCharge + nextExpenses.reduce((sum, expense) => sum + expense.amount, 0),
-        }
-      }),
-    )
   }
 
   const handleFreightChange = (lineIdx: number, value: number) => {
@@ -147,7 +131,7 @@ export default function InvoicesPage() {
         return {
           ...item,
           freightCharge,
-          lineTotal: freightCharge + item.expenses.reduce((sum, expense) => sum + expense.amount, 0),
+          lineTotal: freightCharge,
         }
       }),
     )
@@ -345,7 +329,7 @@ export default function InvoicesPage() {
               </button>
             </div>
 
-            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight and expense amounts. This creates a new PENDING invoice for finance review; {editInvoice.invoiceNumber} will be closed as superseded.</p>
+            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight amounts. This creates a new PENDING invoice for finance review; {editInvoice.invoiceNumber} will be closed as superseded.</p>
 
             <div className="mt-4 space-y-3">
               {editedItems.map((item, lineIdx) => (
@@ -367,22 +351,6 @@ export default function InvoicesPage() {
                       />
                     </div>
                   </div>
-                  {item.expenses.map((expense, expIdx) => (
-                    <div key={expIdx} className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-sm capitalize text-gray-600">{expense.type.replace(/_/g, ' ').toLowerCase()}</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-400">Rs</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={expense.amount}
-                          onChange={(e) => handleExpenseChange(lineIdx, expIdx, Number(e.target.value))}
-                          className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-right text-sm font-semibold text-text outline-none focus:border-primary focus:bg-white"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  {item.expenses.length === 0 ? <p className="mt-2 text-xs text-gray-400">No expenses on this line.</p> : null}
                 </div>
               ))}
             </div>

@@ -43,14 +43,6 @@ export const ROUTES = {
   PROFILE_BANK: '/profile/bank',
 } as const
 
-export const EXPENSE_TYPES = [
-  { value: 'EXPENSE', label: 'Expense' },
-  { value: 'DETENTION', label: 'Detention' },
-  { value: 'LOADING_UNLOADING', label: 'Loading / Unloading' },
-  { value: 'WEIGHBRIDGE', label: 'Weighbridge' },
-  { value: 'OTHER', label: 'Other' },
-] as const
-
 export const VEHICLE_TYPES = [
   { value: '20FT_CONTAINER', label: '20ft Container' },
   { value: '32FT_CONTAINER', label: '32ft Container' },

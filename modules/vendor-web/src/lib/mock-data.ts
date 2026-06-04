@@ -1,5 +1,5 @@
 import type {
-  DashboardData, Auction, Contract, Indent, Trip, Expense,
+  DashboardData, Auction, Contract, Indent, Trip,
   Vehicle, Driver, CapacityDeclaration, Invoice, LedgerEntry, Notification,
   CompanyInfo, BankDetails, Vendor, ExceptionRecord,
 } from '@vendor/types'
@@ -42,13 +42,11 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1',  type: 'ONBOARDING', title: 'Complete vendor setup',       message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/vendor/profile/company',              isRead: false, createdAt: new Date(Date.now() - 2   * 60  * 1000).toISOString() },
   { id: 'n2',  type: 'TRIPS',      title: 'New Booking Request',         message: 'Indent BKG-2026-1001 for Bengaluru → Chandausi',                                                  deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 10  * 60  * 1000).toISOString() },
   { id: 'n3',  type: 'SOURCING',   title: 'Auction Going Live',          message: 'Reverse Auction AUC-012 starts in 30 min',                                           deepLink: '/vendor/sourcing/auctions/AUC-012',    isRead: false, createdAt: new Date(Date.now() - 30  * 60  * 1000).toISOString() },
-  { id: 'n4',  type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense bundle ₹5,500 added for BKG-2026-1043',                                            deepLink: '/vendor/bookings/completed/BKG-2026-1043',  isRead: false, createdAt: new Date(Date.now() - 60  * 60  * 1000).toISOString() },
   { id: 'n5',  type: 'INVOICES',   title: 'Payment Received',            message: '₹1,45,000 credited for INV-2026-028',                                                deepLink: '/vendor/invoices/INV-2026-028',        isRead: true,  createdAt: new Date(Date.now() - 2   * 3600 * 1000).toISOString() },
   { id: 'n6',  type: 'CONTRACTS',  title: 'Contract Updated',            message: 'Contract CNT-001 rate card and SLA details were updated',                            deepLink: '/vendor/contracts/CNT-001',            isRead: false, createdAt: new Date(Date.now() - 3   * 3600 * 1000).toISOString() },
   { id: 'n7',  type: 'INVOICES',   title: 'Invoice Rejected',            message: 'Invoice INV-2026-026 was rejected. Raise a dispute if you disagree.',                deepLink: '/vendor/invoices/INV-2026-026',        isRead: false, createdAt: new Date(Date.now() - 5   * 3600 * 1000).toISOString() },
   { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip BKG-2026-1051 (Bengaluru → Hyderabad)',                       deepLink: '/vendor/bookings/completed/BKG-2026-1051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
   { id: 'n9',  type: 'SOURCING',   title: 'Auction Awarded',             message: 'You won R1 allocation on AUC-009 – Mumbai → Nashik lane',                           deepLink: '/vendor/sourcing',                    isRead: true,  createdAt: new Date(Date.now() - 12  * 3600 * 1000).toISOString() },
-  { id: 'n10', type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense ₹850 added for BKG-2026-1048',                                                     deepLink: '/vendor/bookings/completed/BKG-2026-1048',  isRead: false, createdAt: new Date(Date.now() - 24  * 3600 * 1000).toISOString() },
   { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-007 for Delhi → Jaipur is ready for review',                     deepLink: '/vendor/contracts',                   isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
   { id: 'n12', type: 'INVOICES',   title: 'Invoice Approved',            message: 'Invoice INV-2026-024 approved. Payment due in 15 days.',                            deepLink: '/vendor/invoices/INV-2026-024',        isRead: true,  createdAt: new Date(Date.now() - 48  * 3600 * 1000).toISOString() },
   { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent BKG-2026-1008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
@@ -407,7 +405,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-60a', title: 'Accepted', description: 'Vendor accepted booking, awaiting vehicle assignment', timestamp: new Date(Date.now() - 900000).toISOString(), status: 'ACCEPTED' },
     ],
-    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 38000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 900000).toISOString(),
   },
   {
@@ -420,7 +418,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-50a', title: 'Accepted', description: 'Vendor accepted booking', timestamp: new Date(Date.now() - 3600000).toISOString(), status: 'ACCEPTED' },
       { id: 'tt-50b', title: 'Assigned', description: 'Vehicle and driver assigned, LR generated', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'ASSIGNED' },
     ],
-    freightRate: 38000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 38000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -433,7 +431,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-51a', title: 'Assigned', description: 'Vehicle assigned', timestamp: new Date(Date.now() - 7200000).toISOString(), status: 'ASSIGNED' },
       { id: 'tt-51b', title: 'Out for Pickup', description: 'Driver started movement toward pickup', timestamp: new Date(Date.now() - 3600000).toISOString(), status: 'OUT_FOR_PICKUP' },
     ],
-    freightRate: 42000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 42000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 7200000).toISOString(),
   },
   {
@@ -447,7 +445,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-61b', title: 'Out for Pickup', description: 'Driver moving to pickup', timestamp: new Date(Date.now() - 10800000).toISOString(), status: 'OUT_FOR_PICKUP' },
       { id: 'tt-61c', title: 'Pickup Reached', description: 'Vehicle entered pickup geofence', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'PICKUP_REACHED' },
     ],
-    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 31000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
@@ -461,7 +459,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-52b', title: 'Pickup Reached', description: 'Reached pickup location', timestamp: new Date(Date.now() - 7200000).toISOString(), status: 'PICKUP_REACHED' },
       { id: 'tt-52c', title: 'Loading Started', description: 'Loading started at pickup', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'LOADING_STARTED' },
     ],
-    freightRate: 31000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 31000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
@@ -474,7 +472,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-62a', title: 'Loading Started', description: 'Loading underway', timestamp: new Date(Date.now() - 10800000).toISOString(), status: 'LOADING_STARTED' },
       { id: 'tt-62b', title: 'Loading Completed', description: 'Loading completed; awaiting invoice + e-way bill + LR', timestamp: new Date(Date.now() - 1800000).toISOString(), status: 'LOADING_COMPLETED' },
     ],
-    freightRate: 22000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 22000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 21600000).toISOString(),
   },
   {
@@ -490,7 +488,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-1', title: 'Assigned', description: 'Vehicle and driver assigned', timestamp: '2026-04-22T08:05:00Z', status: 'ASSIGNED' },
       { id: 'tt-2', title: 'In Transit', description: 'Truck is en route to destination', timestamp: '2026-04-22T11:30:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 45000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
@@ -504,7 +502,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-5', title: 'In Transit', description: 'Loaded and dispatched from Pune yard', timestamp: '2026-04-22T10:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 65000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 65000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -519,7 +517,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-7', title: 'Disruption reported', description: 'Driver breakdown at unloading point', timestamp: '2026-04-26T13:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 15000, slaFlag: 'DELAYED', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 15000, slaFlag: 'DELAYED', isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
@@ -534,7 +532,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-10', title: 'Disrupted', description: 'Vehicle breakdown during transit', timestamp: '2026-04-27T12:00:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 18000, slaFlag: 'DELAYED', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 18000, slaFlag: 'DELAYED', isInvoiced: false,
     createdAt: '2026-04-26T08:00:00Z',
   },
   {
@@ -547,7 +545,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-11', title: 'Disrupted', description: 'Vehicle and driver replacement requested', timestamp: '2026-04-28T07:30:00Z', status: 'IN_TRANSIT' },
     ],
-    freightRate: 24000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 24000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-27T18:00:00Z',
   },
   {
@@ -562,7 +560,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-63a', title: 'In Transit', description: 'Dispatched from origin', timestamp: '2026-05-18T07:00:00Z', status: 'IN_TRANSIT' },
       { id: 'tt-63b', title: 'Destination Reached', description: 'Vehicle entered delivery geofence', timestamp: new Date(Date.now() - 900000).toISOString(), status: 'DESTINATION_REACHED' },
     ],
-    freightRate: 52000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 52000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-05-18T06:30:00Z',
   },
   {
@@ -578,7 +576,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-12', title: 'Destination Reached', description: 'Reached delivery location', timestamp: '2026-05-17T16:30:00Z', status: 'DESTINATION_REACHED' },
       { id: 'tt-12b', title: 'POD Pending', description: 'Delivery handed over; POD pending from destination team', timestamp: '2026-05-17T17:30:00Z', status: 'POD_PENDING' },
     ],
-    freightRate: 36000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 36000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-05-16T08:30:00Z',
   },
   {
@@ -594,7 +592,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-8', title: 'POD Pending', description: 'Delivery handed over; awaiting POD', timestamp: '2026-04-26T09:00:00Z', status: 'POD_PENDING' },
     ],
-    freightRate: 32000, slaFlag: 'ON_TIME', expenseSummary: { total: 1400 }, isInvoiced: false,
+    freightRate: 32000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-25T06:00:00Z',
   },
   {
@@ -612,7 +610,7 @@ export const MOCK_TRIPS: Trip[] = [
       { id: 'tt-3', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-04-18T09:30:00Z', status: 'IN_TRANSIT' },
       { id: 'tt-4', title: 'Completed', description: 'POD uploaded; booking ended', timestamp: '2026-04-20T16:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 5500 }, isInvoiced: false,
+    freightRate: 45000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
@@ -628,7 +626,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-6', title: 'Completed', description: 'Booking completed and invoiced', timestamp: '2026-04-10T16:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', expenseSummary: { total: 4800 }, isInvoiced: true,
+    freightRate: 45000, slaFlag: 'ON_TIME', isInvoiced: true,
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
@@ -643,7 +641,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-9', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-04-24T10:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 28000, slaFlag: 'ON_TIME', expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 28000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-24T08:00:00Z',
   },
   {
@@ -657,44 +655,11 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-13', title: 'Cancelled', description: 'Booking cancelled', timestamp: '2026-05-18T10:00:00Z', status: 'CANCELLED' },
     ],
-    freightRate: 34500, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 34500, isInvoiced: false,
     createdAt: '2026-05-17T07:45:00Z',
   }
 ]
 
-export const MOCK_EXPENSES: Expense[] = [
-  {
-    id: 'EXP-101',
-    tripId: 'BKG-2026-1043',
-    tripReference: 'BKG-2026-1043',
-    lineItems: [
-      { id: 'EXP-101-1', expenseType: 'EXPENSE', amount: 3000, description: 'Mumbai-Delhi highway toll' },
-      { id: 'EXP-101-2', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
-    ],
-    amount: 5500,
-    submittedAt: '2026-04-21T10:00:00Z',
-  },
-  {
-    id: 'EXP-103',
-    tripId: 'BKG-2026-1042',
-    tripReference: 'BKG-2026-1042',
-    lineItems: [
-      { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800, description: 'Pune bypass toll' },
-    ],
-    amount: 1800,
-    submittedAt: '2026-04-22T14:00:00Z',
-  },
-  {
-    id: 'EXP-104',
-    tripId: 'BKG-2026-1045',
-    tripReference: 'BKG-2026-1045',
-    lineItems: [
-      { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
-    ],
-    amount: 500,
-    submittedAt: '2026-04-22T15:00:00Z',
-  }
-]
 
 export const MOCK_VEHICLES: Vehicle[] = [
   // Mirrors the vehicle onboarded by Mahesh Transport through the tenant
@@ -743,8 +708,8 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-01', to: '2026-04-15' },
     paymentDueDate: '2026-05-15', status: 'APPROVED', paymentDate: '2026-05-12',
     lineItems: [
-      { tripId: 'BKG-2026-1040', tripReference: 'BKG-2026-1040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
-      { tripId: 'BKG-2026-1041', tripReference: 'BKG-2026-1041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
+      { tripId: 'BKG-2026-1040', tripReference: 'BKG-2026-1040', freightCharge: 50000, lineTotal: 50000 },
+      { tripId: 'BKG-2026-1041', tripReference: 'BKG-2026-1041', freightCharge: 50000, lineTotal: 50000 },
     ],
     subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', tripReferences: ['BKG-2026-1040', 'BKG-2026-1041'], createdAt: '2026-04-15T12:00:00Z',
   },
@@ -753,7 +718,7 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-01', to: '2026-05-13' },
     paymentDueDate: '2026-06-12', status: 'APPROVED',
     lineItems: [
-      { tripId: 'BKG-2026-1042', tripReference: 'BKG-2026-1042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
+      { tripId: 'BKG-2026-1042', tripReference: 'BKG-2026-1042', freightCharge: 100000, lineTotal: 100000 }
     ],
     subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', tripReferences: ['BKG-2026-1042'], createdAt: '2026-05-13T10:00:00Z',
   },
@@ -761,21 +726,21 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1046', tripReference: 'BKG-2026-1046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
+    lineItems: [{ tripId: 'BKG-2026-1046', tripReference: 'BKG-2026-1046', freightCharge: 85000, lineTotal: 85000 }],
     subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', tripReferences: ['BKG-2026-1046'], createdAt: '2026-05-17T10:00:00Z',
   },
   {
     id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1047', tripReference: 'BKG-2026-1047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
+    lineItems: [{ tripId: 'BKG-2026-1047', tripReference: 'BKG-2026-1047', freightCharge: 92000, lineTotal: 92000 }],
     subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', tripReferences: ['BKG-2026-1047'], createdAt: '2026-05-18T10:00:00Z',
   },
   {
     id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1048', tripReference: 'BKG-2026-1048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
+    lineItems: [{ tripId: 'BKG-2026-1048', tripReference: 'BKG-2026-1048', freightCharge: 68000, lineTotal: 68000 }],
     subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', tripReferences: ['BKG-2026-1048'], createdAt: '2026-05-19T10:00:00Z',
   },
   {
@@ -784,10 +749,9 @@ export const MOCK_INVOICES: Invoice[] = [
     paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
       tripId: 'BKG-2026-1049', tripReference: 'BKG-2026-1049', freightCharge: 74000,
-      expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
-      lineTotal: 74800,
+      lineTotal: 74000,
     }],
-    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['BKG-2026-1049'], createdAt: '2026-05-19T11:00:00Z',
+    subtotal: 74000, gstAmount: 8880, grandTotal: 82880, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['BKG-2026-1049'], createdAt: '2026-05-19T11:00:00Z',
   },
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
@@ -795,19 +759,15 @@ export const MOCK_INVOICES: Invoice[] = [
     paymentDueDate: '2026-06-17', status: 'DISPUTED',
     lineItems: [{
       tripId: 'BKG-2026-1050', tripReference: 'BKG-2026-1050', freightCharge: 58000,
-      expenses: [
-        { type: 'DETENTION', amount: 3000 },
-        { type: 'LOADING_UNLOADING', amount: 1500 },
-      ],
-      lineTotal: 62500,
+      lineTotal: 58000,
     }],
-    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['BKG-2026-1050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 58000, gstAmount: 6960, grandTotal: 64960, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['BKG-2026-1050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
-    lineItems: [{ tripId: 'BKG-2026-1051', tripReference: 'BKG-2026-1051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
+    lineItems: [{ tripId: 'BKG-2026-1051', tripReference: 'BKG-2026-1051', freightCharge: 47000, lineTotal: 47000 }],
     subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['BKG-2026-1051'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
   },
   {
@@ -815,7 +775,7 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2026-009', invoiceNumber: 'INV-2026-009', invoiceDate: '2026-05-16', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-12', to: '2026-05-16' },
     paymentDueDate: '2026-06-15', status: 'CLOSED', closeReason: 'REJECTED',
-    lineItems: [{ tripId: 'BKG-2026-1052', tripReference: 'BKG-2026-1052', freightCharge: 39000, expenses: [], lineTotal: 39000 }],
+    lineItems: [{ tripId: 'BKG-2026-1052', tripReference: 'BKG-2026-1052', freightCharge: 39000, lineTotal: 39000 }],
     subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['BKG-2026-1052'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
   },
   {
@@ -823,7 +783,7 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2026-010', invoiceNumber: 'INV-2026-010', invoiceDate: '2026-05-14', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-13', status: 'CLOSED', closeReason: 'SUPERSEDED', supersededByInvoiceId: 'INV-2026-011',
-    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 61000, expenses: [], lineTotal: 61000 }],
+    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 61000, lineTotal: 61000 }],
     subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
   },
   {
@@ -831,7 +791,7 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2026-011', invoiceNumber: 'INV-2026-011', invoiceDate: '2026-05-20', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-19', status: 'PENDING', supersedesInvoiceId: 'INV-2026-010',
-    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 59000, expenses: [], lineTotal: 59000 }],
+    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 59000, lineTotal: 59000 }],
     subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
   }
 ]
