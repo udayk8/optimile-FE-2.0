@@ -45,25 +45,41 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
       return "pending";
     };
 
+    // Booking-wise expenses, read straight off the booking (no duplication in
+    // Finance). Only "Approved" expenses are billable; "Pending" is shown for
+    // visibility; "Rejected" (and anything else) is excluded from both.
+    const sumExpenses = (booking: BookingRecord, status: "Approved" | "Pending") =>
+      (booking.expenses ?? [])
+        .filter((expense) => (expense.status ?? "Pending") === status)
+        .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const approvedExpensesOf = (booking: BookingRecord) => sumExpenses(booking, "Approved");
+
     const allBookings = store.listTenantBookings(tenantId);
     const eligible = allBookings.filter((b) => POD_ELIGIBLE_STATUSES.has(b.status));
 
-    const trips: ARTrip[] = eligible.map((b) => ({
-      id: b.bookingId,
-      bookingId: b.bookingId,
-      client: customerName(b.customerId),
-      consignee: customerName(b.customerId),
-      lane: laneOf(b),
-      truck: b.assignment?.vehicleLabel ?? "—",
-      driver: b.assignment?.driverName ?? "—",
-      vehicle: b.assignment?.vehicleLabel ?? "—",
-      vendor: b.assignment?.vendorName ?? "Own fleet",
-      delivered: (b.updatedAt ?? b.createdAt ?? "").slice(0, 10),
-      daysPending: daysSince(b.updatedAt ?? b.createdAt),
-      revenue: b.pricing?.calculatedFreight ?? 0,
-      expense: 0,
-      podStage: podStageOf(b),
-    }));
+    const trips: ARTrip[] = eligible.map((b) => {
+      const approvedExpenses = approvedExpensesOf(b);
+      const pendingExpenses = sumExpenses(b, "Pending");
+      return {
+        id: b.bookingId,
+        bookingId: b.bookingId,
+        client: customerName(b.customerId),
+        consignee: customerName(b.customerId),
+        lane: laneOf(b),
+        truck: b.assignment?.vehicleLabel ?? "—",
+        driver: b.assignment?.driverName ?? "—",
+        vehicle: b.assignment?.vehicleLabel ?? "—",
+        vendor: b.assignment?.vendorName ?? "Own fleet",
+        delivered: (b.updatedAt ?? b.createdAt ?? "").slice(0, 10),
+        daysPending: daysSince(b.updatedAt ?? b.createdAt),
+        revenue: b.pricing?.calculatedFreight ?? 0,
+        // expense (legacy field) carries the billable/approved amount.
+        expense: approvedExpenses,
+        approvedExpenses,
+        pendingExpenses,
+        podStage: podStageOf(b),
+      };
+    });
 
     const invoices: ARInvoice[] = store
       .listTenantInvoices(tenantId)
@@ -131,7 +147,10 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         const customerId = bookings[0].customerId;
         const sameCustomer = bookings.filter((b) => b.customerId === customerId);
 
-        const subtotal = sameCustomer.reduce((sum, b) => sum + (b.pricing?.calculatedFreight ?? 0), 0);
+        // Total Invoice Amount = Booking Freight + Approved Expenses (only).
+        const freightTotal = sameCustomer.reduce((sum, b) => sum + (b.pricing?.calculatedFreight ?? 0), 0);
+        const approvedExpenseTotal = sameCustomer.reduce((sum, b) => sum + approvedExpensesOf(b), 0);
+        const subtotal = freightTotal + approvedExpenseTotal;
         const cgst = Math.round(subtotal * 0.09);
         const sgst = Math.round(subtotal * 0.09);
         const total = subtotal + cgst + sgst;

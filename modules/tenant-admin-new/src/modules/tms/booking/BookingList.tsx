@@ -38,8 +38,9 @@ const pipelineColumns: Array<{
   { key: "cancelled", label: "Cancelled", statuses: ["CANCELLED"] },
 ];
 
-// Default selection per spec: Assignment + In Transit only.
-const DEFAULT_VISIBLE_KEYS = ["assignment", "transit"] as const;
+// Default operational stages shown on the dashboard. Users can add/remove via
+// the "Customize" selector; the choice persists per tenant in localStorage.
+const DEFAULT_VISIBLE_KEYS = ["assignment", "transit", "pod", "completed"] as const;
 
 // Map URL ?pipeline= slugs to internal keys so /bookings?pipeline=in-transit
 // and /bookings?pipeline=pod-pending land on the right column.
@@ -373,13 +374,12 @@ export function BookingListPage() {
             <div className="flex min-w-max gap-2">
               {visiblePipelineGroups.map((column) => {
                 const isActive = selectedPipelineKey === column.key;
+                const tone = getPipelineTone(column.key);
                 return (
                   <div
                     key={column.key}
-                    className={`flex h-[150px] w-[220px] shrink-0 flex-col overflow-hidden rounded-md transition ${
-                      isActive
-                        ? "border-2 border-slate-400 bg-slate-50/80 shadow-sm"
-                        : "border border-slate-200 bg-white shadow-sm/30"
+                    className={`flex h-[156px] w-[230px] shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition ${
+                      isActive ? `border-transparent ring-2 ${tone.ring}` : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
                     <button
@@ -388,39 +388,35 @@ export function BookingListPage() {
                         setSelectedPipelineKey(column.key);
                         setStatusFilter("all");
                       }}
-                      className={`flex items-center justify-between gap-2 border-b px-2.5 py-1.5 text-left transition ${
-                        isActive ? "border-slate-200 bg-slate-100/70" : "border-slate-200 bg-slate-50/60 hover:bg-slate-100/70"
-                      }`}
+                      className={`flex items-center justify-between gap-2 px-3 py-2 text-left ${tone.cardBg}`}
                     >
-                      <span className="truncate text-[12px] font-semibold text-slate-800">{column.label}</span>
-                      <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded-full bg-white px-1.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                      <span className={`truncate text-[13px] font-semibold ${tone.headline}`}>{column.label}</span>
+                      <span className={`inline-flex h-5 min-w-[22px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${tone.countChip}`}>
                         {column.bookings.length}
                       </span>
                     </button>
 
-                    <div className="flex-1 space-y-1 overflow-y-auto px-2 py-1.5">
-                      {column.totalFreight ? (
-                        <p className="text-[11px] font-medium text-slate-600">{formatCurrency(column.totalFreight)}</p>
-                      ) : null}
+                    <div className="flex-1 space-y-1 overflow-y-auto px-2.5 py-2">
+                      <p className={`text-[12px] font-bold ${tone.headline}`}>{column.totalFreight ? formatCurrency(column.totalFreight) : "—"}</p>
                       {column.previewBookings.length ? (
                         column.previewBookings.slice(0, 2).map((booking) => (
                           <button
                             key={booking.id}
                             type="button"
                             onClick={() => openBooking(booking.id)}
-                            className="flex w-full items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1 text-left transition hover:bg-slate-50"
+                            className="flex w-full items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-2 py-1 text-left transition hover:bg-gray-50"
                           >
                             <div className="min-w-0">
-                              <p className="truncate text-[11px] font-semibold text-slate-800">{booking.bookingId}</p>
-                              <p className="truncate text-[10px] text-slate-500">
+                              <p className="truncate text-[11px] font-semibold text-gray-800">{booking.bookingId}</p>
+                              <p className="truncate text-[10px] text-gray-500">
                                 {customerMap.get(booking.customerId)?.name ?? "Unknown customer"}
                               </p>
                             </div>
-                            <ArrowRight className="size-3 shrink-0 text-slate-400" />
+                            <ArrowRight className="size-3 shrink-0 text-gray-400" />
                           </button>
                         ))
                       ) : (
-                        <p className="px-1 py-0.5 text-[11px] text-slate-500">No bookings</p>
+                        <p className="px-1 py-0.5 text-[11px] text-gray-400">No bookings</p>
                       )}
                     </div>
 
@@ -436,7 +432,7 @@ export function BookingListPage() {
                           return next;
                         });
                       }}
-                      className="border-t border-slate-200 bg-slate-50/60 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100/70 hover:text-slate-800"
+                      className={`py-1.5 text-[11px] font-semibold transition ${isActive ? tone.viewAllActive : tone.viewAll}`}
                     >
                       View All →
                     </button>
@@ -551,6 +547,8 @@ export function BookingListPage() {
                   lrNumbersLabel={getLrNumbersLabel(booking)}
                   onOpen={() => openBooking(booking.id)}
                   onTrack={() => openTrack(booking.bookingId)}
+                  onInvoice={() => navigate(`/tenant/${tenant.id}/finance/invoicing`)}
+                  showActions={isFullView}
                 />
               ))}
             </div>
@@ -665,6 +663,8 @@ function BookingSummaryRow({
   lrNumbersLabel,
   onOpen,
   onTrack,
+  onInvoice,
+  showActions = false,
 }: {
   booking: BookingRecord;
   customerName: string;
@@ -676,7 +676,21 @@ function BookingSummaryRow({
   lrNumbersLabel: string;
   onOpen: () => void;
   onTrack: () => void;
+  onInvoice?: () => void;
+  showActions?: boolean;
 }) {
+  const primaryStatus = getPrimaryBookingStatus(booking.status);
+  const rowAction = (label: string, handler: () => void, tone: string) => (
+    <span
+      role="button"
+      tabIndex={0}
+      onClick={(event) => { event.stopPropagation(); handler(); }}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); handler(); } }}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-semibold transition ${tone}`}
+    >
+      {label}
+    </span>
+  );
   const hasRevisionPending = (booking.destinationChangeRequests ?? []).some((request) =>
     ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(request.status),
   );
@@ -709,11 +723,11 @@ function BookingSummaryRow({
       </div>
 
       <div className="min-w-0">
-        <p className="truncate text-[12px] font-semibold text-slate-900">
-          {vehicleLabel}
-          {lrNumbersLabel ? <span className="ml-1 font-normal text-slate-600">({lrNumbersLabel})</span> : null}
-        </p>
-        <p className="mt-0.5 truncate text-[10.5px] text-slate-500">{driverName}</p>
+        <p className="truncate text-[12px] text-slate-900"><span className="text-slate-400">Vehicle:</span> <span className="font-semibold">{vehicleLabel}</span></p>
+        {lrNumbersLabel ? (
+          <p className="truncate text-[11px] text-slate-700"><span className="text-slate-400">LR:</span> {lrNumbersLabel}</p>
+        ) : null}
+        <p className="mt-0.5 truncate text-[10.5px] text-slate-500"><span className="text-slate-400">Driver:</span> {driverName}</p>
       </div>
 
       <div className="min-w-0">
@@ -725,29 +739,24 @@ function BookingSummaryRow({
         <BookingStatusBadge status={booking.status} />
       </div>
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-1.5">
         {booking.status === "IN_TRANSIT" ? (
           // Non-button (row is itself a <button>): avoids invalid nested buttons.
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(event) => {
-              event.stopPropagation();
-              onTrack();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                event.stopPropagation();
-                onTrack();
-              }
-            }}
-            className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100"
-          >
-            <MapPin className="size-3" />
-            Track
-          </span>
+          rowAction(
+            "Track",
+            onTrack,
+            "border-sky-200 bg-sky-50 text-sky-700 hover:border-sky-300 hover:bg-sky-100",
+          )
         ) : null}
+        {showActions && primaryStatus === "PENDING_ASSIGNMENT"
+          ? rowAction("Assign", onOpen, "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100")
+          : null}
+        {showActions && primaryStatus === "POD_PENDING"
+          ? rowAction("Upload POD", onOpen, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")
+          : null}
+        {showActions && primaryStatus === "COMPLETED" && onInvoice
+          ? rowAction("Create Invoice", onInvoice, "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100")
+          : null}
         <ArrowRight className="size-4 text-slate-400" />
       </div>
     </button>

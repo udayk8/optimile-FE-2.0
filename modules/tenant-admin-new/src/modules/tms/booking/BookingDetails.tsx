@@ -47,6 +47,8 @@ import type {
   BookingDeliveryShipmentDocuments,
   BookingDestinationChangeRequest,
   BookingExpenseRecord,
+  BookingExpensePaymentMode,
+  BookingExpenseStatus,
   BookingPodSnapshot,
   BookingVehicleReplacementHistoryRecord,
   BookingVehicleReplacementInput,
@@ -157,6 +159,18 @@ const VEHICLE_REPLACEMENT_REASON_OPTIONS: Array<{ value: BookingVehicleReplaceme
   { value: "OTHER", label: "Other" },
 ];
 
+const BOOKING_EXPENSE_TYPES = [
+  "Toll charge",
+  "Loading charge",
+  "Unloading charge",
+  "Detention charge",
+  "Parking charge",
+  "Driver allowance",
+  "Weighment charge",
+  "Other",
+];
+const BOOKING_EXPENSE_PAID_BY = ["Driver", "Vendor", "Company", "Self"];
+
 export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -195,11 +209,19 @@ export function BookingDetailsPage() {
   const [selectedLrMode, setSelectedLrMode] = useState<"MANUAL" | "PRE_GENERATED" | "AUTO">("MANUAL");
   const [expenseLabel, setExpenseLabel] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
-  const [activeTab, setActiveTab] = useState("Deliveries");
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [expenseViewId, setExpenseViewId] = useState<string | null>(null);
+  const [expenseType, setExpenseType] = useState("Toll charge");
+  const [expensePaymentMode, setExpensePaymentMode] = useState<BookingExpensePaymentMode>("UPI");
+  const [expensePaidBy, setExpensePaidBy] = useState("Driver");
+  const [expenseBillFile, setExpenseBillFile] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [activeTab, setActiveTab] = useState("Overview");
   const [showExecutionOpsPanel, setShowExecutionOpsPanel] = useState(false);
   const [deliveryWorkspaceTabs, setDeliveryWorkspaceTabs] = useState<Record<string, string>>({});
   const [activeDeliveryWorkspaceId, setActiveDeliveryWorkspaceId] = useState<string | null>(null);
   const [podForms, setPodForms] = useState<Record<string, BookingPodSnapshot>>({});
+  const [podEditId, setPodEditId] = useState<string | null>(null);
   const [remarkDeliveryId, setRemarkDeliveryId] = useState<string | null>(null);
   const [remarkType, setRemarkType] = useState<(typeof DELIVERY_REMARK_TYPES)[number]["value"]>("INTACT");
   const [remarkLocation, setRemarkLocation] = useState("");
@@ -1638,22 +1660,44 @@ export function BookingDetailsPage() {
     });
   }
 
-  function addExpense() {
-    if (!expenseLabel.trim() || Number(expenseAmount) <= 0) {
+  function submitExpense() {
+    if (!expenseType.trim() || Number(expenseAmount) <= 0 || !expenseBillFile.trim()) {
       return;
     }
+    const now = new Date().toISOString();
     const nextExpense: BookingExpenseRecord = {
       id: `expense-${Date.now()}`,
-      label: expenseLabel.trim(),
+      label: expenseType.trim(),
       amount: Number(expenseAmount),
-      createdAt: new Date().toISOString(),
-      createdBy: "Ops",
+      createdAt: now,
+      createdBy: session.actorName || "Ops",
+      bookingId: bookingRecord.bookingId,
+      dateTime: now,
+      expenseType: expenseType.trim(),
+      paymentMode: expensePaymentMode,
+      paidBy: expensePaidBy,
+      billReceiptFile: expenseBillFile.trim(),
+      notes: expenseNotes.trim() || undefined,
+      status: "Pending",
     };
     updateBooking(bookingRecord.id, {
       expenses: [...(bookingRecord.expenses ?? []), nextExpense],
     });
-    setExpenseLabel("");
     setExpenseAmount("");
+    setExpenseBillFile("");
+    setExpenseNotes("");
+    setExpenseType("Toll charge");
+    setExpensePaymentMode("UPI");
+    setExpensePaidBy("Driver");
+    setExpenseModalOpen(false);
+  }
+
+  function setExpenseStatus(expenseId: string, status: BookingExpenseStatus) {
+    updateBooking(bookingRecord.id, {
+      expenses: (bookingRecord.expenses ?? []).map((expense) =>
+        expense.id === expenseId ? { ...expense, status } : expense,
+      ),
+    });
   }
 
   function saveDeliveryPod(deliveryId: string) {
@@ -1787,62 +1831,22 @@ export function BookingDetailsPage() {
 
   return (
     <div className="space-y-3">
-      <Card className="glass-panel overflow-hidden">
-        <CardContent className="p-3 sm:p-4">
-          <div className={`rounded-[22px] border px-4 py-3 shadow-[0_20px_50px_rgba(15,23,42,0.24)] ${bookingOperationalAlert ? "border-amber-300 bg-gradient-to-br from-amber-900 via-orange-900 to-slate-950 text-white" : "border-white/80 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 text-white"}`}>
-            <div className="grid gap-2 xl:grid-cols-[1.15fr_0.95fr_1.15fr]">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200/90">TMS • Live Booking</p>
-                    <p className="mt-1 text-xl font-semibold tracking-[-0.03em]">{bookingRecord.bookingId}</p>
-                    <p className="text-sm text-slate-300">
-                      {customer?.name ?? "-"} • {sourceAddress?.city ?? "-"} to {destinationAddress?.city ?? "-"}
-                    </p>
-                  </div>
-                  <BookingStatusBadge status={bookingRecord.status} />
-                </div>
-                <div className="grid gap-2 grid-cols-2">
-                  <MiniStat label="Selling Freight" value={`Rs ${customerFreight.toLocaleString()}`} inverse />
-                  <MiniStat label="Buying Freight" value={bookingRecord.assignment?.vendorFreight != null ? `Rs ${bookingRecord.assignment.vendorFreight.toLocaleString()}` : "Pending"} inverse />
-                  {access.can("BOOKING_DETAIL", "VIEW_MARGIN") ? (
-                    <>
-                      <MiniStat label="Margin Amount" value={bookingRecord.assignment?.marginAmount != null ? `Rs ${bookingRecord.assignment.marginAmount.toLocaleString()}` : "Pending"} inverse />
-                      <MiniStat label="Margin %" value={bookingRecord.assignment?.marginPercent != null ? `${bookingRecord.assignment.marginPercent}%` : "Pending"} inverse />
-                    </>
-                  ) : null}
-                  <MiniStat label="Pickup" value={bookingRecord.pickupDate || bookingRecord.pickupTime ? `${bookingRecord.pickupDate ?? "-"} ${bookingRecord.pickupTime ?? ""}`.trim() : "-"} inverse />
-                  <MiniStat label="Deliveries" value={String(bookingRecord.numberOfDeliveries ?? bookingRecord.deliveries?.length ?? 1)} inverse />
-                </div>
-                {bookingOperationalAlert ? (
-                  <div className="rounded-2xl border border-amber-200/40 bg-amber-100/10 px-3 py-2 text-xs text-amber-100">
-                    {bookingRevisionEnabled ? "Destination change pending review. Booking is revision-enabled." : "Destination revised. Historical delivery audit retained."}
-                  </div>
-                ) : null}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="flex items-center gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Booking</p>
+                <p className="text-lg font-bold text-gray-900">{bookingRecord.bookingId}</p>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <MiniInfoPill strong label="Lane" value={`${sourceAddress?.addressName ?? "-"} to ${destinationAddress?.addressName ?? "-"}`} />
-                <MiniInfoPill label="Qty / Weight" value={`${bookingRecord.quantity} ${bookingRecord.uom} / ${bookingRecord.weight} ${bookingRecord.weightUom ?? bookingRecord.uom}`} />
-                <MiniInfoPill label="Status / Stage" value={`${visibleBookingStatus.replace(/_/g, " ")} / ${currentExecutionStage.label}`} />
-              </div>
-              <div className="space-y-2">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <MiniInfoPill label="Vehicle" value={assignedVehicle?.registrationNumber ?? "Not assigned"} />
-                  <MiniInfoPill label="Driver / Vendor" value={`${assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned"} / ${assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Not assigned"}`} />
-                </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="outline">{bookingRecord.modeOfTransport ?? "ROAD"}</Badge>
-                    <Badge variant="outline">{bookingRecord.serviceType}</Badge>
-                    <Badge variant="outline">{bookingRecord.commercialType}</Badge>
-                  <Badge variant="outline">{bookingRecord.pricing.rateType.replace(/_/g, " ")}</Badge>
-                  <Badge variant={loadingCompleted ? "success" : loadingStarted ? "accent" : "outline"}>
-                    {loadingCompleted ? "Loading Completed" : loadingStarted ? "Loading Started" : "Loading Pending"}
-                  </Badge>
-                  <Badge variant={documentsReady ? "success" : "warning"}>
-                    {documentsReady ? "Documents Ready" : "Documents Pending"}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
+              <BookingStatusBadge status={bookingRecord.status} />
+            </div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Customer</p><p className="text-sm font-semibold text-gray-900">{customer?.name ?? "-"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Vehicle</p><p className="text-sm font-semibold text-gray-900">{assignedVehicle?.registrationNumber ?? "Not assigned"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Driver</p><p className="text-sm font-semibold text-gray-900">{assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Vendor</p><p className="text-sm font-semibold text-gray-900">{assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Freight</p><p className="text-sm font-semibold text-gray-900">Rs {customerFreight.toLocaleString()}</p></div>
+                            <div className="flex flex-wrap gap-1.5">
                   <Button asChild size="sm" variant="outline">
                     <Link to={`/tenant/${tenant.id}/bookings`}>Back</Link>
                   </Button>
@@ -1919,23 +1923,21 @@ export function BookingDetailsPage() {
                   {bookingRecord.status === "POD_PENDING" && allDeliveryPodsCaptured && access.can("BOOKING_DETAIL", "MARK_COMPLETED") ? <Button size="sm" onClick={markBookingCompleted}>Complete Booking</Button> : null}
                   {["DELAYED", "EXCEPTION"].includes(bookingRecord.status) ? <Button size="sm" variant="outline" onClick={resumeTransit}>Move to Transit</Button> : null}
                 </div>
-                </div>
-                {bookingRecord.status === "CANCELLED" && latestCancellationReason ? (
+          </div>
+                          {bookingRecord.status === "CANCELLED" && latestCancellationReason ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
                     Cancellation reason: {latestCancellationReason}
                   </div>
                 ) : null}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-      <Card className="glass-panel overflow-hidden">
-        <CardContent className="p-3 sm:p-4">
+      <Card>
+        <CardContent className="p-4">
           <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Tabs tabs={["Deliveries", "Expenses", "Timeline"]} active={activeTab} onChange={setActiveTab} />
-            {activeTab === "Deliveries" && actionableReassignmentRemarks.length ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Tabs tabs={["Overview", "Deliveries", "Documents", "Timeline", "Expenses"]} active={activeTab} onChange={setActiveTab} />
+                          {activeTab === "Deliveries" && actionableReassignmentRemarks.length ? (
               <button
                 type="button"
                 onClick={() => setShowExecutionOpsPanel((current) => !current)}
@@ -1945,9 +1947,49 @@ export function BookingDetailsPage() {
                 <span>{actionableReassignmentRemarks[0]?.type.replace(/_/g, " ")}</span>
               </button>
             ) : null}
-          </div>
+            </div>
 
-          {activeTab === "Deliveries" ? (
+            {activeTab === "Overview" ? (
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-900">Booking Information</p>
+                  <div className="grid gap-1.5">
+                    <DetailRow label="Booking No" value={bookingRecord.bookingId} />
+                    <DetailRow label="Customer" value={customer?.name ?? "-"} />
+                    <DetailRow label="Lane" value={`${sourceAddress?.city ?? "-"} to ${destinationAddress?.city ?? "-"}`} />
+                    <DetailRow label="Pickup" value={bookingRecord.pickupDate || bookingRecord.pickupTime ? `${bookingRecord.pickupDate ?? "-"} ${bookingRecord.pickupTime ?? ""}`.trim() : "-"} />
+                    <DetailRow label="Deliveries" value={String(bookingRecord.numberOfDeliveries ?? bookingRecord.deliveries?.length ?? 1)} />
+                    <DetailRow label="Qty / Weight" value={`${bookingRecord.quantity} ${bookingRecord.uom} / ${bookingRecord.weight} ${bookingRecord.weightUom ?? bookingRecord.uom}`} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-900">Vehicle Information</p>
+                  <div className="grid gap-1.5">
+                    <DetailRow label="Vehicle" value={assignedVehicle?.registrationNumber ?? "Not assigned"} />
+                    <DetailRow label="Vehicle Type" value={vehicleType?.typeCode ?? "-"} />
+                    <DetailRow label="Driver" value={assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned"} />
+                    <DetailRow label="Driver Phone" value={assignedDriver?.phone ?? "-"} />
+                    <DetailRow label="Vendor" value={assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet"} />
+                    <DetailRow label="Mode / Service" value={`${bookingRecord.modeOfTransport ?? "ROAD"} / ${bookingRecord.serviceType}`} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white p-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-900">Commercial Information</p>
+                  <div className="grid gap-1.5">
+                    <DetailRow label="Commercial Type" value={bookingRecord.commercialType} />
+                    <DetailRow label="Rate Type" value={bookingRecord.pricing.rateType.replace(/_/g, " ")} />
+                    <DetailRow label="Selling Freight" value={`Rs ${customerFreight.toLocaleString()}`} />
+                    <DetailRow label="Buying Freight" value={bookingRecord.assignment?.vendorFreight != null ? `Rs ${bookingRecord.assignment.vendorFreight.toLocaleString()}` : "Pending"} />
+                    {access.can("BOOKING_DETAIL", "VIEW_MARGIN") ? (
+                      <DetailRow label="Margin" value={bookingRecord.assignment?.marginAmount != null ? `Rs ${bookingRecord.assignment.marginAmount.toLocaleString()}` : "Pending"} />
+                    ) : null}
+                    <DetailRow label="Documents" value={documentsReady ? "Ready" : "Pending"} />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+                      {activeTab === "Deliveries" ? (
             <div className="space-y-3">
               {showExecutionOpsPanel && (
                 <div className="rounded-[20px] border border-rose-200 bg-white p-3 shadow-sm">
@@ -2189,17 +2231,17 @@ export function BookingDetailsPage() {
                       key={`selector-${delivery.id}`}
                       type="button"
                       onClick={() => setActiveDeliveryWorkspaceId(delivery.id)}
-                      className={`rounded-[20px] border px-3 py-2.5 text-left transition ${
+                      className={`rounded-xl border px-3 py-2.5 text-left transition ${
                         isActive
-                          ? "border-cyan-300 bg-gradient-to-br from-cyan-500 via-blue-500 to-slate-900 text-white shadow-[0_12px_28px_rgba(14,116,144,0.20)]"
-                          : "border-white/70 bg-gradient-to-br from-white to-slate-50 hover:border-cyan-200 hover:bg-slate-50"
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-slate-950"}`}>Delivery {delivery.deliveryNo}</p>
-                          <p className={`mt-0.5 text-xs ${isActive ? "text-cyan-100" : "text-slate-500"}`}>{formatStatusLabel(delivery.status)}</p>
-                          <p className={`mt-1 text-[11px] ${isActive ? "text-cyan-100/90" : "text-slate-500"}`}>
+                          <p className="text-sm font-semibold text-gray-900">Delivery {delivery.deliveryNo}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">{formatStatusLabel(delivery.status)}</p>
+                          <p className="mt-1 text-[11px] text-gray-500">
                             {delivery.trackingId || "Tracking pending"}{visibleDeliveryLrNumber ? ` | LR ${visibleDeliveryLrNumber}` : ""}
                           </p>
                         </div>
@@ -2207,9 +2249,9 @@ export function BookingDetailsPage() {
                           {delivery.pod?.podUploaded ? "POD" : "Open"}
                         </Badge>
                       </div>
-                      <div className={`mt-1.5 ${isActive ? "text-slate-100" : "text-slate-600"}`}>
+                      <div className="mt-1.5 text-gray-600">
                         <p className="line-clamp-1 text-sm font-medium">{deliveryDestinationConsignee}</p>
-                        <p className={`mt-0.5 line-clamp-2 text-xs ${isActive ? "text-cyan-100/90" : "text-slate-500"}`}>
+                        <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
                           {deliveryDestinationFullAddress}
                         </p>
                       </div>
@@ -2275,7 +2317,7 @@ export function BookingDetailsPage() {
                 const visibleDeliveryLrNumber = getVisibleDeliveryLrNumber(delivery);
 
                 return (
-                  <div key={delivery.id} className="max-h-[68vh] overflow-y-auto rounded-[24px] border border-white/75 bg-gradient-to-br from-white via-white to-sky-50/80 p-4 shadow-[0_18px_42px_rgba(15,23,42,0.08)]">
+                  <div key={delivery.id} className="max-h-[68vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-base font-semibold tracking-[-0.02em] text-slate-950">Delivery {delivery.deliveryNo}</p>
@@ -2330,7 +2372,7 @@ export function BookingDetailsPage() {
                             <span className="text-sm font-medium text-slate-600">{trackingSummary.progressPercent}%</span>
                           </div>
                           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-600" style={{ width: `${trackingSummary.progressPercent}%` }} />
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${trackingSummary.progressPercent}%` }} />
                           </div>
                           <p className="mt-3 text-sm text-slate-700">Last updated location & time: {trackingSummary.lastKnownLocation}</p>
                         </div>
@@ -2352,45 +2394,22 @@ export function BookingDetailsPage() {
 
                     {deliveryTab === "Load Details" ? (
                       <div className="mt-3 space-y-3">
+                        {/* Delivery-specific fields only. Customer / Vehicle / Driver / Freight / Status live in Overview; Invoice / E-Way Bill / LR / POD live in Documents. */}
                         <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-3">
-                          <DetailRow label="Delivery Freight" value={formatCurrency(deliveryFreight || 0)} tone="blue" />
-                          <DetailRow label="Total Freight" value={formatCurrency(latestFreight || 0)} tone="emerald" />
-                          <DetailRow label="Status" value={formatStatusLabel(delivery.status)} tone="blue" />
-                          <DetailRow label="Customer Name" value={customer?.name ?? "-"} tone="blue" />
-                          <DetailRow label="Vendor / Carrier Name" value={assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "EasyLane"} tone="blue" />
-                          <DetailRow label="Service Type" value={bookingRecord.serviceType} tone="blue" />
-                          <DetailRow label="Booking Date & Time" value={formatDateTime(bookingRecord.createdAt)} tone="blue" />
-                          <DetailRow label="Vehicle Number" value={assignedVehicle?.registrationNumber ?? "N/A"} tone="emerald" />
-                          <DetailRow label="Driver Name" value={assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "N/A"} tone="emerald" />
-                          <DetailRow label="Driver Phone" value={assignedDriver?.phone ?? "N/A"} tone="emerald" />
-                          <DetailRow label="Vehicle Type" value={vehicleType?.typeCode ?? "N/A"} tone="emerald" />
-                          <DetailRow label="Origin" value={deliveryOrigin?.addressName ?? delivery.originCity ?? "-"} tone="amber" />
-                          <DetailRow label="Destination" value={deliveryDestinationConsignee} tone="amber" />
-                          <DetailRow
-                            label="Consignee Full Address"
-                            value={deliveryDestinationFullAddress}
-                            tone="amber"
-                          />
-                          <DetailRow label="Material" value={deliveryMaterial?.materialCode ?? "-"} tone="violet" />
-                          <DetailRow label="Sub-brand" value={invoiceFiles.map((invoice) => invoice.subBrand).filter(Boolean).join(", ") || bookingRecord.subBrand || "N/A"} tone="violet" />
-                          <DetailRow label="Quantity" value={delivery.quantity != null ? `${delivery.quantity} ${delivery.uom ?? ""}`.trim() : "-"} tone="violet" />
-                          <DetailRow label="Weight" value={delivery.weight != null ? `${delivery.weight} ${delivery.weightUom ?? ""}`.trim() : "-"} tone="violet" />
-                          <DetailRow label="Charge Type" value={bookingRecord.chargeType ?? "N/A"} tone="emerald" />
-                          <DetailRow label="Pickup Date & Time" value={bookingRecord.pickupDate || bookingRecord.pickupTime ? `${bookingRecord.pickupDate ?? "-"} ${bookingRecord.pickupTime ?? ""}`.trim() : "N/A"} tone="amber" />
-                          <DetailRow label="E-Way Bill Number" value={deliveryDocuments?.ewayBill?.ewayBillNumber ?? "N/A"} tone="slate" />
-                          <DetailRow label="E-Way Bill From" value={deliveryDocuments?.ewayBill?.validFromDate || deliveryDocuments?.ewayBill?.validFromTime ? `${deliveryDocuments?.ewayBill?.validFromDate ?? "-"} ${deliveryDocuments?.ewayBill?.validFromTime ?? ""}`.trim() : "N/A"} tone="slate" />
-                          <DetailRow label="E-Way Bill To" value={deliveryDocuments?.ewayBill?.validToDate || deliveryDocuments?.ewayBill?.validToTime ? `${deliveryDocuments?.ewayBill?.validToDate ?? "-"} ${deliveryDocuments?.ewayBill?.validToTime ?? ""}`.trim() : "N/A"} tone="slate" />
-                          <DetailRow label="Invoice Number" value={invoiceNumbers || "N/A"} tone="slate" />
-                          <DetailRow label="Invoice Value" value={formatCurrency(invoiceFiles.reduce((sum, invoice) => sum + (invoice.invoiceValue ?? 0), 0))} tone="slate" />
-                          <DetailRow label="Invoice Material" value={invoiceMaterials || "N/A"} tone="slate" />
-                          <DetailRow label="Invoice Quantity" value={invoiceQuantities || "N/A"} tone="slate" />
-                          <DetailRow label="Invoice Weight" value={invoiceWeights || "N/A"} tone="slate" />
-                          <DetailRow label="Consignee Name" value={firstInvoice?.consigneeName ?? podForms[delivery.id]?.consigneeName ?? "N/A"} tone="amber" />
-                          <DetailRow label="Consignee GSTIN" value={firstInvoice?.consigneeGstin ?? "N/A"} tone="amber" />
-                          <DetailRow label="TAT" value={bookingRecord.tat ?? "N/A"} tone="slate" />
-                          <DetailRow label="ETA" value={trackingSummary.eta} tone="slate" />
-                          <DetailRow label="Approx Trip Distance" value={trackingSummary.distance} tone="slate" />
-                          <DetailRow label="Notes" value={bookingRecord.opsRemark?.trim() || "--"} tone="slate" />
+                          <DetailRow label="Delivery Freight" value={formatCurrency(deliveryFreight || 0)} />
+                          <DetailRow label="Origin" value={deliveryOrigin?.addressName ?? delivery.originCity ?? "-"} />
+                          <DetailRow label="Destination" value={deliveryDestinationConsignee} />
+                          <DetailRow label="Consignee Full Address" value={deliveryDestinationFullAddress} />
+                          <DetailRow label="Consignee Name" value={firstInvoice?.consigneeName ?? podForms[delivery.id]?.consigneeName ?? "N/A"} />
+                          <DetailRow label="Material" value={deliveryMaterial?.materialCode ?? "-"} />
+                          <DetailRow label="Sub-brand" value={invoiceFiles.map((invoice) => invoice.subBrand).filter(Boolean).join(", ") || bookingRecord.subBrand || "N/A"} />
+                          <DetailRow label="Quantity" value={delivery.quantity != null ? `${delivery.quantity} ${delivery.uom ?? ""}`.trim() : "-"} />
+                          <DetailRow label="Weight" value={delivery.weight != null ? `${delivery.weight} ${delivery.weightUom ?? ""}`.trim() : "-"} />
+                          <DetailRow label="Pickup Date & Time" value={bookingRecord.pickupDate || bookingRecord.pickupTime ? `${bookingRecord.pickupDate ?? "-"} ${bookingRecord.pickupTime ?? ""}`.trim() : "N/A"} />
+                          <DetailRow label="TAT" value={bookingRecord.tat ?? "N/A"} />
+                          <DetailRow label="ETA" value={trackingSummary.eta} />
+                          <DetailRow label="Approx Trip Distance" value={trackingSummary.distance} />
+                          <DetailRow label="Notes" value={bookingRecord.opsRemark?.trim() || "--"} />
                         </div>
                         <div className="rounded-2xl border border-white/70 bg-white/80 p-3">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Trip Documents</p>
@@ -2427,7 +2446,7 @@ export function BookingDetailsPage() {
                               <DeliveryRemarkTimeline remarks={bookingRecord.remarks.filter((remark) => remark.deliveryId === delivery.id)} />
                             </div>
                           </SectionStrip>
-                          {podEnabled ? (
+                          {false /* POD moved to Documents tab */ ? (
                             <SectionStrip title="POD">
                               <div className="space-y-2">
                                 <div className="flex flex-wrap items-center gap-2">
@@ -2490,65 +2509,233 @@ export function BookingDetailsPage() {
             </div>
           ) : null}
 
-          {activeTab === "Expenses" ? (
-            <div className="space-y-3">
-              {(bookingRecord.expenses ?? []).length ? (
-                (bookingRecord.expenses ?? []).map((expense) => (
-                  <div key={expense.id} className="flex items-center justify-between rounded-2xl border border-white/70 bg-gradient-to-r from-white to-slate-50/80 px-3 py-3 text-sm shadow-sm">
-                    <span>{expense.label}</span>
-                    <span className="font-medium">Rs {expense.amount.toLocaleString()}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-xl border border-dashed px-3 py-4 text-xs text-muted-foreground">No expenses</div>
-              )}
-              {bookingRecord.status === "IN_TRANSIT" ? (
-                <div className="grid gap-3 rounded-[24px] border border-white/70 bg-gradient-to-br from-slate-50 to-sky-50/70 p-4 shadow-sm md:grid-cols-[1fr_180px_auto]">
-                  <CompactField label="Expense Type">
-                    <Input value={expenseLabel} onChange={(event) => setExpenseLabel(event.target.value)} placeholder="Toll / unloading / detention" />
-                  </CompactField>
-                  <CompactField label="Amount">
-                    <Input value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0" />
-                  </CompactField>
-                  <div className="flex items-end">
-                    <Button onClick={addExpense}>Add Expense</Button>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+            {activeTab === "Documents" ? (
+              <div className="space-y-3">
+                {(bookingRecord.deliveries ?? []).map((delivery) => {
+                  const docs = shipmentDocuments.deliveries.find((item) => item.deliveryId === delivery.id) ?? null;
+                  const invoices = docs?.invoices ?? [];
+                  const lrNumber = getVisibleDeliveryLrNumber(delivery);
+                  const pod = podForms[delivery.id] ?? null;
+                  const podOpen = podEditId === delivery.id;
+                  const podLocked = bookingRecord.status === "COMPLETED";
+                  return (
+                    <div key={`doc-${delivery.id}`} className="rounded-xl border border-gray-200 bg-white p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-gray-900">Delivery {delivery.deliveryNo}</p>
+                        <div className="flex items-center gap-1.5">
+                          {lrNumber ? (
+                            <Button asChild size="sm" variant="outline"><Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}/lr`}>View LR</Link></Button>
+                          ) : null}
+                          {access.can("BOOKING_DETAIL", "UPLOAD_POD") && ["POD_PENDING", "COMPLETED"].includes(bookingRecord.status) ? (
+                            <Button size="sm" variant={podOpen ? "default" : "outline"} onClick={() => setPodEditId(podOpen ? null : delivery.id)}>
+                              {pod?.podUploaded ? "Edit POD" : "Upload POD"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <DetailRow label="Invoice" value={invoices.map((invoice) => invoice.invoiceNumber).filter(Boolean).join(", ") || "—"} />
+                        <DetailRow label="E-Way Bill" value={docs?.ewayBill?.ewayBillNumber ?? "—"} />
+                        <DetailRow label="LR" value={lrNumber ?? "—"} />
+                        <DetailRow label="POD" value={pod?.podUploaded ? "Uploaded" : "Pending"} />
+                      </div>
+                      {invoices.length || docs?.ewayBill?.fileName || pod?.podDocument ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {invoices.map((invoice) => (<Badge key={invoice.id} variant="outline">{invoice.fileName || invoice.invoiceNumber || "Invoice"}</Badge>))}
+                          {docs?.ewayBill?.fileName ? <Badge variant="outline">{docs.ewayBill.fileName}</Badge> : null}
+                          {pod?.podDocument ? <Badge variant="outline">{pod.podDocument}</Badge> : null}
+                        </div>
+                      ) : null}
+                      {podOpen ? (
+                        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className={`inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium ${podLocked ? "pointer-events-none opacity-60" : ""}`}>
+                              <input type="file" className="hidden" disabled={podLocked} onChange={(event) => { const file = event.target.files?.[0] ?? null; if (!file) { return; } setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], podDocument: file.name, photoName: file.name, podUploaded: false } })); event.target.value = ""; }} />
+                              {pod?.podDocument ? "Replace POD" : "Choose POD"}
+                            </label>
+                            <span className="text-xs text-gray-500">{pod?.podDocument || "No document uploaded"}</span>
+                          </div>
+                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                            <Input value={pod?.consigneeName ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], consigneeName: event.target.value } }))} placeholder="Consignee name" />
+                            <Input value={pod?.podRemark ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], podRemark: event.target.value } }))} placeholder="POD remark" />
+                          </div>
+                          <div className="mt-2">
+                            <Button size="sm" disabled={podLocked} onClick={() => { saveDeliveryPod(delivery.id); setPodEditId(null); }}>Save POD</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
 
-          {activeTab === "Timeline" ? (
-            <div className="grid gap-4 xl:grid-cols-2">
-              <div>
-                <p className="mb-3 text-sm font-semibold">Remarks</p>
-                <BookingRemarksTimeline
-                  remarks={[...bookingRecord.remarks].sort((left, right) => left.timestamp.localeCompare(right.timestamp))}
-                  renderAction={(remark) => {
-                    if (remark.type !== "VEHICLE_BREAKDOWN" || !canHandleVehicleBreakdown) {
-                      return null;
-                    }
-                    const linkedBreakdown = breakdownEvents.find((event) => event.remarkId === remark.id) ?? null;
-                    if (!linkedBreakdown) {
-                      return null;
-                    }
-                    return (
-                      <Button size="sm" onClick={() => openBreakdownAction(linkedBreakdown.id, "SELECT")}>
-                        Take Action
-                      </Button>
-                    );
-                  }}
-                />
+            {activeTab === "Timeline" ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <ol className="relative ml-3 border-l border-gray-200">
+                  {[...bookingRecord.statusTimeline].sort((left, right) => left.timestamp.localeCompare(right.timestamp)).map((event) => (
+                    <li key={event.id} className="mb-4 ml-4">
+                      <span className="absolute -left-[6px] mt-1 h-3 w-3 rounded-full border-2 border-white bg-primary" />
+                      <p className="text-sm font-semibold text-gray-900">{event.status.replace(/_/g, " ")}</p>
+                      <p className="text-xs text-gray-500">{formatDateTime(event.timestamp)}{event.actor ? ` · ${event.actor}` : ""}</p>
+                      {event.note ? <p className="mt-0.5 text-xs text-gray-600">{event.note}</p> : null}
+                    </li>
+                  ))}
+                </ol>
               </div>
-              <div>
-                <p className="mb-3 text-sm font-semibold">Status Timeline</p>
-                <BookingStatusTimeline events={[...bookingRecord.statusTimeline].sort((left, right) => left.timestamp.localeCompare(right.timestamp))} />
+            ) : null}
+
+                      {activeTab === "Expenses" ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-900">Booking Expenses</p>
+                {bookingRecord.status !== "COMPLETED" ? (
+                  <Button size="sm" onClick={() => setExpenseModalOpen(true)}>+ Add Expense</Button>
+                ) : null}
               </div>
+              {(bookingRecord.expenses ?? []).length ? (
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2">Date &amp; time</th>
+                        <th className="px-3 py-2">Expense type</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Payment mode</th>
+                        <th className="px-3 py-2">Paid by</th>
+                        <th className="px-3 py-2">Bill/Receipt</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(bookingRecord.expenses ?? []).map((expense) => (
+                        <tr key={expense.id} className="border-b border-gray-100">
+                          <td className="px-3 py-2 text-gray-600">{formatDateTime(expense.dateTime ?? expense.createdAt)}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900">{expense.expenseType ?? expense.label}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900">{formatCurrency(expense.amount)}</td>
+                          <td className="px-3 py-2 text-gray-600">{expense.paymentMode ?? "-"}</td>
+                          <td className="px-3 py-2 text-gray-600">{expense.paidBy ?? "-"}</td>
+                          <td className="px-3 py-2">
+                            {expense.billReceiptFile ? (
+                              <button type="button" className="text-primary underline" onClick={() => setExpenseViewId(expense.id)}>Download</button>
+                            ) : "-"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant={expense.status === "Approved" ? "success" : expense.status === "Rejected" ? "danger" : "warning"}>
+                              {expense.status ?? "Pending"}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button size="sm" variant="outline" onClick={() => setExpenseViewId(expense.id)}>View</Button>
+                              {bookingRecord.status !== "COMPLETED" && (expense.status ?? "Pending") === "Pending" ? (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Approved")}>Approve</Button>
+                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Rejected")}>Reject</Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">No expenses yet.</div>
+              )}
             </div>
           ) : null}
-        </div>
+          </div>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={expenseModalOpen}
+        onOpenChange={setExpenseModalOpen}
+        title="Add Booking Expense"
+        description="Recorded against this booking. Approved expenses are billed to the customer in Finance."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setExpenseModalOpen(false)}>Cancel</Button>
+            <Button onClick={submitExpense}>Save Expense</Button>
+          </div>
+        }
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <CompactField label="Expense type *">
+            <Select value={expenseType} onChange={(event) => setExpenseType(event.target.value)}>
+              {BOOKING_EXPENSE_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </Select>
+          </CompactField>
+          <CompactField label="Amount *">
+            <Input value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0" />
+          </CompactField>
+          <CompactField label="Payment mode *">
+            <Select value={expensePaymentMode} onChange={(event) => setExpensePaymentMode(event.target.value as BookingExpensePaymentMode)}>
+              <option value="NEFT">NEFT</option>
+              <option value="UPI">UPI</option>
+              <option value="Cash">Cash</option>
+              <option value="Cheque">Cheque</option>
+            </Select>
+          </CompactField>
+          <CompactField label="Paid by *">
+            <Select value={expensePaidBy} onChange={(event) => setExpensePaidBy(event.target.value)}>
+              {BOOKING_EXPENSE_PAID_BY.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </Select>
+          </CompactField>
+          <CompactField label="Bill / Receipt *">
+            <div className="flex items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium">
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (file) {
+                      setExpenseBillFile(file.name);
+                    }
+                    event.target.value = "";
+                  }}
+                />
+                {expenseBillFile ? "Replace file" : "Choose file"}
+              </label>
+              <span className="truncate text-xs text-gray-500">{expenseBillFile || "No file"}</span>
+            </div>
+          </CompactField>
+          <CompactField label="Notes">
+            <Textarea value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} />
+          </CompactField>
+        </div>
+      </Dialog>
+
+      {expenseViewId
+        ? (() => {
+            const ex = (bookingRecord.expenses ?? []).find((expense) => expense.id === expenseViewId);
+            if (!ex) {
+              return null;
+            }
+            return (
+              <Dialog open onOpenChange={() => setExpenseViewId(null)} title="Expense Details">
+                <div className="grid gap-2">
+                  <DetailRow label="Date & time" value={formatDateTime(ex.dateTime ?? ex.createdAt)} />
+                  <DetailRow label="Expense type" value={ex.expenseType ?? ex.label} />
+                  <DetailRow label="Amount" value={formatCurrency(ex.amount)} />
+                  <DetailRow label="Payment mode" value={ex.paymentMode ?? "-"} />
+                  <DetailRow label="Paid by" value={ex.paidBy ?? "-"} />
+                  <DetailRow label="Bill / Receipt" value={ex.billReceiptFile ?? "-"} />
+                  <DetailRow label="Status" value={ex.status ?? "Pending"} />
+                  <DetailRow label="Notes" value={ex.notes ?? "-"} />
+                </div>
+              </Dialog>
+            );
+          })()
+        : null}
 
       <Dialog
         open={reassignmentOpen}
@@ -3243,6 +3430,13 @@ export function BookingDetailsPage() {
         }
       >
         <div className="grid gap-3 md:grid-cols-2">
+          <div className="md:col-span-2 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Booking</p><p className="text-sm font-semibold text-gray-900">{bookingRecord.bookingId}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Customer</p><p className="text-sm font-semibold text-gray-900">{customer?.name ?? "-"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Route</p><p className="text-sm font-semibold text-gray-900">{sourceAddress?.city ?? "-"} → {destinationAddress?.city ?? "-"}</p></div>
+            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Freight</p><p className="text-sm font-semibold text-gray-900">Rs {customerFreight.toLocaleString()}</p></div>
+            <div className="ml-auto"><BookingStatusBadge status={bookingRecord.status} /></div>
+          </div>
           <CompactField label="Vendor">
             <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
               <option value="">Select vendor</option>
@@ -3338,9 +3532,15 @@ export function BookingDetailsPage() {
                   </Select>
                 </div>
                 </CompactField>
-                <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  Active place: {activeLrOrgUnit?.name ?? "Not selected"} | Available manual LR count: {availableManualPools.length} | Source: {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved LR" : "General LR"}
-                </div>
+                {requiresActiveLrScope ? (
+                  <div className="md:col-span-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Select active place to view available LR numbers.
+                  </div>
+                ) : (
+                  <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
+                    Active place: <span className="font-medium text-gray-900">{activeLrOrgUnit?.name ?? "Not selected"}</span> · Available LR: <span className="font-medium text-gray-900">{availableManualPools.length}</span> · {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved" : "General"}
+                  </div>
+                )}
               </>
             ) : (
             <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
@@ -3358,30 +3558,16 @@ export function BookingDetailsPage() {
             </div>
           ) : null}
             {selectedLrMode !== "AUTO" && selectedLrConfig && !requiresActiveLrScope && availableManualPools.length === 0 ? (
-              <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p className="font-medium">
+              <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <span>
                   {selectedLrMode === "PRE_GENERATED"
-                    ? "No customer-reserved LR available for this customer and active place."
-                    : "Insufficient manual LR stock for this active place."}
-                </p>
-              <p className="mt-1">
-                Assignment only shows LR numbers that are already available for{" "}
-                <span className="font-medium">{activeLrOrgUnit?.name ?? "the selected place"}</span>.
-              </p>
-              <p className="mt-2">
-                Use one of these flows first:
-              </p>
-              <ul className="mt-1 list-disc pl-5 text-xs">
-                <li>Upload or create LR directly for this place from Manual LR Operations.</li>
-                <li>Request LR if you are working as Operations Manager or Dispatch Supervisor.</li>
-                <li>Allocate or approve LR from the regional pool if you are working as Regional Manager or Operations Head.</li>
-              </ul>
-              <div className="mt-3">
+                    ? "No customer-reserved LR available for this place."
+                    : "No LR numbers available for this place."}
+                </span>
                 <Button asChild size="sm" variant="outline">
-                  <Link to={`/tenant/${tenant.id}/lr`}>Open Manual LR Workspace</Link>
+                  <Link to={`/tenant/${tenant.id}/lr`}>Open LR Workspace</Link>
                 </Button>
               </div>
-            </div>
           ) : null}
         </div>
       </Dialog>

@@ -410,8 +410,8 @@ const POD_STAGE: Record<string, { label: string; tone: any }> = {
   validated: { label: "POD validated", tone: "green" },
 };
 
-interface BookingGroup { bookingId: string; customer: string; truck: string; drops: ARTrip[]; freight: number; expense: number }
-interface CustomerSummary { customer: string; bookings: BookingGroup[]; drops: number; freight: number; expense: number }
+interface BookingGroup { bookingId: string; customer: string; truck: string; drops: ARTrip[]; freight: number; expense: number; approvedExpenses: number; pendingExpenses: number }
+interface CustomerSummary { customer: string; bookings: BookingGroup[]; drops: number; freight: number; expense: number; approvedExpenses: number; pendingExpenses: number }
 
 /* Group billable drops (POD uploaded) into bookings, then by customer — KPIs from the booking module. */
 function buildCustomers(trips: ARTrip[]): CustomerSummary[] {
@@ -419,39 +419,48 @@ function buildCustomers(trips: ARTrip[]): CustomerSummary[] {
   const byBooking = new Map<string, BookingGroup>();
   eligible.forEach((t) => {
     const bid = t.bookingId ?? t.id;
-    const g = byBooking.get(bid) ?? { bookingId: bid, customer: t.client, truck: t.truck, drops: [], freight: 0, expense: 0 };
+    const g = byBooking.get(bid) ?? { bookingId: bid, customer: t.client, truck: t.truck, drops: [], freight: 0, expense: 0, approvedExpenses: 0, pendingExpenses: 0 };
     g.drops.push(t);
-    g.freight += contractRateFor(t.lane, t.truck, t.client).base;
+    // Prefer the real booking freight when present (embedded mode); fall back to
+    // the contract-rate lookup for standalone mock trips.
+    g.freight += (t.revenue && t.revenue > 0) ? t.revenue : contractRateFor(t.lane, t.truck, t.client).base;
+    g.approvedExpenses += t.approvedExpenses ?? 0;
+    g.pendingExpenses += t.pendingExpenses ?? 0;
     g.expense += t.expense ?? 0;
     byBooking.set(bid, g);
   });
   const byCust = new Map<string, CustomerSummary>();
   [...byBooking.values()].forEach((g) => {
-    const c = byCust.get(g.customer) ?? { customer: g.customer, bookings: [], drops: 0, freight: 0, expense: 0 };
-    c.bookings.push(g); c.drops += g.drops.length; c.freight += g.freight; c.expense += g.expense;
+    const c = byCust.get(g.customer) ?? { customer: g.customer, bookings: [], drops: 0, freight: 0, expense: 0, approvedExpenses: 0, pendingExpenses: 0 };
+    c.bookings.push(g); c.drops += g.drops.length; c.freight += g.freight; c.expense += g.expense; c.approvedExpenses += g.approvedExpenses; c.pendingExpenses += g.pendingExpenses;
     byCust.set(g.customer, c);
   });
   return [...byCust.values()].sort((a, b) => b.freight - a.freight);
 }
 
 /* The three booking-module KPIs the user asked for. */
-export function Kpis({ freight, bookings, drops, expense }: { freight: number; bookings: number; drops: number; expense: number }) {
+export function Kpis({ freight, bookings, drops, approvedExpenses = 0, pendingExpenses = 0 }: { freight: number; bookings: number; drops: number; expense?: number; approvedExpenses?: number; pendingExpenses?: number }) {
   return (
-    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card className="p-5">
-        <div className="text-xs font-medium text-slate-500">Freight rate</div>
+        <div className="text-xs font-medium text-slate-500">Freight Amount</div>
         <Money value={freight} className="mt-1 block text-2xl font-bold text-slate-900" />
-        <div className="mt-0.5 text-xs text-emerald-600">Margin <Money value={freight - expense} /></div>
+        <div className="mt-0.5 text-xs text-slate-400">{bookings} booking{bookings === 1 ? "" : "s"} · {drops} POD{drops === 1 ? "" : "s"}</div>
       </Card>
       <Card className="p-5">
-        <div className="text-xs font-medium text-slate-500">Booking details</div>
-        <div className="mt-1 text-2xl font-bold text-slate-900">{bookings}<span className="text-sm font-normal text-slate-400"> booking{bookings === 1 ? "" : "s"}</span></div>
-        <div className="mt-0.5 text-xs text-slate-400">{drops} drop{drops === 1 ? "" : "s"} (PODs)</div>
+        <div className="text-xs font-medium text-slate-500">Approved Expenses</div>
+        <Money value={approvedExpenses} className="mt-1 block text-2xl font-bold text-emerald-700" />
+        <div className="mt-0.5 text-xs text-slate-400">added to invoice</div>
       </Card>
       <Card className="p-5">
-        <div className="text-xs font-medium text-slate-500">Expenses</div>
-        <Money value={expense} className="mt-1 block text-2xl font-bold text-slate-700" />
-        <div className="mt-0.5 text-xs text-slate-400">cost from booking module</div>
+        <div className="text-xs font-medium text-slate-500">Pending Expenses</div>
+        <Money value={pendingExpenses} className="mt-1 block text-2xl font-bold text-amber-600" />
+        <div className="mt-0.5 text-xs text-slate-400">not added to total</div>
+      </Card>
+      <Card className="p-5 ring-1 ring-blue-200">
+        <div className="text-xs font-medium text-slate-500">Total Invoice Amount</div>
+        <Money value={freight + approvedExpenses} className="mt-1 block text-2xl font-bold text-blue-700" />
+        <div className="mt-0.5 text-xs text-slate-400">freight + approved expenses</div>
       </Card>
     </div>
   );
@@ -527,7 +536,7 @@ export default function Invoicing({ toast }: any) {
         </button>
         <SectionTitle sub="All booked freight with POD uploaded, ready to bill. Generate one invoice per booking, or select several and raise a single consolidated invoice.">{c.customer}</SectionTitle>
 
-        <Kpis freight={c.freight} bookings={c.bookings.length} drops={c.drops} expense={c.expense} />
+        <Kpis freight={c.freight} bookings={c.bookings.length} drops={c.drops} approvedExpenses={c.approvedExpenses} pendingExpenses={c.pendingExpenses} />
 
         {selected.size > 0 && (
           <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 p-4 ring-1 ring-blue-200">
@@ -548,7 +557,12 @@ export default function Invoicing({ toast }: any) {
                       <span className="font-mono text-sm font-semibold text-slate-800">{g.bookingId}</span>
                       <Pill tone="slate">{g.drops.length} drop{g.drops.length > 1 ? "s" : ""}</Pill>
                     </div>
-                    <div className="mt-0.5 text-xs text-slate-400">{g.truck} · freight <Money value={g.freight} /></div>
+                    <div className="mt-0.5 text-xs text-slate-400">
+                      {g.truck} · Freight <Money value={g.freight} />
+                      {g.approvedExpenses > 0 ? <> · Approved exp <Money value={g.approvedExpenses} /></> : null}
+                      {g.pendingExpenses > 0 ? <span className="text-amber-600"> · Pending exp <Money value={g.pendingExpenses} /></span> : null}
+                      {" · "}<span className="font-semibold text-blue-700">Invoice <Money value={g.freight + g.approvedExpenses} /></span>
+                    </div>
                   </div>
                 </label>
                 <Btn onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
@@ -594,9 +608,9 @@ export default function Invoicing({ toast }: any) {
                   <ChevronRight size={16} className="text-slate-400" />
                 </div>
                 <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
-                  <div><div className="text-[11px] text-slate-500">Freight rate</div><Money value={cs.freight} className="mt-0.5 block font-bold text-slate-800" /></div>
-                  <div><div className="text-[11px] text-slate-500">Bookings</div><div className="mt-0.5 font-bold text-slate-800">{cs.bookings.length}<span className="text-xs font-normal text-slate-400"> · {cs.drops}d</span></div></div>
-                  <div><div className="text-[11px] text-slate-500">Expenses</div><Money value={cs.expense} className="mt-0.5 block font-bold text-slate-600" /></div>
+                  <div><div className="text-[11px] text-slate-500">Freight</div><Money value={cs.freight} className="mt-0.5 block font-bold text-slate-800" /></div>
+                  <div><div className="text-[11px] text-slate-500">Approved exp</div><Money value={cs.approvedExpenses} className="mt-0.5 block font-bold text-emerald-700" /></div>
+                  <div><div className="text-[11px] text-slate-500">Total invoice</div><Money value={cs.freight + cs.approvedExpenses} className="mt-0.5 block font-bold text-blue-700" /></div>
                 </div>
               </button>
             </Card>

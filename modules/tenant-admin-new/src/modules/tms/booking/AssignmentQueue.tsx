@@ -43,7 +43,13 @@ export function AssignmentQueuePage() {
   const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
   const vehicleMap = useMemo(() => buildVehicleLookup(adminSources.vehicles), [adminSources.vehicles]);
   const vendorMap = useMemo(() => buildVendorLookup(adminSources.vendors), [adminSources.vendors]);
-  const queue = bookings.filter((booking) => booking.status === "PENDING_ASSIGNMENT");
+  // Bookings still awaiting a vehicle: raw PENDING_ASSIGNMENT plus vendor-accepted
+  // bookings whose vehicle isn't assigned yet. Anything already vehicle-assigned
+  // (or further along) drops out of the assignment queue.
+  const queue = bookings.filter(
+    (booking) =>
+      getPrimaryBookingStatus(booking.status) === "PENDING_ASSIGNMENT" && !booking.assignment?.vehicleId,
+  );
   const currentUser =
     adminSources.users.find((user) => user.name === session.actorName || user.email === session.actorName) ?? null;
   const currentUserOrgUnitIds = currentUser?.orgUnitIds ?? [];

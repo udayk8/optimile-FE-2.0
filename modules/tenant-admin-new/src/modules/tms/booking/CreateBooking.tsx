@@ -753,435 +753,403 @@ export function CreateBookingPage({
   }
 
   return (
-    <div className="-mx-4 -my-6 min-h-full bg-slate-50/70 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:py-7">
-      <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-3 text-slate-700">
-      {error ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div> : null}
+    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-3 px-4 py-5 pb-28">
+      <PageHeader
+        eyebrow="TMS"
+        title={isEditMode ? "Edit Booking" : "Create Booking"}
+        description="Fast, operations-first booking flow."
+      />
 
-      <div className="sticky top-3 z-20 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700">TMS</p>
-            <h1 className="mt-0.5 text-lg font-semibold tracking-[-0.02em] text-slate-800">
-              {isEditMode ? "Edit Booking" : "Create Booking"}
-            </h1>
-          </div>
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <Summary label="Customer" value={selectedCustomer?.name ?? "Select customer"} />
-          <Summary label="Booking Type" value={draft.commercialType === "CONTRACT" ? "Contract" : "Spot"} />
-          <Summary
-            label="Pricing State"
-            value={
-              draft.commercialType === "SPOT"
-                ? "Ready to price"
-                : laneFound
-                  ? "Ready to price"
-                  : "Lane not mapped"
-            }
-          />
-          <Summary label="Deliveries" value={String(deliveryCount)} />
-          <Summary label="Total Freight" value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"} />
-        </div>
-      </div>
+      ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_0.55fr]">
-        <div className="space-y-4">
-          {isDirectCustomerTenant(tenant) ? (
-            <div className="rounded-2xl border border-sky-200/70 bg-sky-50/70 px-4 py-3 text-sm text-sky-900">
-              This direct-customer tenant uses its own customer context by default. Booking, finance, LR, and vendor flows remain unchanged.
-            </div>
+      {/* STEP 1 — Booking Setup */}
+      <StepSection
+        step={1}
+        title="Booking Setup"
+        summary={`${selectedCustomer?.name ?? "No customer"} · ${draft.commercialType === "CONTRACT" ? "Contract" : "Spot"} · ${draft.serviceType} · ${deliveryCount} ${deliveryCount === 1 ? "delivery" : "deliveries"}`}
+        defaultOpen
+      >
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {!customerLocked ? (
+            <Field label="Customer">
+              <Select value={draft.customerId} onChange={(event) => resetForCustomer(event.target.value)}>
+                <option value="">Select customer</option>
+                {adminSources.customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
           ) : null}
-          <SectionCard title="Booking Basics">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              <Field label="Customer">
-                {customerLocked ? (
-                  <Input value={selectedCustomer?.name ?? "—"} disabled />
-                ) : (
-                  <Select value={draft.customerId} onChange={(event) => resetForCustomer(event.target.value)}>
-                    <option value="">Select customer</option>
-                    {adminSources.customers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-              <Field label="Booking Commercial Type">
-                <Select
-                  value={draft.commercialType}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      commercialType: event.target.value as BookingCommercialType,
-                      enteredRate: "",
-                    }))
-                  }
-                >
-                  <option value="CONTRACT">Contract</option>
-                  <option value="SPOT">Spot</option>
-                </Select>
-              </Field>
-              <Field label="Mode">
-                <Input value={draft.modeOfTransport} disabled />
-              </Field>
-              <Field label="Service Type">
-                <Select value={draft.serviceType} onChange={(event) => setDraft((current) => ({ ...current, serviceType: event.target.value as BookingServiceType }))}>
-                  <option value="FTL">FTL</option>
-                  <option value="PTL">PTL</option>
-                </Select>
-              </Field>
-                {draft.customerId && draft.commercialType === "CONTRACT" ? (
-                <Field label="Rate Type">
-                  <Select
-                    value={draft.contractRateType}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        contractRateType: event.target.value as BookingDraft["contractRateType"],
-                      }))
-                    }
-                  >
-                    <option value="PER_MT">PER_MT</option>
-                    <option value="PER_KM">PER_KM</option>
-                    <option value="PER_TRIP">PER_TRIP</option>
-                  </Select>
-                </Field>
-              ) : null}
-            </div>
-          </SectionCard>
+          <Field label="Commercial Type">
+            <Select
+              value={draft.commercialType}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  commercialType: event.target.value as BookingCommercialType,
+                  enteredRate: "",
+                }))
+              }
+            >
+              <option value="CONTRACT">Contract</option>
+              <option value="SPOT">Spot</option>
+            </Select>
+          </Field>
+          <Field label="Service Type">
+            <Select
+              value={draft.serviceType}
+              onChange={(event) => setDraft((current) => ({ ...current, serviceType: event.target.value as BookingServiceType }))}
+            >
+              <option value="FTL">FTL</option>
+              <option value="PTL">PTL</option>
+            </Select>
+          </Field>
+          <Field label="Mode">
+            <Input value={draft.modeOfTransport} disabled />
+          </Field>
+          <Field label="No. of Deliveries">
+            <Input value={String(deliveryCount)} disabled />
+          </Field>
+          {draft.customerId && draft.commercialType === "CONTRACT" ? (
+            <Field label="Rate Type">
+              <Select
+                value={draft.contractRateType}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    contractRateType: event.target.value as BookingDraft["contractRateType"],
+                  }))
+                }
+              >
+                <option value="PER_MT">PER_MT</option>
+                <option value="PER_KM">PER_KM</option>
+                <option value="PER_TRIP">PER_TRIP</option>
+              </Select>
+            </Field>
+          ) : null}
+        </div>
+      </StepSection>
 
-          <SectionCard title="Deliveries">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">{deliveries.length} {deliveries.length === 1 ? "delivery" : "deliveries"} planned.</p>
-              <Button type="button" size="sm" onClick={addDelivery}>+ Add Delivery</Button>
-            </div>
-            <div className="mt-3 space-y-3">
-              {deliveries.map((delivery, index) => {
-                const originName = customerAddresses.find((address) => address.id === delivery.originAddressId)?.addressName ?? "Select origin";
-                const destinationName =
-                  customerAddresses.find((address) => address.id === delivery.destinationAddressId)?.addressName ??
-                  delivery.destinationCity ??
-                  "Select destination";
-                const selectedMaterial = customerMaterials.find((material) => material.id === delivery.materialId) ?? null;
-                const laneLabel = deliveryRateCards[index]?.lanes ?? `${originName} â†’ ${destinationName}`;
-                const mapping = getMaterialUOMMapping(selectedMaterial, selectedCustomer, adminSources.uomMappings);
-                const selectedOriginAddress = customerAddresses.find((address) => address.id === delivery.originAddressId) ?? null;
-                const selectedDestinationAddress = customerAddresses.find((address) => address.id === delivery.destinationAddressId) ?? null;
-                const preferredRateBasis = selectedCustomer?.rateMatchingBasis ?? "LANE_TO_LANE";
-                const effectiveRateBasis =
-                  selectedOriginAddress && delivery.destinationCity
-                    ? getEffectiveRateMatchingBasis(preferredRateBasis, {
-                        lane: selectedDestinationAddress
-                          ? buildRateValidationLane(selectedOriginAddress.addressName, selectedDestinationAddress.addressName)
-                          : null,
-                        fromCity: selectedOriginAddress.city,
-                        toCity: selectedDestinationAddress?.city ?? delivery.destinationCity,
-                        fromLocation: selectedOriginAddress.addressName,
-                        toLocation: selectedDestinationAddress?.addressName ?? null,
-                        fromPincode: selectedOriginAddress.pincode,
-                        toPincode: selectedDestinationAddress?.pincode ?? null,
-                      }, {
-                        allowDestinationFallback: !selectedDestinationAddress,
-                      })
-                    : preferredRateBasis;
-                const isRateBasisFallbackActive =
-                  preferredRateBasis !== "CITY_TO_CITY" &&
-                  effectiveRateBasis === "CITY_TO_CITY" &&
-                  !selectedDestinationAddress;
-
-                return (
-                  <div key={delivery.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800">Delivery {index + 1}</p>
-                        <p className="mt-1 text-sm text-slate-600">{originName} â†’ {destinationName}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          <Badge variant={deliveryRateCards[index] ? "success" : "warning"}>{deliveryRateCards[index] ? "Rate matched" : "Rate open"}</Badge>
-                          <Badge variant="outline">{mapping ? `${mapping.source} weight mapping` : "Manual weight"}</Badge>
-                        </div>
-                      </div>
-                      {deliveries.length > 1 ? (
-                        <Button type="button" size="sm" variant="outline" onClick={() => removeDelivery(index)}>Remove</Button>
-                      ) : null}
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      <SubBlock title="Route" tone="blue">
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <Field label="Origin City">
-                            <Select value={delivery.originCity} onChange={(event) => handleDeliveryCityChange(index, "originCity", event.target.value)}>
-                              <option value="">Select city</option>
-                              {getUniqueAddressCities(
-                                customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                              ).map((city) => (
-                                <option key={city} value={city}>{city}</option>
-                              ))}
-                            </Select>
-                          </Field>
-                          <Field label="Origin Address">
-                            <Select
-                              value={delivery.originAddressId}
-                              onChange={(event) => handleAddressSelect(index, "originAddressId", event.target.value)}
-                              disabled={!delivery.originCity}
-                            >
-                              <option value="">
-                                {!delivery.originCity
-                                  ? "Select city first"
-                                  : getAddressesForCity(
-                                        customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                                        delivery.originCity,
-                                      ).length
-                                    ? "Select origin address"
-                                    : "No addresses found for this city"}
-                              </option>
-                              {getAddressesForCity(
-                                customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
-                                delivery.originCity,
-                              ).map((address) => (
-                                <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
-                              ))}
-                            </Select>
-                          </Field>
-                          <Field label="Destination City">
-                            <Select value={delivery.destinationCity} onChange={(event) => handleDeliveryCityChange(index, "destinationCity", event.target.value)}>
-                              <option value="">Select city</option>
-                              {getUniqueAddressCities(
-                                customerAddresses
-                                  .filter((address) => address.id !== delivery.originAddressId)
-                                  .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                              ).map((city) => (
-                                <option key={city} value={city}>{city}</option>
-                              ))}
-                            </Select>
-                          </Field>
-                          <Field
-                            label="Destination Address"
-                            helper={
-                              isRateBasisFallbackActive
-                                ? "Pricing uses city-to-city until the consignee is confirmed."
-                                : "Optional now; confirm from invoice later."
-                            }
-                          >
-                            <Select
-                              value={delivery.destinationAddressId}
-                              onChange={(event) => handleAddressSelect(index, "destinationAddressId", event.target.value)}
-                              disabled={!delivery.destinationCity}
-                            >
-                              <option value="">
-                                {!delivery.destinationCity
-                                  ? "Select city first"
-                                  : getAddressesForCity(
-                                        customerAddresses
-                                          .filter((address) => address.id !== delivery.originAddressId)
-                                          .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                                        delivery.destinationCity,
-                                      ).length
-                                    ? "Optional: select saved destination address"
-                                    : "No addresses found for this city"}
-                              </option>
-                              {getAddressesForCity(
-                                customerAddresses
-                                  .filter((address) => address.id !== delivery.originAddressId)
-                                  .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
-                                delivery.destinationCity,
-                              ).map((address) => (
-                                <option key={address.id} value={address.id}>{formatCustomerAddressOptionLabel(address)}</option>
-                              ))}
-                            </Select>
-                          </Field>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between gap-3">
-                          {!draft.customerId ? (
-                            <p className="text-xs text-amber-700">Select customer before adding address.</p>
-                          ) : (
-                            <span className="text-xs text-slate-500">Lane: {laneLabel}</span>
-                          )}
-                          <Button type="button" size="sm" variant="outline" onClick={() => openAddressDialog(index, "destinationAddressId")} disabled={!draft.customerId}>
-                            + Add Address
-                          </Button>
-                        </div>
-                      </SubBlock>
-
-                      <SubBlock title="Cargo">
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                          <Field label="Material">
-                            <Select value={delivery.materialId} onChange={(event) => updateDelivery(index, "materialId", event.target.value)}>
-                              <option value="">Select material</option>
-                              {customerMaterials.map((material) => (
-                                <option key={material.id} value={material.id}>{material.materialCode}</option>
-                              ))}
-                            </Select>
-                          </Field>
-                          <Field label="Quantity">
-                            <div className="grid grid-cols-[1fr_100px] gap-2">
-                              <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
-                              <div className="flex items-center justify-center rounded-md border border-border bg-slate-50 px-3 text-sm font-semibold text-slate-700">
-                                {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
-                              </div>
-                            </div>
-                          </Field>
-                          <Field
-                            label="Weight"
-                            helper={
-                              mapping
-                                ? `Auto from 1 ${mapping.quantityUOM} = ${mapping.conversionValue} ${mapping.weightUOM}. Still editable.`
-                                : "No mapping found. Enter manually or pick a mapped material."
-                            }
-                          >
-                            <div className="grid grid-cols-[1fr_110px] gap-2">
-                              <Input value={delivery.weight} onChange={(event) => updateDelivery(index, "weight", event.target.value)} />
-                              <Select value={delivery.weightUom} onChange={(event) => updateDelivery(index, "weightUom", event.target.value)}>
-                                <option value="">Weight UOM</option>
-                                {weightUOMOptions.map((uom) => (
-                                  <option key={uom} value={uom}>{uom}</option>
-                                ))}
-                              </Select>
-                            </div>
-                          </Field>
-                          {rateType === "PER_KM" ? (
-                            <Field label="Distance (KM)">
-                              <Input value={delivery.distanceKm} onChange={(event) => updateDelivery(index, "distanceKm", event.target.value)} placeholder="Distance in KM" />
-                            </Field>
-                          ) : null}
-                        </div>
-                      </SubBlock>
-                    </div>
+      {/* STEP 2 — Route */}
+      <StepSection
+        step={2}
+        title="Route"
+        summary={`${deliveries.length} ${deliveries.length === 1 ? "delivery" : "deliveries"}`}
+        defaultOpen
+        action={
+          <Button type="button" size="sm" variant="outline" onClick={addDelivery}>
+            + Add Delivery
+          </Button>
+        }
+      >
+        <div className="space-y-3">
+          {deliveries.map((delivery, index) => {
+            const originName =
+              customerAddresses.find((address) => address.id === delivery.originAddressId)?.addressName ?? "Origin";
+            const destinationName =
+              customerAddresses.find((address) => address.id === delivery.destinationAddressId)?.addressName ??
+              delivery.destinationCity ??
+              "Destination";
+            return (
+              <div key={delivery.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    <span className="text-gray-600">
+                      {originName} → {destinationName}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Pricing">
-            <div className="grid gap-4 xl:grid-cols-[1fr,1fr]">
-              {/* Left — actionable inputs only */}
-              <div className="space-y-3">
-                <Field label={rateType === "PER_MT" ? "Vehicle Type Preference" : "Vehicle Type"}>
-                  <Select value={draft.vehicleTypeId} onChange={(event) => setDraft((current) => ({ ...current, vehicleTypeId: event.target.value }))}>
-                    <option value="">{rateType === "PER_MT" ? "Optional vehicle type" : "Select vehicle type"}</option>
-                    {adminSources.vehicleTypes.filter((vehicleType) => vehicleType.status === "active").map((vehicleType) => (
-                      <option key={vehicleType.id} value={vehicleType.id}>
-                        {vehicleType.typeCode}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Pickup Date & Time">
-                  <Input type="datetime-local" value={draft.pickupDateTime} onChange={(event) => setDraft((current) => ({ ...current, pickupDateTime: event.target.value }))} />
-                </Field>
-                {draft.commercialType === "SPOT" ? (
-                  <Field label="Spot Rate (Manual)" helper="No rate card is used for spot bookings.">
-                    <Input value={draft.enteredRate} onChange={(event) => setDraft((current) => ({ ...current, enteredRate: event.target.value }))} placeholder="Enter rate" />
-                  </Field>
-                ) : null}
-              </div>
-
-              {/* Right — single rate display panel */}
-              <div className="rounded-xl border border-sky-200/70 bg-sky-50/50 p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
-                    {draft.commercialType === "SPOT" ? "Manual Freight" : "Contract Pricing"}
-                  </p>
-                  {draft.commercialType === "CONTRACT" ? (
-                    rateLookupPending ? (
-                      <Badge variant="outline">Validating</Badge>
-                    ) : laneFound ? (
-                      <Badge variant="success">Rate Card Matched</Badge>
-                    ) : (
-                      <Badge variant="warning">No Rate Card</Badge>
-                    )
+                  {deliveries.length > 1 ? (
+                    <Button type="button" size="sm" variant="outline" onClick={() => removeDelivery(index)}>
+                      Remove
+                    </Button>
                   ) : null}
                 </div>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-800">
-                  {draft.commercialType === "SPOT"
-                    ? numericRate
-                      ? formatCurrency(numericRate)
-                      : formatCurrency(0)
-                    : calculatedFreight
-                      ? formatCurrency(calculatedFreight)
-                      : "—"}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {draft.commercialType === "SPOT"
-                    ? "Manual freight entered by ops."
-                    : rateType === "PER_KM"
-                      ? "PER_KM pricing is a placeholder in the frontend for now."
-                      : `Based on ${rateType.toLowerCase()} pricing.`}
-                </p>
-                {draft.commercialType === "CONTRACT" ? (
-                  <div className="mt-4 grid gap-2">
-                    <Summary label="Rate Type" value={rateType} />
-                    <Summary
-                      label="Rate Matching Basis"
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="Origin City">
+                    <Select value={delivery.originCity} onChange={(event) => handleDeliveryCityChange(index, "originCity", event.target.value)}>
+                      <option value="">Select city</option>
+                      {getUniqueAddressCities(
+                        customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                      ).map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Origin Address">
+                    <Select
+                      value={delivery.originAddressId}
+                      onChange={(event) => handleAddressSelect(index, "originAddressId", event.target.value)}
+                      disabled={!delivery.originCity}
+                    >
+                      <option value="">
+                        {!delivery.originCity
+                          ? "Select city first"
+                          : getAddressesForCity(
+                                customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                                delivery.originCity,
+                              ).length
+                            ? "Select origin address"
+                            : "No addresses found for this city"}
+                      </option>
+                      {getAddressesForCity(
+                        customerAddresses.filter((address) => isAddressSelectableForField(address, "originAddressId")),
+                        delivery.originCity,
+                      ).map((address) => (
+                        <option key={address.id} value={address.id}>
+                          {formatCustomerAddressOptionLabel(address)}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Destination City">
+                    <Select value={delivery.destinationCity} onChange={(event) => handleDeliveryCityChange(index, "destinationCity", event.target.value)}>
+                      <option value="">Select city</option>
+                      {getUniqueAddressCities(
+                        customerAddresses
+                          .filter((address) => address.id !== delivery.originAddressId)
+                          .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                      ).map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Destination Address">
+                    <div className="flex gap-2">
+                      <Select
+                        value={delivery.destinationAddressId}
+                        onChange={(event) => handleAddressSelect(index, "destinationAddressId", event.target.value)}
+                        disabled={!delivery.destinationCity}
+                      >
+                        <option value="">
+                          {!delivery.destinationCity
+                            ? "Select city first"
+                            : getAddressesForCity(
+                                  customerAddresses
+                                    .filter((address) => address.id !== delivery.originAddressId)
+                                    .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                                  delivery.destinationCity,
+                                ).length
+                              ? "Optional: saved address"
+                              : "No addresses found"}
+                        </option>
+                        {getAddressesForCity(
+                          customerAddresses
+                            .filter((address) => address.id !== delivery.originAddressId)
+                            .filter((address) => isAddressSelectableForField(address, "destinationAddressId")),
+                          delivery.destinationCity,
+                        ).map((address) => (
+                          <option key={address.id} value={address.id}>
+                            {formatCustomerAddressOptionLabel(address)}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openAddressDialog(index, "destinationAddressId")}
+                        disabled={!draft.customerId}
+                      >
+                        + Add
+                      </Button>
+                    </div>
+                  </Field>
+                  {rateType === "PER_KM" ? (
+                    <Field label="Distance (KM)">
+                      <Input value={delivery.distanceKm} onChange={(event) => updateDelivery(index, "distanceKm", event.target.value)} placeholder="Distance in KM" />
+                    </Field>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </StepSection>
+
+      {/* STEP 3 — Material */}
+      <StepSection
+        step={3}
+        title="Material"
+        summary={totalWeight ? `${totalQuantity} ${deliveries[0]?.uom || ""} · ${formatUOMWeight(totalWeight)} ${PRICING_WEIGHT_UOM}`.trim() : "No material yet"}
+        defaultOpen
+        action={
+          <Button type="button" size="sm" variant="outline" onClick={addDelivery}>
+            + Add Material
+          </Button>
+        }
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-2 py-2 font-semibold">#</th>
+                <th className="px-2 py-2 font-semibold">Material</th>
+                <th className="px-2 py-2 font-semibold">Sub Brand</th>
+                <th className="px-2 py-2 font-semibold">Quantity</th>
+                <th className="px-2 py-2 font-semibold">Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deliveries.map((delivery, index) => {
+                const selectedMaterial = customerMaterials.find((material) => material.id === delivery.materialId) ?? null;
+                const mapping = getMaterialUOMMapping(selectedMaterial, selectedCustomer, adminSources.uomMappings);
+                return (
+                  <tr key={delivery.id} className="border-b border-gray-100 align-top">
+                    <td className="px-2 py-2 text-gray-500">{index + 1}</td>
+                    <td className="px-2 py-2">
+                      <Select value={delivery.materialId} onChange={(event) => updateDelivery(index, "materialId", event.target.value)}>
+                        <option value="">Select material</option>
+                        {customerMaterials.map((material) => (
+                          <option key={material.id} value={material.id}>
+                            {material.materialCode}
+                          </option>
+                        ))}
+                      </Select>
+                    </td>
+                    <td className="px-2 py-2">
+                      <Input value={selectedMaterial?.description ?? "—"} disabled />
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="grid grid-cols-[1fr_88px] gap-2">
+                        <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
+                        <div className="flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-2 text-xs font-semibold text-gray-700">
+                          {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2">
+                      <div className="grid grid-cols-[1fr_104px] gap-2">
+                        <Input value={delivery.weight} onChange={(event) => updateDelivery(index, "weight", event.target.value)} />
+                        <Select value={delivery.weightUom} onChange={(event) => updateDelivery(index, "weightUom", event.target.value)}>
+                          <option value="">UOM</option>
+                          {weightUOMOptions.map((uom) => (
+                            <option key={uom} value={uom}>
+                              {uom}
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
+                      {mapping ? (
+                        <p className="mt-1 text-[11px] text-gray-400">{`Auto: 1 ${mapping.quantityUOM} = ${mapping.conversionValue} ${mapping.weightUOM}`}</p>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </StepSection>
+
+      {/* STEP 4 — Vehicle Requirement */}
+      <StepSection
+        step={4}
+        title="Vehicle Requirement"
+        summary={`${selectedVehicleTypeCode ?? (rateType === "PER_MT" ? "Any vehicle" : "No vehicle")}${draft.pickupDateTime ? ` · ${draft.pickupDateTime.replace("T", " ")}` : ""}`}
+        defaultOpen
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={rateType === "PER_MT" ? "Vehicle Type (optional)" : "Vehicle Type"}>
+            <Select value={draft.vehicleTypeId} onChange={(event) => setDraft((current) => ({ ...current, vehicleTypeId: event.target.value }))}>
+              <option value="">{rateType === "PER_MT" ? "Optional vehicle type" : "Select vehicle type"}</option>
+              {adminSources.vehicleTypes
+                .filter((vehicleType) => vehicleType.status === "active")
+                .map((vehicleType) => (
+                  <option key={vehicleType.id} value={vehicleType.id}>
+                    {vehicleType.typeCode}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+          <Field label="Pickup Date &amp; Time">
+            <Input type="datetime-local" value={draft.pickupDateTime} onChange={(event) => setDraft((current) => ({ ...current, pickupDateTime: event.target.value }))} />
+          </Field>
+        </div>
+      </StepSection>
+
+      {/* STEP 5 — Commercial Preview (only after customer + route + material) */}
+      {(() => {
+        const routeReady = deliveries.some((delivery) => delivery.originAddressId && delivery.destinationCity);
+        const materialReady = deliveries.some(
+          (delivery) => delivery.materialId && Number(delivery.quantity) > 0 && Number(delivery.weight) > 0,
+        );
+        const commercialReady = Boolean(selectedCustomer) && routeReady && materialReady;
+        if (!commercialReady) {
+          return null;
+        }
+        return (
+          <StepSection
+            step={5}
+            title="Commercial Preview"
+            summary={calculatedFreight ? formatCurrency(calculatedFreight) : "—"}
+            defaultOpen
+          >
+            <div className="space-y-3">
+              {draft.commercialType === "SPOT" ? (
+                <Field label="Spot Rate (Manual)">
+                  <Input value={draft.enteredRate} onChange={(event) => setDraft((current) => ({ ...current, enteredRate: event.target.value }))} />
+                </Field>
+              ) : null}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <div className="grid gap-2">
+                  <KV label="Rate Type" value={rateType} />
+                  {draft.commercialType === "CONTRACT" ? (
+                    <KV
+                      label="Matched Rate"
                       value={
-                        selectedCustomer
-                          ? effectiveRateBasisLabel(
-                              selectedCustomer.rateMatchingBasis ?? "LANE_TO_LANE",
-                              deliveries[deliveries.length - 1],
-                              customerAddresses,
-                            )
-                          : "LANE_TO_LANE"
+                        rateLookupPending
+                          ? "Checking…"
+                          : baseRate != null
+                            ? formatCurrency(baseRate)
+                            : "No rate found"
                       }
                     />
-                    <Summary
-                      label="Matched Rate"
-                      value={baseRate != null ? formatCurrency(baseRate) : "Not configured"}
-                    />
+                  ) : (
+                    <KV label="Entered Rate" value={numericRate ? formatCurrency(numericRate) : "—"} />
+                  )}
+                  <div className="mt-1 flex items-center justify-between border-t border-gray-200 pt-2">
+                    <span className="text-sm font-semibold text-gray-900">Total Freight</span>
+                    <span className="text-lg font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
                   </div>
-                ) : null}
-                {draft.commercialType === "CONTRACT" && !rateLookupPending && !laneFound ? (
-                  <p className="mt-3 text-xs font-medium text-amber-700">No rate found for selected configuration.</p>
-                ) : null}
-                {laneFound && matchedRateCard?.lanes ? (
-                  <p className="mt-3 text-xs text-muted-foreground">{matchedRateCard.lanes}</p>
-                ) : null}
+                </div>
               </div>
+              <Field label="Ops Remark">
+                <Textarea value={draft.opsRemark} onChange={(event) => setDraft((current) => ({ ...current, opsRemark: event.target.value }))} className="min-h-[72px]" />
+              </Field>
             </div>
-          </SectionCard>
-        </div>
+          </StepSection>
+        );
+      })()}
 
-        <TenantPanel title="Commercial Summary" description="Live booking totals and pricing output.">
-          <div className="space-y-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Pricing Breakdown</p>
-              <div className="mt-3 grid gap-2 text-sm">
-                <SignalRow label="Rate" value={numericRate ? formatCurrency(numericRate) : "-"} />
-                <SignalRow
-                  label="Basis"
-                  value={
-                    rateType === "PER_MT"
-                      ? `${formatUOMWeight(totalWeight)} ${PRICING_WEIGHT_UOM}`
-                      : rateType === "PER_KM"
-                        ? `${maxDistance || 0} KM`
-                        : `${deliveryCount} trip`
-                  }
-                />
-                <SignalRow label="Freight" value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"} />
-              </div>
-            </div>
-            <Summary label="Booking Commercial Type" value={draft.commercialType === "CONTRACT" ? "Contract" : "Spot"} />
-            <Summary label="Rate Type" value={rateType} />
-            <Summary label="Deliveries" value={String(deliveryCount)} />
-            <Summary label="Total Quantity" value={totalQuantity ? `${totalQuantity} ${deliveries[0]?.uom || ""}`.trim() : "-"} />
-            <Summary label="Total Weight" value={totalWeight ? `${formatUOMWeight(totalWeight)} ${PRICING_WEIGHT_UOM}` : "-"} />
-            <Summary label="Billing Distance" value={rateType === "PER_KM" && maxDistance ? `${maxDistance} KM` : "-"} />
-            <Summary label="Final Freight" value={calculatedFreight ? formatCurrency(calculatedFreight) : "-"} />
-            <Field label="Ops Remark">
-              <Textarea value={draft.opsRemark} onChange={(event) => setDraft((current) => ({ ...current, opsRemark: event.target.value }))} className="min-h-[88px]" />
-            </Field>
-            <div className="flex justify-end gap-2 pt-2">
-              {access.can("CREATE_BOOKING", "CREATE") ? (
-                <Button variant="outline" onClick={() => persistBooking("DRAFT", false)}>
-                  Save Draft
-                </Button>
-              ) : null}
-              {access.can("CREATE_BOOKING", "SUBMIT_BOOKING") ? (
-                <Button onClick={() => persistBooking(submitStatus, true)}>Submit Booking</Button>
-              ) : null}
-            </div>
-          </div>
-        </TenantPanel>
+      {/* STEP 6 — Actions (sticky footer, always visible) */}
+      <div className="sticky bottom-0 z-30 -mx-4 mt-1 flex items-center justify-between gap-3 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="text-sm text-gray-600">
+          <span className="font-medium text-gray-500">Total Freight</span>{" "}
+          <span className="text-base font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
+        </div>
+        <div className="flex gap-2">
+          {access.can("CREATE_BOOKING", "CREATE") ? (
+            <Button variant="outline" onClick={() => persistBooking("DRAFT", false)}>
+              Save Draft
+            </Button>
+          ) : null}
+          {access.can("CREATE_BOOKING", "SUBMIT_BOOKING") ? (
+            <Button onClick={() => persistBooking(submitStatus, true)}>Submit Booking</Button>
+          ) : null}
+        </div>
       </div>
 
       <Dialog
@@ -1208,9 +1176,7 @@ export function CreateBookingPage({
       >
         <div className="grid gap-4">
           {addressDialogError ? (
-            <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {addressDialogError}
-            </div>
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{addressDialogError}</div>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Contact Code" helper="Auto-generated as ADDR-0001 if left blank">
@@ -1219,7 +1185,9 @@ export function CreateBookingPage({
             <Field label="Address Usage">
               <Select value={addressDraft.addressUsage} onChange={(event) => setAddressDraft((current) => ({ ...current, addressUsage: event.target.value as BookingAddressUsage }))}>
                 {getBookingAddressUsageOptions(addressDialogField).map((usage) => (
-                  <option key={usage} value={usage}>{usage}</option>
+                  <option key={usage} value={usage}>
+                    {usage}
+                  </option>
                 ))}
               </Select>
             </Field>
@@ -1263,7 +1231,6 @@ export function CreateBookingPage({
           </div>
         </div>
       </Dialog>
-      </div>
     </div>
   );
 }
@@ -1507,84 +1474,60 @@ function formatUOMWeight(value: number) {
   return value.toFixed(4).replace(/\.?0+$/, "");
 }
 
-function SectionCard({ title, children }: { title: string; children: ReactNode }) {
+function StepSection({
+  step,
+  title,
+  summary,
+  action,
+  defaultOpen,
+  children,
+}: {
+  step: number;
+  title: string;
+  summary?: string;
+  action?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <header className="rounded-t-2xl border-b border-slate-200 bg-slate-50/60 px-5 py-3">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{title}</h2>
-      </header>
-      <div className="space-y-4 px-5 py-4 text-slate-700">{children}</div>
+    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-b border-gray-100 bg-primary/5 px-4 py-2.5">
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          className="flex flex-1 items-center gap-3 text-left"
+          aria-expanded={open}
+        >
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+            {step}
+          </span>
+          <span className="text-base font-semibold text-gray-900">{title}</span>
+          {summary ? <span className="truncate text-xs font-medium text-gray-500">{summary}</span> : null}
+          <span className="ml-auto text-gray-400">{open ? "▾" : "▸"}</span>
+        </button>
+        {action ? <div className="shrink-0">{action}</div> : null}
+      </div>
+      {open ? <div className="px-4 py-4">{children}</div> : null}
     </section>
-  );
-}
-
-function SubBlock({ title, tone = "default", children }: { title?: string; tone?: "default" | "blue" | "amber"; children: ReactNode }) {
-  const toneClass =
-    tone === "blue"
-      ? "border-sky-200/70 bg-sky-50/50"
-      : tone === "amber"
-        ? "border-amber-200/60 bg-amber-50/50"
-        : "border-slate-200 bg-slate-50/60";
-  return (
-    <div className={`rounded-xl border ${toneClass} px-4 py-3`}>
-      {title ? (
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</p>
-      ) : null}
-      {children}
-    </div>
   );
 }
 
 function Field({ label, helper, children }: { label: string; helper?: string; children: ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-[12px] font-semibold uppercase tracking-[0.08em] text-slate-600">{label}</label>
+      <label className="block text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</label>
       {children}
-      {helper ? <p className="text-xs text-slate-500">{helper}</p> : null}
+      {helper ? <p className="text-[11px] text-gray-400">{helper}</p> : null}
     </div>
   );
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function KV({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <p className="mt-1 truncate text-sm font-semibold text-slate-800">{value}</p>
-    </div>
-  );
-}
-
-function SignalRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-800">{value}</span>
-    </div>
-  );
-}
-
-function QuickStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "blue" | "indigo" | "emerald" | "amber";
-}) {
-  const toneClass =
-    tone === "blue"
-      ? "from-blue-100 via-sky-100 to-cyan-100 text-blue-700"
-      : tone === "indigo"
-        ? "from-indigo-100 via-violet-100 to-fuchsia-100 text-indigo-700"
-        : tone === "emerald"
-          ? "from-emerald-100 via-green-100 to-lime-100 text-emerald-700"
-          : "from-amber-100 via-orange-100 to-yellow-100 text-amber-700";
-
-  return (
-    <div className={`rounded-[24px] border border-white/80 bg-gradient-to-br ${toneClass} p-4 shadow-sm`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-current/70">{label}</p>
-      <p className="mt-2 text-base font-semibold tracking-[-0.02em] text-slate-950">{value}</p>
+    <div className="flex items-center justify-between gap-4 text-sm">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-medium text-gray-900">{value}</span>
     </div>
   );
 }

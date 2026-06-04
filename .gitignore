@@ -5,3 +5,7 @@ dist/
 vite.config.js
 vite.config.d.ts
 .claude/settings.local.json
+
+# dev server logs
+vite-*.out
+vite-*.err

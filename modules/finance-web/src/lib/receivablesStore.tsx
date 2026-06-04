@@ -46,6 +46,11 @@ export interface ARTrip {
   daysPending: number
   revenue: number
   expense?: number
+  // Booking-wise expenses surfaced from the booking module (read by bookingId).
+  // approvedExpenses are billable into the invoice; pendingExpenses are shown
+  // for visibility only and are NOT added to the invoice total.
+  approvedExpenses?: number
+  pendingExpenses?: number
   vendor: string
   driver?: string
   vehicle?: string

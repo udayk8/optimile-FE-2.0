@@ -386,12 +386,25 @@ export interface BookingPodSnapshot {
   capturedAt?: string | null;
 }
 
+export type BookingExpenseStatus = "Pending" | "Approved" | "Rejected";
+export type BookingExpensePaymentMode = "NEFT" | "UPI" | "Cash" | "Cheque";
+
 export interface BookingExpenseRecord {
   id: string;
   label: string;
   amount: number;
   createdAt: string;
   createdBy: string;
+  // Extended booking-wise expense fields. Optional so existing/seeded records
+  // (which only carry label/amount) keep working. New expenses set all of these.
+  bookingId?: string;
+  dateTime?: string;
+  expenseType?: string;
+  paymentMode?: BookingExpensePaymentMode;
+  paidBy?: string;
+  billReceiptFile?: string | null;
+  notes?: string;
+  status?: BookingExpenseStatus;
 }
 
 export interface BookingDocumentSnapshot {
