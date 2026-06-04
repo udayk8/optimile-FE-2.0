@@ -179,8 +179,6 @@ export function EditableVendorContractRows({
     setEditIndex(null);
   }
 
-  if (rows.length === 0) return null;
-
   return (
     <>
       <DataTable
@@ -205,7 +203,7 @@ export function EditableVendorContractRows({
             </Button>
           </div>,
         ])}
-        emptyMessage="No contract rows yet."
+        emptyMessage="No contract rows yet — upload a CSV to add contracts."
         pageSize={10}
       />
 

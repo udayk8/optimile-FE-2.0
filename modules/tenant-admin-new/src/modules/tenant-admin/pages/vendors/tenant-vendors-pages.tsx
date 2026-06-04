@@ -7,7 +7,6 @@ import { PageHeader } from "@/shared/components/common/page-header";
 import {
   TenantEmptyState,
   TenantFilterBar,
-  TenantPanel,
 } from "@/modules/tenant-admin/components/tenant-primitives";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -407,15 +406,10 @@ export function TenantVendorDetailPage() {
 
       {message ? <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
 
-      <TenantPanel
-        title="Vendor Contracts"
-        description="The same contract list the vendor sees in their portal."
-      >
-        <TenantVendorContractsSection
-          vendor={{ id: tenantVendor.id, name: tenantVendor.name, tenantId: tenant.id }}
-          onUploaded={(count) => setMessage(`${count} vendor contract${count === 1 ? "" : "s"} imported.`)}
-        />
-      </TenantPanel>
+      <TenantVendorContractsSection
+        vendor={{ id: tenantVendor.id, name: tenantVendor.name, tenantId: tenant.id }}
+        onUploaded={(count) => setMessage(`${count} vendor contract${count === 1 ? "" : "s"} imported.`)}
+      />
     </div>
   );
 }
