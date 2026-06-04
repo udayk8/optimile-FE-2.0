@@ -1,9 +1,25 @@
 import { useMemo } from "react";
 import { useMockStore } from "@/shared/store/mock-store";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
-import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
+import type { BookingRecord, BookingExpenseRecord, BookingStatus } from "@/modules/tms/booking/types";
+import { areAllDeliveryPodsCaptured } from "@/modules/tms/booking/services/booking-engine";
 import type { FinanceDataBridge } from "@finance/integration/finance-data-bridge";
-import type { ARInvoice, ARTrip, PodStage } from "@finance/lib/receivablesStore";
+import type { ARInvoice, ARTrip, LedgerExpense, PodStage } from "@finance/lib/receivablesStore";
+
+// Project one booking expense into the finance LedgerExpense shape so the finance
+// team sees every charge line (not just rolled-up totals). Read-only in finance.
+function mapExpense(e: BookingExpenseRecord): LedgerExpense {
+  return {
+    type: e.expenseType ?? e.label,
+    amount: e.amount ?? 0,
+    paymentMode: e.paymentMode ?? undefined,
+    paidBy: e.paidBy ?? undefined,
+    status: (e.status ?? "Pending") as LedgerExpense["status"],
+    billReceipt: e.billReceiptFile ?? null,
+    date: e.dateTime ?? e.createdAt,
+    notes: e.notes ?? undefined,
+  };
+}
 
 // Bookings that are "delivered enough" for a POD/invoice to exist. We never
 // invent statuses — these are existing lifecycle values.
@@ -41,8 +57,15 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
 
     const podStageOf = (booking: BookingRecord): PodStage => {
       if (booking.invoiceId || booking.isInvoiced) return "invoiced";
-      if (booking.pod?.podUploaded) return "validated";
-      return "pending";
+      // Mirror the booking module's own "POD uploaded" signal, which is at the
+      // DELIVERY level (its badge + pendingPodDeliveries key off delivery.pod).
+      // The booking-level `pod` is only a best-effort copy, so checking it alone
+      // misses genuinely-uploaded PODs and strands them in Pending POD.
+      const podDone =
+        Boolean(booking.pod?.podUploaded) ||
+        areAllDeliveryPodsCaptured(booking.deliveries) ||
+        booking.status === "COMPLETED";
+      return podDone ? "validated" : "pending";
     };
 
     // Booking-wise expenses, read straight off the booking (no duplication in
@@ -54,12 +77,32 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         .reduce((sum, expense) => sum + (expense.amount || 0), 0);
     const approvedExpensesOf = (booking: BookingRecord) => sumExpenses(booking, "Approved");
 
+    // Master-data lookups for the rich booking detail the finance team needs.
+    const materialName = (materialId?: string | null) => {
+      if (!materialId) return undefined;
+      const m = store.listTenantMaterials(tenantId).find((x) => x.id === materialId);
+      return m?.description ?? m?.materialCode ?? undefined;
+    };
+    const addressLabel = (customerId: string, addressId?: string | null) => {
+      if (!addressId) return undefined;
+      const a = store.listTenantCustomerAddresses(customerId).find((x) => x.id === addressId);
+      return a?.fullAddress ?? a?.addressName ?? undefined;
+    };
+    const consigneeNameOf = (b: BookingRecord) => {
+      if (b.pod?.consigneeName) return b.pod.consigneeName;
+      const d = b.deliveries?.[0];
+      if (d?.contactPerson) return d.contactPerson;
+      const a = store.listTenantCustomerAddresses(b.customerId).find((x) => x.id === b.consigneeAddressId);
+      return a?.consigneeName ?? a?.contactPerson ?? undefined;
+    };
+
     const allBookings = store.listTenantBookings(tenantId);
     const eligible = allBookings.filter((b) => POD_ELIGIBLE_STATUSES.has(b.status));
 
     const trips: ARTrip[] = eligible.map((b) => {
       const approvedExpenses = approvedExpensesOf(b);
       const pendingExpenses = sumExpenses(b, "Pending");
+      const d = b.deliveries?.[0];
       return {
         id: b.bookingId,
         bookingId: b.bookingId,
@@ -78,15 +121,48 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         approvedExpenses,
         pendingExpenses,
         podStage: podStageOf(b),
+        // Rich booking detail for the finance views.
+        expenseItems: (b.expenses ?? []).map(mapExpense),
+        qty: b.quantity ?? d?.quantity ?? undefined,
+        weight: b.weight ?? d?.weight ?? undefined,
+        uom: b.uom ?? d?.uom ?? undefined,
+        weightUom: b.weightUom ?? d?.weightUom ?? undefined,
+        commodity: materialName(d?.materialId ?? b.materialIds?.[0]) ?? b.subBrand ?? undefined,
+        pickupAddress: addressLabel(b.customerId, b.sourceAddressId ?? d?.originAddressId),
+        dropAddress: addressLabel(b.customerId, b.destinationAddressId ?? d?.destinationAddressId),
+        consigneeName: consigneeNameOf(b),
+        commercialType: b.commercialType ?? undefined,
+        rateType: b.pricing?.rateType ?? undefined,
+        buyingFreight: b.assignment?.vendorFreight ?? undefined,
+        margin: b.assignment?.marginAmount ?? undefined,
       };
     });
 
     const invoices: ARInvoice[] = store
       .listTenantInvoices(tenantId)
       .map((inv) => {
-        const firstBooking = inv.bookingIds?.[0]
-          ? allBookings.find((b) => b.bookingId === inv.bookingIds[0]) ?? null
-          : null;
+        const invBookings = (inv.bookingIds ?? [])
+          .map((bid) => allBookings.find((b) => b.bookingId === bid))
+          .filter((b): b is BookingRecord => Boolean(b));
+        const firstBooking = invBookings[0] ?? null;
+        // Every expense across the invoice's bookings (all statuses) so the finance
+        // team sees each charge; the UI bills only the Approved ones.
+        const expenseItems: LedgerExpense[] = invBookings.flatMap((b) =>
+          (b.expenses ?? []).map(mapExpense),
+        );
+        // Recompute billed amounts LIVE from the bookings so the invoice total
+        // tracks expense approvals (the stored subtotal/total is frozen at
+        // generation). Rule: only APPROVED expenses bill into the total.
+        const freightTotal = invBookings.reduce((s, b) => s + (b.pricing?.calculatedFreight ?? 0), 0);
+        const base = freightTotal || inv.subtotal;
+        const approvedExpenseTotal = invBookings.reduce(
+          (s, b) => s + (b.expenses ?? [])
+            .filter((e) => (e.status ?? "Pending") === "Approved")
+            .reduce((x, e) => x + (e.amount || 0), 0),
+          0,
+        );
+        const subtotalLive = base + approvedExpenseTotal;          // freight + approved expenses
+        const totalLive = subtotalLive + 2 * Math.round(subtotalLive * 0.09); // + 18% GST (CGST+SGST)
         return {
           id: inv.invoiceId,
           tripId: inv.bookingIds?.[0],
@@ -95,15 +171,20 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           truck: firstBooking?.assignment?.vehicleLabel ?? "—",
           date: (inv.createdAt ?? "").slice(0, 10),
           terms: "Net 30",
-          base: inv.subtotal,
+          base,
           accessorials: [],
-          contracted: inv.subtotal,
-          invoiced: inv.total,
-          amount: inv.total,
+          contracted: base,
+          invoiced: subtotalLive,
+          amount: totalLive,
           variancePct: 0,
           flagged: false,
           stage: "submitted",
           bookingIds: inv.bookingIds,
+          expenseItems,
+          // One drop per booking so multi-booking invoices resolve every trip.
+          drops: invBookings.length > 1
+            ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))
+            : undefined,
         };
       });
 
