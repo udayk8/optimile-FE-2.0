@@ -79,7 +79,7 @@ export default function ContractsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left">
+            <table className="w-full min-w-[1100px] text-left">
               <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-5 py-3 font-bold">Contract</th>
@@ -87,6 +87,7 @@ export default function ContractsPage() {
                   <th className="px-5 py-3 font-bold">Vehicle Type</th>
                   <th className="px-5 py-3 font-bold">Rate</th>
                   <th className="px-5 py-3 font-bold">Rate Type</th>
+                  <th className="px-5 py-3 font-bold">Volume</th>
                   <th className="px-5 py-3 font-bold">Start Date</th>
                   <th className="px-5 py-3 font-bold">End Date</th>
                   <th className="px-5 py-3 font-bold">Source</th>
@@ -112,6 +113,11 @@ export default function ContractsPage() {
                     <span className="font-mono">₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}</span>
                   </td>
                   <td className="px-5 py-4 text-sm text-text">{getRateTypeLabel(contract.rateCard[0]?.rateType ?? '')}</td>
+                  <td className="px-5 py-4 text-sm text-text">
+                    {contract.volumeAllocation.unit === '%'
+                      ? `${contract.volumeAllocation.volume}%`
+                      : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
+                  </td>
                   <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityFrom)}</td>
                   <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityTo)}</td>
                   <td className="px-5 py-4">

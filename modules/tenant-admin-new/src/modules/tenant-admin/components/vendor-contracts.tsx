@@ -119,19 +119,16 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
     <DataTable
       title="Vendor contracts"
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Source", "Status"]}
+      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Source", "Status"]}
       rows={contracts.map((contract) => [
-        <div key={`${contract.contractId}-lane`}>
-          <span className="font-mono font-semibold">{contract.laneCode}</span>
-          {contract.allocationRank ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {contract.allocationRank} · {contract.volumeAllocationPercent ?? 100}% volume
-            </p>
-          ) : null}
-        </div>,
+        <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
+        <span key={`${contract.contractId}-volume`}>
+          {contract.volumeAllocationPercent ?? 100}%
+          {contract.allocationRank ? <span className="ml-1 text-xs text-muted-foreground">({contract.allocationRank})</span> : null}
+        </span>,
         contract.startDate,
         contract.endDate,
         <Badge key={`${contract.contractId}-source`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>

@@ -163,7 +163,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'L1',
-        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Bharuch', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'Bangalore', state: 'Karnataka' }, distanceKm: 1200 },
+        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'BLR', state: 'Karnataka' }, distanceKm: 1200 },
         volumeRequirement: { estimatedVolume: 50, unit: 'trucks/month', frequency: 'MONTHLY' },
         basePrice: 28000,
         currentBestBid: 25000,
@@ -171,7 +171,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'L2',
-        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Bharuch', state: 'Gujarat' }, destination: { name: 'Chennai Hub', city: 'Chennai', state: 'Tamil Nadu' }, distanceKm: 1450 },
+        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Chennai Hub', city: 'MAA', state: 'Tamil Nadu' }, distanceKm: 1450 },
         volumeRequirement: { estimatedVolume: 20, unit: 'trucks/month', frequency: 'MONTHLY' },
         basePrice: 34000,
         currentBestBid: 31000,
@@ -185,7 +185,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-011', type: 'SPOT', customerName: 'ITC Limited', state: 'LIVE', pricingUnit: 'PER_TRIP',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Munger Factory', city: 'Munger', state: 'Bihar' }, destination: { name: 'Kolkata Depot', city: 'Kolkata', state: 'West Bengal' }, distanceKm: 320 },
+      laneDetails: { origin: { name: 'Munger Factory', city: 'MGR', state: 'Bihar' }, destination: { name: 'Kolkata Depot', city: 'CCU', state: 'West Bengal' }, distanceKm: 320 },
       basePrice: 21000,
       currentBestBid: 18500,
       minBidDecrement: 200
@@ -202,7 +202,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'L1',
-        laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Pune', city: 'Pune', state: 'MH' }, distanceKm: 150 },
+        laneDetails: { origin: { name: 'Bhiwandi', city: 'MUM', state: 'MH' }, destination: { name: 'Pune', city: 'PNQ', state: 'MH' }, distanceKm: 150 },
         volumeRequirement: { estimatedVolume: 100, unit: 'trucks', frequency: 'MONTHLY' },
         basePrice: 15000,
         currentBestBid: 12000,
@@ -210,7 +210,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'L2',
-        laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Nashik', city: 'Nashik', state: 'MH' }, distanceKm: 165 },
+        laneDetails: { origin: { name: 'Bhiwandi', city: 'MUM', state: 'MH' }, destination: { name: 'Nashik', city: 'NSK', state: 'MH' }, distanceKm: 165 },
         volumeRequirement: { estimatedVolume: 80, unit: 'trucks', frequency: 'MONTHLY' },
         basePrice: 16500,
         currentBestBid: 13500,
@@ -228,7 +228,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-014', type: 'SPOT', customerName: 'Tata Motors', state: 'UPCOMING', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Pune Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Lucknow', city: 'Lucknow', state: 'UP' }, distanceKm: 1350 },
+      laneDetails: { origin: { name: 'Pune Plant', city: 'PNQ', state: 'MH' }, destination: { name: 'Lucknow', city: 'LKO', state: 'UP' }, distanceKm: 1350 },
       basePrice: 22000,
       minBidDecrement: 500
     }],
@@ -239,7 +239,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-015', type: 'BULK', customerName: 'Nestle India', state: 'PENDING_AWARD', pricingUnit: 'PER_MT',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Moga Factory', city: 'Moga', state: 'PB' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 400 },
+      laneDetails: { origin: { name: 'Moga Factory', city: 'MOG', state: 'PB' }, destination: { name: 'Delhi', city: 'DEL', state: 'DL' }, distanceKm: 400 },
       basePrice: 1800,
       currentBestBid: 1500,
       minBidDecrement: 50
@@ -252,7 +252,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-016', type: 'SPOT', customerName: 'Mahindra Logistics', state: 'AWARDED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'MH' }, distanceKm: 700 },
+      laneDetails: { origin: { name: 'Chakan Plant', city: 'PNQ', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'NAG', state: 'MH' }, distanceKm: 700 },
       basePrice: 18500,
       currentBestBid: 16500,
       minBidDecrement: 250
@@ -267,7 +267,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-017', type: 'LOT', customerName: 'Adani Ports', state: 'NOT_AWARDED', pricingUnit: 'PER_TRIP',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Mundra Port', city: 'Mundra', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 320 },
+      laneDetails: { origin: { name: 'Mundra Port', city: 'MUN', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'AMD', state: 'GJ' }, distanceKm: 320 },
       basePrice: 11000,
       currentBestBid: 9800,
       minBidDecrement: 100
@@ -280,7 +280,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-019', type: 'SPOT', customerName: 'Bharat Petroleum', state: 'NOT_PARTICIPATED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Refinery', city: 'Mumbai', state: 'MH' }, destination: { name: 'Depot', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 530 },
+      laneDetails: { origin: { name: 'Refinery', city: 'MUM', state: 'MH' }, destination: { name: 'Depot', city: 'AMD', state: 'GJ' }, distanceKm: 530 },
       basePrice: 12500,
       minBidDecrement: 100
     }],
@@ -292,7 +292,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-018', type: 'SPOT', customerName: 'Blue Dart', state: 'CANCELLED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Mumbai Hub', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat DC', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
+      laneDetails: { origin: { name: 'Mumbai Hub', city: 'MUM', state: 'MH' }, destination: { name: 'Surat DC', city: 'SRT', state: 'GJ' }, distanceKm: 280 },
       basePrice: 14000,
       minBidDecrement: 100
     }],
@@ -305,7 +305,7 @@ export const MOCK_AUCTIONS: Auction[] = [
 export const MOCK_CONTRACTS: Contract[] = [
   {
     id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD', laneCode: 'MUM-DEL',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
+    laneDetails: { origin: { name: 'Mumbai Port', city: 'MUM', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'DEL', state: 'Delhi' }, distanceKm: 1420 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
@@ -316,7 +316,7 @@ export const MOCK_CONTRACTS: Contract[] = [
   },
   {
     id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD', laneCode: 'JSR-HLD',
-    laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
+    laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'JSR', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'HLD', state: 'West Bengal' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_MT', rate: 1800, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 45, billingCycle: 'MONTHLY' },
@@ -327,7 +327,7 @@ export const MOCK_CONTRACTS: Contract[] = [
   },
   {
     id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD', laneCode: 'MUM-SRT',
-    laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
+    laneDetails: { origin: { name: 'Vikhroli', city: 'MUM', state: 'MH' }, destination: { name: 'Surat Hub', city: 'SRT', state: 'GJ' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
