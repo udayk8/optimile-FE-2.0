@@ -172,7 +172,7 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
-    id: 'CNT-001', customerName: 'Hindustan Unilever', customerGSTIN: '27AABCU9603R1ZM', status: 'ACTIVE',
+    id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD', laneCode: 'MUM-DEL',
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     rateCard: [{ vehicleType: '20ft Container', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
@@ -183,7 +183,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-01-05T10:30:00Z', pdfUrl: '/contracts/CNT-001.pdf', createdAt: '2025-12-20T14:00:00Z',
   },
   {
-    id: 'CNT-005', customerName: 'Tata Steel Ltd.', customerGSTIN: '20AABCT1234D1ZP', status: 'DRAFT',
+    id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD', laneCode: 'JSR-HLD',
     laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'Flatbed', rateType: 'PER_TRIP', rate: 28000, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
@@ -194,7 +194,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], pdfUrl: '/contracts/CNT-005.pdf', createdAt: '2026-04-20T09:00:00Z',
   },
   {
-    id: 'CNT-003', customerName: 'Godrej Consumer', customerGSTIN: '27AABCU9603R1ZA', status: 'EXPIRED',
+    id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD', laneCode: 'MUM-SRT',
     laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'LCV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },

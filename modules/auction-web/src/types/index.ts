@@ -146,6 +146,8 @@ export interface Contract {
   startDate: string
   endDate: string
   estimatedTrips: number
+  /** How the contract came to exist; auction awards stamp AUCTION_WIN. */
+  createdFrom?: 'AUCTION_WIN' | 'MANUAL_UPLOAD'
   status: ContractStatus
   l1OverrideReason?: string
   rateSyncedToTms: boolean

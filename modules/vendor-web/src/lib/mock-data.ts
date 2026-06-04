@@ -304,7 +304,7 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
-    id: 'CNT-001', customerName: 'Kanodia Cements', customerGSTIN: '27AABCU9603R1ZM', status: 'ACTIVE',
+    id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD', laneCode: 'MUM-DEL',
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
@@ -315,9 +315,9 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-01-05T10:30:00Z', pdfUrl: '/contracts/CNT-001.pdf', createdAt: '2025-12-20T14:00:00Z',
   },
   {
-    id: 'CNT-005', customerName: 'Tata Steel Ltd.', customerGSTIN: '20AABCT1234D1ZP', status: 'DRAFT',
+    id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD', laneCode: 'JSR-HLD',
     laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
-    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 28000, surcharges: [] }],
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_MT', rate: 1800, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 45, billingCycle: 'MONTHLY' },
     slaClauses: [{ name: 'Placement SLA', valueHours: 6, description: 'Vehicle must report within 6 hours' }],
@@ -326,7 +326,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], pdfUrl: '/contracts/CNT-005.pdf', createdAt: '2026-04-20T09:00:00Z',
   },
   {
-    id: 'CNT-003', customerName: 'Godrej Consumer', customerGSTIN: '27AABCU9603R1ZA', status: 'EXPIRED',
+    id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD', laneCode: 'MUM-SRT',
     laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },
@@ -626,7 +626,7 @@ export const MOCK_TRIPS: Trip[] = [
     timeline: [
       { id: 'tt-6', title: 'Completed', description: 'Booking completed and invoiced', timestamp: '2026-04-10T16:00:00Z', status: 'COMPLETED' },
     ],
-    freightRate: 45000, slaFlag: 'ON_TIME', isInvoiced: true,
+    freightRate: 50000, slaFlag: 'ON_TIME', isInvoiced: true,
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
@@ -657,7 +657,137 @@ export const MOCK_TRIPS: Trip[] = [
     ],
     freightRate: 34500, isInvoiced: false,
     createdAt: '2026-05-17T07:45:00Z',
-  }
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1040', contractId: 'CNT-001', indentId: 'BKG-2026-1040', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chandausi', city: 'Chandausi', state: '' }, distanceKm: 1980 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-04-12T15:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-040',
+    timeline: [
+      { id: 'tt-40z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-04-12T15:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 50000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-04-06T08:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1031', contractId: 'CNT-001', indentId: 'BKG-2026-1031', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mumbai', city: 'Mumbai', state: '' }, distanceKm: 980 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-11T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-031',
+    timeline: [
+      { id: 'tt-31z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-11T16:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 100000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-07T08:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1032', contractId: 'CNT-001', indentId: 'BKG-2026-1032', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-15T11:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-032',
+    timeline: [
+      { id: 'tt-32z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-15T11:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 85000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-12T08:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1033', contractId: 'CNT-001', indentId: 'BKG-2026-1033', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-16T12:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-033',
+    timeline: [
+      { id: 'tt-33z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-16T12:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 92000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-13T08:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1034', contractId: 'CNT-001', indentId: 'BKG-2026-1034', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Pune', city: 'Pune', state: '' }, distanceKm: 840 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-17T10:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-034',
+    timeline: [
+      { id: 'tt-34z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-17T10:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 68000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-14T08:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1035', contractId: 'CNT-001', indentId: 'BKG-2026-1035', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Kochi', city: 'Kochi', state: '' }, distanceKm: 550 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-17T18:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-035',
+    timeline: [
+      { id: 'tt-35z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-17T18:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 74000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-14T09:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1036', contractId: 'CNT-001', indentId: 'BKG-2026-1036', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-16T17:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-036',
+    timeline: [
+      { id: 'tt-36z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-16T17:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 58000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-13T09:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1037', contractId: 'CNT-001', indentId: 'BKG-2026-1037', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mysuru', city: 'Mysuru', state: '' }, distanceKm: 145 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-15T14:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-037',
+    timeline: [
+      { id: 'tt-37z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-15T14:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 47000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-13T07:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1038', contractId: 'CNT-001', indentId: 'BKG-2026-1038', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-14T13:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-038',
+    timeline: [
+      { id: 'tt-38z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-14T13:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 39000, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-05-12T07:00:00Z',
+  },
+  {
+    // Legacy billed booking — kept for invoice history (INV references).
+    id: 'BKG-2026-1039', contractId: 'CNT-001', indentId: 'BKG-2026-1039', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hubballi', city: 'Hubballi', state: '' }, distanceKm: 410 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-12T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-039',
+    timeline: [
+      { id: 'tt-39z', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-12T16:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 59000, slaFlag: 'ON_TIME', isInvoiced: true,
+    createdAt: '2026-05-10T07:00:00Z',
+  },
 ]
 
 
@@ -718,81 +848,81 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-01', to: '2026-05-13' },
     paymentDueDate: '2026-06-12', status: 'APPROVED',
     lineItems: [
-      { tripId: 'BKG-2026-1042', tripReference: 'BKG-2026-1042', freightCharge: 100000, lineTotal: 100000 }
+      { tripId: 'BKG-2026-1031', tripReference: 'BKG-2026-1031', freightCharge: 100000, lineTotal: 100000 }
     ],
-    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', tripReferences: ['BKG-2026-1042'], createdAt: '2026-05-13T10:00:00Z',
+    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', tripReferences: ['BKG-2026-1031'], createdAt: '2026-05-13T10:00:00Z',
   },
   {
     id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1046', tripReference: 'BKG-2026-1046', freightCharge: 85000, lineTotal: 85000 }],
-    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', tripReferences: ['BKG-2026-1046'], createdAt: '2026-05-17T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1032', tripReference: 'BKG-2026-1032', freightCharge: 85000, lineTotal: 85000 }],
+    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', tripReferences: ['BKG-2026-1032'], createdAt: '2026-05-17T10:00:00Z',
   },
   {
     id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1047', tripReference: 'BKG-2026-1047', freightCharge: 92000, lineTotal: 92000 }],
-    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', tripReferences: ['BKG-2026-1047'], createdAt: '2026-05-18T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1033', tripReference: 'BKG-2026-1033', freightCharge: 92000, lineTotal: 92000 }],
+    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', tripReferences: ['BKG-2026-1033'], createdAt: '2026-05-18T10:00:00Z',
   },
   {
     id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'APPROVED',
-    lineItems: [{ tripId: 'BKG-2026-1048', tripReference: 'BKG-2026-1048', freightCharge: 68000, lineTotal: 68000 }],
-    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', tripReferences: ['BKG-2026-1048'], createdAt: '2026-05-19T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1034', tripReference: 'BKG-2026-1034', freightCharge: 68000, lineTotal: 68000 }],
+    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', tripReferences: ['BKG-2026-1034'], createdAt: '2026-05-19T10:00:00Z',
   },
   {
     id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-17', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
-      tripId: 'BKG-2026-1049', tripReference: 'BKG-2026-1049', freightCharge: 74000,
+      tripId: 'BKG-2026-1035', tripReference: 'BKG-2026-1035', freightCharge: 74000,
       lineTotal: 74000,
     }],
-    subtotal: 74000, gstAmount: 8880, grandTotal: 82880, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['BKG-2026-1049'], createdAt: '2026-05-19T11:00:00Z',
+    subtotal: 74000, gstAmount: 8880, grandTotal: 82880, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['BKG-2026-1035'], createdAt: '2026-05-19T11:00:00Z',
   },
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'DISPUTED',
     lineItems: [{
-      tripId: 'BKG-2026-1050', tripReference: 'BKG-2026-1050', freightCharge: 58000,
+      tripId: 'BKG-2026-1036', tripReference: 'BKG-2026-1036', freightCharge: 58000,
       lineTotal: 58000,
     }],
-    subtotal: 58000, gstAmount: 6960, grandTotal: 64960, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['BKG-2026-1050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 58000, gstAmount: 6960, grandTotal: 64960, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['BKG-2026-1036'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
-    lineItems: [{ tripId: 'BKG-2026-1051', tripReference: 'BKG-2026-1051', freightCharge: 47000, lineTotal: 47000 }],
-    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['BKG-2026-1051'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1037', tripReference: 'BKG-2026-1037', freightCharge: 47000, lineTotal: 47000 }],
+    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['BKG-2026-1037'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
   },
   {
     // CLOSED — finance rejected the invoice outright.
     id: 'INV-2026-009', invoiceNumber: 'INV-2026-009', invoiceDate: '2026-05-16', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-12', to: '2026-05-16' },
     paymentDueDate: '2026-06-15', status: 'CLOSED', closeReason: 'REJECTED',
-    lineItems: [{ tripId: 'BKG-2026-1052', tripReference: 'BKG-2026-1052', freightCharge: 39000, lineTotal: 39000 }],
-    subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['BKG-2026-1052'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1038', tripReference: 'BKG-2026-1038', freightCharge: 39000, lineTotal: 39000 }],
+    subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['BKG-2026-1038'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
   },
   {
     // CLOSED — superseded by INV-2026-011 after a resubmission.
     id: 'INV-2026-010', invoiceNumber: 'INV-2026-010', invoiceDate: '2026-05-14', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-13', status: 'CLOSED', closeReason: 'SUPERSEDED', supersededByInvoiceId: 'INV-2026-011',
-    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 61000, lineTotal: 61000 }],
-    subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1039', tripReference: 'BKG-2026-1039', freightCharge: 61000, lineTotal: 61000 }],
+    subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['BKG-2026-1039'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
   },
   {
     // PENDING — the corrected invoice that replaced INV-2026-010.
     id: 'INV-2026-011', invoiceNumber: 'INV-2026-011', invoiceDate: '2026-05-20', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-19', status: 'PENDING', supersedesInvoiceId: 'INV-2026-010',
-    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 59000, lineTotal: 59000 }],
-    subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1039', tripReference: 'BKG-2026-1039', freightCharge: 59000, lineTotal: 59000 }],
+    subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['BKG-2026-1039'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
   }
 ]
 
@@ -832,7 +962,7 @@ export const MOCK_DISPUTES: import('../types').Dispute[] = [
     invoiceId: 'INV-2026-007',
     invoiceNumber: 'INV-2026-007',
     invoiceAmount: 70000,
-    reason: 'Detention and loading charges do not match the approved rate card for BKG-2026-1050.',
+    reason: 'Detention and loading charges do not match the approved rate card for BKG-2026-1036.',
     status: 'OPEN',
     raisedAt: '2026-05-19T10:00:00Z',
     updatedAt: '2026-05-19T10:00:00Z',
@@ -841,7 +971,7 @@ export const MOCK_DISPUTES: import('../types').Dispute[] = [
       {
         id: 'dmsg-seed-1',
         sender: 'FINANCE',
-        message: 'Detention and loading charges do not match the approved rate card for BKG-2026-1050.',
+        message: 'Detention and loading charges do not match the approved rate card for BKG-2026-1036.',
         createdAt: '2026-05-19T10:00:00Z',
       },
     ],

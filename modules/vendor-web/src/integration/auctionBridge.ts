@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { isValidLaneCode, normalizeLaneCode, splitLaneCode } from '@shared-utils'
 import type {
   Auction,
   AuctionBid,
@@ -91,13 +92,13 @@ interface SourceStore {
   contracts: SourceContract[]
 }
 
-interface VendorIdentity {
+export interface VendorIdentity {
   vendorId: string
   vendorName: string
   tenantId?: string
 }
 
-function readIdentity(): VendorIdentity {
+export function readIdentity(): VendorIdentity {
   const fallback: VendorIdentity = { vendorId: 'v-001', vendorName: 'My Transport Co' }
   if (typeof window === 'undefined') return fallback
   try {
@@ -138,8 +139,11 @@ function writeStore(store: SourceStore) {
   window.dispatchEvent(new CustomEvent('optimile-auction-store'))
 }
 
-// "Mumbai → Delhi" / "Mumbai -> Delhi" → ["Mumbai", "Delhi"]
+// "Mumbai → Delhi" / "Mumbai -> Delhi" → ["Mumbai", "Delhi"];
+// lane codes ("MUM-BLR") split into their two location codes.
 function splitLane(lane: string): [string, string] {
+  const codeParts = splitLaneCode(lane)
+  if (codeParts) return codeParts
   const parts = lane.split(/→|->/).map((p) => p.trim())
   return [parts[0] ?? lane, parts[1] ?? '']
 }
@@ -244,13 +248,13 @@ function mapContract(source: SourceContract): Contract {
   const [origin, destination] = splitLane(source.lane)
   return {
     id: source.id,
-    customerName: source.region ?? 'Optimile Customer',
-    customerGSTIN: '—',
+    laneCode: isValidLaneCode(source.lane) ? normalizeLaneCode(source.lane) : undefined,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
+    source: 'AUCTION_WIN',
     rateCard: [
       {
         vehicleType: source.vehicleType,
-        rateType: source.rateUnit === 'PER_TRIP' ? 'PER_TRIP' : 'PER_KM',
+        rateType: source.rateUnit,
         rate: source.contractedRate,
         surcharges: [],
       },

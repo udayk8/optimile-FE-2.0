@@ -11,6 +11,7 @@ import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
 import { createAuction, fetchBookings, fetchVendors } from '@auction/lib/mock-services'
+import { getLaneCodeError, isValidLaneCode, normalizeLaneCode } from '@shared-utils'
 import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
@@ -71,13 +72,13 @@ const COMMODITY_OPTIONS = [
 ] as const
 
 const LANE_OPTIONS = [
-  'Mumbai → Delhi',
-  'Mumbai → Bangalore',
-  'Bangalore → Chennai',
-  'Chennai → Mumbai',
-  'Delhi → Lucknow',
-  'Pune → Jaipur',
-  'Ahmedabad → Surat',
+  'MUM-DEL',
+  'MUM-BLR',
+  'BLR-MAA',
+  'MAA-MUM',
+  'DEL-LKO',
+  'PNQ-JAI',
+  'AMD-SRT',
 ] as const
 
 const REGION_OPTIONS = ['North India', 'South India', 'West India', 'East India', 'Central India'] as const
@@ -101,7 +102,7 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
 }
 
 function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
-  const lane = laneName ?? (type === 'SPOT' ? 'Mumbai → Delhi' : 'Mumbai → Bangalore')
+  const lane = laneName ?? (type === 'SPOT' ? 'MUM-DEL' : 'MUM-BLR')
   const isLot = type === 'LOT'
   return {
     lane,
@@ -137,7 +138,7 @@ function parseLaneMode(value: unknown): DraftLane['allocationMode'] {
 
 const FALLBACK_BOOKING: BookingReference = {
   id: 'BK-DEMO-0001',
-  lane: 'Mumbai → Delhi',
+  lane: 'MUM-DEL',
   vehicleType: '20 MT Open Body',
   commodity: 'FMCG',
   quantity: 18,
@@ -179,16 +180,16 @@ export default function AuctionCreatePage() {
 
   const activeBooking = bookings.find((item) => item.id === selectedBookingId) ?? selectedBooking
   const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
-    if (auctionRegion === 'North India') return lane === 'Mumbai → Delhi' || lane === 'Delhi → Lucknow'
-    if (auctionRegion === 'South India') return lane === 'Mumbai → Bangalore' || lane === 'Bangalore → Chennai' || lane === 'Chennai → Mumbai'
-    if (auctionRegion === 'West India') return lane === 'Pune → Jaipur' || lane === 'Ahmedabad → Surat'
+    if (auctionRegion === 'North India') return lane === 'MUM-DEL' || lane === 'DEL-LKO'
+    if (auctionRegion === 'South India') return lane === 'MUM-BLR' || lane === 'BLR-MAA' || lane === 'MAA-MUM'
+    if (auctionRegion === 'West India') return lane === 'PNQ-JAI' || lane === 'AMD-SRT'
     return true
   })
 
   useEffect(() => {
     if (!effectiveType) return
     const defaultBooking = bookings[0] ?? FALLBACK_BOOKING
-    const defaultLane = effectiveType === 'SPOT' ? defaultBooking.lane : 'Mumbai → Bangalore'
+    const defaultLane = effectiveType === 'SPOT' ? defaultBooking.lane : 'MUM-BLR'
     setTitle(
       effectiveType === 'SPOT'
         ? `Spot | ${defaultBooking.id} | ${defaultBooking.lane}`
@@ -204,7 +205,7 @@ export default function AuctionCreatePage() {
 
   const addLane = () => {
     if (effectiveType !== 'LOT') return
-    setLanes((current) => [...current, makeDefaultLane('LOT', lotLaneOptions[0] ?? 'Mumbai → Bangalore')])
+    setLanes((current) => [...current, makeDefaultLane('LOT', lotLaneOptions[0] ?? 'MUM-BLR')])
   }
 
   const updateLane = (index: number, field: keyof DraftLane, value: string) => {
@@ -229,11 +230,20 @@ export default function AuctionCreatePage() {
       const worksheet = workbook.worksheets[0]
       if (!worksheet) throw new Error('No sheets found.')
       const importedLanes: DraftLane[] = []
+      const laneErrors: string[] = []
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return
         const values = row.values as unknown[]
-        const lane = normalizeText(values[1])
-        if (!lane) return
+        const rawLane = normalizeText(values[1])
+        if (!rawLane) return
+        // Lane codes ("MUM-BLR") share validation with vendor-web; the legacy
+        // "City → City" format from existing templates stays accepted.
+        const isLegacyLane = /→|->/.test(rawLane)
+        const lane = isLegacyLane ? rawLane : normalizeLaneCode(rawLane)
+        if (!isLegacyLane && !isValidLaneCode(lane)) {
+          laneErrors.push(`Row ${rowNumber}: ${getLaneCodeError(lane) ?? 'Invalid lane.'}`)
+          return
+        }
         importedLanes.push({
           lane,
           vehicleType: normalizeText(values[2]) || '20 MT Open Body',
@@ -248,6 +258,7 @@ export default function AuctionCreatePage() {
           l3: normalizeText(values[10]) || '0',
         })
       })
+      if (laneErrors.length) throw new Error(laneErrors.join(' '))
       if (!importedLanes.length) throw new Error(`Required headers: ${laneTemplateHeaders().join(', ')}`)
       setLanes(importedLanes)
       setImportFileName(file.name)

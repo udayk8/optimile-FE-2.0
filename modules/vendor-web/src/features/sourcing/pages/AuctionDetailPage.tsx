@@ -10,6 +10,7 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { formatLaneDisplay, getRateTypeLabel } from '@shared-utils'
 import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
 
 export default function AuctionDetailPage() {
@@ -85,14 +86,9 @@ export default function AuctionDetailPage() {
     setSubmitted(true)
   }
 
-  const getPricingUnitLabel = () => {
-    switch(auction.pricingUnit) {
-      case 'PER_MT': return 'per MT'
-      case 'PER_KM': return 'per Km'
-      case 'PER_TRIP':
-      default: return 'per Trip'
-    }
-  }
+  // Every bid carries the auction's rate type (PER_TRIP / PER_MT / PER_KM).
+  const rateType = auction.pricingUnit ?? 'PER_TRIP'
+  const rateTypeLabel = getRateTypeLabel(rateType)
 
   return (
     <div className="pb-20">
@@ -137,8 +133,8 @@ export default function AuctionDetailPage() {
             </div>
           </div>
           <div>
-            <div className="mb-1 text-sm text-gray-500">Pricing Model</div>
-            <div className="font-bold text-text">{getPricingUnitLabel()}</div>
+            <div className="mb-1 text-sm text-gray-500">Rate Type</div>
+            <div className="font-bold text-text">{rateTypeLabel}</div>
           </div>
           <div>
             <div className="mb-1 text-sm text-gray-500">Total Lanes</div>
@@ -162,6 +158,7 @@ export default function AuctionDetailPage() {
               <tr>
                 <th className="min-w-[180px] px-4 py-3 text-xs font-bold uppercase tracking-wide">Lane Details</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Volume</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Rate Type</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Initial Base Price</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Winning Bid</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Active Bid</th>
@@ -189,7 +186,7 @@ export default function AuctionDetailPage() {
                       <div className="flex items-start gap-2">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                         <div>
-                          <div className="font-bold text-text">{lane.laneDetails.origin.city} → {lane.laneDetails.destination.city}</div>
+                          <div className="font-mono font-bold text-text">{formatLaneDisplay(lane.laneDetails.origin.city, lane.laneDetails.destination.city)}</div>
                           <div className="text-xs text-gray-500">{lane.laneDetails.distanceKm} km</div>
                         </div>
                       </div>
@@ -201,6 +198,9 @@ export default function AuctionDetailPage() {
                           <div className="text-xs text-gray-500">{lane.volumeRequirement.frequency}</div>
                         </div>
                       ) : '-'}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-block rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{rateTypeLabel}</span>
                     </td>
                     <td className="px-4 py-4">
                       {lane.basePrice ? (
@@ -254,7 +254,7 @@ export default function AuctionDetailPage() {
                           <input 
                             type="number"
                             className={`h-10 w-full max-w-[150px] rounded-lg border bg-white px-3 text-sm outline-none transition ${bidErrors[lane.id] ? 'border-danger ring-danger/20 focus:border-danger focus:ring-4' : 'border-gray-300 ring-primary/20 focus:border-primary focus:ring-4'}`}
-                            placeholder={`Rate ${getPricingUnitLabel()}`}
+                            placeholder={`Rate (${rateTypeLabel})`}
                             value={bids[lane.id] || ''}
                             onChange={(e) => handleBidChange(lane.id, e.target.value)}
                           />

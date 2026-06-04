@@ -8,6 +8,7 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
+import { formatLaneDisplay } from '@shared-utils'
 import { useSourcingBridge } from '@vendor/integration/auctionBridge'
 import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AuctionState } from '@vendor/types'
@@ -154,7 +155,7 @@ export default function SourcingPage() {
                             <div>
                               <div className="text-sm font-medium text-text">
                                 {auction.lanes.length === 1 && auction.lanes[0]
-                                  ? `${auction.lanes[0].laneDetails.origin.city} → ${auction.lanes[0].laneDetails.destination.city}`
+                                  ? formatLaneDisplay(auction.lanes[0].laneDetails.origin.city, auction.lanes[0].laneDetails.destination.city)
                                   : `${auction.lanes.length} lanes`}
                               </div>
                               <div className="mt-1 text-xs text-gray-500">{auction.lanes.length === 1 ? 'Single lane' : 'Multi-lane auction'}</div>

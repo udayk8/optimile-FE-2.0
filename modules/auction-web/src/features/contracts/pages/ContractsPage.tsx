@@ -10,6 +10,7 @@ import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
 import { formatDate } from '@auction/lib/date-utils'
 import { fetchContract, fetchContracts, terminateContract } from '@auction/lib/mock-services'
+import { getContractSourceLabel, getRateTypeLabel } from '@shared-utils'
 import type { Contract } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 
@@ -34,6 +35,19 @@ export default function ContractsPage() {
   const [page, setPage] = useState(1)
   const activeTab = normalizeTab(searchParams.get('tab'))
 
+  // refreshKey bumps when the shared auction store changes (e.g. a winner is
+  // finalized in another tab/module), so the registry refetches automatically.
+  const [refreshKey, setRefreshKey] = useState(0)
+  useEffect(() => {
+    const bump = () => setRefreshKey((v) => v + 1)
+    window.addEventListener('optimile-auction-store', bump)
+    window.addEventListener('storage', bump)
+    return () => {
+      window.removeEventListener('optimile-auction-store', bump)
+      window.removeEventListener('storage', bump)
+    }
+  }, [])
+
   useEffect(() => {
     setLoading(true)
     fetchContracts({
@@ -43,7 +57,7 @@ export default function ContractsPage() {
       .then(setContracts)
       .catch(() => setContracts([]))
       .finally(() => setLoading(false))
-  }, [activeTab, search])
+  }, [activeTab, search, refreshKey])
 
   useEffect(() => {
     if (!selectedContractId) {
@@ -104,7 +118,21 @@ export default function ContractsPage() {
         header: 'Rate',
         render: (contract) => (
           <span className="text-sm text-[#0F172A]">
-            <CurrencyDisplay amount={contract.contractedRate} /> / {contract.rateUnit.replace('PER_', '').replace('_', ' ')}
+            <CurrencyDisplay amount={contract.contractedRate} />
+          </span>
+        ),
+      },
+      {
+        key: 'rateType',
+        header: 'Rate Type',
+        render: (contract) => <span className="text-sm text-[#0F172A]">{getRateTypeLabel(contract.rateUnit)}</span>,
+      },
+      {
+        key: 'source',
+        header: 'Source',
+        render: (contract) => (
+          <span className="inline-block rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
+            {getContractSourceLabel(contract.createdFrom ?? 'AUCTION_WIN')}
           </span>
         ),
       },
@@ -166,7 +194,7 @@ export default function ContractsPage() {
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Rate</p>
                   <p className="mt-2 text-sm font-semibold text-[#0F172A]">
-                    <CurrencyDisplay amount={selectedContract.contractedRate} /> / {selectedContract.rateUnit.replace('PER_', '').replace('_', ' ')}
+                    <CurrencyDisplay amount={selectedContract.contractedRate} /> · {getRateTypeLabel(selectedContract.rateUnit)}
                   </p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">

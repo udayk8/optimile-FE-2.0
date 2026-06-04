@@ -175,12 +175,16 @@ export interface AuctionBid {
 // ==================== CONTRACT TYPES ====================
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED'
 
+/** MANUAL_UPLOAD = uploaded by tenant admin; AUCTION_WIN = produced by an auction award. */
+export type ContractSource = 'MANUAL_UPLOAD' | 'AUCTION_WIN'
+
 export interface Contract {
   id: string
-  customerName: string
-  customerGSTIN: string
+  /** AAA-BBB lane code (e.g. MUM-BLR); laneDetails carries the display fallback. */
+  laneCode?: string
   laneDetails: LaneDetails
   rateCard: RateCardEntry[]
+  source: ContractSource
   volumeAllocation: { volume: number; unit: string; frequency: string }
   paymentTerms: { creditPeriodDays: number; billingCycle: string }
   slaClauses: { name: string; valueHours: number; description: string }[]
@@ -197,7 +201,7 @@ export interface Contract {
 
 export interface RateCardEntry {
   vehicleType: string
-  rateType: 'PER_TRIP' | 'PER_KM'
+  rateType: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   rate: number
   surcharges: { name: string; amount: number }[]
 }

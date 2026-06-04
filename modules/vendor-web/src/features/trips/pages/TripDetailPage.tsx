@@ -92,9 +92,7 @@ export default function TripDetailPage() {
   const detail: VendorBookingDetail | null = bridgeDetail ?? (() => {
     if (!booking) return null
     const lane = booking.laneDetails
-    const contract = contracts.find((c) => c.id === booking.contractId)
-    const customerName =
-      contract?.customerName ?? indent?.contractReference.split('/').pop()?.trim() ?? 'Customer'
+    const customerName = indent?.contractReference.split('/').pop()?.trim() ?? 'Customer'
     // Same party shape the bridge resolves from shared customer addresses.
     const party = (point: typeof lane.origin) =>
       MOCK_BOOKING_PARTIES[point.city] ?? {
