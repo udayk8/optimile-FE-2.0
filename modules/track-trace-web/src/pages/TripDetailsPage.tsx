@@ -72,11 +72,14 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
     return () => { active = false }
   }, [trip?.origin, trip?.destination]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // TD1: open (non-Resolved) alerts for this trip
-  const tripAlerts = useMemo(
-    () => alerts.filter((a) => a.tripId === tripId && a.status !== 'Resolved'),
-    [alerts, tripId],
-  )
+  // TD1: open (non-Resolved) alerts for this trip, ordered by severity
+  // (Critical → High → Medium → Low) regardless of when each was received.
+  const tripAlerts = useMemo(() => {
+    const severityRank: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 }
+    return alerts
+      .filter((a) => a.tripId === tripId && a.status !== 'Resolved')
+      .sort((a, b) => (severityRank[a.severity] ?? 99) - (severityRank[b.severity] ?? 99))
+  }, [alerts, tripId])
 
   // TD2: geofence zones linked to this trip
   const tripGeofences = useMemo(
@@ -224,10 +227,27 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
       {/* TD1: Open alerts */}
       {tripAlerts.length > 0 && (
         <div className="rounded-xl border border-danger/30 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <p className="text-[13px] font-semibold text-text">
-              {tripAlerts.length} open alert{tripAlerts.length !== 1 ? 's' : ''}
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+            {/* LIVE severity-count strip */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide text-success">
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                Live
+              </span>
+              {([
+                { label: 'Critical', count: tripAlerts.filter((a) => a.severity === 'Critical').length, on: 'bg-red-600 text-white',    off: 'bg-gray-100 text-gray-400' },
+                { label: 'High',     count: tripAlerts.filter((a) => a.severity === 'High').length,     on: 'bg-orange-500 text-white', off: 'bg-gray-100 text-gray-400' },
+                { label: 'Medium',   count: tripAlerts.filter((a) => a.severity === 'Medium').length,   on: 'bg-amber-400 text-white',  off: 'bg-gray-100 text-gray-400' },
+                { label: 'Low',      count: tripAlerts.filter((a) => a.severity === 'Low').length,       on: 'bg-blue-500 text-white',   off: 'bg-gray-100 text-gray-400' },
+              ] as const).map(({ label, count, on, off }) => (
+                <span
+                  key={label}
+                  className={`rounded-full px-3 py-1 text-[12px] font-bold ${count > 0 ? on : off}`}
+                >
+                  {count} {label}
+                </span>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => navigate(scopedPath('/alerts') + '?tripId=' + encodeURIComponent(tripId))}
@@ -304,8 +324,8 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Details */}
-        <div className="lg:col-span-1 space-y-6">
+        {/* Left Column: Details — fills the row height to match the Route Map card */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
             {/* Route Card */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
                 <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -437,6 +457,52 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                     </div>
                 </div>
             </div>
+
+            {/* Live Status Card — fills the remaining left-column height with useful, real-time facts */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 flex flex-1 flex-col">
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <span className={`mr-2 h-2.5 w-2.5 rounded-full ${trackingTrip && !trackingTrip.isOffline ? 'bg-success animate-pulse' : 'bg-gray-300'}`} />
+                    Live Status
+                </h3>
+                {trackingTrip ? (
+                    <dl className="space-y-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                            <dt className="text-gray-500">Current location</dt>
+                            <dd className="text-right font-medium text-gray-900">{trackingTrip.lastLocationLabel || '—'}</dd>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                            <dt className="text-gray-500">Last update</dt>
+                            <dd className="text-right font-medium text-gray-900">{pingAgo(trackingTrip.lastUpdatedAt)} ago</dd>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                            <dt className="text-gray-500">Delay</dt>
+                            <dd className={`text-right font-semibold ${trackingTrip.delayMinutes > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                {trackingTrip.delayMinutes > 0 ? `+${trackingTrip.delayMinutes} min` : 'On time'}
+                            </dd>
+                        </div>
+                        {trackingTrip.delayReason && (
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-gray-500">Reason</dt>
+                                <dd className="text-right font-medium text-gray-900">{trackingTrip.delayReason}</dd>
+                            </div>
+                        )}
+                        {trackingTrip.customerName && (
+                            <div className="flex items-start justify-between gap-3">
+                                <dt className="text-gray-500">Customer</dt>
+                                <dd className="text-right font-medium text-gray-900">{trackingTrip.customerName}</dd>
+                            </div>
+                        )}
+                        <div className="flex items-start justify-between gap-3">
+                            <dt className="text-gray-500">Distance left</dt>
+                            <dd className="text-right font-medium text-gray-900">{trackingTrip.remainingDistanceKm.toLocaleString()} km</dd>
+                        </div>
+                    </dl>
+                ) : (
+                    <div className="flex flex-1 items-center justify-center rounded-lg bg-gray-50 p-6 text-center">
+                        <p className="text-sm text-gray-400">Live tracking will appear here once the trip is dispatched.</p>
+                    </div>
+                )}
+            </div>
         </div>
 
         {/* Right Column: Map */}
@@ -482,7 +548,7 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                     )}
                 </div>
 
-                <div className="relative flex-1 min-h-0">
+                <div className="relative flex-1 min-h-0 overflow-hidden">
                     {!GOOGLE_MAPS_API_KEY ? (
                         <div className="flex h-full items-center justify-center bg-gray-50 p-6 text-center">
                             <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8">
@@ -491,11 +557,20 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                             </div>
                         </div>
                     ) : (
+                        // Scale the embed down so Google's origin/destination panel renders
+                        // small/unobtrusive; the iframe is enlarged + clipped so the map still
+                        // fills the card.
                         <iframe
                             title="Trip Route"
-                            width="100%"
-                            height="100%"
-                            style={{ border: 0, display: 'block', minHeight: '350px' }}
+                            style={{
+                                border: 0,
+                                display: 'block',
+                                width: '153.85%',
+                                height: '153.85%',
+                                transform: 'scale(0.65)',
+                                transformOrigin: '0 0',
+                                minHeight: '538px',
+                            }}
                             src={`https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${encodeURIComponent(trip.origin)}&destination=${encodeURIComponent(trip.destination)}&mode=driving`}
                             allowFullscreen
                             loading="lazy"
