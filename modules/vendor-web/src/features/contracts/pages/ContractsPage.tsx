@@ -79,53 +79,52 @@ export default function ContractsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Same outlined-grid look as Tenant Admin → View Contracts. */}
             <table className="w-full min-w-[1100px] text-left">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+              <thead className="text-gray-500">
                 <tr>
-                  <th className="px-5 py-3 font-bold">Contract</th>
-                  <th className="px-5 py-3 font-bold">Lane</th>
-                  <th className="px-5 py-3 font-bold">Vehicle Type</th>
-                  <th className="px-5 py-3 font-bold">Rate</th>
-                  <th className="px-5 py-3 font-bold">Rate Type</th>
-                  <th className="px-5 py-3 font-bold">Volume</th>
-                  <th className="px-5 py-3 font-bold">Start Date</th>
-                  <th className="px-5 py-3 font-bold">End Date</th>
-                  <th className="px-5 py-3 font-bold">Source</th>
-                  <th className="px-5 py-3 font-bold">Status</th>
+                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Start Date', 'End Date', 'Source', 'Status'].map((header) => (
+                    <th
+                      key={header}
+                      className="border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] last:border-r-0"
+                    >
+                      {header}
+                    </th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {pagedContracts.map((contract) => (
+              <tbody>
+                {pagedContracts.map((contract, index) => (
                   <tr
                   key={contract.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className={`cursor-pointer border-t border-gray-200 transition-colors hover:bg-blue-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}
                   onClick={() => navigate(`/vendor/contracts/${contract.id}`)}
                 >
-                  <td className="px-5 py-4 font-mono text-sm font-semibold text-text">{contract.id}</td>
-                  <td className="px-5 py-4">
+                  <td className="border-r border-gray-200 px-4 py-3 font-mono text-sm font-semibold text-text">{contract.id}</td>
+                  <td className="border-r border-gray-200 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-text">
                       <MapPin className="h-3.5 w-3.5 text-gray-400" />
                       <span className={contract.laneCode ? 'font-mono font-semibold' : ''}>{laneLabel(contract)}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-sm text-text">{contract.rateCard[0]?.vehicleType ?? '—'}</td>
-                  <td className="px-5 py-4 text-sm text-text">
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{contract.rateCard[0]?.vehicleType ?? '—'}</td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
                     <span className="font-mono">₹{contract.rateCard[0]?.rate?.toLocaleString('en-IN')}</span>
                   </td>
-                  <td className="px-5 py-4 text-sm text-text">{getRateTypeLabel(contract.rateCard[0]?.rateType ?? '')}</td>
-                  <td className="px-5 py-4 text-sm text-text">
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{getRateTypeLabel(contract.rateCard[0]?.rateType ?? '')}</td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
                     {contract.volumeAllocation.unit === '%'
                       ? `${contract.volumeAllocation.volume}%`
                       : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
                   </td>
-                  <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityFrom)}</td>
-                  <td className="px-5 py-4 text-sm text-text">{formatDate(contract.validityTo)}</td>
-                  <td className="px-5 py-4">
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityFrom)}</td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityTo)}</td>
+                  <td className="border-r border-gray-200 px-4 py-3">
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${contract.source === 'AUCTION_WIN' ? 'bg-violet-50 text-violet-700' : 'bg-sky-50 text-sky-700'}`}>
                       {getContractSourceLabel(contract.source)}
                     </span>
                   </td>
-                  <td className="px-5 py-4"><StatusBadge status={contract.status} /></td>
+                  <td className="px-4 py-3"><StatusBadge status={contract.status} /></td>
                   </tr>
                 ))}
               </tbody>
