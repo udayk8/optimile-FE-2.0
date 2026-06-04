@@ -19,22 +19,27 @@ import type {
   Vehicle as VendorVehicle,
 } from "@vendor/types";
 
-// ── Booking status → Vendor Portal bucket ────────────────────────────────────
+// ── Booking status → Vendor Portal trip status ───────────────────────────────
 // A booking carries a vendor only from VEHICLE_ASSIGNED onward (assignment time).
-const INDENT_STATUSES = new Set<string>(["VEHICLE_ASSIGNED", "ACCEPTED", "ASSIGNED"]);
-const ACTIVE_STATUSES = new Set<string>([
-  "LOADING_STARTED",
-  "LOADING_COMPLETED",
-  "LOADING",
-  "LOADED",
-  "DOCUMENT_PENDING",
-  "DOCUMENT_COMPLETED",
-  "READY_FOR_DISPATCH",
-  "DISPATCHED",
-  "IN_TRANSIT",
-  "ARRIVED",
-  "DELAYED",
-]);
+// Granular map so the vendor sees the booking walk through Assigned → Loading →
+// In Transit → Destination instead of jumping straight to IN_TRANSIT.
+const VENDOR_TRIP_STATUS: Record<string, VendorTrip["status"]> = {
+  VEHICLE_ASSIGNED: "ASSIGNED",
+  ASSIGNED: "ASSIGNED",
+  LOADING_STARTED: "LOADING_STARTED",
+  LOADING: "LOADING_STARTED",
+  LOADING_COMPLETED: "LOADING_COMPLETED",
+  LOADED: "LOADING_COMPLETED",
+  // Vendor portal has no document states — keep these in the assignment bucket
+  // until dispatch.
+  DOCUMENT_PENDING: "LOADING_COMPLETED",
+  DOCUMENT_COMPLETED: "LOADING_COMPLETED",
+  READY_FOR_DISPATCH: "LOADING_COMPLETED",
+  DISPATCHED: "IN_TRANSIT",
+  IN_TRANSIT: "IN_TRANSIT",
+  DELAYED: "IN_TRANSIT",
+  ARRIVED: "DESTINATION_REACHED",
+};
 const COMPLETED_STATUSES = new Set<string>(["COMPLETED", "INVOICED", "PAID"]);
 
 const FUEL_MAP: Record<string, VehicleFuelType> = {
@@ -226,8 +231,8 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       else if (status === "POD_PENDING") bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "POD_PENDING"));
       else if (COMPLETED_STATUSES.has(status)) bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "COMPLETED"));
       else if (status === "CANCELLED") bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "CANCELLED"));
-      else if (status === "VEHICLE_ASSIGNED" || ACTIVE_STATUSES.has(status))
-        bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "IN_TRANSIT"));
+      else if (VENDOR_TRIP_STATUS[status])
+        bookingTrips.push(toVendorTrip(booking, vtLabel(booking), VENDOR_TRIP_STATUS[status]));
     }
 
     const findMyPendingIndent = (bookingRef: string) =>
@@ -255,11 +260,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       }
     };
 
-    const assignVehicle = (bookingRef: string, vehicleId: string, driverId: string) => {
-      const booking = tenantBookings.find((b) => b.bookingId === bookingRef || b.id === bookingRef);
-      const vehicle = tenantVehicles.find((v) => v.id === vehicleId);
-      const driver = tenantDrivers.find((d) => d.id === driverId);
-      if (!booking || !vehicle || !driver) return;
+    const doAssign = (booking: BookingRecord, vehicle: TenantVehicle, driver: TenantDriver) => {
       // Vendor assignment is ALWAYS Auto LR, generated from the booking owner's
       // place (captured on the winning indent at send time). The vendor never
       // chooses an LR mode/number or touches internal LR inventory.
@@ -281,6 +282,42 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
           lrType: "AUTO",
           orgUnitId: lrPlaceId,
         });
+      } catch (error) {
+        window.alert((error as Error).message);
+      }
+    };
+
+    const assignVehicle = (bookingRef: string, vehicleId: string, driverId: string) => {
+      const booking = tenantBookings.find((b) => b.bookingId === bookingRef || b.id === bookingRef);
+      const vehicle = tenantVehicles.find((v) => v.id === vehicleId);
+      const driver = tenantDrivers.find((d) => d.id === driverId);
+      if (!booking || !vehicle || !driver) return;
+      doAssign(booking, vehicle, driver);
+    };
+
+    // Like assignVehicle, but takes the full vendor-shaped vehicle/driver so a
+    // local demo (mock) pick — whose id doesn't exist in tenant master data —
+    // gets auto-onboarded to the tenant first, then assigned.
+    const assignVehicleResolved = (
+      bookingRef: string,
+      vendorVehicle: VendorVehicle,
+      vendorDriver: VendorDriver,
+    ) => {
+      const booking = tenantBookings.find((b) => b.bookingId === bookingRef || b.id === bookingRef);
+      if (!booking) return;
+      try {
+        const vehicle =
+          tenantVehicles.find((v) => v.id === vendorVehicle.id) ??
+          tenantVehicles.find((v) => v.registrationNumber === vendorVehicle.registrationNumber) ??
+          createTenantVehicle({
+            tenantId,
+            ...toTenantVehicleInput(vendorVehicle, resolveTypeId(vendorVehicle.vehicleType), vendorId, vendorName),
+          });
+        const driver =
+          tenantDrivers.find((d) => d.id === vendorDriver.id) ??
+          tenantDrivers.find((d) => d.licenseNumber && d.licenseNumber === vendorDriver.licenseNumber) ??
+          createTenantDriver({ tenantId, ...toTenantDriverInput(vendorDriver, vendorId, vendorName) });
+        doAssign(booking, vehicle, driver);
       } catch (error) {
         window.alert((error as Error).message);
       }
@@ -351,6 +388,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       acceptBooking,
       declineBooking,
       assignVehicle,
+      assignVehicleResolved,
       getBookingDetail,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

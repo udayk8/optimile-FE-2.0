@@ -27,17 +27,18 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
 
   const handleAssign = () => {
     if (!selectedVehicle || !selectedDriver) return
+    const vehicle = vehicles.find((v) => v.id === selectedVehicle)
+    const driver = drivers.find((d) => d.id === selectedDriver)
+    if (!vehicle || !driver) return
     const isMockTrip = mockTrips.some((t) => t.id === tripId)
     if (isMockTrip) {
       // Object-based assign so a real (bridge) vehicle/driver — whose id isn't in
       // the local store — can still be attached to a demo trip.
-      const vehicle = vehicles.find((v) => v.id === selectedVehicle)
-      const driver = drivers.find((d) => d.id === selectedDriver)
-      if (!vehicle || !driver) return
       assignResolved(tripId, vehicle, driver)
     } else {
-      // Real booking → persist through the bridge (needs a real tenant vehicle).
-      bridge?.assignVehicle(tripId, selectedVehicle, selectedDriver)
+      // Real booking → persist through the bridge. Object-based so a local demo
+      // vehicle/driver gets auto-onboarded to the tenant before assignment.
+      bridge?.assignVehicleResolved(tripId, vehicle, driver)
     }
     onClose()
   }

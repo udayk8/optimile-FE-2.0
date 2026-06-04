@@ -79,6 +79,12 @@ export interface TenantDataBridge {
   declineBooking: (bookingId: string) => void
   /** Vendor assigns a vehicle+driver to an accepted booking. */
   assignVehicle: (bookingId: string, vehicleId: string, driverId: string) => void
+  /**
+   * Like assignVehicle but takes the full vendor-shaped records, so a local
+   * demo vehicle/driver (not yet in tenant master data) is auto-onboarded to
+   * the tenant before assignment.
+   */
+  assignVehicleResolved: (bookingId: string, vehicle: Vehicle, driver: Driver) => void
   /** Full booking detail (consignor/consignee, documents, LR) for the detail page. */
   getBookingDetail: (bookingRef: string) => VendorBookingDetail | null
 }

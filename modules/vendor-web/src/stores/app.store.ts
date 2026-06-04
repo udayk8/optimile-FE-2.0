@@ -367,7 +367,8 @@ export const useAppStore = create<AppState>((set) => ({
       updatedIndents[indentIndex] = { ...indent, status: 'ACCEPTED' }
 
       const newTrip: Trip = {
-        id: `TRP-${Math.floor(1000 + Math.random() * 9000)}`,
+        // Same booking ref carries through the lifecycle, like cross-module bookings.
+        id: indent.id,
         contractId: indent.contractId,
         indentId: indent.id,
         laneDetails: indent.laneDetails,

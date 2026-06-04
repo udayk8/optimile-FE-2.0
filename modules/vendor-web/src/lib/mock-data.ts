@@ -29,9 +29,9 @@ export const MOCK_DASHBOARD: DashboardData = {
   pendingIndents: {
     count: 3,
     items: [
-      { id: 'IND-001', contractId: 'CNT-001', lane: 'Mumbai → Delhi', vehicleType: '20ft Container', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
-      { id: 'IND-002', contractId: 'CNT-002', lane: 'Pune → Chennai', vehicleType: 'Flatbed', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
-      { id: 'IND-003', contractId: 'CNT-001', lane: 'Delhi → Jaipur', vehicleType: 'LCV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1001', contractId: 'CNT-001', lane: 'Bengaluru → Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1002', contractId: 'CNT-002', lane: 'Bengaluru → Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1003', contractId: 'CNT-001', lane: 'Bengaluru → Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
     ],
   },
   uninvoicedBookings: { count: 4, totalBillableAmount: 285000 },
@@ -40,28 +40,28 @@ export const MOCK_DASHBOARD: DashboardData = {
 
 export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1',  type: 'ONBOARDING', title: 'Complete vendor setup',       message: 'Your profile is 45% complete. Review bank details and finish company information.', deepLink: '/vendor/profile/company',              isRead: false, createdAt: new Date(Date.now() - 2   * 60  * 1000).toISOString() },
-  { id: 'n2',  type: 'TRIPS',      title: 'New Booking Request',         message: 'Indent IND-001 for Mumbai → Delhi',                                                  deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 10  * 60  * 1000).toISOString() },
+  { id: 'n2',  type: 'TRIPS',      title: 'New Booking Request',         message: 'Indent BKG-2026-1001 for Bengaluru → Chandausi',                                                  deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 10  * 60  * 1000).toISOString() },
   { id: 'n3',  type: 'SOURCING',   title: 'Auction Going Live',          message: 'Reverse Auction AUC-012 starts in 30 min',                                           deepLink: '/vendor/sourcing/auctions/AUC-012',    isRead: false, createdAt: new Date(Date.now() - 30  * 60  * 1000).toISOString() },
-  { id: 'n4',  type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense bundle ₹5,500 added for TRP-043',                                            deepLink: '/vendor/bookings/completed/TRP-043',  isRead: false, createdAt: new Date(Date.now() - 60  * 60  * 1000).toISOString() },
+  { id: 'n4',  type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense bundle ₹5,500 added for BKG-2026-1043',                                            deepLink: '/vendor/bookings/completed/BKG-2026-1043',  isRead: false, createdAt: new Date(Date.now() - 60  * 60  * 1000).toISOString() },
   { id: 'n5',  type: 'INVOICES',   title: 'Payment Received',            message: '₹1,45,000 credited for INV-2026-028',                                                deepLink: '/vendor/invoices/INV-2026-028',        isRead: true,  createdAt: new Date(Date.now() - 2   * 3600 * 1000).toISOString() },
   { id: 'n6',  type: 'CONTRACTS',  title: 'Contract Updated',            message: 'Contract CNT-001 rate card and SLA details were updated',                            deepLink: '/vendor/contracts/CNT-001',            isRead: false, createdAt: new Date(Date.now() - 3   * 3600 * 1000).toISOString() },
   { id: 'n7',  type: 'INVOICES',   title: 'Invoice Rejected',            message: 'Invoice INV-2026-026 was rejected. Raise a dispute if you disagree.',                deepLink: '/vendor/invoices/INV-2026-026',        isRead: false, createdAt: new Date(Date.now() - 5   * 3600 * 1000).toISOString() },
-  { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip TRP-051 (Mumbai → Pune)',                       deepLink: '/vendor/bookings/completed/TRP-051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
+  { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip BKG-2026-1051 (Bengaluru → Hyderabad)',                       deepLink: '/vendor/bookings/completed/BKG-2026-1051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
   { id: 'n9',  type: 'SOURCING',   title: 'Auction Awarded',             message: 'You won R1 allocation on AUC-009 – Mumbai → Nashik lane',                           deepLink: '/vendor/sourcing',                    isRead: true,  createdAt: new Date(Date.now() - 12  * 3600 * 1000).toISOString() },
-  { id: 'n10', type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense ₹850 added for TRP-048',                                                     deepLink: '/vendor/bookings/completed/TRP-048',  isRead: false, createdAt: new Date(Date.now() - 24  * 3600 * 1000).toISOString() },
+  { id: 'n10', type: 'EXPENSES',   title: 'Expense Added',               message: 'Expense ₹850 added for BKG-2026-1048',                                                     deepLink: '/vendor/bookings/completed/BKG-2026-1048',  isRead: false, createdAt: new Date(Date.now() - 24  * 3600 * 1000).toISOString() },
   { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-007 for Delhi → Jaipur is ready for review',                     deepLink: '/vendor/contracts',                   isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
   { id: 'n12', type: 'INVOICES',   title: 'Invoice Approved',            message: 'Invoice INV-2026-024 approved. Payment due in 15 days.',                            deepLink: '/vendor/invoices/INV-2026-024',        isRead: true,  createdAt: new Date(Date.now() - 48  * 3600 * 1000).toISOString() },
-  { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent IND-008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
+  { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent BKG-2026-1008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
   { id: 'n14', type: 'ONBOARDING', title: 'Document Verification Done',  message: 'Your GST and PAN documents have been verified successfully.',                       deepLink: '/vendor/profile/company',              isRead: true,  createdAt: new Date(Date.now() - 5   * 86400 * 1000).toISOString() },
 ]
 
 export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
   {
     id: 'EXC-2048',
-    bookingId: 'TRP-045',
-    route: 'Mumbai → Satara',
-    vehicle: 'MH-12-AB-4421',
-    driver: 'Suresh Yadav',
+    bookingId: 'BKG-2026-1045',
+    route: 'Bengaluru → Chandausi',
+    vehicle: 'KA01JK1234',
+    driver: 'Kartik Pawar',
     issueType: 'Breakdown',
     severity: 'CRITICAL',
     status: 'OPEN',
@@ -76,10 +76,10 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
   },
   {
     id: 'EXC-1982',
-    bookingId: 'TRP-043',
-    route: 'Pune → Chennai',
-    vehicle: 'MH-14-KK-1007',
-    driver: 'Manoj Sharma',
+    bookingId: 'BKG-2026-1043',
+    route: 'Bengaluru → Hyderabad',
+    vehicle: 'KA01JK1234',
+    driver: 'Kartik Pawar',
     issueType: 'Delay',
     severity: 'HIGH',
     status: 'ACKNOWLEDGED',
@@ -95,10 +95,10 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
   },
   {
     id: 'EXC-2011',
-    bookingId: 'TRP-047',
-    route: 'Delhi → Jaipur',
-    vehicle: 'RJ-14-TR-7788',
-    driver: 'Ramesh Singh',
+    bookingId: 'BKG-2026-1047',
+    route: 'Bengaluru → Chennai',
+    vehicle: 'KA01JK1234',
+    driver: 'Kartik Pawar',
     issueType: 'Route deviation',
     severity: 'MEDIUM',
     status: 'IN_PROGRESS',
@@ -115,10 +115,10 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
   },
   {
     id: 'EXC-1934',
-    bookingId: 'TRP-041',
-    route: 'Nashik → Bangalore',
-    vehicle: 'KA-01-MN-5454',
-    driver: 'Sandeep Patil',
+    bookingId: 'BKG-2026-1041',
+    route: 'Bengaluru → Mysuru',
+    vehicle: 'KA01JK1234',
+    driver: 'Kartik Pawar',
     issueType: 'Accident',
     severity: 'CRITICAL',
     status: 'RESOLVED',
@@ -136,10 +136,10 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
   },
   {
     id: 'EXC-1888',
-    bookingId: 'TRP-039',
-    route: 'Kolkata → Guwahati',
-    vehicle: 'WB-02-PT-2201',
-    driver: 'Imran Ali',
+    bookingId: 'BKG-2026-1039',
+    route: 'Bengaluru → Hubballi',
+    vehicle: 'KA01JK1234',
+    driver: 'Kartik Pawar',
     issueType: 'Delay',
     severity: 'HIGH',
     status: 'CLOSED',
@@ -306,9 +306,9 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
-    id: 'CNT-001', customerName: 'Hindustan Unilever', customerGSTIN: '27AABCU9603R1ZM', status: 'ACTIVE',
+    id: 'CNT-001', customerName: 'Kanodia Cements', customerGSTIN: '27AABCU9603R1ZM', status: 'ACTIVE',
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
-    rateCard: [{ vehicleType: '20ft Container', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
     slaClauses: [{ name: 'Placement SLA', valueHours: 4, description: 'Vehicle must report within 4 hours of acceptance' }],
@@ -319,7 +319,7 @@ export const MOCK_CONTRACTS: Contract[] = [
   {
     id: 'CNT-005', customerName: 'Tata Steel Ltd.', customerGSTIN: '20AABCT1234D1ZP', status: 'DRAFT',
     laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
-    rateCard: [{ vehicleType: 'Flatbed', rateType: 'PER_TRIP', rate: 28000, surcharges: [] }],
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 28000, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 45, billingCycle: 'MONTHLY' },
     slaClauses: [{ name: 'Placement SLA', valueHours: 6, description: 'Vehicle must report within 6 hours' }],
@@ -330,7 +330,7 @@ export const MOCK_CONTRACTS: Contract[] = [
   {
     id: 'CNT-003', customerName: 'Godrej Consumer', customerGSTIN: '27AABCU9603R1ZA', status: 'EXPIRED',
     laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
-    rateCard: [{ vehicleType: 'LCV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
     slaClauses: [], penaltyClauses: [],
@@ -339,41 +339,57 @@ export const MOCK_CONTRACTS: Contract[] = [
   },
 ]
 
+// Consignor/consignee parties for mock bookings — same shape the cross-module
+// bridge resolves from shared customer addresses (name, full address, contact, phone).
+export const MOCK_BOOKING_PARTIES: Record<string, { name: string; address: string; contact: string; phone: string }> = {
+  Bengaluru:  { name: 'Umesh', address: 'GM Palya, CV Raman Nagar, Bengaluru, Karnataka, 560093', contact: 'Umesh Rao', phone: '9886011223' },
+  Chandausi:  { name: 'Rajeev Kanodia', address: 'Kanodia Cement Depot, GT Road, Chandausi, Uttar Pradesh, 244412', contact: 'Rajeev Kanodia', phone: '9812345670' },
+  Hyderabad:  { name: 'Srinivas', address: 'Plot 14, IDA Uppal, Hyderabad, Telangana, 500039', contact: 'Srinivas Reddy', phone: '9849022113' },
+  Chennai:    { name: 'Murugan', address: 'No 8, SIDCO Industrial Estate, Ambattur, Chennai, Tamil Nadu, 600098', contact: 'Murugan S', phone: '9841155667' },
+  Mysuru:     { name: 'Prakash', address: 'Hebbal Industrial Area, Mysuru, Karnataka, 570016', contact: 'Prakash K', phone: '9886544332' },
+  Hubballi:   { name: 'Basavaraj', address: 'Gokul Road Industrial Estate, Hubballi, Karnataka, 580030', contact: 'Basavaraj H', phone: '9845098450' },
+  Tumakuru:   { name: 'Manjunath', address: 'Antharasanahalli Industrial Area, Tumakuru, Karnataka, 572106', contact: 'Manjunath T', phone: '9900887766' },
+  Salem:      { name: 'Kumar', address: 'SIDCO Industrial Estate, Salem, Tamil Nadu, 636004', contact: 'Kumar V', phone: '9842233445' },
+  Pune:       { name: 'Deshpande', address: 'Bhosari MIDC, Pune, Maharashtra, 411026', contact: 'A. Deshpande', phone: '9822011223' },
+  Vijayawada: { name: 'Venkat', address: 'Auto Nagar, Vijayawada, Andhra Pradesh, 520007', contact: 'Venkata Rao', phone: '9848012345' },
+  Mangaluru:  { name: 'Suresh Shetty', address: 'Baikampady Industrial Area, Mangaluru, Karnataka, 575011', contact: 'Suresh Shetty', phone: '9845677889' },
+}
+
 export const MOCK_INDENTS: Indent[] = [
   {
-    id: 'IND-001', contractId: 'CNT-001', contractReference: 'CNT-001 / HUL', status: 'PENDING',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
-    loadDetails: { commodity: 'FMCG Goods', weightKg: 18000, volumeCbm: 32 },
-    vehicleTypeRequired: '20ft Container', reportingDateTime: '2026-04-26T06:00:00Z',
+    id: 'BKG-2026-1001', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'PENDING',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chandausi', city: 'Chandausi', state: '' }, distanceKm: 1980 },
+    loadDetails: { commodity: 'Cargo', weightKg: 18000, volumeCbm: 32 },
+    vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-26T06:00:00Z',
     slaDeadline: new Date(Date.now() + 3600000).toISOString(), createdAt: new Date(Date.now() - 1800000).toISOString(),
   },
   {
-    id: 'IND-002', contractId: 'CNT-002', contractReference: 'CNT-002 / RELIANCE', status: 'PENDING',
-    laneDetails: { origin: { name: 'Pune Plant', city: 'Pune', state: 'Maharashtra' }, destination: { name: 'Chennai DC', city: 'Chennai', state: 'Tamil Nadu' }, distanceKm: 1200 },
-    loadDetails: { commodity: 'Electronics', weightKg: 12000, volumeCbm: 40 },
-    vehicleTypeRequired: 'Flatbed', reportingDateTime: '2026-04-27T08:00:00Z',
+    id: 'BKG-2026-1002', contractId: 'CNT-002', contractReference: 'Shree Cements', status: 'PENDING',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
+    loadDetails: { commodity: 'Cargo', weightKg: 12000, volumeCbm: 40 },
+    vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-27T08:00:00Z',
     slaDeadline: new Date(Date.now() + 7200000).toISOString(), createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    id: 'IND-003', contractId: 'CNT-001', contractReference: 'CNT-001 / HUL', status: 'PENDING',
-    laneDetails: { origin: { name: 'Delhi Warehouse', city: 'Delhi', state: 'Delhi' }, destination: { name: 'Jaipur Hub', city: 'Jaipur', state: 'Rajasthan' }, distanceKm: 280 },
-    loadDetails: { commodity: 'FMCG Goods', weightKg: 5000, volumeCbm: 15 },
-    vehicleTypeRequired: 'LCV', reportingDateTime: '2026-04-28T10:00:00Z',
+    id: 'BKG-2026-1003', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'PENDING',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    loadDetails: { commodity: 'Cargo', weightKg: 5000, volumeCbm: 15 },
+    vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-28T10:00:00Z',
     slaDeadline: new Date(Date.now() + 14400000).toISOString(), createdAt: new Date(Date.now() - 7200000).toISOString(),
   },
   {
-    id: 'IND-004', contractId: 'CNT-001', contractReference: 'CNT-001 / HUL', status: 'DECLINED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'MH' }, destination: { name: 'Nagpur', city: 'Nagpur', state: 'MH' }, distanceKm: 800 },
-    loadDetails: { commodity: 'FMCG Goods', weightKg: 10000, volumeCbm: 20 },
-    vehicleTypeRequired: '20ft Container', reportingDateTime: '2026-04-25T06:00:00Z',
+    id: 'BKG-2026-1004', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'DECLINED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mysuru', city: 'Mysuru', state: '' }, distanceKm: 145 },
+    loadDetails: { commodity: 'Cargo', weightKg: 10000, volumeCbm: 20 },
+    vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-25T06:00:00Z',
     slaDeadline: new Date(Date.now() - 3600000).toISOString(), createdAt: new Date(Date.now() - 86400000).toISOString(),
     rejectionReason: 'Vehicle availability not aligned with required dispatch window',
   },
   {
-    id: 'IND-005', contractId: 'CNT-001', contractReference: 'CNT-001 / HUL', status: 'ACCEPTED',
-    laneDetails: { origin: { name: 'Mumbai', city: 'Mumbai', state: 'MH' }, destination: { name: 'Pune', city: 'Pune', state: 'MH' }, distanceKm: 150 },
-    loadDetails: { commodity: 'Goods', weightKg: 5000, volumeCbm: 10 },
-    vehicleTypeRequired: 'LCV', reportingDateTime: '2026-04-26T12:00:00Z',
+    id: 'BKG-2026-1005', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'ACCEPTED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hubballi', city: 'Hubballi', state: '' }, distanceKm: 410 },
+    loadDetails: { commodity: 'Cargo', weightKg: 5000, volumeCbm: 10 },
+    vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-26T12:00:00Z',
     slaDeadline: new Date(Date.now() + 3600000).toISOString(), createdAt: new Date(Date.now() - 3600000).toISOString(),
     assignedVehicleId: 'VH-001',
     assignedDriverId: 'DR-001',
@@ -382,10 +398,11 @@ export const MOCK_INDENTS: Indent[] = [
 
 export const MOCK_TRIPS: Trip[] = [
   {
-    id: 'TRP-060', contractId: 'CNT-001', indentId: 'IND-110', status: 'ACCEPTED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Hyderabad Hub', city: 'Hyderabad', state: 'Telangana' }, distanceKm: 710 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1060', contractId: 'CNT-001', indentId: 'BKG-2026-1110', status: 'ACCEPTED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Tumakuru', city: 'Tumakuru', state: '' }, distanceKm: 70 },
+    // Vehicle pending — filled only when the vendor assigns, like cross-module bookings.
+    assignedVehicle: { id: '', registrationNumber: '—', type: 'MGV' },
+    assignedDriver: { id: '', name: '—', mobile: '' },
     documents: [],
     timeline: [
       { id: 'tt-60a', title: 'Accepted', description: 'Vendor accepted booking, awaiting vehicle assignment', timestamp: new Date(Date.now() - 900000).toISOString(), status: 'ACCEPTED' },
@@ -394,10 +411,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 900000).toISOString(),
   },
   {
-    id: 'TRP-050', contractId: 'CNT-001', indentId: 'IND-104', status: 'ASSIGNED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Hyderabad Hub', city: 'Hyderabad', state: 'Telangana' }, distanceKm: 710 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1050', contractId: 'CNT-001', indentId: 'BKG-2026-1104', status: 'ASSIGNED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Salem', city: 'Salem', state: '' }, distanceKm: 190 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-50a', title: 'Accepted', description: 'Vendor accepted booking', timestamp: new Date(Date.now() - 3600000).toISOString(), status: 'ACCEPTED' },
@@ -407,10 +424,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    id: 'TRP-051', contractId: 'CNT-002', indentId: 'IND-105', status: 'OUT_FOR_PICKUP',
-    laneDetails: { origin: { name: 'Pune Yard', city: 'Pune', state: 'Maharashtra' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'Gujarat' }, distanceKm: 660 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1051', contractId: 'CNT-002', indentId: 'BKG-2026-1105', status: 'OUT_FOR_PICKUP',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Pune', city: 'Pune', state: '' }, distanceKm: 840 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-51a', title: 'Assigned', description: 'Vehicle assigned', timestamp: new Date(Date.now() - 7200000).toISOString(), status: 'ASSIGNED' },
@@ -420,10 +437,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 7200000).toISOString(),
   },
   {
-    id: 'TRP-061', contractId: 'CNT-001', indentId: 'IND-111', status: 'PICKUP_REACHED',
-    laneDetails: { origin: { name: 'Nashik Yard', city: 'Nashik', state: 'Maharashtra' }, destination: { name: 'Indore DC', city: 'Indore', state: 'Madhya Pradesh' }, distanceKm: 540 },
-    assignedVehicle: { id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', type: 'LCV' },
-    assignedDriver: { id: 'DR-003', name: 'Ramesh Singh', mobile: '+91 9876500003' },
+    id: 'BKG-2026-1061', contractId: 'CNT-001', indentId: 'BKG-2026-1111', status: 'PICKUP_REACHED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Vijayawada', city: 'Vijayawada', state: '' }, distanceKm: 650 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-61a', title: 'Assigned', description: 'Vehicle assigned', timestamp: new Date(Date.now() - 14400000).toISOString(), status: 'ASSIGNED' },
@@ -434,10 +451,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
-    id: 'TRP-052', contractId: 'CNT-001', indentId: 'IND-106', status: 'LOADING_STARTED',
-    laneDetails: { origin: { name: 'Nashik Yard', city: 'Nashik', state: 'Maharashtra' }, destination: { name: 'Indore DC', city: 'Indore', state: 'Madhya Pradesh' }, distanceKm: 540 },
-    assignedVehicle: { id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', type: 'LCV' },
-    assignedDriver: { id: 'DR-003', name: 'Ramesh Singh', mobile: '+91 9876500003' },
+    id: 'BKG-2026-1052', contractId: 'CNT-001', indentId: 'BKG-2026-1106', status: 'LOADING_STARTED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mangaluru', city: 'Mangaluru', state: '' }, distanceKm: 355 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-52a', title: 'Assigned', description: 'Vehicle assigned', timestamp: new Date(Date.now() - 14400000).toISOString(), status: 'ASSIGNED' },
@@ -448,10 +465,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 14400000).toISOString(),
   },
   {
-    id: 'TRP-062', contractId: 'CNT-002', indentId: 'IND-112', status: 'LOADING_COMPLETED',
-    laneDetails: { origin: { name: 'Surat Hub', city: 'Surat', state: 'Gujarat' }, destination: { name: 'Mumbai DC', city: 'Mumbai', state: 'Maharashtra' }, distanceKm: 290 },
-    assignedVehicle: { id: 'VH-003', registrationNumber: 'GJ-01-XY-9999', type: 'Tanker' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1062', contractId: 'CNT-002', indentId: 'BKG-2026-1112', status: 'LOADING_COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chandausi', city: 'Chandausi', state: '' }, distanceKm: 1980 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-62a', title: 'Loading Started', description: 'Loading underway', timestamp: new Date(Date.now() - 10800000).toISOString(), status: 'LOADING_STARTED' },
@@ -461,10 +478,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 21600000).toISOString(),
   },
   {
-    id: 'TRP-044', contractId: 'CNT-001', indentId: 'IND-098', status: 'IN_TRANSIT',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1044', contractId: 'CNT-001', indentId: 'BKG-2026-1098', status: 'IN_TRANSIT',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-1', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-044.pdf', fileUrl: '/docs/pod-trp-044.pdf', createdAt: '2026-04-22T16:30:00Z', note: 'Awaiting driver upload' },
       { id: 'td-2', type: 'EWAY_BILL', title: 'E-way bill copy', fileName: 'ewaybill-trp-044.pdf', fileUrl: '/docs/ewaybill-trp-044.pdf', createdAt: '2026-04-22T08:30:00Z' },
@@ -477,10 +494,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
-    id: 'TRP-042', contractId: 'CNT-002', indentId: 'IND-096', status: 'IN_TRANSIT',
-    laneDetails: { origin: { name: 'Pune', city: 'Pune', state: 'MH' }, destination: { name: 'Chennai', city: 'Chennai', state: 'TN' }, distanceKm: 1200 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1042', contractId: 'CNT-002', indentId: 'BKG-2026-1096', status: 'IN_TRANSIT',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-6', type: 'EWAY_BILL', title: 'E-way bill copy', fileName: 'ewaybill-trp-042.pdf', fileUrl: '/docs/ewaybill-trp-042.pdf', createdAt: '2026-04-22T09:30:00Z' },
     ],
@@ -491,11 +508,11 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
-    id: 'TRP-045', contractId: 'CNT-002', indentId: 'IND-099', status: 'IN_TRANSIT', exceptionFlag: true,
+    id: 'BKG-2026-1045', contractId: 'CNT-002', indentId: 'BKG-2026-1099', status: 'IN_TRANSIT', exceptionFlag: true,
     disruption: { reason: 'DRIVER_BREAKDOWN', reportedAt: '2026-04-26T13:00:00Z', notes: 'Driver fell ill at unloading point; awaiting replacement.' },
-    laneDetails: { origin: { name: 'Chennai', city: 'Chennai', state: 'TN' }, destination: { name: 'Bangalore', city: 'Bangalore', state: 'KA' }, distanceKm: 350 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mysuru', city: 'Mysuru', state: '' }, distanceKm: 145 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-9', type: 'REMARKS', title: 'Remarks', fileName: 'remarks-trp-045.json', fileUrl: '/docs/remarks-trp-045.json', createdAt: '2026-04-26T11:00:00Z', note: 'Exception report available' },
     ],
@@ -506,11 +523,11 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
-    id: 'TRP-048', contractId: 'CNT-002', indentId: 'IND-102', status: 'IN_TRANSIT', exceptionFlag: true,
+    id: 'BKG-2026-1048', contractId: 'CNT-002', indentId: 'BKG-2026-1102', status: 'IN_TRANSIT', exceptionFlag: true,
     disruption: { reason: 'VEHICLE_BREAKDOWN', reportedAt: '2026-04-27T12:00:00Z', notes: 'Engine failure 60km before destination — vehicle replacement required.' },
-    laneDetails: { origin: { name: 'Chennai Port', city: 'Chennai', state: 'Tamil Nadu' }, destination: { name: 'Bangalore Hub', city: 'Bangalore', state: 'Karnataka' }, distanceKm: 350 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hubballi', city: 'Hubballi', state: '' }, distanceKm: 410 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-13', type: 'REMARKS', title: 'Disruption remarks', fileName: 'disrupted-trp-048.json', fileUrl: '/docs/disrupted-trp-048.json', createdAt: '2026-04-27T12:00:00Z', note: 'Route disruption due to road closure' },
     ],
@@ -521,11 +538,11 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-26T08:00:00Z',
   },
   {
-    id: 'TRP-049', contractId: 'CNT-001', indentId: 'IND-103', status: 'IN_TRANSIT', exceptionFlag: true,
+    id: 'BKG-2026-1049', contractId: 'CNT-001', indentId: 'BKG-2026-1103', status: 'IN_TRANSIT', exceptionFlag: true,
     disruption: { reason: 'VEHICLE_OR_DRIVER_BREAKDOWN', reportedAt: '2026-04-28T07:30:00Z', notes: 'Reported mechanical issue and driver fatigue; both replacements requested.' },
-    laneDetails: { origin: { name: 'Hyderabad Yard', city: 'Hyderabad', state: 'Telangana' }, destination: { name: 'Pune DC', city: 'Pune', state: 'Maharashtra' }, distanceKm: 560 },
-    assignedVehicle: { id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', type: 'LCV' },
-    assignedDriver: { id: 'DR-003', name: 'Ramesh Singh', mobile: '+91 9876500003' },
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Tumakuru', city: 'Tumakuru', state: '' }, distanceKm: 70 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [],
     timeline: [
       { id: 'tt-11', title: 'Disrupted', description: 'Vehicle and driver replacement requested', timestamp: '2026-04-28T07:30:00Z', status: 'IN_TRANSIT' },
@@ -534,10 +551,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-27T18:00:00Z',
   },
   {
-    id: 'TRP-063', contractId: 'CNT-001', indentId: 'IND-113', status: 'DESTINATION_REACHED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Bangalore Hub', city: 'Bangalore', state: 'Karnataka' }, distanceKm: 980 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1063', contractId: 'CNT-001', indentId: 'BKG-2026-1113', status: 'DESTINATION_REACHED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Salem', city: 'Salem', state: '' }, distanceKm: 190 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-16', type: 'EWAY_BILL', title: 'E-way bill copy', fileName: 'ewaybill-trp-063.pdf', fileUrl: '/docs/ewaybill-trp-063.pdf', createdAt: '2026-05-18T07:00:00Z' },
     ],
@@ -549,10 +566,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-05-18T06:30:00Z',
   },
   {
-    id: 'TRP-053', contractId: 'CNT-002', indentId: 'IND-104', status: 'POD_PENDING',
-    laneDetails: { origin: { name: 'Nagpur', city: 'Nagpur', state: 'Maharashtra' }, destination: { name: 'Indore', city: 'Indore', state: 'Madhya Pradesh' }, distanceKm: 450 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1053', contractId: 'CNT-002', indentId: 'BKG-2026-1104', status: 'POD_PENDING',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Pune', city: 'Pune', state: '' }, distanceKm: 840 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     deliveredDate: '2026-05-17T17:30:00Z', podStatus: 'PENDING',
     documents: [
       { id: 'td-14', type: 'REMARKS', title: 'Delivery note', fileName: 'delivery-note-trp-053.txt', fileUrl: '/docs/delivery-note-trp-053.txt', createdAt: '2026-05-17T18:00:00Z', note: 'Awaiting consignee POD upload' },
@@ -565,10 +582,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-05-16T08:30:00Z',
   },
   {
-    id: 'TRP-046', contractId: 'CNT-001', indentId: 'IND-100', status: 'POD_PENDING',
-    laneDetails: { origin: { name: 'Navi Mumbai Yard', city: 'Navi Mumbai', state: 'Maharashtra' }, destination: { name: 'Jaipur DC', city: 'Jaipur', state: 'Rajasthan' }, distanceKm: 1150 },
-    assignedVehicle: { id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', type: 'LCV' },
-    assignedDriver: { id: 'DR-003', name: 'Ramesh Singh', mobile: '+91 9876500003' },
+    id: 'BKG-2026-1046', contractId: 'CNT-001', indentId: 'BKG-2026-1100', status: 'POD_PENDING',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Vijayawada', city: 'Vijayawada', state: '' }, distanceKm: 650 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     deliveredDate: '2026-04-26T09:00:00Z', podStatus: 'PENDING',
     documents: [
       { id: 'td-10', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-046.pdf', fileUrl: '/docs/pod-trp-046.pdf', createdAt: '2026-04-26T09:15:00Z', note: 'POD pending upload from consignee' },
@@ -581,10 +598,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-25T06:00:00Z',
   },
   {
-    id: 'TRP-043', contractId: 'CNT-001', indentId: 'IND-097', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1043', contractId: 'CNT-001', indentId: 'BKG-2026-1097', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mangaluru', city: 'Mangaluru', state: '' }, distanceKm: 355 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     deliveredDate: '2026-04-20T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-043',
     documents: [
       { id: 'td-3', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-043.pdf', fileUrl: '/docs/pod-trp-043.pdf', createdAt: '2026-04-20T16:15:00Z', note: 'Signed POD available' },
@@ -599,10 +616,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
-    id: 'TRP-041', contractId: 'CNT-001', indentId: 'IND-095', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Mumbai', city: 'Mumbai', state: 'MH' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 1420 },
-    assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
-    assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
+    id: 'BKG-2026-1041', contractId: 'CNT-001', indentId: 'BKG-2026-1095', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chandausi', city: 'Chandausi', state: '' }, distanceKm: 1980 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     deliveredDate: '2026-04-10T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-041',
     documents: [
       { id: 'td-7', type: 'INVOICE_COPY', title: 'Invoice copy', fileName: 'invoice-trp-041.pdf', fileUrl: '/docs/invoice-trp-041.pdf', createdAt: '2026-04-11T10:00:00Z' },
@@ -615,10 +632,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
-    id: 'TRP-047', contractId: 'CNT-001', indentId: 'IND-101', status: 'COMPLETED',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Surat Depot', city: 'Surat', state: 'Gujarat' }, distanceKm: 280 },
-    assignedVehicle: { id: 'VH-003', registrationNumber: 'GJ-01-XY-9999', type: 'Tanker' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1047', contractId: 'CNT-001', indentId: 'BKG-2026-1101', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     deliveredDate: '2026-04-24T10:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-047',
     documents: [
       { id: 'td-12', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-047.pdf', fileUrl: '/docs/pod-trp-047.pdf', createdAt: '2026-04-24T10:30:00Z' },
@@ -630,10 +647,10 @@ export const MOCK_TRIPS: Trip[] = [
     createdAt: '2026-04-24T08:00:00Z',
   },
   {
-    id: 'TRP-054', contractId: 'CNT-002', indentId: 'IND-105', status: 'CANCELLED',
-    laneDetails: { origin: { name: 'Bhiwandi Hub', city: 'Bhiwandi', state: 'Maharashtra' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'Gujarat' }, distanceKm: 520 },
-    assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
-    assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
+    id: 'BKG-2026-1054', contractId: 'CNT-002', indentId: 'BKG-2026-1105', status: 'CANCELLED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
     documents: [
       { id: 'td-15', type: 'REMARKS', title: 'Cancellation note', fileName: 'cancelled-trp-054.txt', fileUrl: '/docs/cancelled-trp-054.txt', createdAt: '2026-05-18T10:00:00Z', note: 'Booking cancelled during POD pending stage' },
     ],
@@ -648,8 +665,8 @@ export const MOCK_TRIPS: Trip[] = [
 export const MOCK_EXPENSES: Expense[] = [
   {
     id: 'EXP-101',
-    tripId: 'TRP-043',
-    tripReference: 'TRP-043',
+    tripId: 'BKG-2026-1043',
+    tripReference: 'BKG-2026-1043',
     lineItems: [
       { id: 'EXP-101-1', expenseType: 'EXPENSE', amount: 3000, description: 'Mumbai-Delhi highway toll' },
       { id: 'EXP-101-2', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
@@ -659,8 +676,8 @@ export const MOCK_EXPENSES: Expense[] = [
   },
   {
     id: 'EXP-103',
-    tripId: 'TRP-042',
-    tripReference: 'TRP-042',
+    tripId: 'BKG-2026-1042',
+    tripReference: 'BKG-2026-1042',
     lineItems: [
       { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800, description: 'Pune bypass toll' },
     ],
@@ -669,8 +686,8 @@ export const MOCK_EXPENSES: Expense[] = [
   },
   {
     id: 'EXP-104',
-    tripId: 'TRP-045',
-    tripReference: 'TRP-045',
+    tripId: 'BKG-2026-1045',
+    tripReference: 'BKG-2026-1045',
     lineItems: [
       { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
     ],
@@ -680,130 +697,44 @@ export const MOCK_EXPENSES: Expense[] = [
 ]
 
 export const MOCK_VEHICLES: Vehicle[] = [
+  // Mirrors the vehicle onboarded by Mahesh Transport through the tenant
+  // workspace (shared master data), so standalone and embedded show the same fleet.
   {
-    id: 'VH-001', registrationNumber: 'MH-04-AB-1234', vehicleType: '20ft Container',
-    model: 'Tata Ultra 1918',
-    engineNumber: 'EN-1918-001',
-    chassisNumber: 'CH-1918-001',
-    odometerReading: '45210',
-    manufacturer: 'Tata Motors',
-    manufactureDate: '2024-03-12',
-    registrationDate: '2024-04-01',
-    permitType: 'National Permit',
-    capacityKg: '18000',
-    capacityCubicMeter: '32',
-    capacityLiters: '0',
-    length: '20',
-    width: '8',
-    height: '9',
-    rcStartDate: '2024-04-01',
-    rcEndDate: '2029-03-31',
-    rcFileName: 'rc-mh-04-ab-1234.pdf',
-    trackingSelections: [
-      { type: 'GPS Tracking', checked: true, primarySet: true, gpsOption: 'gps-vamosys', gpsDeviceID: 'GPS-001' },
-      { type: 'Manual Tracking', checked: false, primarySet: false },
-    ],
-    additionalDocuments: [
-      { id: 'vdoc-1', type: 'Insurance', fileName: 'insurance.pdf', startDate: '2026-01-15', endDate: '2027-01-15' },
-      { id: 'vdoc-2', type: 'Fitness Certificate', fileName: 'fitness.pdf', startDate: '2026-02-20', endDate: '2026-08-20' },
-    ],
-    baseLocation: 'Mumbai', operationalStatus: 'ACTIVE', complianceStatus: 'COMPLIANT', gpsDeviceId: 'GPS-001',
+    id: 'VH-001', registrationNumber: 'KA01JK1234', vehicleType: 'MGV',
+    manufacturer: 'TATA', model: 'TATA', year: '2012', fuelType: 'Diesel',
+    engineNumber: 'sefeffeqw', chassisNumber: 'qewrwdewdew',
+    capacityKg: '15000',
+    baseLocation: 'KA', operationalStatus: 'ACTIVE', complianceStatus: 'COMPLIANT',
     complianceDocuments: [
-      { id: 'doc1', type: 'Insurance', fileName: 'insurance.pdf', fileUrl: '/docs/insurance.pdf', expiryDate: '2027-01-15', status: 'VALID', uploadedAt: '2026-01-15' },
-      { id: 'doc2', type: 'Fitness Certificate', fileName: 'fitness.pdf', fileUrl: '/docs/fitness.pdf', expiryDate: '2026-08-20', status: 'VALID', uploadedAt: '2026-02-20' },
-      { id: 'doc3', type: 'Permit (National)', fileName: 'permit.pdf', fileUrl: '/docs/permit.pdf', expiryDate: '2026-05-10', status: 'EXPIRING_SOON', uploadedAt: '2025-05-10' },
-      { id: 'doc4', type: 'PUC Certificate', fileName: 'puc.pdf', fileUrl: '/docs/puc.pdf', expiryDate: '2026-12-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'doc-rc', type: 'RC', fileName: '6925_CONSIGNOR_COPY.pdf', fileUrl: '/docs/6925_CONSIGNOR_COPY.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'doc-ins', type: 'Insurance', fileName: 'LR copy format for AI.pdf', fileUrl: '/docs/LR copy format for AI.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'doc-puc', type: 'PUC', fileName: 'Bill Format Print File.pdf', fileUrl: '/docs/Bill Format Print File.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'doc-fc', type: 'FC', fileName: 'Bill Format Print File.pdf', fileUrl: '/docs/Bill Format Print File.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'doc-np', type: 'NationalPermit', fileName: 'Bill Format Print File.pdf', fileUrl: '/docs/Bill Format Print File.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
     ],
     blackoutDates: [],
   },
-  {
-    id: 'VH-003', registrationNumber: 'GJ-01-XY-9999', vehicleType: 'Tanker',
-    model: 'Ashok Leyland Boss',
-    engineNumber: 'EN-AX-032',
-    chassisNumber: 'CH-AX-032',
-    odometerReading: '78100',
-    manufacturer: 'Ashok Leyland',
-    manufactureDate: '2023-07-08',
-    registrationDate: '2023-08-10',
-    permitType: 'State Permit',
-    capacityKg: '16000',
-    capacityCubicMeter: '24',
-    capacityLiters: '12000',
-    length: '18',
-    width: '8',
-    height: '9',
-    rcStartDate: '2023-08-10',
-    rcEndDate: '2028-08-09',
-    rcFileName: 'rc-gj-01-xy-9999.pdf',
-    trackingSelections: [{ type: 'GPS Tracking', checked: true, primarySet: true, gpsOption: 'gps-loconav', gpsDeviceID: 'GPS-007' }],
-    additionalDocuments: [{ id: 'vdoc-3', type: 'Insurance', fileName: 'insurance2.pdf', startDate: '2025-03-01', endDate: '2026-03-01' }],
-    baseLocation: 'Ahmedabad', operationalStatus: 'ACTIVE', complianceStatus: 'EXPIRED',
-    complianceDocuments: [
-      { id: 'doc5', type: 'Insurance', fileName: 'insurance2.pdf', fileUrl: '/docs/insurance2.pdf', expiryDate: '2026-03-01', status: 'EXPIRED', uploadedAt: '2025-03-01' },
-    ],
-    blackoutDates: [],
-  },
-  {
-    id: 'VH-004', registrationNumber: 'MH-12-PZ-1010', vehicleType: 'LCV',
-    model: 'Mahindra Bolero Pickup',
-    engineNumber: 'EN-MH-120',
-    chassisNumber: 'CH-MH-120',
-    odometerReading: '18200',
-    manufacturer: 'Mahindra',
-    manufactureDate: '2025-01-11',
-    registrationDate: '2025-02-01',
-    permitType: 'Local Permit',
-    capacityKg: '2500',
-    capacityCubicMeter: '10',
-    capacityLiters: '0',
-    length: '12',
-    width: '6',
-    height: '7',
-    rcStartDate: '2025-02-01',
-    rcEndDate: '2030-01-31',
-    rcFileName: 'rc-mh-12-pz-1010.pdf',
-    trackingSelections: [{ type: 'Manual Tracking', checked: true, primarySet: true }],
-    additionalDocuments: [],
-    baseLocation: 'Pune', operationalStatus: 'INACTIVE', complianceStatus: 'COMPLIANT',
-    complianceDocuments: [
-      { id: 'doc6', type: 'Insurance', fileName: 'ins3.pdf', fileUrl: '/docs/ins3.pdf', expiryDate: '2027-01-01', status: 'VALID', uploadedAt: '2026-01-01' }
-    ],
-    blackoutDates: []
-  }
 ]
 
 export const MOCK_DRIVERS: Driver[] = [
+  // Mirrors the driver onboarded by Mahesh Transport through the tenant workspace.
   {
-    id: 'DR-001', name: 'Suresh Yadav', dateOfBirth: '1990-05-12', dlName: 'Suresh Yadav', dlVerified: true,
-    mobile: '+91 9876500001', licenseNumber: 'MH0420210012345', dlValidTillDate: '2028-06-30', gender: 'Male', email: 'suresh@yadav.in', dlCopyFileName: 'dl.pdf',
-    trackingSelections: [{ type: 'SIM Tracking', checked: true, primarySet: true }, { type: 'Driver App Tracking', checked: true, primarySet: false }],
-    licenseExpiry: '2028-06-30', licenseClass: ['HCV', 'LCV'], complianceStatus: 'COMPLIANT', currentStatus: 'ACTIVE',
+    id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373',
+    licenseNumber: 'DL002323', licenseExpiry: '2027-06-01', licenseClass: ['HMV'],
+    complianceStatus: 'COMPLIANT', currentStatus: 'ACTIVE',
+    gender: 'Male', email: 'kartikpawar391@gmail.com', baseLocation: 'KA',
+    aadhaarMasked: '21324832947324324',
+    dlName: 'Kartik Pawar', dlVerified: true, dlValidTillDate: '2027-06-01',
     complianceDocuments: [
-      { id: 'dd1', type: 'Driving License', fileName: 'dl.pdf', fileUrl: '/docs/dl.pdf', expiryDate: '2028-06-30', status: 'VALID', uploadedAt: '2026-01-01' },
-      { id: 'dd2', type: 'Medical Certificate', fileName: 'medical.pdf', fileUrl: '/docs/medical.pdf', expiryDate: '2027-01-01', status: 'VALID', uploadedAt: '2026-01-01' },
+      { id: 'dd-dl', type: 'DL', fileName: 'Bill Format Print File.pdf', fileUrl: '/docs/Bill Format Print File.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
+      { id: 'dd-med', type: 'MedicalCertificate', fileName: 'Bill Format Print File.pdf', fileUrl: '/docs/Bill Format Print File.pdf', expiryDate: '2027-06-01', status: 'VALID', uploadedAt: '2026-06-01' },
     ],
   },
-  {
-    id: 'DR-002', name: 'Manoj Sharma', dateOfBirth: '1988-02-20', dlName: 'Manoj Sharma', dlVerified: true,
-    mobile: '+91 9876500002', licenseNumber: 'RJ1420180054321', dlValidTillDate: '2026-05-15', gender: 'Male', email: 'manoj@sharma.in', dlCopyFileName: 'dl2.pdf',
-    trackingSelections: [{ type: 'SIM Tracking', checked: true, primarySet: true }],
-    licenseExpiry: '2026-05-15', licenseClass: ['LCV'], complianceStatus: 'EXPIRING_SOON', currentStatus: 'ACTIVE',
-    complianceDocuments: [
-      { id: 'dd3', type: 'Driving License', fileName: 'dl2.pdf', fileUrl: '/docs/dl2.pdf', expiryDate: '2026-05-15', status: 'EXPIRING_SOON', uploadedAt: '2021-05-15' }
-    ]
-  },
-  {
-    id: 'DR-003', name: 'Ramesh Singh', dateOfBirth: '1985-09-01', dlName: 'Ramesh Singh', dlVerified: false,
-    mobile: '+91 9876500003', licenseNumber: 'DL0120150098765', dlValidTillDate: '2025-12-31', gender: 'Male', email: 'ramesh@singh.in', dlCopyFileName: 'dl3.pdf',
-    trackingSelections: [],
-    licenseExpiry: '2025-12-31', licenseClass: ['HCV'], complianceStatus: 'EXPIRED', currentStatus: 'BLOCKED',
-    complianceDocuments: []
-  }
 ]
 
 export const MOCK_CAPACITY: CapacityDeclaration[] = [
-  { id: 'cap1', vehicleType: '20ft Container', availableQuantity: 15, baseOperatingHubs: ['Mumbai', 'Pune', 'Nashik'], blackoutDates: [] },
-  { id: 'cap2', vehicleType: 'Flatbed', availableQuantity: 8, baseOperatingHubs: ['Mumbai', 'Delhi'], blackoutDates: [{ from: '2026-05-01', to: '2026-05-05' }] },
+  { id: 'cap1', vehicleType: 'MGV', availableQuantity: 15, baseOperatingHubs: ['Mumbai', 'Pune', 'Nashik'], blackoutDates: [] },
+  { id: 'cap2', vehicleType: 'MGV', availableQuantity: 8, baseOperatingHubs: ['Mumbai', 'Delhi'], blackoutDates: [{ from: '2026-05-01', to: '2026-05-05' }] },
 ]
 
 export const MOCK_INVOICES: Invoice[] = [
@@ -812,96 +743,96 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-01', to: '2026-04-15' },
     paymentDueDate: '2026-05-15', status: 'APPROVED', paymentDate: '2026-05-12',
     lineItems: [
-      { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
-      { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
+      { tripId: 'BKG-2026-1040', tripReference: 'BKG-2026-1040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
+      { tripId: 'BKG-2026-1041', tripReference: 'BKG-2026-1041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
     ],
-    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', tripReferences: ['TRP-040', 'TRP-041'], createdAt: '2026-04-15T12:00:00Z',
+    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', tripReferences: ['BKG-2026-1040', 'BKG-2026-1041'], createdAt: '2026-04-15T12:00:00Z',
   },
   {
     id: 'INV-2026-002', invoiceNumber: 'INV-2026-002', invoiceDate: '2026-05-13', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-01', to: '2026-05-13' },
     paymentDueDate: '2026-06-12', status: 'APPROVED',
     lineItems: [
-      { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
+      { tripId: 'BKG-2026-1042', tripReference: 'BKG-2026-1042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
     ],
-    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', tripReferences: ['TRP-042'], createdAt: '2026-05-13T10:00:00Z',
+    subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', tripReferences: ['BKG-2026-1042'], createdAt: '2026-05-13T10:00:00Z',
   },
   {
     id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-046', tripReference: 'TRP-046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
-    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', tripReferences: ['TRP-046'], createdAt: '2026-05-17T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1046', tripReference: 'BKG-2026-1046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
+    subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', tripReferences: ['BKG-2026-1046'], createdAt: '2026-05-17T10:00:00Z',
   },
   {
     id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
-    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', tripReferences: ['TRP-047'], createdAt: '2026-05-18T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1047', tripReference: 'BKG-2026-1047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
+    subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', tripReferences: ['BKG-2026-1047'], createdAt: '2026-05-18T10:00:00Z',
   },
   {
     id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-048', tripReference: 'TRP-048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
-    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', tripReferences: ['TRP-048'], createdAt: '2026-05-19T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1048', tripReference: 'BKG-2026-1048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
+    subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', tripReferences: ['BKG-2026-1048'], createdAt: '2026-05-19T10:00:00Z',
   },
   {
     id: 'INV-2026-006', invoiceNumber: 'INV-2026-006', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-17', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
-      tripId: 'TRP-049', tripReference: 'TRP-049', freightCharge: 74000,
+      tripId: 'BKG-2026-1049', tripReference: 'BKG-2026-1049', freightCharge: 74000,
       expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
       lineTotal: 74800,
     }],
-    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['TRP-049'], createdAt: '2026-05-19T11:00:00Z',
+    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', tripReferences: ['BKG-2026-1049'], createdAt: '2026-05-19T11:00:00Z',
   },
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'DISPUTED',
     lineItems: [{
-      tripId: 'TRP-050', tripReference: 'TRP-050', freightCharge: 58000,
+      tripId: 'BKG-2026-1050', tripReference: 'BKG-2026-1050', freightCharge: 58000,
       expenses: [
         { type: 'DETENTION', amount: 3000 },
         { type: 'LOADING_UNLOADING', amount: 1500 },
       ],
       lineTotal: 62500,
     }],
-    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['TRP-050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', tripReferences: ['BKG-2026-1050'], notes: 'Finance raised a dispute on the detention and handling charges.', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
-    lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
-    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['TRP-051'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1051', tripReference: 'BKG-2026-1051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
+    subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', tripReferences: ['BKG-2026-1051'], notes: 'Finance asked for a corrected invoice. Create a new invoice to replace this one.', createdAt: '2026-05-17T16:00:00Z',
   },
   {
     // CLOSED — finance rejected the invoice outright.
     id: 'INV-2026-009', invoiceNumber: 'INV-2026-009', invoiceDate: '2026-05-16', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-12', to: '2026-05-16' },
     paymentDueDate: '2026-06-15', status: 'CLOSED', closeReason: 'REJECTED',
-    lineItems: [{ tripId: 'TRP-052', tripReference: 'TRP-052', freightCharge: 39000, expenses: [], lineTotal: 39000 }],
-    subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['TRP-052'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1052', tripReference: 'BKG-2026-1052', freightCharge: 39000, expenses: [], lineTotal: 39000 }],
+    subtotal: 39000, gstAmount: 4680, grandTotal: 43680, pdfUrl: '/invoices/INV-2026-009.pdf', tripReferences: ['BKG-2026-1052'], notes: 'Rejected by finance — trip was not delivered against a valid contract.', createdAt: '2026-05-16T10:00:00Z',
   },
   {
     // CLOSED — superseded by INV-2026-011 after a resubmission.
     id: 'INV-2026-010', invoiceNumber: 'INV-2026-010', invoiceDate: '2026-05-14', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-13', status: 'CLOSED', closeReason: 'SUPERSEDED', supersededByInvoiceId: 'INV-2026-011',
-    lineItems: [{ tripId: 'TRP-053', tripReference: 'TRP-053', freightCharge: 61000, expenses: [], lineTotal: 61000 }],
-    subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['TRP-053'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 61000, expenses: [], lineTotal: 61000 }],
+    subtotal: 61000, gstAmount: 7320, grandTotal: 68320, pdfUrl: '/invoices/INV-2026-010.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Replaced by INV-2026-011 after finance requested a resubmission.', createdAt: '2026-05-14T10:00:00Z',
   },
   {
     // PENDING — the corrected invoice that replaced INV-2026-010.
     id: 'INV-2026-011', invoiceNumber: 'INV-2026-011', invoiceDate: '2026-05-20', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-10', to: '2026-05-14' },
     paymentDueDate: '2026-06-19', status: 'PENDING', supersedesInvoiceId: 'INV-2026-010',
-    lineItems: [{ tripId: 'TRP-053', tripReference: 'TRP-053', freightCharge: 59000, expenses: [], lineTotal: 59000 }],
-    subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['TRP-053'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
+    lineItems: [{ tripId: 'BKG-2026-1053', tripReference: 'BKG-2026-1053', freightCharge: 59000, expenses: [], lineTotal: 59000 }],
+    subtotal: 59000, gstAmount: 7080, grandTotal: 66080, pdfUrl: '/invoices/INV-2026-011.pdf', tripReferences: ['BKG-2026-1053'], notes: 'Corrected resubmission of INV-2026-010.', createdAt: '2026-05-20T10:00:00Z',
   }
 ]
 
@@ -941,7 +872,7 @@ export const MOCK_DISPUTES: import('../types').Dispute[] = [
     invoiceId: 'INV-2026-007',
     invoiceNumber: 'INV-2026-007',
     invoiceAmount: 70000,
-    reason: 'Detention and loading charges do not match the approved rate card for TRP-050.',
+    reason: 'Detention and loading charges do not match the approved rate card for BKG-2026-1050.',
     status: 'OPEN',
     raisedAt: '2026-05-19T10:00:00Z',
     updatedAt: '2026-05-19T10:00:00Z',
@@ -950,7 +881,7 @@ export const MOCK_DISPUTES: import('../types').Dispute[] = [
       {
         id: 'dmsg-seed-1',
         sender: 'FINANCE',
-        message: 'Detention and loading charges do not match the approved rate card for TRP-050.',
+        message: 'Detention and loading charges do not match the approved rate card for BKG-2026-1050.',
         createdAt: '2026-05-19T10:00:00Z',
       },
     ],

@@ -8,10 +8,10 @@ import { AlertTriangle } from 'lucide-react'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 
 const BOOKINGS = [
-  { id: 'TRP-045', route: 'Mumbai → Satara', vehicle: 'MH-12-AB-4421', driver: 'Suresh Yadav' },
-  { id: 'TRP-043', route: 'Pune → Chennai', vehicle: 'MH-14-KK-1007', driver: 'Manoj Sharma' },
-  { id: 'TRP-047', route: 'Delhi → Jaipur', vehicle: 'RJ-14-TR-7788', driver: 'Ramesh Singh' },
-  { id: 'TRP-041', route: 'Nashik → Bangalore', vehicle: 'KA-01-MN-5454', driver: 'Sandeep Patil' },
+  { id: 'BKG-2026-1045', route: 'Bengaluru → Chandausi', vehicle: 'KA01JK1234', driver: 'Kartik Pawar' },
+  { id: 'BKG-2026-1043', route: 'Bengaluru → Hyderabad', vehicle: 'KA01JK1234', driver: 'Kartik Pawar' },
+  { id: 'BKG-2026-1047', route: 'Bengaluru → Chennai', vehicle: 'KA01JK1234', driver: 'Kartik Pawar' },
+  { id: 'BKG-2026-1041', route: 'Bengaluru → Mysuru', vehicle: 'KA01JK1234', driver: 'Kartik Pawar' },
 ]
 
 const ISSUE_TYPES: ExceptionIssueType[] = ['Breakdown', 'Delay', 'Accident', 'Route deviation', 'Cargo issue']

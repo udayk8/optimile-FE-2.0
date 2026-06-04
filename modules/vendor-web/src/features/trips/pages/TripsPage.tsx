@@ -91,7 +91,11 @@ export default function TripsPage() {
   const navigate = useNavigate()
   const activeTab = getBookingsTab(location.pathname, location.search)
 
-  const { indents, trips, declineIndent, acceptIndent } = useVendorBookings()
+  const { indents, trips, declineIndent, acceptIndent, isBridgeRecord } = useVendorBookings()
+
+  // Cross-module (bridge) bookings render on white; local mock demo rows on light gray.
+  const rowClass = (id: string) =>
+    isBridgeRecord(id) ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
   const [reassignTripId, setReassignTripId] = useState<string | null>(null)
@@ -181,7 +185,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pendingAllocation.map((indent) => (
-                    <tr key={indent.id} className="hover:bg-gray-50">
+                    <tr key={indent.id} className={rowClass(indent.id)}>
                       <td className="px-5 py-4"><StatusBadge status={indent.status} label="Pending Allocation" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{indent.id}</div>
@@ -236,7 +240,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {assignmentBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={rowClass(trip.id)}>
                       <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -289,7 +293,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {inTransitBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={rowClass(trip.id)}>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-1.5">
                           <StatusBadge status={trip.status} />
@@ -340,7 +344,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {pendingPodBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={rowClass(trip.id)}>
                       <td className="px-5 py-4"><StatusBadge status="POD_PENDING" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
@@ -392,7 +396,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {completedBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={rowClass(trip.id)}>
                       <td className="px-5 py-4">
                         <StatusBadge status="COMPLETED" />
                       </td>
@@ -437,7 +441,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {cancelledBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                    <tr key={booking.id} className={rowClass(booking.id)}>
                       <td className="px-5 py-4"><StatusBadge status="CANCELLED" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
@@ -480,7 +484,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {rejectedBookings.map((booking) => (
-                    <tr key={booking.id} className="hover:bg-gray-50">
+                    <tr key={booking.id} className={rowClass(booking.id)}>
                       <td className="px-5 py-4"><StatusBadge status="REJECTED" /></td>
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
@@ -522,7 +526,7 @@ export default function TripsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {exceptionBookings.map((trip) => (
-                    <tr key={trip.id} className="hover:bg-gray-50">
+                    <tr key={trip.id} className={rowClass(trip.id)}>
                       <td className="px-5 py-4">
                         <div className="flex flex-wrap gap-1.5">
                           <StatusBadge status={trip.status} />

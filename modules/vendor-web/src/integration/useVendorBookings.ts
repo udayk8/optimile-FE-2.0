@@ -10,6 +10,8 @@ export interface VendorBookingsData {
   assignVehicle: (bookingId: string, vehicleId: string, driverId: string) => void
   /** Rich shared-booking detail (embedded only); null standalone. */
   getBookingDetail: (bookingRef: string) => VendorBookingDetail | null
+  /** True when the record came from the cross-module tenant bridge (vs local mock data). */
+  isBridgeRecord: (id: string) => boolean
 }
 
 /**
@@ -32,6 +34,10 @@ export function useVendorBookings(): VendorBookingsData {
   if (bridge) {
     const mockIndentIds = new Set(indents.map((i) => i.id))
     const mockTripIds = new Set(trips.map((t) => t.id))
+    const bridgeIds = new Set([
+      ...bridge.bookingIndents.map((i) => i.id),
+      ...bridge.bookingTrips.map((t) => t.id),
+    ])
     return {
       indents: [...bridge.bookingIndents, ...indents],
       trips: [...bridge.bookingTrips, ...trips],
@@ -44,9 +50,10 @@ export function useVendorBookings(): VendorBookingsData {
       // Mock trips have no rich detail; bridge.getBookingDetail returns null for
       // any ref it doesn't own, so this is safe for both.
       getBookingDetail: bridge.getBookingDetail,
+      isBridgeRecord: (id) => bridgeIds.has(id),
     }
   }
 
   // Standalone (no bridge): local mock demo dataset only.
-  return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null }
+  return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, isBridgeRecord: () => false }
 }
