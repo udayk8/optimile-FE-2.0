@@ -8,7 +8,6 @@ import {
   TenantEmptyState,
   TenantFilterBar,
   TenantPanel,
-  TenantSummaryCard,
 } from "@/modules/tenant-admin/components/tenant-primitives";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -226,6 +225,7 @@ export function TenantVendorsPage() {
           </div>,
         ])}
         emptyMessage="No tenant vendors found."
+        pageSize={10}
       />
     </div>
   );
@@ -345,22 +345,33 @@ export function TenantVendorOnboardingPage() {
         onSubmit={submit}
         lockCompanyName={Boolean(editingVendor)}
         lockPrimaryContactPhone={Boolean(editingVendor)}
-        extraReviewContent={
-          <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Vendor contracts (optional)
+        extraSteps={[
+          {
+            label: "Contracts",
+            content: (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Bulk upload the vendor's contract CSVs (optional). Rows can be edited or removed below and are
+                  saved together with the vendor on submit.
+                </p>
+                <VendorContractCsvUpload
+                  onRowsParsed={(_file, result) =>
+                    setPendingContractRows((current) => [...current, ...result.validRows])
+                  }
+                />
+                <EditableVendorContractRows rows={pendingContractRows} onChange={setPendingContractRows} />
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Bulk upload contract CSVs — rows can be edited or removed below and are saved together with the vendor on submit.
-              </p>
+            ),
+          },
+        ]}
+        extraReviewContent={
+          <div className="rounded-xl border bg-muted/30 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contracts</div>
+            <div className="mt-1 text-sm font-bold">
+              {pendingContractRows.length
+                ? `${pendingContractRows.length} contract row${pendingContractRows.length === 1 ? "" : "s"} ready to import`
+                : "No contracts uploaded"}
             </div>
-            <VendorContractCsvUpload
-              onRowsParsed={(_file, result) =>
-                setPendingContractRows((current) => [...current, ...result.validRows])
-              }
-            />
-            <EditableVendorContractRows rows={pendingContractRows} onChange={setPendingContractRows} />
           </div>
         }
       />
@@ -374,7 +385,6 @@ export function TenantVendorDetailPage() {
   const { getTenantVendorById } = useTenantVendors(tenant.id);
   const tenantVendor = getTenantVendorById(tenantVendorId);
   const [message, setMessage] = useState("");
-  const contracts = useVendorContracts({ id: tenantVendor?.id ?? "", name: tenantVendor?.name ?? "" });
 
   if (!tenantVendor) {
     return (
@@ -386,9 +396,6 @@ export function TenantVendorDetailPage() {
     );
   }
 
-  const manualCount = contracts.filter((contract) => contract.createdFrom === "MANUAL_UPLOAD").length;
-  const auctionCount = contracts.length - manualCount;
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -399,12 +406,6 @@ export function TenantVendorDetailPage() {
       />
 
       {message ? <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{message}</div> : null}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <TenantSummaryCard label="Contracts" value={String(contracts.length)} helper="Manual uploads + auction wins" />
-        <TenantSummaryCard label="Manual uploads" value={String(manualCount)} helper="Uploaded via contract CSV" />
-        <TenantSummaryCard label="Auction won" value={String(auctionCount)} helper="Awarded from finished auctions" />
-      </div>
 
       <TenantPanel
         title="Vendor Contracts"

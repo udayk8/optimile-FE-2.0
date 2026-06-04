@@ -9,7 +9,7 @@ import { Select } from "@/shared/components/ui/select";
 import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
-  VENDOR_CONTRACT_CSV_TEMPLATE,
+  buildVendorContractCsvTemplate,
   getContractSourceLabel,
   getLaneCodeError,
   getRateTypeLabel,
@@ -105,7 +105,7 @@ export function useVendorContracts(vendor: { id: string; name: string }): Vendor
 }
 
 export function downloadVendorContractCsvTemplate() {
-  const blob = new Blob([VENDOR_CONTRACT_CSV_TEMPLATE], { type: "text/csv" });
+  const blob = new Blob([buildVendorContractCsvTemplate()], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -139,6 +139,7 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
         </Badge>,
       ])}
       emptyMessage="No contracts yet — upload a CSV or award an auction to this vendor."
+      pageSize={10}
     />
   );
 }
@@ -205,6 +206,7 @@ export function EditableVendorContractRows({
           </div>,
         ])}
         emptyMessage="No contract rows yet."
+        pageSize={10}
       />
 
       <Dialog

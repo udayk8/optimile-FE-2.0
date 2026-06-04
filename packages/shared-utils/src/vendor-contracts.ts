@@ -64,11 +64,19 @@ export const VENDOR_CONTRACT_CSV_HEADERS = [
   'endDate',
 ] as const
 
-export const VENDOR_CONTRACT_CSV_TEMPLATE = [
-  VENDOR_CONTRACT_CSV_HEADERS.join(','),
-  'MUM-BLR,32FT,45000,PER_TRIP,2026-06-01,2026-12-31',
-  'DEL-LKO,20FT,1800,PER_MT,2026-06-01,2026-12-31',
-].join('\n')
+/** Template with sample rows dated from today so downloads always validate. */
+export function buildVendorContractCsvTemplate(): string {
+  const startDate = new Date().toISOString().slice(0, 10)
+  const endDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  return [
+    VENDOR_CONTRACT_CSV_HEADERS.join(','),
+    `MUM-BLR,32FT,45000,PER_TRIP,${startDate},${endDate}`,
+    `DEL-LKO,20FT,1800,PER_MT,${startDate},${endDate}`,
+    `PNQ-JAI,32FT,52,PER_KM,${startDate},${endDate}`,
+  ].join('\n')
+}
+
+export const VENDOR_CONTRACT_CSV_TEMPLATE = buildVendorContractCsvTemplate()
 
 const CUSTOMER_HEADER_REGEX = /^customer(name|id|code)?$/i
 
