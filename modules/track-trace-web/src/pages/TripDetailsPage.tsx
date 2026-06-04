@@ -54,6 +54,9 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Secondary data (vehicle/driver/devices/distance) loads after the trip itself,
+  // without blocking the page — these areas show skeletons while it resolves.
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [actionError, setActionError] = useState<string|null>(null);
   const [trackedDistanceKm, setTrackedDistanceKm] = useState<number | null>(null);
   const [routeRows, setRouteRows] = useState<RoutePerformance[]>([]);
@@ -61,7 +64,61 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
   const [installedDevices, setInstalledDevices] = useState<VehicleTrackingDevice[]>([]);
 
   useEffect(() => {
-    loadTripDetails();
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      // Reset per-trip state so the previous trip's data never lingers when
+      // navigating between trips (the component stays mounted on the route).
+      setVehicle(null);
+      setDriver(null);
+      setTrackedDistanceKm(null);
+      setInstalledDevices([]);
+
+      // 1) Primary fetch — gate the page only on the trip itself, so the header,
+      //    route, alerts, map and live status paint as soon as possible.
+      let tripData: Trip | undefined;
+      try {
+        tripData = await TripAPI.getById(tripId);
+      } catch {
+        if (!cancelled) {
+          setActionError('Trip details could not be loaded. Please try again.');
+          setTimeout(() => setActionError(null), 4000);
+        }
+      }
+      if (cancelled) return;
+      setTrip(tripData ?? null);
+      setIsLoading(false);
+      if (!tripData) return;
+
+      // 2) Secondary data — fetched in parallel (not serially) and without
+      //    blocking the page; the Assignment + tracking areas show skeletons.
+      if (!tripData.vehicle_id && !tripData.driver_id) return;
+      setDetailsLoading(true);
+      const needsDistance =
+        tripData.status === TripStatus.IN_TRANSIT || tripData.status === TripStatus.COMPLETED;
+      try {
+        const [vData, dist, installed, dData] = await Promise.all([
+          tripData.vehicle_id ? VehicleAPI.getById(tripData.vehicle_id) : Promise.resolve(undefined),
+          tripData.vehicle_id && needsDistance ? TelematicsAPI.getTripDistance(tripData.vehicle_id) : Promise.resolve(null),
+          tripData.vehicle_id ? TrackingDeviceAPI.getAllByVehicleId(tripData.vehicle_id) : Promise.resolve([]),
+          tripData.driver_id ? DriverAPI.getById(tripData.driver_id) : Promise.resolve(undefined),
+        ]);
+        if (cancelled) return;
+        setVehicle(vData || null);
+        setTrackedDistanceKm(dist);
+        setInstalledDevices(installed);
+        setDriver(dData || null);
+      } catch {
+        if (!cancelled) {
+          setActionError('Some trip details could not be loaded.');
+          setTimeout(() => setActionError(null), 4000);
+        }
+      } finally {
+        if (!cancelled) setDetailsLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, [tripId]);
 
   // TD3: fetch corridor performance once trip loads (origin/destination available)
@@ -93,38 +150,6 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
     const key = trip.origin.toLowerCase() + '-' + trip.destination.toLowerCase()
     return routeRows.find((r) => r.laneId === key) ?? null
   }, [routeRows, trip])
-
-  const loadTripDetails = async () => {
-    setIsLoading(true);
-    setInstalledDevices([]);
-    try {
-      const tripData = await TripAPI.getById(tripId);
-      if (tripData) {
-        setTrip(tripData);
-        if (tripData.vehicle_id) {
-          const vData = await VehicleAPI.getById(tripData.vehicle_id);
-          setVehicle(vData || null);
-          if (tripData.status === TripStatus.IN_TRANSIT || tripData.status === TripStatus.COMPLETED) {
-            const dist = await TelematicsAPI.getTripDistance(tripData.vehicle_id);
-            setTrackedDistanceKm(dist);
-          }
-          // Tracking sources available to this booking = devices fitted to its vehicle.
-          const installed = await TrackingDeviceAPI.getAllByVehicleId(tripData.vehicle_id);
-          setInstalledDevices(installed);
-        }
-        if (tripData.driver_id) {
-          const dData = await DriverAPI.getById(tripData.driver_id);
-          setDriver(dData || null);
-        }
-      }
-    } catch {
-      setActionError('Trip details could not be loaded. Please try again.');
-      setTimeout(() => setActionError(null), 4000);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading trip details...</div>;
   if (!trip) return (
@@ -187,7 +212,7 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <button onClick={onBack} className="text-gray-500 hover:text-gray-700">
+          <button type="button" onClick={onBack} aria-label="Back to dispatch" className="text-gray-500 hover:text-gray-700">
             <IconArrowRight className="w-6 h-6 transform rotate-180" />
           </button>
           <div>
@@ -384,6 +409,19 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                 </h3>
 
                 <div className="space-y-4">
+                  {detailsLoading ? (
+                    <>
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Vehicle</p>
+                        <div className="h-[60px] animate-pulse rounded-lg bg-gray-100" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Driver</p>
+                        <div className="h-[60px] animate-pulse rounded-lg bg-gray-100" />
+                      </div>
+                    </>
+                  ) : (
+                   <>
                     <div>
                         <p className="text-xs text-gray-500 uppercase mb-1">Vehicle</p>
                         {vehicle ? (
@@ -455,6 +493,8 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                             </div>
                         )}
                     </div>
+                   </>
+                  )}
                 </div>
             </div>
 
@@ -572,7 +612,7 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                                 minHeight: '538px',
                             }}
                             src={`https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${encodeURIComponent(trip.origin)}&destination=${encodeURIComponent(trip.destination)}&mode=driving`}
-                            allowFullscreen
+                            allowFullScreen
                             loading="lazy"
                             referrerPolicy="no-referrer-when-downgrade"
                         />
@@ -685,12 +725,12 @@ export const TripDetailsPage: React.FC<TripDetailsPageProps> = ({ tripId, onBack
                         </div>
                         <div className="flex-1 pl-3">
                           <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Progress</p>
-                          <p className={`mt-0.5 text-2xl font-extrabold leading-none ${pct !== null ? 'text-blue-600' : 'text-gray-900'}`}>
+                          <p className={`mt-0.5 text-2xl font-extrabold leading-none ${pct !== null ? 'text-primary' : 'text-gray-900'}`}>
                             {pct !== null ? `${pct}%` : '—'}
                           </p>
                           {pct !== null && !isCompleted && (
                             <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-                              <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${pct}%` }} />
+                              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
                             </div>
                           )}
                         </div>
