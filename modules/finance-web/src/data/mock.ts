@@ -343,30 +343,30 @@ export const AUDIT_LOG = [
    The Ledgers page can filter by client and recomputes balances per selection. */
 export const CLIENT_LEDGER = [
   // Britannia Industries — net ₹1,81,000 (drives the own-fleet client ledger)
-  { date: "2026-04-12", type: "Invoice", ref: "INV-2026-0142", client: "Britannia Industries", amt: 145000, bal: 145000 },
-  { date: "2026-04-20", type: "Invoice", ref: "INV-2026-0151", client: "Britannia Industries", amt: 132000, bal: 277000 },
-  { date: "2026-05-02", type: "Payment", ref: "RCPT-3301", client: "Britannia Industries", amt: -100000, bal: 177000 },
-  { date: "2026-05-10", type: "Credit Note", ref: "CN-2026-014", client: "Britannia Industries", amt: -8000, bal: 169000 },
-  { date: "2026-05-15", type: "Debit Note", ref: "DN-2026-009", client: "Britannia Industries", amt: 12000, bal: 181000 },
+  { id: "led-c001", date: "2026-04-12", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0142", client: "Britannia Industries", desc: "Freight invoice INV-2026-0142 raised on customer", amt: 145000, bal: 145000 },
+  { id: "led-c002", date: "2026-04-20", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0151", client: "Britannia Industries", desc: "Freight invoice INV-2026-0151 raised on customer", amt: 132000, bal: 277000 },
+  { id: "led-c003", date: "2026-05-02", type: "Payment", particular: "Customer Payment", ref: "RCPT-3301", client: "Britannia Industries", desc: "Payment received against outstanding invoices", amt: -100000, bal: 177000 },
+  { id: "led-c004", date: "2026-05-10", type: "Credit Note", particular: "Credit Note Issued", ref: "CN-2026-014", client: "Britannia Industries", desc: "Credit note CN-2026-014 issued to customer", amt: -8000, bal: 169000 },
+  { id: "led-c005", date: "2026-05-15", type: "Debit Note", particular: "Debit Note Raised", ref: "DN-2026-009", client: "Britannia Industries", desc: "Debit note DN-2026-009 raised on customer", amt: 12000, bal: 181000 },
   // Asian Paints Ltd — net ₹67,000
-  { date: "2026-04-28", type: "Invoice", ref: "INV-2026-0158", client: "Asian Paints Ltd", amt: 38000, bal: 38000 },
-  { date: "2026-05-08", type: "Invoice", ref: "INV-2026-0170", client: "Asian Paints Ltd", amt: 67000, bal: 105000 },
-  { date: "2026-05-18", type: "Payment", ref: "RCPT-3312", client: "Asian Paints Ltd", amt: -38000, bal: 67000 },
+  { id: "led-c006", date: "2026-04-28", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0158", client: "Asian Paints Ltd", desc: "Freight invoice INV-2026-0158 raised on customer", amt: 38000, bal: 38000 },
+  { id: "led-c007", date: "2026-05-08", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0170", client: "Asian Paints Ltd", desc: "Freight invoice INV-2026-0170 raised on customer", amt: 67000, bal: 105000 },
+  { id: "led-c008", date: "2026-05-18", type: "Payment", particular: "Customer Payment", ref: "RCPT-3312", client: "Asian Paints Ltd", desc: "Payment received against outstanding invoices", amt: -38000, bal: 67000 },
   // Marico Limited — net ₹42,000
-  { date: "2026-05-02", type: "Invoice", ref: "INV-2026-0163", client: "Marico Limited", amt: 92000, bal: 92000 },
-  { date: "2026-05-20", type: "Payment", ref: "RCPT-3320", client: "Marico Limited", amt: -50000, bal: 42000 },
+  { id: "led-c009", date: "2026-05-02", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0163", client: "Marico Limited", desc: "Freight invoice INV-2026-0163 raised on customer", amt: 92000, bal: 92000 },
+  { id: "led-c010", date: "2026-05-20", type: "Payment", particular: "Customer Payment", ref: "RCPT-3320", client: "Marico Limited", desc: "Payment received against outstanding invoices", amt: -50000, bal: 42000 },
   // Dabur India — net ₹24,500
-  { date: "2026-05-05", type: "Invoice", ref: "INV-2026-0166", client: "Dabur India", amt: 24500, bal: 24500 },
+  { id: "led-c011", date: "2026-05-05", type: "Invoice", particular: "Invoice Raised", ref: "INV-2026-0166", client: "Dabur India", desc: "Freight invoice INV-2026-0166 raised on customer", amt: 24500, bal: 24500 },
 ];
 
 /* ---------- Vendor (AP) ledger (sample, append-only) ----------
    Payables side: a bill approval increases what we owe (debit), a payment
    reduces it (credit/negative). Running balance = what's still owed. */
 export const VENDOR_LEDGER = [
-  { date: "2026-04-11", type: "Bill approved", ref: "VB-8780", amt: 96000, bal: 96000 },
-  { date: "2026-04-24", type: "Payment", ref: "PAY-7741", amt: -96000, bal: 0 },
-  { date: "2026-05-10", type: "Bill approved", ref: "VB-8801", amt: 118000, bal: 118000 },
-  { date: "2026-05-11", type: "Bill approved", ref: "VB-8820", amt: 109500, bal: 227500 },
+  { id: "led-v001", date: "2026-04-11", type: "Bill approved", particular: "Vendor Bill Approved", ref: "VB-8780", desc: "Vendor bill VB-8780 approved for payment", amt: 96000, bal: 96000 },
+  { id: "led-v002", date: "2026-04-24", type: "Payment", particular: "Payment Made", ref: "PAY-7741", desc: "Payment released to vendor against VB-8780", amt: -96000, bal: 0 },
+  { id: "led-v003", date: "2026-05-10", type: "Bill approved", particular: "Vendor Bill Approved", ref: "VB-8801", desc: "Vendor bill VB-8801 approved for payment", amt: 118000, bal: 118000 },
+  { id: "led-v004", date: "2026-05-11", type: "Bill approved", particular: "Vendor Bill Approved", ref: "VB-8820", desc: "Vendor bill VB-8820 approved for payment", amt: 109500, bal: 227500 },
 ];
 
 /* ---------- Enterprise Reports hub (freight analytics cards) ---------- */

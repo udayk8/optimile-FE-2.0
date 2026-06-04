@@ -89,6 +89,9 @@ export interface LedgerEntry {
   amt: number
   bal: number
   client?: string   // AR rows carry their client; AP/vendor rows omit it
+  id?: string        // ledger row id → "Reference" column (led-001)
+  particular?: string // bold label → "Particular" column
+  desc?: string      // narrative → "Description" column
 }
 
 export interface SeriesRow {
