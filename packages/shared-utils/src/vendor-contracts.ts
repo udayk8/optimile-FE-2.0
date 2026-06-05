@@ -16,7 +16,6 @@
      GET  /admin/vendors/:vendorId/contracts
    ============================================================ */
 
-import { citiesToDisplayLane, laneCodeToCityDisplay } from './lane'
 import { isValidRateType, type RateType } from './rate-type'
 
 // ── Model ──
@@ -39,11 +38,9 @@ export interface VendorContract {
   /** Vendor display name — vendor-web also matches on this (same as auction bridge). */
   vendorName: string
   tenantId?: string
-  /** Lane identity — source/destination cities (address-book vocabulary). */
-  originCity?: string
-  destinationCity?: string
-  /** Legacy/internal lane code; display uses the cities. */
-  laneCode: string
+  /** Lane = source/destination cities (address-book vocabulary). */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   rate: number
   rateType: RateType
@@ -59,16 +56,12 @@ export interface VendorContract {
   volumeAllocationPercent?: number
 }
 
-/** "Mumbai → Delhi" — from cities when present, else expanded legacy code. */
+/** "Mumbai → Delhi" — display label from the source/destination cities. */
 export function vendorContractLaneLabel(contract: {
-  originCity?: string
-  destinationCity?: string
-  laneCode: string
+  originCity: string
+  destinationCity: string
 }): string {
-  if (contract.originCity && contract.destinationCity) {
-    return `${contract.originCity} → ${contract.destinationCity}`
-  }
-  return laneCodeToCityDisplay(contract.laneCode) || contract.laneCode
+  return `${contract.originCity} → ${contract.destinationCity}`
 }
 
 // ── CSV template + validation ──
@@ -125,7 +118,6 @@ export function validateVendorContractCsvHeaders(headers: string[]): string[] {
 export interface VendorContractCsvRow {
   originCity: string
   destinationCity: string
-  laneCode: string
   vehicleType: string
   rate: number
   rateType: RateType
@@ -168,7 +160,6 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
     const destinationCity = (values[index('destinationCity')] ?? '').trim()
     if (!originCity) errors.push('Origin city is required.')
     if (!destinationCity) errors.push('Destination city is required.')
-    const laneCode = citiesToDisplayLane(originCity, destinationCity)
 
     const vehicleType = values[index('vehicleType')] ?? ''
     if (!vehicleType) errors.push('Vehicle type is required.')
@@ -191,7 +182,7 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
       invalidRows.push({ rowNumber, errors })
       return
     }
-    validRows.push({ originCity, destinationCity, laneCode, vehicleType, rate, rateType: rateType as RateType, startDate, endDate })
+    validRows.push({ originCity, destinationCity, vehicleType, rate, rateType: rateType as RateType, startDate, endDate })
   })
 
   return { headerErrors: [], validRows, invalidRows }
@@ -247,7 +238,6 @@ export function createVendorContracts(
     tenantId: vendor.tenantId,
     originCity: row.originCity,
     destinationCity: row.destinationCity,
-    laneCode: row.laneCode,
     vehicleType: row.vehicleType,
     rate: row.rate,
     rateType: row.rateType,

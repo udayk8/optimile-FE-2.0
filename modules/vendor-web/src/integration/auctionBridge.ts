@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { isValidLaneCode, normalizeLaneCode, splitLaneCode } from '@shared-utils'
 import type {
   Auction,
   AuctionBid,
@@ -44,9 +43,9 @@ interface SourceLaneBid {
 }
 interface SourceLane {
   id: string
-  lane: string
-  originCity?: string
-  destinationCity?: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   capacityMt: number
@@ -86,9 +85,9 @@ interface SourceContract {
   contractType?: 'BULK' | 'LOT' | 'SPOT'
   vendorId: string
   vendorName: string
-  lane: string
-  originCity?: string
-  destinationCity?: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   contractedRate: number
@@ -164,15 +163,6 @@ function writeStore(store: SourceStore) {
   window.dispatchEvent(new CustomEvent('optimile-auction-store'))
 }
 
-// "Mumbai → Delhi" / "Mumbai -> Delhi" → ["Mumbai", "Delhi"];
-// lane codes ("MUM-BLR") split into their two location codes.
-function splitLane(lane: string): [string, string] {
-  const codeParts = splitLaneCode(lane)
-  if (codeParts) return codeParts
-  const parts = lane.split(/→|->| - /).map((p) => p.trim())
-  return [parts[0] ?? lane, parts[1] ?? '']
-}
-
 function toLocation(city: string): Location {
   return { name: city, city, state: '' }
 }
@@ -204,9 +194,7 @@ function mapState(source: SourceAuction, won: boolean): AuctionState {
 }
 
 function mapLane(lane: SourceLane, identity: VendorIdentity): AuctionLane {
-  const [origin, destination] = lane.originCity && lane.destinationCity
-    ? [lane.originCity, lane.destinationCity]
-    : splitLane(lane.lane)
+  const [origin, destination] = [lane.originCity ?? '', lane.destinationCity ?? '']
   const best = lane.ranking.length
     ? Math.min(...lane.ranking.map((b) => b.amount))
     : undefined
@@ -295,12 +283,9 @@ function mapContractStatus(status: SourceContract['status']): ContractStatus {
 }
 
 function mapContract(source: SourceContract): Contract {
-  const [origin, destination] = source.originCity && source.destinationCity
-    ? [source.originCity, source.destinationCity]
-    : splitLane(source.lane)
+  const [origin, destination] = [source.originCity ?? '', source.destinationCity ?? '']
   return {
     id: source.id,
-    laneCode: isValidLaneCode(source.lane) ? normalizeLaneCode(source.lane) : undefined,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
     source: 'AUCTION_WIN',
     rateCard: [
@@ -517,8 +502,8 @@ export function useAuctionNotificationsSync(): void {
               const best = Math.min(...lane.ranking.map((b) => b.amount))
               push(base(
                 `ntf-auc-outbid-${source.id}-${lane.id}`,
-                `Outbid on ${lane.lane}`,
-                `Your bid on ${lane.lane} in ${source.id} is now L${myBid.rank}. Best bid is ₹${best.toLocaleString('en-IN')}.`,
+                `Outbid on ${lane.originCity} → ${lane.destinationCity}`,
+                `Your bid on ${lane.originCity} → ${lane.destinationCity} in ${source.id} is now L${myBid.rank}. Best bid is ₹${best.toLocaleString('en-IN')}.`,
                 detailLink,
               ))
             }

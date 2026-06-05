@@ -98,7 +98,7 @@ export default function DashboardPage() {
                   <span className="font-mono text-sm font-semibold">{contract.id}</span>
                   <StatusBadge status={contract.status} />
                 </div>
-                <p className="mt-2 text-sm font-bold text-text">{contract.lane}</p>
+                <p className="mt-2 text-sm font-bold text-text">{contract.originCity} - {contract.destinationCity}</p>
                 <p className="mt-1 text-xs text-gray-500">{contract.vendorName} · {contract.vehicleType}</p>
               </Link>
             ))}

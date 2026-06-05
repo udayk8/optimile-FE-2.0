@@ -10,13 +10,11 @@ import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
   buildVendorContractCsvTemplate,
-  citiesToDisplayLane,
   getRateTypeLabel,
   isValidRateType,
   listTenantCities,
   listVendorContracts,
   parseVendorContractCsv,
-  vendorContractLaneLabel,
   uploadVendorContractsCsv,
   type RateType,
   type VendorContract,
@@ -42,9 +40,9 @@ interface AuctionStoreContract {
   contractType?: "BULK" | "LOT" | "SPOT";
   vendorId: string;
   vendorName: string;
-  lane: string;
-  originCity?: string;
-  destinationCity?: string;
+  /** Lane = source/destination city pair. */
+  originCity: string;
+  destinationCity: string;
   vehicleType: string;
   contractedRate: number;
   rateUnit: VendorContract["rateType"];
@@ -71,9 +69,8 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
         contractId: contract.id,
         vendorId: contract.vendorId,
         vendorName: contract.vendorName,
-        originCity: contract.originCity,
-        destinationCity: contract.destinationCity,
-        laneCode: contract.lane,
+        originCity: contract.originCity ?? "",
+        destinationCity: contract.destinationCity ?? "",
         vehicleType: contract.vehicleType,
         rate: contract.contractedRate,
         rateType: contract.rateUnit,
@@ -138,9 +135,8 @@ function readSpotContracts(vendor: { id: string; name: string }): VendorSpotCont
         consumedByBookingId: contract.consumedByBookingId,
         vendorId: contract.vendorId,
         vendorName: contract.vendorName,
-        originCity: contract.originCity,
-        destinationCity: contract.destinationCity,
-        laneCode: contract.lane,
+        originCity: contract.originCity ?? "",
+        destinationCity: contract.destinationCity ?? "",
         vehicleType: contract.vehicleType,
         rate: contract.contractedRate,
         rateType: contract.rateUnit,
@@ -184,8 +180,8 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
       description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
       headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity ?? vendorContractLaneLabel(contract)}</span>,
-        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity ?? "—"}</span>,
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity || "—"}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity || "—"}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -224,8 +220,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
       headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity ?? vendorContractLaneLabel(contract)}</span>,
-        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity ?? "—"}</span>,
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity || "—"}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity || "—"}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -251,7 +247,6 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
 const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
   originCity: "",
   destinationCity: "",
-  laneCode: "",
   vehicleType: "",
   rate: 0,
   rateType: "PER_TRIP",
@@ -304,7 +299,7 @@ export function VendorContractFormDialog({
   function save() {
     const validationError = validateContractRow(form);
     if (validationError) return setError(validationError);
-    onSave({ ...form, laneCode: citiesToDisplayLane(form.originCity, form.destinationCity) });
+    onSave({ ...form });
     onOpenChange(false);
   }
 

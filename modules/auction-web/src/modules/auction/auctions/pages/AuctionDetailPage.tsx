@@ -192,7 +192,7 @@ export default function AuctionDetailPage() {
                     <StatusBadge status={contract.status} />
                   </div>
                   <p className="mt-2 text-sm font-bold text-text">{contract.vendorName}</p>
-                  <p className="mt-1 text-xs text-gray-500">{contract.lane} · {contract.allocationRank}</p>
+                  <p className="mt-1 text-xs text-gray-500">{contract.originCity} - {contract.destinationCity} · {contract.allocationRank}</p>
                 </Link>
               ))}
             </CardContent>
@@ -205,7 +205,7 @@ export default function AuctionDetailPage() {
           {auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>{lane.lane}</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity}</CardTitle>
                 <StatusBadge status={auction.status} />
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-4">
@@ -242,7 +242,7 @@ export default function AuctionDetailPage() {
           {auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader>
-                <CardTitle>{lane.lane} Ranking</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity} Ranking</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {lane.ranking.length === 0 && <p className="text-sm text-gray-600">No valid bids recorded on this lane.</p>}
@@ -292,7 +292,7 @@ export default function AuctionDetailPage() {
           {auction.type !== 'SPOT' && auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>{lane.lane}</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity}</CardTitle>
                 {lane.awardDecision ? <StatusBadge status="AWARDED" /> : <StatusBadge status={auction.status} />}
               </CardHeader>
               <CardContent className="space-y-4">
@@ -412,7 +412,10 @@ export default function AuctionDetailPage() {
             <div className="space-y-4">
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p className="text-sm font-bold text-text">
-                  {awardModal.scope === 'SPOT' ? spotLane?.lane : auction.lanes.find((lane) => lane.id === awardModal.laneId)?.lane}
+                  {(() => {
+                    const modalLane = awardModal.scope === 'SPOT' ? spotLane : auction.lanes.find((lane) => lane.id === awardModal.laneId)
+                    return modalLane ? `${modalLane.originCity} - ${modalLane.destinationCity}` : ''
+                  })()}
                 </p>
                 {awardModal.scope === 'SPOT' && spotLane && (
                   <p className="mt-1 text-xs text-gray-600">Spot ranks are shown in bid order. L1 is the current top bidder.</p>

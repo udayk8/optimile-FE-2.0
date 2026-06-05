@@ -29,9 +29,9 @@ export const MOCK_DASHBOARD: DashboardData = {
   pendingIndents: {
     count: 3,
     items: [
-      { id: 'BKG-2026-1001', contractId: 'CNT-001', lane: 'Bengaluru → Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1002', contractId: 'CNT-002', lane: 'Bengaluru → Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1003', contractId: 'CNT-001', lane: 'Bengaluru → Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1001', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1002', contractId: 'CNT-002', originCity: 'Bengaluru', destinationCity: 'Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1003', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
     ],
   },
   uninvoicedBookings: { count: 4, totalBillableAmount: 285000 },

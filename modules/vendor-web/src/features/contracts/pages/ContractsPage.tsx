@@ -20,8 +20,7 @@ const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
 
 function laneLabel(contract: Contract): string {
   const { origin, destination } = contract.laneDetails
-  if (origin.city && destination.city) return formatLaneDisplay(origin.city, destination.city)
-  return contract.laneCode ?? formatLaneDisplay(origin.city, destination.city)
+  return formatLaneDisplay(origin.city, destination.city)
 }
 
 export default function ContractsPage() {

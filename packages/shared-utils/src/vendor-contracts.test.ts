@@ -80,7 +80,6 @@ describe('CSV row parsing', () => {
       {
         originCity: 'Mumbai',
         destinationCity: 'Bengaluru',
-        laneCode: 'Mumbai - Bengaluru',
         vehicleType: '32FT',
         rate: 45000,
         rateType: 'PER_TRIP',

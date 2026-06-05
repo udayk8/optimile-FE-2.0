@@ -98,7 +98,8 @@ export default function ContractsPage() {
         query.length === 0 ||
         contract.id.toLowerCase().includes(query) ||
         contract.vendorName.toLowerCase().includes(query) ||
-        contract.lane.toLowerCase().includes(query) ||
+        contract.originCity.toLowerCase().includes(query) ||
+        contract.destinationCity.toLowerCase().includes(query) ||
         contract.vehicleType.toLowerCase().includes(query)
       return matchesTab && matchesSearch
     })
@@ -136,14 +137,14 @@ export default function ContractsPage() {
         key: 'origin',
         header: 'Source',
         render: (contract) => (
-          <span className="text-sm text-[#0F172A]">{contract.originCity ?? contract.lane}</span>
+          <span className="text-sm text-[#0F172A]">{contract.originCity}</span>
         ),
       },
       {
         key: 'destination',
         header: 'Destination',
         render: (contract) => (
-          <span className="text-sm text-[#0F172A]">{contract.destinationCity ?? '—'}</span>
+          <span className="text-sm text-[#0F172A]">{contract.destinationCity}</span>
         ),
       },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },
@@ -229,7 +230,7 @@ export default function ContractsPage() {
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Lane</p>
-                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.lane}</p>
+                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.originCity} - {selectedContract.destinationCity}</p>
                   <p className="mt-1 text-xs text-[#64748B]">{selectedContract.vehicleType}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">

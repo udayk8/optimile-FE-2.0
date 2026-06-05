@@ -27,7 +27,8 @@ export default function ContractsPage() {
       return (
         contract.id.toLowerCase().includes(query) ||
         contract.vendorName.toLowerCase().includes(query) ||
-        contract.lane.toLowerCase().includes(query)
+        contract.originCity.toLowerCase().includes(query) ||
+        contract.destinationCity.toLowerCase().includes(query)
       )
     })
   }, [contracts, search])
@@ -46,7 +47,7 @@ export default function ContractsPage() {
             <StatusBadge status={contract.status} />
           </div>
           <p className="mt-2 text-sm font-bold text-text">{contract.vendorName}</p>
-          <p className="mt-1 text-xs text-gray-500">{contract.lane}</p>
+          <p className="mt-1 text-xs text-gray-500">{contract.originCity} - {contract.destinationCity}</p>
         </div>
       ),
     },
@@ -113,7 +114,7 @@ export default function ContractsPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <InfoGrid className="md:grid-cols-2">
-                <InfoItem label="Lane">{selectedContract.lane}</InfoItem>
+                <InfoItem label="Lane">{selectedContract.originCity} - {selectedContract.destinationCity}</InfoItem>
                 <InfoItem label="Vehicle Type">{selectedContract.vehicleType}</InfoItem>
                 <InfoItem label="Contracted Rate">
                     <CurrencyDisplay amount={selectedContract.contractedRate} /> / {selectedContract.rateUnit.replace('PER_', '').replace('_', ' ')}

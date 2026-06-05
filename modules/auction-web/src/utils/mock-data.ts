@@ -51,7 +51,8 @@ export const MOCK_VENDORS: VendorOption[] = [
 export const MOCK_BOOKINGS: BookingReference[] = [
   {
     id: 'BK-2026-11203',
-    lane: 'Mumbai → Delhi',
+    originCity: 'Mumbai',
+    destinationCity: 'Delhi',
     vehicleType: '20 MT Open Body',
     commodity: 'FMCG - packaged snacks',
     quantity: 18,
@@ -61,7 +62,8 @@ export const MOCK_BOOKINGS: BookingReference[] = [
   },
   {
     id: 'BK-2026-11261',
-    lane: 'Pune → Jaipur',
+    originCity: 'Pune',
+    destinationCity: 'Jaipur',
     vehicleType: '32 FT Closed Body',
     commodity: 'Consumer durables',
     quantity: 22,
@@ -111,7 +113,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-1',
-        lane: 'Mumbai → Delhi',
+        originCity: 'Mumbai',
+        destinationCity: 'Delhi',
         region: 'North India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -161,7 +164,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-1',
-        lane: 'Mumbai → Bangalore',
+        originCity: 'Mumbai',
+        destinationCity: 'Bangalore',
         region: 'South India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -183,7 +187,8 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'lane-bulk-2',
-        lane: 'Bangalore → Chennai',
+        originCity: 'Bangalore',
+        destinationCity: 'Chennai',
         region: 'South India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -232,7 +237,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-lot-1',
-        lane: 'Delhi → Lucknow',
+        originCity: 'Delhi',
+        destinationCity: 'Lucknow',
         region: 'North India',
         vehicleType: '32 FT Closed Body',
         capacityMt: 32,
@@ -282,7 +288,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-3',
-        lane: 'Ahmedabad → Surat',
+        originCity: 'Ahmedabad',
+        destinationCity: 'Surat',
         region: 'West India',
         vehicleType: 'LCV',
         capacityMt: 8,
@@ -314,7 +321,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-2',
     vendorName: 'BlueAxle Freight',
-    lane: 'Delhi → Lucknow',
+    originCity: 'Delhi',
+    destinationCity: 'Lucknow',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 13100,
@@ -336,7 +344,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-4',
     vendorName: 'MetroFleet Movers',
-    lane: 'Delhi → Lucknow',
+    originCity: 'Delhi',
+    destinationCity: 'Lucknow',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 12900,
@@ -357,7 +366,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-1',
     vendorName: 'SwiftHaul Logistics',
-    lane: 'Delhi → Lucknow',
+    originCity: 'Delhi',
+    destinationCity: 'Lucknow',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 13250,
@@ -378,7 +388,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'BULK',
     vendorId: 'ven-3',
     vendorName: 'RoadBridge Carriers',
-    lane: 'Pune → Jaipur',
+    originCity: 'Pune',
+    destinationCity: 'Jaipur',
     region: 'West India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 48800,

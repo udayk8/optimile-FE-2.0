@@ -14,7 +14,9 @@ export interface UserProfile {
 
 export interface BookingReference {
   id: string
-  lane: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   commodity: string
   quantity: number
@@ -52,10 +54,9 @@ export interface AuctionEvent {
 
 export interface AuctionLane {
   id: string
-  lane: string
-  /** City-pair lane identity (lane code is display shorthand). */
-  originCity?: string
-  destinationCity?: string
+  /** Lane = source/destination city pair (address-book vocabulary). */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   capacityMt: number
@@ -139,10 +140,9 @@ export interface Contract {
   contractType: 'BULK' | 'LOT' | 'SPOT'
   vendorId: string
   vendorName: string
-  lane: string
-  /** City-pair lane identity copied from the auction lane at award. */
-  originCity?: string
-  destinationCity?: string
+  /** Lane = source/destination city pair copied from the auction lane at award. */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   contractedRate: number
@@ -224,7 +224,9 @@ export interface RfqType {
 }
 
 export interface RfqResponseRow {
-  lane: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   price: number
 }

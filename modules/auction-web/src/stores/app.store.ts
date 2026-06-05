@@ -160,9 +160,9 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8500 },
-        { lane: 'Mumbai - Nashik', vehicleType: '20ft Container', price: 12000 },
-        { lane: 'Pune - Nagpur', vehicleType: '32ft SXL', price: 18500 },
+        { originCity: 'Mumbai', destinationCity: 'Pune', vehicleType: '20ft Container', price: 8500 },
+        { originCity: 'Mumbai', destinationCity: 'Nashik', vehicleType: '20ft Container', price: 12000 },
+        { originCity: 'Pune', destinationCity: 'Nagpur', vehicleType: '32ft SXL', price: 18500 },
       ],
     },
     {
@@ -173,10 +173,10 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8200 },
-        { lane: 'Mumbai - Nashik', vehicleType: '20ft Container', price: 11800 },
-        { lane: 'Pune - Nagpur', vehicleType: '32ft SXL', price: 17500 },
-        { lane: 'Delhi - Jaipur', vehicleType: '20ft Container', price: 9000 },
+        { originCity: 'Mumbai', destinationCity: 'Pune', vehicleType: '20ft Container', price: 8200 },
+        { originCity: 'Mumbai', destinationCity: 'Nashik', vehicleType: '20ft Container', price: 11800 },
+        { originCity: 'Pune', destinationCity: 'Nagpur', vehicleType: '32ft SXL', price: 17500 },
+        { originCity: 'Delhi', destinationCity: 'Jaipur', vehicleType: '20ft Container', price: 9000 },
       ],
     },
     {
@@ -187,9 +187,9 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8800 },
-        { lane: 'Delhi - Jaipur', vehicleType: '20ft Container', price: 9500 },
-        { lane: 'Chennai - Bengaluru', vehicleType: '32ft SXL', price: 14200 },
+        { originCity: 'Mumbai', destinationCity: 'Pune', vehicleType: '20ft Container', price: 8800 },
+        { originCity: 'Delhi', destinationCity: 'Jaipur', vehicleType: '20ft Container', price: 9500 },
+        { originCity: 'Chennai', destinationCity: 'Bengaluru', vehicleType: '32ft SXL', price: 14200 },
       ],
     },
   ],
@@ -434,7 +434,8 @@ export const useAppStore = create<AppState>((set) => ({
               contractType: auction.type as 'BULK' | 'LOT',
               vendorId: decision.vendorId,
               vendorName: decision.vendorName,
-              lane: lane.lane,
+              originCity: lane.originCity,
+              destinationCity: lane.destinationCity,
               region: lane.region,
               vehicleType: lane.vehicleType,
               contractedRate: decision.awardedAmount,
@@ -452,7 +453,12 @@ export const useAppStore = create<AppState>((set) => ({
             }))
 
       const contractsWithoutCurrentLane = state.contracts.filter(
-        (contract) => !(contract.sourceAuctionId === auction.id && contract.lane === lane.lane)
+        (contract) =>
+          !(
+            contract.sourceAuctionId === auction.id &&
+            contract.originCity === lane.originCity &&
+            contract.destinationCity === lane.destinationCity
+          )
       )
 
       return {
@@ -479,9 +485,9 @@ export const useAppStore = create<AppState>((set) => ({
             auditTrail: [
               ...item.auditTrail,
               ...(bidRank !== allocationRank
-                ? [makeEvent(`${item.id}-evt-override-${item.auditTrail.length + 1}`, 'OVERRIDE', `${lane.lane} ${allocationRank} assigned to ${bidRank} with reason: ${reason}`, actor)]
+                ? [makeEvent(`${item.id}-evt-override-${item.auditTrail.length + 1}`, 'OVERRIDE', `${lane.originCity} - ${lane.destinationCity} ${allocationRank} assigned to ${bidRank} with reason: ${reason}`, actor)]
                 : []),
-              makeEvent(`${item.id}-evt-award-${item.auditTrail.length + 2}`, 'AWARDED', `${lane.lane} awarded and contract output prepared.`, actor),
+              makeEvent(`${item.id}-evt-award-${item.auditTrail.length + 2}`, 'AWARDED', `${lane.originCity} - ${lane.destinationCity} awarded and contract output prepared.`, actor),
             ],
           }
         }),
@@ -519,7 +525,12 @@ export const useAppStore = create<AppState>((set) => ({
       if (selectedEntries.length === 0) return state
 
       const contractsWithoutCurrentLane = state.contracts.filter(
-        (contract) => !(contract.sourceAuctionId === auction.id && contract.lane === lane.lane)
+        (contract) =>
+          !(
+            contract.sourceAuctionId === auction.id &&
+            contract.originCity === lane.originCity &&
+            contract.destinationCity === lane.destinationCity
+          )
       )
 
       const newContracts: Contract[] =
@@ -531,7 +542,8 @@ export const useAppStore = create<AppState>((set) => ({
               contractType: auction.type as 'BULK' | 'LOT',
               vendorId: decision.vendorId,
               vendorName: decision.vendorName,
-              lane: lane.lane,
+              originCity: lane.originCity,
+              destinationCity: lane.destinationCity,
               region: lane.region,
               vehicleType: lane.vehicleType,
               contractedRate: decision.awardedAmount,
@@ -572,7 +584,7 @@ export const useAppStore = create<AppState>((set) => ({
             completedAt: allAwarded ? new Date().toISOString() : item.completedAt,
             auditTrail: [
               ...item.auditTrail,
-              makeEvent(`${item.id}-evt-award-${item.auditTrail.length + 1}`, 'AWARDED', `${lane.lane} awarded and contract output prepared.`, actor),
+              makeEvent(`${item.id}-evt-award-${item.auditTrail.length + 1}`, 'AWARDED', `${lane.originCity} - ${lane.destinationCity} awarded and contract output prepared.`, actor),
             ],
           }
         }),

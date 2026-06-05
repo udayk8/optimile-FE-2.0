@@ -696,7 +696,9 @@ export interface BookingRecord {
     vendorName: string;
     rate: number;
     rateUnit: "PER_TRIP" | "PER_KM" | "PER_MT";
-    lane: string;
+    /** Lane = source/destination city pair. */
+    originCity: string;
+    destinationCity: string;
   } | null;
 
   poNumber?: string | null;
@@ -759,7 +761,9 @@ export interface BookingInput {
     vendorName: string;
     rate: number;
     rateUnit: "PER_TRIP" | "PER_KM" | "PER_MT";
-    lane: string;
+    /** Lane = source/destination city pair. */
+    originCity: string;
+    destinationCity: string;
   } | null;
 
   poNumber?: string | null;

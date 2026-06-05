@@ -43,7 +43,8 @@ export interface PriorityAuction {
 export interface ExpiringContract {
   id: string
   vendorName: string
-  lane: string
+  originCity: string
+  destinationCity: string
   endDate: string
   status: string
 }
@@ -59,7 +60,8 @@ export interface SearchResultItem {
   id: string
   title?: string
   vendorName?: string
-  lane?: string
+  originCity?: string
+  destinationCity?: string
   type?: string
   status?: string
 }
@@ -311,7 +313,6 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
       contractType: auction.type as 'BULK' | 'LOT' | 'SPOT',
       vendorId: d.vendorId,
       vendorName: d.vendorName,
-      lane: lane.lane,
       originCity: lane.originCity,
       destinationCity: lane.destinationCity,
       region: lane.region,
@@ -336,7 +337,7 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
       placementFailures: [],
       rateDeviationOpen: false,
     }))
-    if (contracts.length > 0) replaceLaneContracts(auction.id, lane.lane, contracts)
+    if (contracts.length > 0) replaceLaneContracts(auction.id, { originCity: lane.originCity, destinationCity: lane.destinationCity }, contracts)
   })
 
   updateAuction(auctionId, (a) => {
@@ -439,7 +440,8 @@ export async function fetchContracts(params?: { status?: string; search?: string
       (c) =>
         c.id.toLowerCase().includes(q) ||
         c.vendorName.toLowerCase().includes(q) ||
-        c.lane.toLowerCase().includes(q)
+        c.originCity.toLowerCase().includes(q) ||
+        c.destinationCity.toLowerCase().includes(q)
     )
   }
   return out
@@ -481,7 +483,7 @@ export async function fetchRfqResponses(rfqId: string): Promise<RfqResponse[]> {
 }
 export async function uploadRfqResponse(
   rfqId: string,
-  data: { fileName: string; vendorName?: string; rows: { lane: string; vehicleType: string; price: number }[] }
+  data: { fileName: string; vendorName?: string; rows: { originCity: string; destinationCity: string; vehicleType: string; price: number }[] }
 ): Promise<RfqResponse> {
   const next: RfqResponse = {
     id: `RFQR-LOCAL-${Date.now()}`,
@@ -507,7 +509,8 @@ export async function searchAuctionService(q: string): Promise<SearchResponse> {
       (c) =>
         c.id.toLowerCase().includes(lower) ||
         c.vendorName.toLowerCase().includes(lower) ||
-        c.lane.toLowerCase().includes(lower)
-    ).map((c) => ({ id: c.id, vendorName: c.vendorName, lane: c.lane, status: c.status })),
+        c.originCity.toLowerCase().includes(lower) ||
+        c.destinationCity.toLowerCase().includes(lower)
+    ).map((c) => ({ id: c.id, vendorName: c.vendorName, originCity: c.originCity, destinationCity: c.destinationCity, status: c.status })),
   }
 }

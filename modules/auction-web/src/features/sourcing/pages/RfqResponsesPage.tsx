@@ -16,7 +16,8 @@ const PAGE_SIZE = 15
 
 type FlatRow = {
   id: string
-  lane: string
+  originCity: string
+  destinationCity: string
   vehicleType: string
   price: number
   avgPrice: number
@@ -75,7 +76,8 @@ export default function RfqResponsesPage() {
       response.rows.forEach((row, idx) => {
         rows.push({
           id: `${response.id}-${idx}`,
-          lane: row.lane,
+          originCity: row.originCity,
+          destinationCity: row.destinationCity,
           vehicleType: row.vehicleType,
           price: row.price,
           avgPrice: 0,
@@ -90,7 +92,7 @@ export default function RfqResponsesPage() {
   const avgPriceMap = useMemo(() => {
     const map = new Map<string, { sum: number; count: number }>()
     allRows.forEach((row) => {
-      const key = `${row.lane}||${row.vehicleType}`
+      const key = `${row.originCity}||${row.destinationCity}||${row.vehicleType}`
       const existing = map.get(key) || { sum: 0, count: 0 }
       map.set(key, { sum: existing.sum + row.price, count: existing.count + 1 })
     })
@@ -104,11 +106,15 @@ export default function RfqResponsesPage() {
     const from = dateFrom ? new Date(dateFrom).getTime() : 0
     const to = dateTo ? new Date(dateTo + 'T23:59:59').getTime() : Infinity
     return allRows
-      .map((row) => ({ ...row, avgPrice: avgPriceMap.get(`${row.lane}||${row.vehicleType}`) ?? row.price }))
+      .map((row) => ({ ...row, avgPrice: avgPriceMap.get(`${row.originCity}||${row.destinationCity}||${row.vehicleType}`) ?? row.price }))
       .filter((row) => {
         const uploadedTime = new Date(row.uploadedAt).getTime()
         const matchesDate = uploadedTime >= from && uploadedTime <= to
-        const matchesSearch = !query || row.lane.toLowerCase().includes(query) || row.vendorName.toLowerCase().includes(query)
+        const matchesSearch =
+          !query ||
+          row.originCity.toLowerCase().includes(query) ||
+          row.destinationCity.toLowerCase().includes(query) ||
+          row.vendorName.toLowerCase().includes(query)
         return matchesDate && matchesSearch
       })
   }, [allRows, avgPriceMap, search, dateFrom, dateTo])
@@ -116,9 +122,14 @@ export default function RfqResponsesPage() {
   const columns = useMemo<DataTableColumn<FlatRow>[]>(
     () => [
       {
-        key: 'lane',
-        header: 'Lane',
-        render: (row) => <span className="font-medium text-[#0F172A]">{row.lane}</span>,
+        key: 'originCity',
+        header: 'Source',
+        render: (row) => <span className="font-medium text-[#0F172A]">{row.originCity}</span>,
+      },
+      {
+        key: 'destinationCity',
+        header: 'Destination',
+        render: (row) => <span className="font-medium text-[#0F172A]">{row.destinationCity}</span>,
       },
       {
         key: 'vehicleType',
@@ -175,12 +186,12 @@ export default function RfqResponsesPage() {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line, index) => {
-        const [lane, vehicleType, priceText] = line.split(',').map((part) => part.trim())
+        const [originCity, destinationCity, vehicleType, priceText] = line.split(',').map((part) => part.trim())
         const price = Number(priceText)
-        if (!lane || !vehicleType || !Number.isFinite(price)) {
-          throw new Error(`Invalid quote row ${index + 1}. Use: lane, vehicle type, price`)
+        if (!originCity || !destinationCity || !vehicleType || !Number.isFinite(price)) {
+          throw new Error(`Invalid quote row ${index + 1}. Use: source city, destination city, vehicle type, price`)
         }
-        return { lane, vehicleType, price }
+        return { originCity, destinationCity, vehicleType, price }
       })
   }
 
@@ -295,7 +306,7 @@ export default function RfqResponsesPage() {
               <Input
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                placeholder="Search lane or vendor"
+                placeholder="Search source, destination, or vendor"
                 className="w-full sm:w-[200px]"
               />
               <input

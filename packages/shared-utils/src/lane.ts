@@ -239,18 +239,18 @@ export function legacyLaneToCityKey(lane: string): string {
 }
 
 /**
- * Lane key for a contract-side record that may carry explicit cities (new)
- * or only a lane code (legacy).
+ * Lane key for a contract-side record that carries explicit cities (new)
+ * or only a lane code (legacy stored records).
  */
 export function contractCityLaneKey(record: {
   originCity?: string
   destinationCity?: string
-  lane: string
+  lane?: string
 }): string {
   if (record.originCity && record.destinationCity) {
     return cityLaneKey(record.originCity, record.destinationCity)
   }
-  return legacyLaneToCityKey(record.lane)
+  return legacyLaneToCityKey(record.lane ?? '')
 }
 
 /** "Mumbai" → "MUM" display shorthand (known cities only); else first-3 slug. */

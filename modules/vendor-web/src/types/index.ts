@@ -182,8 +182,7 @@ export type ContractSource = 'MANUAL_UPLOAD' | 'AUCTION_WIN'
 
 export interface Contract {
   id: string
-  /** AAA-BBB lane code (e.g. MUM-BLR); laneDetails carries the display fallback. */
-  laneCode?: string
+  /** Lane = source/destination cities, carried in laneDetails. */
   laneDetails: LaneDetails
   rateCard: RateCardEntry[]
   source: ContractSource
@@ -228,7 +227,9 @@ export type IndentStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED'
 export interface IndentSummary {
   id: string
   contractId: string
-  lane: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   reportingDate: string
   slaDeadline: string

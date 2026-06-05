@@ -21,7 +21,6 @@ import type { AuctionType, VendorOption } from '@auction/types'
 // LOT   — multi-lane, L1/L2/L3 allocation, manual or Excel upload
 
 type DraftLane = {
-  lane: string
   originCity: string
   destinationCity: string
   vehicleType: string
@@ -103,7 +102,6 @@ function makeDefaultLane(type: AuctionType, cities?: { originCity: string; desti
   const destinationCity = cities?.destinationCity ?? (type === 'SPOT' ? 'Delhi' : 'Bengaluru')
   const isLot = type === 'LOT'
   return {
-    lane: citiesToDisplayLane(originCity, destinationCity),
     originCity,
     destinationCity,
     vehicleType: '20 MT Open Body',
@@ -154,7 +152,7 @@ export default function AuctionCreatePage() {
       .catch(() => setVendors([]))
   }, [])
 
-  const [title, setTitle] = useState('Spot | Lane Auction | MUM-DEL')
+  const [title, setTitle] = useState('Spot | Lane Auction | Mumbai - Delhi')
   const [auctionRegion, setAuctionRegion] = useState('North India')
   const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT')])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
@@ -201,11 +199,9 @@ export default function AuctionCreatePage() {
 
   const updateLaneCity = (index: number, field: 'originCity' | 'destinationCity', value: string) => {
     setLanes((current) =>
-      current.map((lane, laneIndex) => {
-        if (laneIndex !== index) return lane
-        const next = { ...lane, [field]: value }
-        return { ...next, lane: citiesToDisplayLane(next.originCity, next.destinationCity) }
-      })
+      current.map((lane, laneIndex) =>
+        laneIndex !== index ? lane : { ...lane, [field]: value }
+      )
     )
   }
 
@@ -235,7 +231,6 @@ export default function AuctionCreatePage() {
           return
         }
         importedLanes.push({
-          lane: citiesToDisplayLane(originCity, destinationCity),
           originCity,
           destinationCity,
           vehicleType: normalizeText(values[3]) || '20 MT Open Body',
@@ -305,7 +300,6 @@ export default function AuctionCreatePage() {
         launchNow: launchNow && !scheduledStartAt,
         startAt: launchNow ? scheduledStartAt : undefined,
         lanes: lanes.map((lane) => ({
-          lane: lane.lane,
           originCity: lane.originCity,
           destinationCity: lane.destinationCity,
           region: effectiveType === 'LOT' ? auctionRegion : undefined,
@@ -567,7 +561,7 @@ export default function AuctionCreatePage() {
                           {lanes.map((lane, i) => (
                             <tr key={i} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-xs text-[#64748B]">{i + 1}</td>
-                              <td className="px-4 py-3 text-sm font-semibold text-[#0F172A]">{lane.lane}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-[#0F172A]">{citiesToDisplayLane(lane.originCity, lane.destinationCity)}</td>
                               <td className="px-4 py-3 text-sm text-[#334155]">{lane.vehicleType}</td>
                               <td className="px-4 py-3 font-mono text-sm text-[#334155]">{lane.capacityMt}</td>
                               <td className="px-4 py-3 text-sm text-[#334155]">{lane.rateUnit.replace('_', ' ')}</td>

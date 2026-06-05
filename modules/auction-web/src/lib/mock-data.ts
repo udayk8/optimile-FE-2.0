@@ -54,7 +54,8 @@ export const MOCK_VENDORS: VendorOption[] = [
 export const MOCK_BOOKINGS: BookingReference[] = [
   {
     id: 'BK-2026-11203',
-    lane: 'Mumbai - Delhi',
+    originCity: 'Mumbai',
+    destinationCity: 'Delhi',
     vehicleType: '20 MT Open Body',
     commodity: 'FMCG - packaged snacks',
     quantity: 18,
@@ -64,7 +65,8 @@ export const MOCK_BOOKINGS: BookingReference[] = [
   },
   {
     id: 'BK-2026-11261',
-    lane: 'Pune - Jaipur',
+    originCity: 'Pune',
+    destinationCity: 'Jaipur',
     vehicleType: '32 FT Closed Body',
     commodity: 'Consumer durables',
     quantity: 22,
@@ -97,7 +99,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   // sources of the CNT-SPOT-21xx one-time contracts below. ──
   {
     id: 'AUC-SPOT-887101',
-    title: 'Spot | Lane Auction | MUM-DEL',
+    title: 'Spot | Lane Auction | Mumbai - Delhi',
     type: 'SPOT',
     status: 'AWARDED',
     tenantId: 'tenant-bl001',
@@ -116,7 +118,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-887101',
-        lane: 'MUM-DEL',
+        originCity: 'Mumbai',
+        destinationCity: 'Delhi',
         vehicleType: '32 FT Closed Body',
         capacityMt: 20,
         rateUnit: 'PER_TRIP',
@@ -146,7 +149,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-SPOT-887102',
-    title: 'Spot | Lane Auction | BLR-MAA',
+    title: 'Spot | Lane Auction | Bengaluru - Chennai',
     type: 'SPOT',
     status: 'AWARDED',
     tenantId: 'tenant-bl001',
@@ -165,7 +168,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-887102',
-        lane: 'BLR-MAA',
+        originCity: 'Bengaluru',
+        destinationCity: 'Chennai',
         vehicleType: 'LCV',
         capacityMt: 20,
         rateUnit: 'PER_TRIP',
@@ -195,7 +199,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-SPOT-887103',
-    title: 'Spot | Lane Auction | PNQ-JAI',
+    title: 'Spot | Lane Auction | Pune - Jaipur',
     type: 'SPOT',
     status: 'AWARDED',
     tenantId: 'tenant-bl001',
@@ -214,7 +218,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-887103',
-        lane: 'PNQ-JAI',
+        originCity: 'Pune',
+        destinationCity: 'Jaipur',
         vehicleType: '32 FT Open Body',
         capacityMt: 20,
         rateUnit: 'PER_TRIP',
@@ -244,7 +249,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-SPOT-887104',
-    title: 'Spot | Lane Auction | DEL-LKO',
+    title: 'Spot | Lane Auction | Delhi - Lucknow',
     type: 'SPOT',
     status: 'AWARDED',
     tenantId: 'tenant-bl001',
@@ -263,7 +268,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-887104',
-        lane: 'DEL-LKO',
+        originCity: 'Delhi',
+        destinationCity: 'Lucknow',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
         rateUnit: 'PER_TRIP',
@@ -313,7 +319,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-1',
-        lane: 'Mumbai - Delhi',
         originCity: 'Mumbai',
         destinationCity: 'Delhi',
         region: 'North India',
@@ -365,7 +370,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-1',
-        lane: 'Mumbai - Bengaluru',
         originCity: 'Mumbai',
         destinationCity: 'Bengaluru',
         region: 'South India',
@@ -417,7 +421,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-lot-1',
-        lane: 'Delhi - Lucknow',
         originCity: 'Delhi',
         destinationCity: 'Lucknow',
         region: 'North India',
@@ -469,7 +472,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-3',
-        lane: 'Ahmedabad - Surat',
         originCity: 'Ahmedabad',
         destinationCity: 'Surat',
         region: 'West India',
@@ -514,7 +516,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-55',
-        lane: 'Ahmedabad - Vadodara',
         originCity: 'Ahmedabad',
         destinationCity: 'Vadodara',
         region: 'West India',
@@ -579,7 +580,6 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-lot-25',
-        lane: 'Jaipur - Udaipur',
         originCity: 'Jaipur',
         destinationCity: 'Udaipur',
         region: 'North India',
@@ -638,7 +638,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'SPOT',
     vendorId: 'tenant-vendor-hh8uo8c',
     vendorName: 'Mahesh Transport',
-    lane: 'DEL-LKO',
+    originCity: 'Delhi',
+    destinationCity: 'Lucknow',
     vehicleType: '20 MT Open Body',
     contractedRate: 21900,
     rateUnit: 'PER_TRIP',
@@ -664,7 +665,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'SPOT',
     vendorId: 'tenant-vendor-hh8uo8c',
     vendorName: 'Mahesh Transport',
-    lane: 'MUM-DEL',
+    originCity: 'Mumbai',
+    destinationCity: 'Delhi',
     vehicleType: '32 FT Closed Body',
     contractedRate: 51500,
     rateUnit: 'PER_TRIP',
@@ -688,7 +690,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'SPOT',
     vendorId: 'tenant-vendor-nqup09r',
     vendorName: 'ABC transport',
-    lane: 'BLR-MAA',
+    originCity: 'Bengaluru',
+    destinationCity: 'Chennai',
     vehicleType: 'LCV',
     contractedRate: 18200,
     rateUnit: 'PER_TRIP',
@@ -712,7 +715,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'SPOT',
     vendorId: 'tenant-vendor-af8xr8p',
     vendorName: 'VRL transports',
-    lane: 'PNQ-JAI',
+    originCity: 'Pune',
+    destinationCity: 'Jaipur',
     vehicleType: '32 FT Open Body',
     contractedRate: 46800,
     rateUnit: 'PER_TRIP',
@@ -735,7 +739,6 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-2',
     vendorName: 'BlueAxle Freight',
-    lane: 'Delhi - Lucknow',
     originCity: 'Delhi',
     destinationCity: 'Lucknow',
     region: 'North India',
@@ -761,7 +764,6 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-4',
     vendorName: 'MetroFleet Movers',
-    lane: 'Delhi - Lucknow',
     originCity: 'Delhi',
     destinationCity: 'Lucknow',
     region: 'North India',
@@ -786,7 +788,6 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-1',
     vendorName: 'SwiftHaul Logistics',
-    lane: 'Delhi - Lucknow',
     originCity: 'Delhi',
     destinationCity: 'Lucknow',
     region: 'North India',
@@ -811,7 +812,6 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'BULK',
     vendorId: 'ven-3',
     vendorName: 'RoadBridge Carriers',
-    lane: 'Pune - Jaipur',
     originCity: 'Pune',
     destinationCity: 'Jaipur',
     region: 'West India',
@@ -942,8 +942,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-4 * 24 * 60 * 60 * 1000),
     uploadedBy: 'ops@swifthaul.com',
     rows: [
-      { lane: 'Pune - Jaipur', vehicleType: '32 FT Closed Body', price: 48500 },
-      { lane: 'Mumbai - Delhi', vehicleType: '20 MT Open Body', price: 62200 },
+      { originCity: 'Pune', destinationCity: 'Jaipur', vehicleType: '32 FT Closed Body', price: 48500 },
+      { originCity: 'Mumbai', destinationCity: 'Delhi', vehicleType: '20 MT Open Body', price: 62200 },
     ],
   },
   {
@@ -954,8 +954,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-3 * 24 * 60 * 60 * 1000),
     uploadedBy: 'sales@blueaxle.com',
     rows: [
-      { lane: 'Pune - Jaipur', vehicleType: '32 FT Closed Body', price: 49100 },
-      { lane: 'Mumbai - Delhi', vehicleType: '20 MT Open Body', price: 61800 },
+      { originCity: 'Pune', destinationCity: 'Jaipur', vehicleType: '32 FT Closed Body', price: 49100 },
+      { originCity: 'Mumbai', destinationCity: 'Delhi', vehicleType: '20 MT Open Body', price: 61800 },
     ],
   },
   {
@@ -966,8 +966,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-2 * 24 * 60 * 60 * 1000),
     uploadedBy: 'rfq@metrofleet.com',
     rows: [
-      { lane: 'Pune - Jaipur', vehicleType: '32 FT Closed Body', price: 48900 },
-      { lane: 'Mumbai - Delhi', vehicleType: '20 MT Open Body', price: 62500 },
+      { originCity: 'Pune', destinationCity: 'Jaipur', vehicleType: '32 FT Closed Body', price: 48900 },
+      { originCity: 'Mumbai', destinationCity: 'Delhi', vehicleType: '20 MT Open Body', price: 62500 },
     ],
   },
   {
@@ -978,7 +978,7 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-6 * 24 * 60 * 60 * 1000),
     uploadedBy: 'ops@swifthaul.com',
     rows: [
-      { lane: 'Bengaluru - Chennai', vehicleType: '20 MT Open Body', price: 28500 },
+      { originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: '20 MT Open Body', price: 28500 },
     ],
   },
   {
@@ -989,7 +989,7 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-5 * 24 * 60 * 60 * 1000),
     uploadedBy: 'sales@blueaxle.com',
     rows: [
-      { lane: 'Bengaluru - Chennai', vehicleType: '20 MT Open Body', price: 29200 },
+      { originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: '20 MT Open Body', price: 29200 },
     ],
   },
 ]
@@ -1004,9 +1004,9 @@ export const MOCK_DASHBOARD_RESPONSE = {
     { id: 'AUC-SPOT-042', title: 'Spot | BK-2026-11203 | Mumbai - Delhi', type: 'SPOT', status: 'AWAITING_APPROVAL', updatedAt: iso(-12 * 60 * 60 * 1000), awardDeadline: iso(12 * 60 * 60 * 1000) },
   ],
   expiringContractsList: [
-    { id: 'CNT-2026-0117', vendorName: 'RoadBridge Carriers', lane: 'Pune - Jaipur', endDate: dateOnly(10 * 24 * 60 * 60 * 1000), status: 'EXPIRING_SOON' },
-    { id: 'CNT-2026-0101', vendorName: 'BlueAxle Freight', lane: 'Delhi - Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
-    { id: 'CNT-2026-0102', vendorName: 'MetroFleet Movers', lane: 'Delhi - Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
-    { id: 'CNT-2026-0103', vendorName: 'SwiftHaul Logistics', lane: 'Delhi - Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0117', vendorName: 'RoadBridge Carriers', originCity: 'Pune', destinationCity: 'Jaipur', endDate: dateOnly(10 * 24 * 60 * 60 * 1000), status: 'EXPIRING_SOON' },
+    { id: 'CNT-2026-0101', vendorName: 'BlueAxle Freight', originCity: 'Delhi', destinationCity: 'Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0102', vendorName: 'MetroFleet Movers', originCity: 'Delhi', destinationCity: 'Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0103', vendorName: 'SwiftHaul Logistics', originCity: 'Delhi', destinationCity: 'Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
   ],
 }

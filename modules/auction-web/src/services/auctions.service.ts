@@ -72,7 +72,8 @@ export async function fetchBookings(): Promise<BookingReference[]> {
   const res = await apiClient.get('/bookings', { params: { status: 'PENDING_AUCTION' } })
   return res.data.map((b: any) => ({
     id: b.id,
-    lane: b.lane,
+    originCity: b.originCity ?? '',
+    destinationCity: b.destinationCity ?? '',
     vehicleType: b.vehicleType,
     commodity: b.commodity,
     quantity: b.quantity,
@@ -87,7 +88,8 @@ export async function fetchBooking(id: string): Promise<BookingReference> {
   const b = res.data
   return {
     id: b.id,
-    lane: b.lane,
+    originCity: b.originCity ?? '',
+    destinationCity: b.destinationCity ?? '',
     vehicleType: b.vehicleType,
     commodity: b.commodity,
     quantity: b.quantity,
@@ -134,7 +136,8 @@ function mapAuction(d: any): Auction {
 function mapLane(d: any): AuctionLane {
   return {
     id: d.id,
-    lane: d.lane,
+    originCity: d.originCity ?? '',
+    destinationCity: d.destinationCity ?? '',
     region: d.region,
     vehicleType: d.vehicleType,
     capacityMt: d.capacityMt ?? 0,

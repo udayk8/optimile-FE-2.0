@@ -17,7 +17,8 @@ export interface PriorityAuction {
 export interface ExpiringContract {
   id: string
   vendorName: string
-  lane: string
+  originCity: string
+  destinationCity: string
   endDate: string
   status: string
 }

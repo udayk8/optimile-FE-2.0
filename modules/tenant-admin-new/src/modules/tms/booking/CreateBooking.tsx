@@ -652,7 +652,8 @@ export function CreateBookingPage({
               vendorName: spotContractMatch.vendorName,
               rate: spotContractMatch.contractedRate,
               rateUnit: spotContractMatch.rateUnit,
-              lane: spotContractMatch.lane,
+              originCity: spotContractMatch.originCity,
+              destinationCity: spotContractMatch.destinationCity,
             }
           : null,
       poNumber: null,
@@ -1109,7 +1110,7 @@ export function CreateBookingPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-amber-900">
-                ⚡ Spot contract available for {spotContractMatch.originCity && spotContractMatch.destinationCity ? `${spotContractMatch.originCity} → ${spotContractMatch.destinationCity}` : spotContractMatch.lane}
+                ⚡ Spot contract available for {spotContractMatch.originCity} → {spotContractMatch.destinationCity}
               </p>
               <p className="mt-1 text-xs text-amber-800">
                 {spotContractMatch.vendorName} @ ₹{spotContractMatch.contractedRate.toLocaleString("en-IN")}{" "}

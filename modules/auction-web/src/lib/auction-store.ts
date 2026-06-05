@@ -1,3 +1,4 @@
+import { cityLaneKey } from '@shared-utils'
 import type { Auction, Contract } from '@auction/types'
 import { MOCK_AUCTIONS, MOCK_CONTRACTS } from '@auction/lib/mock-data'
 
@@ -182,11 +183,17 @@ export function updateContract(id: string, updater: (contract: Contract) => Cont
 /**
  * Replace the contracts produced by one auction lane (removing any prior ones
  * for that lane) and append the freshly awarded set. Keeps award idempotent.
+ * Lane identity = source/destination city pair.
  */
-export function replaceLaneContracts(auctionId: string, lane: string, contracts: Contract[]) {
+export function replaceLaneContracts(
+  auctionId: string,
+  lane: { originCity: string; destinationCity: string },
+  contracts: Contract[],
+) {
+  const laneKey = cityLaneKey(lane.originCity, lane.destinationCity)
   const store = loadStore()
   const kept = store.contracts.filter(
-    (c) => !(c.sourceAuctionId === auctionId && c.lane === lane),
+    (c) => !(c.sourceAuctionId === auctionId && cityLaneKey(c.originCity, c.destinationCity) === laneKey),
   )
   saveStore({ ...store, contracts: [...contracts, ...kept] })
 }
