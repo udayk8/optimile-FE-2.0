@@ -43,14 +43,31 @@ export default function AuctionsPage() {
   const activeTab = normalizeTab(searchParams.get('tab'))
 
   useEffect(() => {
-    setLoading(true)
-    fetchAuctions({
-      status: activeTab === 'ALL' ? undefined : activeTab === 'UPCOMING' ? 'DRAFT' : activeTab,
-      search: search || undefined,
-    })
-      .then(setAuctions)
-      .catch(() => setAuctions([]))
-      .finally(() => setLoading(false))
+    let cancelled = false
+    const load = (showSpinner: boolean) => {
+      if (showSpinner) setLoading(true)
+      fetchAuctions({
+        status: activeTab === 'ALL' ? undefined : activeTab === 'UPCOMING' ? 'DRAFT' : activeTab,
+        search: search || undefined,
+      })
+        .then((data) => {
+          if (!cancelled) setAuctions(data)
+        })
+        .catch(() => {
+          if (!cancelled) setAuctions([])
+        })
+        .finally(() => {
+          if (showSpinner && !cancelled) setLoading(false)
+        })
+    }
+    load(true)
+    // Re-read periodically so a LIVE auction flips to Pending Award on screen
+    // as soon as the store sweep auto-completes it (timer ended).
+    const timer = window.setInterval(() => load(false), 15_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [activeTab, search])
 
   const filteredAuctions = useMemo(() => {
