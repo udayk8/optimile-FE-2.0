@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
@@ -7,43 +7,89 @@ import { useModuleNavigate } from '@vendor/hooks/useModuleRoute'
 import { useAuctionNotificationsSync } from '@vendor/integration/auctionBridge'
 import { useVendorNotificationsSync } from '@vendor/integration/vendorNotificationsSync'
 
-// Slim notification bar shown on every vendor page (standalone AND embedded
+// Simple bell on the top right of every vendor page (standalone AND embedded
 // inside the tenant shell, where the standalone topbar bell isn't rendered).
-function NotificationBar() {
+// Click opens a small popover with the latest items and a View-all action
+// that lands on the notifications page.
+function NotificationBell() {
   const navigate = useModuleNavigate()
   const { pathname } = useLocation()
-  const unreadCount = useAppStore(
-    (state) => state.notifications.filter((n) => !n.isRead).length,
-  )
-  // The notifications page itself doesn't need the bar.
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const notifications = useAppStore((state) => state.notifications)
+  const unreadCount = notifications.filter((n) => !n.isRead).length
+  const latest = [...notifications]
+    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+    .slice(0, 4)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  // The notifications page itself doesn't need the bell.
   if (pathname.endsWith('/notifications')) return null
+
   return (
-    <button
-      type="button"
-      onClick={() => navigate('/vendor/notifications')}
-      className={`mb-4 flex w-full items-center justify-between rounded-lg border px-4 py-2.5 text-sm transition ${
-        unreadCount > 0
-          ? 'border-primary/30 bg-primary/5 text-text hover:bg-primary/10'
-          : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
-      }`}
-    >
-      <span className="flex items-center gap-2">
-        <span className="relative">
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-red-500" />
-          )}
-        </span>
-        {unreadCount > 0 ? (
-          <span>
-            <strong>{unreadCount}</strong> unread notification{unreadCount > 1 ? 's' : ''}
+    <div className="relative z-20 -mb-2 flex justify-end" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="relative flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-900"
+        aria-label="Notifications"
+      >
+        <Bell className="h-4 w-4" strokeWidth={1.75} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
-        ) : (
-          <span>No new notifications</span>
         )}
-      </span>
-      <span className="font-semibold text-primary">View all</span>
-    </button>
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 w-[340px] rounded-xl border border-gray-200 bg-white p-3 shadow-xl">
+          <p className="px-1 text-sm font-semibold text-text">Notifications</p>
+          {latest.length === 0 ? (
+            <p className="mt-2 px-1 pb-1 text-xs text-gray-500">No notifications yet.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-gray-100">
+              {latest.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className="w-full rounded-lg px-1.5 py-2 text-left transition hover:bg-gray-50"
+                    onClick={() => {
+                      setOpen(false)
+                      navigate(n.deepLink || '/vendor/notifications')
+                    }}
+                  >
+                    <span className="flex items-start gap-2">
+                      {!n.isRead && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-text">{n.title}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-gray-500">{n.message}</span>
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-text transition hover:bg-gray-50"
+            onClick={() => {
+              setOpen(false)
+              navigate('/vendor/notifications')
+            }}
+          >
+            View all notifications
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -66,7 +112,7 @@ export function VendorRouteWrapper({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <NotificationBar />
+      <NotificationBell />
       {vendor?.status === 'SUSPENDED' && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
           ⚠️ Your account is <strong>suspended</strong>. You cannot accept indents or participate in sourcing events.
