@@ -616,7 +616,7 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // onboarded via the wizard. If the user's localStorage exists but doesn't
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v5";
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v6";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
 function ensureDemoTenantsRehydrated(): void {
