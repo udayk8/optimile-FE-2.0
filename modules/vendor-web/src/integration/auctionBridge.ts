@@ -45,6 +45,8 @@ interface SourceLaneBid {
 interface SourceLane {
   id: string
   lane: string
+  originCity?: string
+  destinationCity?: string
   region?: string
   vehicleType: string
   capacityMt: number
@@ -85,6 +87,8 @@ interface SourceContract {
   vendorId: string
   vendorName: string
   lane: string
+  originCity?: string
+  destinationCity?: string
   region?: string
   vehicleType: string
   contractedRate: number
@@ -200,7 +204,9 @@ function mapState(source: SourceAuction, won: boolean): AuctionState {
 }
 
 function mapLane(lane: SourceLane, identity: VendorIdentity): AuctionLane {
-  const [origin, destination] = splitLane(lane.lane)
+  const [origin, destination] = lane.originCity && lane.destinationCity
+    ? [lane.originCity, lane.destinationCity]
+    : splitLane(lane.lane)
   const best = lane.ranking.length
     ? Math.min(...lane.ranking.map((b) => b.amount))
     : undefined
@@ -289,7 +295,9 @@ function mapContractStatus(status: SourceContract['status']): ContractStatus {
 }
 
 function mapContract(source: SourceContract): Contract {
-  const [origin, destination] = splitLane(source.lane)
+  const [origin, destination] = source.originCity && source.destinationCity
+    ? [source.originCity, source.destinationCity]
+    : splitLane(source.lane)
   return {
     id: source.id,
     laneCode: isValidLaneCode(source.lane) ? normalizeLaneCode(source.lane) : undefined,

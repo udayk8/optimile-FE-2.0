@@ -312,6 +312,8 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
       vendorId: d.vendorId,
       vendorName: d.vendorName,
       lane: lane.lane,
+      originCity: lane.originCity,
+      destinationCity: lane.destinationCity,
       region: lane.region,
       vehicleType: lane.vehicleType,
       contractedRate: d.awardedAmount,

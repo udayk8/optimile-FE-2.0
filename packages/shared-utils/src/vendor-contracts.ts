@@ -16,7 +16,7 @@
      GET  /admin/vendors/:vendorId/contracts
    ============================================================ */
 
-import { getLaneCodeError, normalizeLaneCode } from './lane'
+import { getLaneCodeError, legacyLaneToCityKey, normalizeLaneCode } from './lane'
 import { isValidRateType, type RateType } from './rate-type'
 
 // ── Model ──
@@ -148,6 +148,11 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
     const laneCode = normalizeLaneCode(values[index('lane')] ?? '')
     const laneError = getLaneCodeError(laneCode)
     if (laneError) errors.push(laneError)
+    // Lane codes must resolve to known cities — bulk upload can't introduce
+    // a lane no booking can ever produce.
+    else if (!legacyLaneToCityKey(laneCode)) {
+      errors.push(`Lane ${laneCode} does not map to known cities — use codes for cities in the address book.`)
+    }
 
     const vehicleType = values[index('vehicleType')] ?? ''
     if (!vehicleType) errors.push('Vehicle type is required.')

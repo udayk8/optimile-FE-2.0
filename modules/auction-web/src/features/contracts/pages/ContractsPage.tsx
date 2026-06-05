@@ -132,7 +132,17 @@ export default function ContractsPage() {
           </span>
         ),
       },
-      { key: 'lane', header: 'Lane', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.lane}</span> },
+      {
+        key: 'lane',
+        header: 'Lane',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">
+            {contract.originCity && contract.destinationCity
+              ? `${contract.originCity} → ${contract.destinationCity}`
+              : contract.lane}
+          </span>
+        ),
+      },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },
       { key: 'status', header: 'Status', render: (contract) => <StatusBadge status={contract.status} /> },
       {

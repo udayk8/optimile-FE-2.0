@@ -12,7 +12,7 @@ import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { formatCurrency } from "@/shared/lib/format-currency";
-import { laneCodeFromCities, normalizeLaneCode } from "@shared-utils";
+import { cityLaneKey, contractCityLaneKey } from "@shared-utils";
 import { loadStore as loadAuctionStore } from "@auction/lib/auction-store";
 import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
@@ -262,15 +262,15 @@ export function CreateBookingPage({
   // Spot-contract lane match: a SPOT booking on a lane with a live one-time
   // spot-auction contract can consume it — no manual vendor rate, indent goes
   // straight to the winning vendor.
-  const spotLaneCode = useMemo(() => {
+  const spotLaneKey = useMemo(() => {
     const first = deliveries[0];
     const last = deliveries[deliveries.length - 1] ?? first;
     if (!first?.originCity || !last?.destinationCity) return "";
-    return laneCodeFromCities(first.originCity, last.destinationCity);
+    return cityLaneKey(first.originCity, last.destinationCity);
   }, [deliveries]);
 
   const spotContractMatch = useMemo(() => {
-    if (draft.commercialType !== "SPOT" || !spotLaneCode) return null;
+    if (draft.commercialType !== "SPOT" || !spotLaneKey) return null;
     const today = new Date().toISOString().slice(0, 10);
     return (
       loadAuctionStore().contracts.find(
@@ -278,11 +278,12 @@ export function CreateBookingPage({
           contract.contractType === "SPOT" &&
           contract.status === "ACTIVE" &&
           !contract.consumedByBookingId &&
-          normalizeLaneCode(contract.lane) === spotLaneCode &&
+          // City-pair identity; legacy AAA-BBB contracts resolve via the shim.
+          contractCityLaneKey(contract) === spotLaneKey &&
           contract.endDate >= today,
       ) ?? null
     );
-  }, [draft.commercialType, spotLaneCode]);
+  }, [draft.commercialType, spotLaneKey]);
   const totalQuantity = deliveries.reduce((sum, delivery) => sum + Number(delivery.quantity || 0), 0);
   const totalWeight = deliveries.reduce(
     (sum, delivery) =>
@@ -1108,7 +1109,7 @@ export function CreateBookingPage({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-amber-900">
-                ⚡ Spot contract available for {spotContractMatch.lane}
+                ⚡ Spot contract available for {spotContractMatch.originCity && spotContractMatch.destinationCity ? `${spotContractMatch.originCity} → ${spotContractMatch.destinationCity}` : spotContractMatch.lane}
               </p>
               <p className="mt-1 text-xs text-amber-800">
                 {spotContractMatch.vendorName} @ ₹{spotContractMatch.contractedRate.toLocaleString("en-IN")}{" "}

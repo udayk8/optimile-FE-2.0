@@ -53,6 +53,9 @@ export interface AuctionEvent {
 export interface AuctionLane {
   id: string
   lane: string
+  /** City-pair lane identity (lane code is display shorthand). */
+  originCity?: string
+  destinationCity?: string
   region?: string
   vehicleType: string
   capacityMt: number
@@ -137,6 +140,9 @@ export interface Contract {
   vendorId: string
   vendorName: string
   lane: string
+  /** City-pair lane identity copied from the auction lane at award. */
+  originCity?: string
+  destinationCity?: string
   region?: string
   vehicleType: string
   contractedRate: number

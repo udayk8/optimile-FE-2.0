@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
@@ -12,7 +12,8 @@ import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
 import { createAuction, fetchVendors } from '@auction/lib/mock-services'
-import { getLaneCodeError, isValidLaneCode, laneCodeToCityDisplay, normalizeLaneCode, knownLocationCodes } from '@shared-utils'
+import { readSessionTenantId } from '@auction/lib/auction-store'
+import { citiesToDisplayLane, isKnownTenantCity, listTenantCities, normalizeCity } from '@shared-utils'
 import type { AuctionType, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
@@ -21,6 +22,8 @@ import type { AuctionType, VendorOption } from '@auction/types'
 
 type DraftLane = {
   lane: string
+  originCity: string
+  destinationCity: string
   vehicleType: string
   capacityMt: string
   commodity: string
@@ -74,16 +77,6 @@ const COMMODITY_OPTIONS = [
   'Agriculture',
 ] as const
 
-const LANE_OPTIONS = [
-  'MUM-DEL',
-  'MUM-BLR',
-  'BLR-MAA',
-  'MAA-MUM',
-  'DEL-LKO',
-  'PNQ-JAI',
-  'AMD-SRT',
-] as const
-
 const REGION_OPTIONS = ['North India', 'South India', 'West India', 'East India', 'Central India'] as const
 
 function titleCase(value: string) {
@@ -105,11 +98,14 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
   }
 }
 
-function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
-  const lane = laneName ?? (type === 'SPOT' ? 'MUM-DEL' : 'MUM-BLR')
+function makeDefaultLane(type: AuctionType, cities?: { originCity: string; destinationCity: string }): DraftLane {
+  const originCity = cities?.originCity ?? 'Mumbai'
+  const destinationCity = cities?.destinationCity ?? (type === 'SPOT' ? 'Delhi' : 'Bengaluru')
   const isLot = type === 'LOT'
   return {
-    lane,
+    lane: citiesToDisplayLane(originCity, destinationCity),
+    originCity,
+    destinationCity,
     vehicleType: '20 MT Open Body',
     capacityMt: '20',
     commodity: 'FMCG',
@@ -124,7 +120,7 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
 }
 
 function laneTemplateHeaders() {
-  return ['lane', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'l1', 'l2', 'l3']
+  return ['originCity', 'destinationCity', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'l1', 'l2', 'l3']
 }
 
 function normalizeText(value: unknown) { return String(value ?? '').trim() }
@@ -160,28 +156,21 @@ export default function AuctionCreatePage() {
 
   const [title, setTitle] = useState('Spot | Lane Auction | MUM-DEL')
   const [auctionRegion, setAuctionRegion] = useState('North India')
-  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', 'MUM-DEL')])
+  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT')])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
   const [importFileName, setImportFileName] = useState('')
 
-  const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
-    if (auctionRegion === 'North India') return lane === 'MUM-DEL' || lane === 'DEL-LKO'
-    if (auctionRegion === 'South India') return lane === 'MUM-BLR' || lane === 'BLR-MAA' || lane === 'MAA-MUM'
-    if (auctionRegion === 'West India') return lane === 'PNQ-JAI' || lane === 'AMD-SRT'
-    return true
-  })
 
   useEffect(() => {
     if (!effectiveType) return
-    const defaultLane = effectiveType === 'SPOT' ? 'MUM-DEL' : 'MUM-BLR'
     setTitle(
       effectiveType === 'SPOT'
-        ? `Spot | Lane Auction | ${defaultLane}`
+        ? 'Spot | Lane Auction'
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
     setAuctionRegion('North India')
-    setLanes([makeDefaultLane(effectiveType, defaultLane)])
+    setLanes([makeDefaultLane(effectiveType)])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
@@ -189,7 +178,7 @@ export default function AuctionCreatePage() {
 
   const addLane = () => {
     if (effectiveType !== 'LOT') return
-    setLanes((current) => [...current, makeDefaultLane('LOT', lotLaneOptions[0] ?? 'MUM-BLR')])
+    setLanes((current) => [...current, makeDefaultLane('LOT')])
   }
 
   const updateLane = (index: number, field: keyof DraftLane, value: string) => {
@@ -206,6 +195,20 @@ export default function AuctionCreatePage() {
     )
   }
 
+  // Cities come from the tenant address book — a lane can only be auctioned
+  // between places bookings can actually use.
+  const tenantCities = useMemo(() => listTenantCities(readSessionTenantId()), [])
+
+  const updateLaneCity = (index: number, field: 'originCity' | 'destinationCity', value: string) => {
+    setLanes((current) =>
+      current.map((lane, laneIndex) => {
+        if (laneIndex !== index) return lane
+        const next = { ...lane, [field]: value }
+        return { ...next, lane: citiesToDisplayLane(next.originCity, next.destinationCity) }
+      })
+    )
+  }
+
   const handleLaneFileImport = async (file: File) => {
     if (effectiveType !== 'LOT') return
     try {
@@ -218,28 +221,33 @@ export default function AuctionCreatePage() {
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return
         const values = row.values as unknown[]
-        const rawLane = normalizeText(values[1])
-        if (!rawLane) return
-        // Lane codes ("MUM-BLR") share validation with vendor-web; the legacy
-        // "City → City" format from existing templates stays accepted.
-        const isLegacyLane = /→|->/.test(rawLane)
-        const lane = isLegacyLane ? rawLane : normalizeLaneCode(rawLane)
-        if (!isLegacyLane && !isValidLaneCode(lane)) {
-          laneErrors.push(`Row ${rowNumber}: ${getLaneCodeError(lane) ?? 'Invalid lane.'}`)
+        const originCity = normalizeText(values[1])
+        const destinationCity = normalizeText(values[2])
+        if (!originCity && !destinationCity) return
+        // Cities must exist in the tenant address book — bulk upload enforces
+        // the same rule as the lane pickers, so no unbookable lane sneaks in.
+        if (!isKnownTenantCity(originCity, tenantCities)) {
+          laneErrors.push(`Row ${rowNumber}: '${originCity || '(empty)'}' is not a city in your address book.`)
+          return
+        }
+        if (!isKnownTenantCity(destinationCity, tenantCities)) {
+          laneErrors.push(`Row ${rowNumber}: '${destinationCity || '(empty)'}' is not a city in your address book.`)
           return
         }
         importedLanes.push({
-          lane,
-          vehicleType: normalizeText(values[2]) || '20 MT Open Body',
-          capacityMt: normalizeText(values[3]) || '20',
+          lane: citiesToDisplayLane(originCity, destinationCity),
+          originCity,
+          destinationCity,
+          vehicleType: normalizeText(values[3]) || '20 MT Open Body',
+          capacityMt: normalizeText(values[4]) || '20',
           commodity: 'FMCG',
-          rateUnit: parseRateUnit(values[4]),
-          ceilingRate: normalizeText(values[5]) || '0',
-          estimatedTrips: normalizeText(values[6]) || '300',
-          allocationMode: parseLaneMode(values[7]),
-          l1: normalizeText(values[8]) || '0',
-          l2: normalizeText(values[9]) || '0',
-          l3: normalizeText(values[10]) || '0',
+          rateUnit: parseRateUnit(values[5]),
+          ceilingRate: normalizeText(values[6]) || '0',
+          estimatedTrips: normalizeText(values[7]) || '300',
+          allocationMode: parseLaneMode(values[8]),
+          l1: normalizeText(values[9]) || '0',
+          l2: normalizeText(values[10]) || '0',
+          l3: normalizeText(values[11]) || '0',
         })
       })
       if (laneErrors.length) throw new Error(laneErrors.join(' '))
@@ -257,11 +265,16 @@ export default function AuctionCreatePage() {
       toast.error('Select an auction type first.')
       return
     }
-    // Lanes are restricted to AAA-BBB location codes so spot contracts can be
-    // matched back to bookings by lane.
-    const invalidLane = lanes.find((lane) => !isValidLaneCode(lane.lane))
+    // Lanes are city pairs from the tenant address book — every auctioned
+    // lane stays bookable by construction.
+    const invalidLane = lanes.find(
+      (lane) =>
+        !isKnownTenantCity(lane.originCity, tenantCities) ||
+        !isKnownTenantCity(lane.destinationCity, tenantCities) ||
+        normalizeCity(lane.originCity) === normalizeCity(lane.destinationCity),
+    )
     if (invalidLane) {
-      toast.error(getLaneCodeError(invalidLane.lane) ?? 'Enter lanes as AAA-BBB codes (e.g. MUM-DEL).')
+      toast.error('Every lane needs two different cities from your address book.')
       return
     }
 
@@ -293,6 +306,8 @@ export default function AuctionCreatePage() {
         startAt: launchNow ? scheduledStartAt : undefined,
         lanes: lanes.map((lane) => ({
           lane: lane.lane,
+          originCity: lane.originCity,
+          destinationCity: lane.destinationCity,
           region: effectiveType === 'LOT' ? auctionRegion : undefined,
           vehicleType: lane.vehicleType,
           capacityMt: Number(lane.capacityMt),
@@ -586,41 +601,38 @@ export default function AuctionCreatePage() {
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Lane</label>
-                              {effectiveType === 'LOT' ? (
+<div className="grid gap-2 sm:grid-cols-2">
                                 <select
-                                  value={lane.lane}
-                                  onChange={(event) => updateLane(index, 'lane', event.target.value)}
+                                  value={lane.originCity}
+                                  onChange={(event) => updateLaneCity(index, 'originCity', event.target.value)}
                                   className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                                 >
-                                  {lotLaneOptions.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
+                                  <option value="">Origin city</option>
+                                  {tenantCities.map((city) => (
+                                    <option key={city} value={city}>{city}</option>
                                   ))}
                                 </select>
+                                <select
+                                  value={lane.destinationCity}
+                                  onChange={(event) => updateLaneCity(index, 'destinationCity', event.target.value)}
+                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                >
+                                  <option value="">Destination city</option>
+                                  {tenantCities.map((city) => (
+                                    <option key={city} value={city}>{city}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              {tenantCities.length === 0 ? (
+                                <p className="mt-1 text-xs text-red-600">
+                                  No cities found — add addresses in Administration → Address Book first.
+                                </p>
                               ) : (
-                                <>
-                                  {/* Free lane entry, restricted to AAA-BBB location codes.
-                                      The city mapping below shows exactly which lane the code
-                                      resolves to — same codes the booking side derives from
-                                      its origin/destination cities. */}
-                                  <Input
-                                    value={lane.lane}
-                                    list="lane-code-suggestions"
-                                    placeholder="AAA-BBB (e.g. MUM-DEL)"
-                                    onChange={(event) => updateLane(index, 'lane', normalizeLaneCode(event.target.value))}
-                                  />
-                                  <datalist id="lane-code-suggestions">
-                                    {LANE_OPTIONS.map((option) => (
-                                      <option key={option} value={option} />
-                                    ))}
-                                  </datalist>
-                                  {getLaneCodeError(lane.lane) ? (
-                                    <p className="mt-1 text-xs text-red-600">{getLaneCodeError(lane.lane)}</p>
-                                  ) : (
-                                    <p className="mt-1 text-xs text-[#64748B]">
-                                      {laneCodeToCityDisplay(lane.lane) || 'Unknown codes are accepted but won\'t auto-match bookings.'}
-                                    </p>
-                                  )}
-                                </>
+                                <p className="mt-1 text-xs text-[#64748B]">
+                                  {lane.originCity && lane.destinationCity
+                                    ? `${lane.originCity} → ${lane.destinationCity}${lane.lane ? ` (${lane.lane})` : ''}`
+                                    : 'Cities come from your address book, so this lane is always bookable.'}
+                                </p>
                               )}
                             </div>
                             <div>

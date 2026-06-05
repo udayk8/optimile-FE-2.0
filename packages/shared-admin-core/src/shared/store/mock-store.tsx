@@ -631,7 +631,7 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // onboarded via the wizard. If the user's localStorage exists but doesn't
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v6";
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v7";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
 // Manual vendor-contract seed for the Bluedart vendors — the shared
@@ -670,10 +670,48 @@ function seedVendorContracts(): void {
   }
 }
 
+// Address Book seed (booking-setup blob) — gives every demo tenant a spread
+// of city pickup/drop points so auction lanes (which only allow address-book
+// cities) and spot bookings have data out of the box.
+const BOOKING_SETUP_KEY = "optimile.tenant.bookingSetup";
+const SEED_ADDRESS_BOOK = [
+  { id: "addr-seed-mum", name: "Mumbai Central Warehouse", type: "BOTH", city: "Mumbai", state: "Maharashtra", pincode: "400001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-del", name: "Delhi NCR Hub", type: "BOTH", city: "Delhi", state: "Delhi", pincode: "110001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-blr", name: "Bengaluru Depot", type: "BOTH", city: "Bengaluru", state: "Karnataka", pincode: "560001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-maa", name: "Chennai Dock Yard", type: "BOTH", city: "Chennai", state: "Tamil Nadu", pincode: "600001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-pnq", name: "Pune Distribution Center", type: "BOTH", city: "Pune", state: "Maharashtra", pincode: "411001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hyd", name: "Hyderabad Hub", type: "BOTH", city: "Hyderabad", state: "Telangana", pincode: "500001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-nsk", name: "Nashik Consolidation Point", type: "BOTH", city: "Nashik", state: "Maharashtra", pincode: "422001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-jai", name: "Jaipur Gateway", type: "BOTH", city: "Jaipur", state: "Rajasthan", pincode: "302001", linkedCustomerId: "", status: "active" },
+];
+
+function seedAddressBookForDemoTenants(): void {
+  try {
+    const raw = window.localStorage.getItem(BOOKING_SETUP_KEY);
+    const all: Record<string, { addresses?: Array<{ id: string }> } & Record<string, unknown>> = raw ? JSON.parse(raw) : {};
+    let changed = false;
+    for (const tenantId of DEMO_TENANT_IDS) {
+      const entry = all[tenantId] ?? {};
+      const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
+      const existingIds = new Set(addresses.map((address) => address.id));
+      const missing = SEED_ADDRESS_BOOK.filter((address) => !existingIds.has(address.id));
+      if (missing.length > 0) {
+        all[tenantId] = { ...entry, addresses: [...addresses, ...missing] };
+        changed = true;
+      }
+    }
+    if (changed) window.localStorage.setItem(BOOKING_SETUP_KEY, JSON.stringify(all));
+
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
+
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
     seedVendorContracts();
+    seedAddressBookForDemoTenants();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
