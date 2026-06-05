@@ -9,21 +9,26 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { useSourcingBridge, withEffectiveState } from '@vendor/integration/auctionBridge'
 import { formatLaneDisplay, getRateTypeLabel } from '@shared-utils'
 import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  // Cross-module: read the auction from the shared auction-web store and write
-  // bids back into it; fall back to the local demo store when not present.
-  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid, hasShared } = useSourcingBridge()
+  // Cross-module: shared-store auctions (auction-web) take precedence; the
+  // permanent local mock samples stay reachable alongside them. Bids on a
+  // shared auction write back through the bridge; bids on a local mock
+  // auction stay in the local demo store.
+  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid } = useSourcingBridge()
   const { auctions: storeAuctions, submitBid } = useAppStore()
-  const auctions = hasShared ? bridgeAuctions : storeAuctions
-  const submitBidFn = hasShared ? bridgePlaceBid : submitBid
+  const bridgeAuction = bridgeAuctions.find(a => a.id === id)
+  const submitBidFn = bridgeAuction ? bridgePlaceBid : submitBid
 
-  const auction = auctions.find(a => a.id === id)
+  const found = bridgeAuction ?? storeAuctions.find(a => a.id === id)
+  // Ended-by-timer live auctions render as ended (no bidding), even when the
+  // local demo store still has them marked LIVE.
+  const auction = found ? withEffectiveState(found) : undefined
 
   // Local state for bidding
   const [bids, setBids] = useState<Record<string, number>>({})

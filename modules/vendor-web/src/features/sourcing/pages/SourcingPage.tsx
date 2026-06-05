@@ -9,14 +9,34 @@ import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { formatLaneDisplay } from '@shared-utils'
-import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { useSourcingBridge, withEffectiveState } from '@vendor/integration/auctionBridge'
 import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { AuctionState } from '@vendor/types'
+import type { Auction, AuctionState } from '@vendor/types'
 
 type SourcingTab = 'ALL' | 'UPCOMING' | 'LIVE' | 'ENDED' | 'CANCELLED'
 
 const SOURCING_TABS: Array<'ALL' | 'UPCOMING' | 'LIVE' | 'ENDED' | 'CANCELLED'> = ['ALL', 'UPCOMING', 'LIVE', 'ENDED', 'CANCELLED']
 const ENDING_STATES: AuctionState[] = ['PENDING_AWARD', 'AWARDED', 'NOT_AWARDED', 'NOT_PARTICIPATED']
+
+// Vendor's best live rank across the auction's lanes (1 = L1/winning).
+// Falls back to a best-bid comparison when running off the local demo store
+// (no shared ranking data).
+function getLiveStanding(auction: Auction): { rank?: number; winning: boolean } | null {
+  const ranks = auction.lanes
+    .map((lane) => lane.myRank)
+    .filter((rank): rank is number => rank != null)
+  if (ranks.length) {
+    const best = Math.min(...ranks)
+    return { rank: best, winning: best === 1 }
+  }
+  const activeBids = auction.vendorBids.filter((bid) => bid.status === 'ACTIVE')
+  if (!activeBids.length) return null
+  const winning = activeBids.some((bid) => {
+    const lane = auction.lanes.find((l) => l.id === bid.laneId)
+    return lane?.currentBestBid != null && bid.amount <= lane.currentBestBid
+  })
+  return { winning }
+}
 
 function getSourcingTab(search: string): SourcingTab {
   const requestedTab = new URLSearchParams(search).get('tab')?.toUpperCase()
@@ -28,11 +48,15 @@ function getSourcingTab(search: string): SourcingTab {
 export default function SourcingPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  // Cross-module: prefer auctions authored in auction-web (shared store); fall
-  // back to the local demo store when auction-web hasn't been opened.
-  const { auctions: bridgeAuctions, hasShared } = useSourcingBridge()
+  // Cross-module auctions authored in auction-web (shared store) merged with
+  // the permanent local mock samples — sample data stays visible regardless
+  // of which vendor is logged in or whether the shared store is populated.
+  const { auctions: bridgeAuctions } = useSourcingBridge()
   const { auctions: storeAuctions } = useAppStore()
-  const auctions = hasShared ? bridgeAuctions : storeAuctions
+  const auctions = useMemo(() => {
+    const bridgeIds = new Set(bridgeAuctions.map((auction) => auction.id))
+    return [...bridgeAuctions, ...storeAuctions.filter((auction) => !bridgeIds.has(auction.id))].map(withEffectiveState)
+  }, [bridgeAuctions, storeAuctions])
   const activeTab = getSourcingTab(location.search)
   const [page, setPage] = useState(1)
 
@@ -138,6 +162,7 @@ export default function SourcingPage() {
                           ? 'Closed'
                           : 'Finished'
                     const timingValue = auction.state === 'UPCOMING' ? auction.startTime : auction.endTime
+                    const liveStanding = auction.state === 'LIVE' ? getLiveStanding(auction) : null
 
                     return (
                       <tr key={auction.id} className="align-top transition-colors hover:bg-gray-50">
@@ -168,7 +193,17 @@ export default function SourcingPage() {
                             : <StatusBadge status={auction.state} />}
                         </td>
                         <td className="px-5 py-4">
-                          {activeTab === 'ENDED' ? (
+                          {auction.state === 'LIVE' ? (
+                            liveStanding ? (
+                              liveStanding.winning ? (
+                                <StatusBadge status="AWARDED" label={liveStanding.rank != null ? 'Winning (L1)' : 'Winning'} />
+                              ) : (
+                                <StatusBadge status="PENDING" label={liveStanding.rank != null ? `L${liveStanding.rank}` : 'Outbid'} />
+                              )
+                            ) : (
+                              <span className="text-sm text-gray-500">No Bid</span>
+                            )
+                          ) : ENDING_STATES.includes(auction.state) ? (
                             <StatusBadge status={outcomeStatus} label={outcomeLabel} />
                           ) : (
                             <span className="text-sm text-gray-500">-</span>

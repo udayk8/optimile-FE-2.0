@@ -92,6 +92,17 @@ interface SourceStore {
   contracts: SourceContract[]
 }
 
+// A live auction whose end time has passed is ended (awaiting award) — show
+// it as Ended with a Details-only action instead of an expired live row.
+// Applied by pages on top of either source (shared bridge or local demo
+// store) so the rule holds even for local-store fallback data.
+export function withEffectiveState(auction: Auction): Auction {
+  if (auction.state === 'LIVE' && auction.endTime && new Date(auction.endTime).getTime() <= Date.now()) {
+    return { ...auction, state: 'PENDING_AWARD' }
+  }
+  return auction
+}
+
 export interface VendorIdentity {
   vendorId: string
   vendorName: string
@@ -154,8 +165,21 @@ function toLocation(city: string): Location {
 
 function mapState(source: SourceAuction, won: boolean): AuctionState {
   switch (source.status) {
-    case 'LIVE':
-      return source.startAt && new Date(source.startAt).getTime() > Date.now() ? 'UPCOMING' : 'LIVE'
+    case 'LIVE': {
+      if (source.startAt && new Date(source.startAt).getTime() > Date.now()) return 'UPCOMING'
+      // A live auction whose timers have all run out is ended (awaiting
+      // award) — never show it as still-live/expired or allow further
+      // bidding. Mirrors auction-web's auto-complete sweep (last lane timer).
+      const laneEnds = source.lanes
+        .map((lane) => new Date(lane.timerEndsAt).getTime())
+        .filter((time) => !Number.isNaN(time))
+      const endsAt = laneEnds.length
+        ? Math.max(...laneEnds)
+        : source.awardDeadline
+          ? new Date(source.awardDeadline).getTime()
+          : Number.NaN
+      return !Number.isNaN(endsAt) && endsAt <= Date.now() ? 'PENDING_AWARD' : 'LIVE'
+    }
     case 'COMPLETED':
       return 'PENDING_AWARD'
     case 'AWARDED':
@@ -285,10 +309,14 @@ function useStoreRevision(): number {
     window.addEventListener('storage', onStorage)
     window.addEventListener('optimile-auction-store', bump)
     window.addEventListener('focus', bump)
+    // Time-based states (LIVE → PENDING_AWARD when the timer lapses) are
+    // computed at read time, so tick periodically to flip them on screen.
+    const timer = window.setInterval(bump, 15_000)
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('optimile-auction-store', bump)
       window.removeEventListener('focus', bump)
+      window.clearInterval(timer)
     }
   }, [])
   return revision
