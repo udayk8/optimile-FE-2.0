@@ -267,6 +267,7 @@ interface MockStoreValue {
   financeDisputeVendorInvoice: (invoiceId: string, reason: string) => void;
   financeRequestVendorResubmission: (invoiceId: string, message?: string) => void;
   financeRejectVendorInvoice: (invoiceId: string, reason?: string) => void;
+  financeReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
   vendorRespondToInvoiceDispute: (invoiceId: string, message: string) => void;
   vendorCreateInvoiceResubmission: (oldInvoiceId: string, lineItems: TenantVendorInvoiceLineItem[], invoiceNumber?: string) => TenantVendorInvoiceRecord | null;
   listTenantVendorRateCards: (tenantVendorId: string) => TenantVendorRateCard[];
@@ -6087,6 +6088,15 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             const now = new Date().toISOString();
             const msgs = inv.dispute.messages ?? [];
             return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "VENDOR", message, createdAt: now }] } };
+          }),
+        ),
+      financeReplyToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message, createdAt: now }] } };
           }),
         ),
       vendorCreateInvoiceResubmission: (oldInvoiceId, lineItems, invoiceNumber) => {

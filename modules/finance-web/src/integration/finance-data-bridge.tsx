@@ -45,6 +45,7 @@ export interface FinanceDataBridge {
   disputeVendorBill?: (id: string, reason: string) => void
   requestVendorResubmission?: (id: string, message?: string) => void
   rejectVendorBill?: (id: string, reason?: string) => void
+  replyToVendorDispute?: (id: string, message: string) => void
 }
 
 const FinanceDataBridgeContext = createContext<FinanceDataBridge | null>(null)

@@ -235,6 +235,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         gst: inv.gstAmount,
         total: inv.grandTotal,
         billingPeriod: inv.billingPeriod,
+        dispute: inv.dispute,
       };
     });
 
@@ -247,6 +248,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
       disputeVendorBill: (id: string, reason: string) => store.financeDisputeVendorInvoice(id, reason),
       requestVendorResubmission: (id: string, message?: string) => store.financeRequestVendorResubmission(id, message),
       rejectVendorBill: (id: string, reason?: string) => store.financeRejectVendorInvoice(id, reason),
+      replyToVendorDispute: (id: string, message: string) => store.financeReplyToInvoiceDispute(id, message),
       invoices,
 
       uploadPod: (tripId) => {

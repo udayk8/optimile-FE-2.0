@@ -52,6 +52,14 @@ export interface VendorBill {
   gst?: number
   total?: number
   billingPeriod?: { from: string; to: string }
+  // Shared dispute thread (when the bill is in dispute) — same record the vendor
+  // portal reads/writes, so the conversation stays aligned across both portals.
+  dispute?: {
+    reason: string
+    status: 'OPEN' | 'CLOSED'
+    responseDueAt?: string
+    messages: { sender: 'FINANCE' | 'VENDOR'; message: string; createdAt: string }[]
+  }
 }
 
 export interface SubvendorRow {
@@ -314,6 +322,7 @@ export function usePayables() {
     vendorDispute: bridge?.disputeVendorBill,
     vendorRequestResubmission: bridge?.requestVendorResubmission,
     vendorReject: bridge?.rejectVendorBill,
+    vendorReplyToDispute: bridge?.replyToVendorDispute,
     setTolerance: store.setTolerance,
     approveBill: store.approveBill,
     autoApproveMatched: store.autoApproveMatched,
