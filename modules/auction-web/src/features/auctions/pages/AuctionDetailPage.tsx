@@ -31,6 +31,7 @@ type AwardModalState =
 
 export default function AuctionDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [auction, setAuction] = useState<Auction | null>(null)
   const [booking, setBooking] = useState<BookingReference | null>(null)
   const [linkedContracts, setLinkedContracts] = useState<Contract[]>([])
@@ -281,6 +282,7 @@ export default function AuctionDetailPage() {
         eyebrow="Auction Detail"
         title={auction.title}
         subtitle={`${auction.id} · ${auction.type} · ${auction.lanes.length} lane${auction.lanes.length > 1 ? 's' : ''}`}
+        onBack={() => navigate('/auction/auctions')}
         action={
           <div className="flex flex-wrap gap-2">
             {/* Scheduled auctions read Upcoming until the start time passes.

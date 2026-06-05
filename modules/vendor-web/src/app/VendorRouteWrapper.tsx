@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { useVendorAuth } from '@vendor/hooks/useVendorAuth'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useAuctionNotificationsSync } from '@vendor/integration/auctionBridge'
-import { useVendorNotificationsSync } from '@vendor/integration/vendorNotificationsSync'
+import { useVendorLedgerSync, useVendorNotificationsSync } from '@vendor/integration/vendorNotificationsSync'
 
 export function VendorRouteWrapper({ children }: { children: ReactNode }) {
   const { vendor } = useVendorAuth()
@@ -14,6 +14,9 @@ export function VendorRouteWrapper({ children }: { children: ReactNode }) {
   // P0 operational events: new/expiring indents, POD due, invoice
   // rejection/resubmission, payments received, compliance expiry, account status.
   useVendorNotificationsSync(vendor?.status)
+  // Finance-approved invoices (cross-module) open their receivable in the
+  // ledger automatically; recorded payments post against it.
+  useVendorLedgerSync()
 
   // Scope the portal data to the logged-in vendor. Blank-listed vendors (e.g.
   // Mahesh Transport) get an empty portal; everyone else keeps the demo data.

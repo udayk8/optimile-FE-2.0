@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useModuleNavigate as useNavigate } from '@auction/hooks/useModuleRoute'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
@@ -24,6 +25,7 @@ type FlatRow = {
 }
 
 export default function RfqResponsesPage() {
+  const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -218,6 +220,7 @@ export default function RfqResponsesPage() {
         title="RFQ Responses"
         subtitle="Upload vendor RFQ responses and analyse lane-wise pricing across all submitted quotes."
         icon={<FileSpreadsheet className="h-5 w-5 text-primary" />}
+        onBack={() => navigate('/auction/sourcing')}
       />
 
       <Card>

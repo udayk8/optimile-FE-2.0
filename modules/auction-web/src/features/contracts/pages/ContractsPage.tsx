@@ -278,7 +278,6 @@ export default function ContractsPage() {
               onPageChange={setPage}
               pageSize={PAGE_SIZE}
               className="w-full"
-              onRowClick={(contract) => navigate(`/auction/contracts/${contract.id}`)}
               emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No contracts match the current filters.</div>}
             />
           )}

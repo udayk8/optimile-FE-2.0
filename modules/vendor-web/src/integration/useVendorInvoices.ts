@@ -35,9 +35,16 @@ export function useVendorInvoices(): VendorInvoicesData {
   const storeResubmit = useAppStore((s) => s.createResubmissionInvoice)
 
   if (bridge) {
+    // MERGE shared-store invoices/disputes with the local mock demo dataset
+    // (same model as useVendorBookings): finance-synced records come first,
+    // the mock baseline stays visible. Mutations route by which set owns the
+    // record id; new invoices always go through the bridge so finance sees
+    // them.
+    const bridgeInvoiceIds = new Set(bridge.vendorInvoices.map((i) => i.id))
+    const bridgeDisputeIds = new Set(bridge.vendorDisputes.map((d) => d.id))
     return {
-      invoices: bridge.vendorInvoices,
-      disputes: bridge.vendorDisputes,
+      invoices: [...bridge.vendorInvoices, ...storeInvoices.filter((i) => !bridgeInvoiceIds.has(i.id))],
+      disputes: [...bridge.vendorDisputes, ...storeDisputes.filter((d) => !bridgeDisputeIds.has(d.id))],
       generateInvoice: (payload) => {
         const gstRate = payload.gstRate ?? 12
         const selected = payload.tripIds
@@ -68,12 +75,23 @@ export function useVendorInvoices(): VendorInvoicesData {
           tripReferences: selected.map((t) => t.id),
         })
       },
-      respondToDispute: (disputeId, message) => {
+      respondToDispute: (disputeId, message, attachmentNames) => {
         const d = bridge.vendorDisputes.find((x) => x.id === disputeId)
-        if (d) bridge.respondToInvoiceDispute(d.invoiceId, message)
+        if (d) {
+          bridge.respondToInvoiceDispute(d.invoiceId, message)
+          return
+        }
+        // Mock dispute — keep it working off the local store.
+        storeRespond(disputeId, message, attachmentNames)
       },
-      createResubmissionInvoice: (oldInvoiceId, lineItems, invoiceNumber) =>
-        bridge.createResubmissionInvoice(oldInvoiceId, lineItems, invoiceNumber),
+      createResubmissionInvoice: (oldInvoiceId, lineItems, invoiceNumber) => {
+        if (bridgeInvoiceIds.has(oldInvoiceId)) {
+          bridge.createResubmissionInvoice(oldInvoiceId, lineItems, invoiceNumber)
+          return
+        }
+        // Mock invoice — local store resubmission (it numbers the new invoice itself).
+        storeResubmit(oldInvoiceId, lineItems)
+      },
     }
   }
 

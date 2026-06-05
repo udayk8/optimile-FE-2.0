@@ -97,8 +97,7 @@ export default function ContractsPage() {
                 {pagedContracts.map((contract, index) => (
                   <tr
                   key={contract.id}
-                  className={`cursor-pointer border-t border-gray-200 transition-colors hover:bg-blue-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}
-                  onClick={() => navigate(`/vendor/contracts/${contract.id}`)}
+                  className={`border-t border-gray-200 transition-colors hover:bg-blue-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}
                 >
                   <td className="border-r border-gray-200 px-4 py-3 font-mono text-sm font-semibold text-text">{contract.id}</td>
                   <td className="border-r border-gray-200 px-4 py-3">

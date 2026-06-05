@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
 import { CheckCircle2, Lock, Upload } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
+import { ExitConfirmDialog } from '@auction/components/shared/ExitConfirmDialog'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
@@ -161,6 +162,7 @@ export default function AuctionCreatePage() {
   const [bookings, setBookings] = useState<BookingReference[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
   const [saving, setSaving] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
 
   useEffect(() => {
     fetchBookings()
@@ -368,6 +370,15 @@ export default function AuctionCreatePage() {
         eyebrow="Auction Builder"
         title={effectiveType ? `Create ${titleCase(effectiveType)} Auction` : 'Create Auction'}
         subtitle="Select the auction type, configure lanes, rate units, ceilings, and launch when ready."
+        onBack={() => setExitConfirmOpen(true)}
+      />
+
+      <ExitConfirmDialog
+        open={exitConfirmOpen}
+        onClose={() => setExitConfirmOpen(false)}
+        onConfirm={() => navigate('/auction/auctions')}
+        title="Exit auction builder?"
+        description="Your auction setup will be lost unless you save it as a draft."
       />
 
       <div>

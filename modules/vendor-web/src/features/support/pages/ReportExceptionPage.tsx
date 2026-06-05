@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
+import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { Button } from '@vendor/components/ui/button'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionIssueType, ExceptionSeverity } from '@vendor/types'
@@ -25,6 +26,7 @@ export default function ReportExceptionPage() {
   const [severity, setSeverity] = useState<ExceptionSeverity>('HIGH')
   const [description, setDescription] = useState('Vehicle needs immediate assistance due to an operational incident.')
   const [submissionError, setSubmissionError] = useState('')
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
   const [evidence, setEvidence] = useState('GPS capture, photo evidence')
 
   const selected = useMemo(() => BOOKINGS.find((item) => item.id === bookingId) ?? BOOKINGS[0], [bookingId])
@@ -61,6 +63,16 @@ export default function ReportExceptionPage() {
         title="Report Exception"
         subtitle="Log a booking-linked exception from the Exceptions tab with severity and issue type"
         icon={<AlertTriangle className="h-6 w-6 text-primary" />}
+        onBack={() => setExitConfirmOpen(true)}
+      />
+
+      <ConfirmDialog
+        isOpen={exitConfirmOpen}
+        onClose={() => setExitConfirmOpen(false)}
+        onConfirm={() => navigate('/vendor/support')}
+        title="Leave exception report?"
+        description="Your exception details will be lost."
+        confirmLabel="Leave"
       />
 
       <form onSubmit={handleSubmit} className="space-y-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
