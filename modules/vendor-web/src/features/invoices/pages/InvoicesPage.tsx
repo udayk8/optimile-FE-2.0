@@ -11,7 +11,7 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
 import { downloadElementAsPdf } from '@vendor/lib/pdf'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
@@ -104,7 +104,7 @@ export default function InvoicesPage() {
   const [editedItems, setEditedItems] = useState<InvoiceLineItem[]>([])
   const [downloadInvoiceId, setDownloadInvoiceId] = useState<string | null>(null)
 
-  const { invoices, disputes, createResubmissionInvoice } = useAppStore()
+  const { invoices, disputes, createResubmissionInvoice } = useVendorInvoices()
   const bridge = useTenantBridge()
   const { trips: allBookings, getBookingDetail } = useVendorBookings()
   const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName

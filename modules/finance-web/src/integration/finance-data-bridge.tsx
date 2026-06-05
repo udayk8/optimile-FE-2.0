@@ -1,5 +1,6 @@
 import { createContext, useContext, type PropsWithChildren } from 'react'
 import type { ARInvoice, ARTrip } from '@finance/lib/receivablesStore'
+import type { VendorBill } from '@finance/lib/payablesStore'
 
 /**
  * Cross-module integration PORT for the Finance module.
@@ -34,6 +35,16 @@ export interface FinanceDataBridge {
   // shared TenantInvoiceRecord and marks each booking invoiced so it leaves
   // Ready-to-Invoice and cannot be invoiced twice. Returns the new invoice id.
   generateInvoice: (tripIds: string[]) => string | null
+
+  // Accounts-payable side: REAL vendor-submitted invoices projected as vendor
+  // bills (linked bookings + GSTINs + billing breakdown) for the 3-way-match
+  // review. The lifecycle actions write back to the shared collection so the
+  // vendor portal's tabs reflect the finance decision.
+  vendorBills?: VendorBill[]
+  approveVendorBill?: (id: string) => void
+  disputeVendorBill?: (id: string, reason: string) => void
+  requestVendorResubmission?: (id: string, message?: string) => void
+  rejectVendorBill?: (id: string, reason?: string) => void
 }
 
 const FinanceDataBridgeContext = createContext<FinanceDataBridge | null>(null)

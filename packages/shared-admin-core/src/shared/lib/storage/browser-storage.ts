@@ -28,6 +28,7 @@ export const storageKeys = {
   tenantLrTransfers: "optimile.tenant.lrTransfers",
   tenantBookings: "optimile.tenant.bookings",
   tenantInvoices: "optimile.tenant.invoices",
+  tenantVendorInvoices: "optimile.tenant.vendorInvoices",
   sessionContext: "optimile.session.context",
 } as const;
 
@@ -397,6 +398,11 @@ const legacyRecoveryRules: Record<StorageKey, RecoveryRule> = {
       "optimile.tenantInvoices.",
       "optimile.tenantInvoices:",
     ],
+    mergeStrategy: "array",
+  },
+  [storageKeys.tenantVendorInvoices]: {
+    exact: ["optimile.tenantVendorInvoices"],
+    prefixes: ["optimile.tenant.vendorInvoices.", "optimile.tenant.vendorInvoices:"],
     mergeStrategy: "array",
   },
   [storageKeys.sessionContext]: {

@@ -1,16 +1,35 @@
 import React, { useState, useRef } from "react";
 import {
-  AlertTriangle, Clock, CheckCircle2, XCircle, Check, X,
-  ArrowLeft, Download, FileText, Loader2, PackageCheck,
+  AlertTriangle, Clock, CheckCircle2, XCircle, Check, X, RefreshCw,
+  ArrowLeft, Download, FileText, Loader2, PackageCheck, ChevronDown, ReceiptText, Link2,
 } from "lucide-react";
 import { Card, Pill, SectionTitle, Modal, ModalHeader } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
 import { VENDOR_BILL_DETAILS, OPTIMILE_BILL_TO, vendorMeta, VENDOR_DISPUTE_RESPONSES, DEFAULT_VENDOR_DISPUTE_RESPONSE } from "@finance/data/mock";
 import { useDisputes } from "@finance/lib/disputesStore";
 import { usePayables, computeMatch } from "@finance/lib/payablesStore";
+import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
+
+/* Synthesized shipment trace for a real (bridged) vendor bill. */
+function bridgedTrace(bill: any) {
+  const t = bill.linkedBookings?.[0];
+  const [origin, destination] = (t?.lane ?? bill.lane ?? "").split("→").map((s: string) => s.trim());
+  return [
+    { label: "Booking created", ts: "—", actor: `TMS · ${t?.bookingId ?? bill.trip}`, done: true },
+    { label: "Indent assigned to vendor", ts: "—", actor: bill.vendor, done: true },
+    { label: "Dispatched from origin", ts: "—", actor: origin ? `${origin} hub` : "—", done: true },
+    { label: "Delivered at destination", ts: t?.delivered ?? "—", actor: destination ? `${destination} · consignee signed` : "—", done: true },
+    { label: "POD verified", ts: "—", actor: "Ops desk", done: !!bill.pod },
+    { label: "Vendor bill received", ts: "—", actor: `${bill.vendor} portal`, done: true },
+  ];
+}
+
+const Row = ({ k, v }: { k: React.ReactNode; v: React.ReactNode }) => (
+  <div className="flex justify-between gap-4"><span className="text-slate-500">{k}</span><span className="text-right text-slate-800">{v}</span></div>
+);
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -76,6 +95,9 @@ export function Trace({ steps }: any) {
 
 export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dispute, onNavigate, toast, backLabel = "Back to vendor bills" }: any) {
   const detail = (VENDOR_BILL_DETAILS as Record<string, any>)[bill.id];
+  // Real bills synthesized from bookings carry linkedBookings and have no mock
+  // VENDOR_BILL_DETAILS entry — render the booking-sourced sections instead.
+  const bridged = Array.isArray(bill.linkedBookings);
   const invoiceRef = useRef(null);
   const podRef = useRef(null);
   const [dl, setDl] = useState(false);
@@ -107,8 +129,8 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
     }
   };
 
-  const contractedTotal = detail.comparison.reduce((s: any, r: any) => s + r.contracted, 0);
-  const invoicedTotal = detail.comparison.reduce((s: any, r: any) => s + r.invoiced, 0);
+  const contractedTotal = detail ? detail.comparison.reduce((s: any, r: any) => s + r.contracted, 0) : 0;
+  const invoicedTotal = detail ? detail.comparison.reduce((s: any, r: any) => s + r.invoiced, 0) : 0;
 
   return (
     <div>
@@ -151,6 +173,56 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
         <Match label="Billed" v={fmtINR(bill.billed)} ok={bill.status !== "variance"} />
       </Card>
 
+      {bridged ? (
+        <>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Reference data — what the vendor submitted on the invoice */}
+            <Card className="p-5">
+              <div className="mb-3 flex items-center gap-2 font-semibold text-slate-800"><ReceiptText size={16} className="text-slate-400" />Reference data</div>
+              <div className="space-y-2 text-sm">
+                <Row k="Vendor GSTIN" v={<span className="font-mono">{bill.vendorGstin ?? "—"}</span>} />
+                <Row k="Customer GSTIN" v={<span className="font-mono">{bill.customerGstin ?? "—"}</span>} />
+                <Row k="PDF URL" v={<span className="font-mono text-blue-600">{bill.pdfUrl ?? "—"}</span>} />
+                {bill.billingPeriod && <Row k="Billing period" v={`${bill.billingPeriod.from} → ${bill.billingPeriod.to}`} />}
+                <Row k="Status" v={<Pill tone={bill.status === "matched" ? "green" : bill.status === "variance" ? "red" : "amber"}>{bill.status === "matched" ? "Matched" : bill.status === "variance" ? "Variance" : "POD pending"}</Pill>} />
+              </div>
+            </Card>
+
+            {/* Billing breakdown */}
+            <Card className="p-5">
+              <div className="mb-3 font-semibold text-slate-800">Billing breakdown</div>
+              <div className="space-y-2 text-sm">
+                <Row k="Subtotal (freight)" v={<span className="font-mono">{fmtINR(bill.subtotal ?? bill.billed)}</span>} />
+                <Row k="GST (12%)" v={<span className="font-mono">{fmtINR(bill.gst ?? 0)}</span>} />
+                <div className="border-t border-slate-100 pt-2"><Row k={<span className="font-semibold text-slate-700">Total</span>} v={<span className="font-mono font-semibold text-slate-900">{fmtINR(bill.total ?? bill.billed)}</span>} /></div>
+                <div className="mt-2 border-t border-slate-100 pt-2"><Row k="Contract rate" v={<span className="font-mono">{fmtINR(bill.contractRate)}</span>} /></div>
+                <Row k="Billed" v={<span className={`font-mono ${bill.status === "variance" ? "text-red-600" : "text-slate-800"}`}>{fmtINR(bill.billed)}</span>} />
+              </div>
+            </Card>
+          </div>
+
+          {/* Linked bookings — one collapsible per booking on this vendor bill */}
+          <div className="mt-6 space-y-3">
+            <div className="flex items-center gap-2 font-semibold text-slate-800"><Link2 size={16} className="text-slate-400" />Linked bookings ({bill.linkedBookings.length})</div>
+            {bill.linkedBookings.map((t: any) => (
+              <details key={t.id} className="group rounded-xl bg-white ring-1 ring-slate-200/80 shadow-sm">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm font-medium text-slate-700">
+                  <span className="flex items-center gap-2"><span className="font-mono text-xs text-slate-500">{t.bookingId ?? t.id}</span><span className="text-slate-400">· vendor freight {fmtINR(t.buyingFreight ?? 0)}</span></span>
+                  <span className="flex items-center gap-2 text-slate-500">{t.lane}<ChevronDown size={15} className="transition group-open:rotate-180" /></span>
+                </summary>
+                <div className="border-t border-slate-100 p-4"><BookingDetailCard trip={t} bare /></div>
+              </details>
+            ))}
+          </div>
+
+          {/* Shipment trace (synthesized from the booking lineage) */}
+          <Card className="mt-6 p-5">
+            <div className="mb-4 font-semibold text-slate-800">Shipment trace</div>
+            <Trace steps={bridgedTrace(bill)} />
+          </Card>
+        </>
+      ) : (
+      <>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Validation: contract vs invoice */}
         <Card className="overflow-hidden">
@@ -229,32 +301,66 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
           </Card>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
 
 export default function VendorMatch({ toast, onNavigate }: any) {
   const { disputes, addDispute } = useDisputes();
-  const { bills, tolerancePct, setTolerance, approveBill, autoApproveMatched, disputeBill } = usePayables();
+  const { bills, tolerancePct, setTolerance, approveBill, disputeBill, bridgedAP, vendorApprove, vendorDispute, vendorRequestResubmission, vendorReject } = usePayables();
   const [open, setOpen] = useState<string | null>(null);
   const [raising, setRaising] = useState<any>(null);
+  const [vendor, setVendor] = useState("all");
+  // Mock-only shim: hide approved bills (bridged bills leave the queue on their
+  // own once the shared invoice status flips).
+  const [approvedIds, setApprovedIds] = useState<Set<string>>(new Set());
 
   const disputeOf = (id: any) => disputes.find((d) => d.id === id && d.kind === "subvendor");
 
   // Live 3-way match computed against the configurable tolerance. Show only the
   // actionable queue (pending / disputed); approved bills move to Scheduled Payments.
-  const view = bills
+  const queue = bills
     .filter((b) => b.stage === "pending" || b.stage === "disputed")
     .map((b) => {
       const m = computeMatch(b, tolerancePct);
       return { ...b, status: m.status, variancePct: m.variancePct, variance: Number(Math.abs(m.variancePct).toFixed(1)), autoEligible: m.autoEligible };
-    });
+    })
+    .filter((b) => bridgedAP || !approvedIds.has(b.id));
+  const vendors = [...new Set(queue.map((b) => b.vendor))].sort();
+  const view = queue.filter((b) => vendor === "all" || b.vendor === vendor);
   const matchedCount = view.filter((b) => b.status === "matched" && b.stage === "pending").length;
 
-  const act = (id: any) => { approveBill(id); setOpen(null); toast(`${id} approved — payment scheduled`); };
+  const act = (id: any) => {
+    if (bridgedAP) vendorApprove?.(id);               // flips shared invoice → APPROVED (vendor portal reflects)
+    else { approveBill(id); setApprovedIds((s) => new Set(s).add(id)); }
+    setOpen(null);
+    toast(`${id} approved — payment scheduled`);
+  };
+
+  const requestResubmission = (id: any) => {
+    vendorRequestResubmission?.(id, "Please correct and resubmit the invoice.");
+    setOpen(null);
+    toast(`${id} sent back to vendor for resubmission`);
+  };
+  const reject = (id: any) => {
+    vendorReject?.(id, "Invoice rejected by finance.");
+    setOpen(null);
+    toast(`${id} rejected`);
+  };
 
   const submitDispute = (reason: any) => {
     const b = raising;
+    if (bridgedAP) {
+      // Real flow: flip the shared invoice → DISPUTED so the vendor portal opens
+      // a dispute thread the vendor can respond to.
+      vendorDispute?.(b.id, reason);
+      setRaising(null);
+      setOpen(null);
+      toast(`Dispute raised on ${b.id} — vendor notified in their portal`);
+      return;
+    }
     const reply = VENDOR_DISPUTE_RESPONSES[b.vendor] ?? DEFAULT_VENDOR_DISPUTE_RESPONSE;
     addDispute({
       id: b.id, client: b.vendor, amount: b.billed, reason, kind: "subvendor",
@@ -269,8 +375,11 @@ export default function VendorMatch({ toast, onNavigate }: any) {
   };
 
   const autoApprove = () => {
-    const n = autoApproveMatched();
-    toast(n ? `${n} matched bill${n > 1 ? "s" : ""} auto-approved & scheduled` : "No matched bills eligible");
+    const eligible = view.filter((b) => b.status === "matched" && b.stage === "pending" && b.autoEligible);
+    if (eligible.length === 0) { toast("No matched bills eligible"); return; }
+    eligible.forEach((b) => approveBill(b.id));
+    setApprovedIds((s) => { const n = new Set(s); eligible.forEach((b) => n.add(b.id)); return n; });
+    toast(`${eligible.length} matched bill${eligible.length > 1 ? "s" : ""} auto-approved & scheduled`);
   };
 
   if (open) {
@@ -287,7 +396,12 @@ export default function VendorMatch({ toast, onNavigate }: any) {
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
         <SectionTitle sub="Auto-checks Contract Rate = POD = Invoice. Within tolerance auto-approves; outside it needs manual approval. Approving schedules the payment.">Vendor Bills · 3-Way Match</SectionTitle>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={vendor} onChange={(e) => setVendor(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-300">
+            <option value="all">All vendors</option>
+            {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
           <label className="flex items-center gap-1.5 text-xs text-slate-500">Tolerance ±
             <input type="number" min={0} step={0.5} value={tolerancePct} onChange={(e) => setTolerance(Number(e.target.value))}
               className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-slate-300" />%
@@ -333,9 +447,22 @@ export default function VendorMatch({ toast, onNavigate }: any) {
               {noPod && <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700"><Clock size={15} />POD not yet uploaded — approval gated until delivery is proven.</div>}
               {ok && <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"><CheckCircle2 size={15} />All three match within ±{tolerancePct}% — eligible for auto-approval.</div>}
 
-              <div className="mt-4 flex items-center justify-end gap-3">
+              <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
                 <button onClick={() => setOpen(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><FileText size={13} />View invoice &amp; trace</button>
-                {dz?.stage === "resolved" ? (
+                {bridgedAP ? (
+                  b.stage === "disputed" ? (
+                    <>
+                      <button onClick={() => requestResubmission(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><RefreshCw size={13} />Request resubmission</button>
+                      <button onClick={() => reject(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"><XCircle size={13} />Reject</button>
+                      <button onClick={() => act(b.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><Check size={13} />Approve</button>
+                    </>
+                  ) : (
+                    <>
+                      {!noPod && <button onClick={() => setRaising(b)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><XCircle size={13} />Dispute</button>}
+                      <button onClick={() => act(b.id)} disabled={noPod} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 disabled:opacity-50"><Check size={13} />{variance ? "Approve anyway" : "Approve & schedule"}</button>
+                    </>
+                  )
+                ) : dz?.stage === "resolved" ? (
                   <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"><Check size={13} />Dispute closed</button>
                 ) : dz ? (
                   <button onClick={() => onNavigate?.("disputes")} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={13} />In Dispute</button>

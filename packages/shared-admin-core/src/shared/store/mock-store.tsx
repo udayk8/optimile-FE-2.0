@@ -105,6 +105,10 @@ import type {
   TenantVehicleInput,
 } from "@/types/fleet";
 import type {
+  TenantVendorInvoiceRecord,
+  TenantVendorInvoiceLineItem,
+} from "@/types/vendor-invoice";
+import type {
   LRAllocationApprovalFlow,
   LRAllocationFlowConfig,
   LRAllocationFlowLevel,
@@ -256,6 +260,15 @@ interface MockStoreValue {
   actionTenantBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) => BookingRecord;
   listTenantInvoices: (tenantId: string) => TenantInvoiceRecord[];
   createTenantInvoice: (input: TenantInvoiceRecord) => TenantInvoiceRecord;
+  // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
+  listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
+  vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
+  financeApproveVendorInvoice: (invoiceId: string) => void;
+  financeDisputeVendorInvoice: (invoiceId: string, reason: string) => void;
+  financeRequestVendorResubmission: (invoiceId: string, message?: string) => void;
+  financeRejectVendorInvoice: (invoiceId: string, reason?: string) => void;
+  vendorRespondToInvoiceDispute: (invoiceId: string, message: string) => void;
+  vendorCreateInvoiceResubmission: (oldInvoiceId: string, lineItems: TenantVendorInvoiceLineItem[], invoiceNumber?: string) => TenantVendorInvoiceRecord | null;
   listTenantVendorRateCards: (tenantVendorId: string) => TenantVendorRateCard[];
   createTenantVendorRateCard: (
     input: Omit<TenantVendorRateCard, "id" | "createdAt" | "updatedAt">,
@@ -3602,6 +3615,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   const [tenantInvoices, setTenantInvoices] = useState<TenantInvoiceRecord[]>(() =>
     loadSeededState(storageKeys.tenantInvoices, mockTenantInvoices),
   );
+  // Vendor (AP) invoices — single source of truth shared by the vendor portal
+  // and the finance module. Seeded empty; populated as vendors generate invoices.
+  const [tenantVendorInvoices, setTenantVendorInvoices] = useState<TenantVendorInvoiceRecord[]>(() =>
+    loadSeededState<TenantVendorInvoiceRecord[]>(storageKeys.tenantVendorInvoices, []),
+  );
   const [tenantLrs, setTenantLrs] = useState<TenantLrRecord[]>(() =>
     normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, mockTenantLrs)),
   );
@@ -3745,6 +3763,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     writeStoredValue(storageKeys.tenantInvoices, tenantInvoices);
   }, [tenantInvoices]);
+
+  useEffect(() => {
+    writeStoredValue(storageKeys.tenantVendorInvoices, tenantVendorInvoices);
+  }, [tenantVendorInvoices]);
 
   useEffect(() => {
     writeStoredValue(storageKeys.tenantLrs, tenantLrs);
@@ -5995,6 +6017,108 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         setTenantInvoices((current) => [input, ...current]);
         return input;
       },
+      // ---- Vendor (AP) invoice lifecycle ----------------------------------
+      listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),
+      vendorSubmitInvoice: (input) => {
+        setTenantVendorInvoices((current) => [input, ...current]);
+        return input;
+      },
+      financeApproveVendorInvoice: (invoiceId) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) =>
+            inv.id === invoiceId && (inv.status === "PENDING" || inv.status === "DISPUTED")
+              ? { ...inv, status: "APPROVED", dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
+              : inv,
+          ),
+        ),
+      financeDisputeVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "PENDING") return inv;
+            const now = new Date().toISOString();
+            return {
+              ...inv,
+              status: "DISPUTED",
+              dispute: {
+                reason,
+                status: "OPEN",
+                raisedAt: now,
+                responseDueAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                messages: [{ id: `dmsg-${invoiceId}-1`, sender: "FINANCE", message: reason, createdAt: now }],
+              },
+            };
+          }),
+        ),
+      financeRequestVendorResubmission: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "DISPUTED") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "RESUBMISSION_REQUIRED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: message?.trim() || "Resubmission required. Please create a corrected invoice.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      financeRejectVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || (inv.status !== "PENDING" && inv.status !== "DISPUTED")) return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "CLOSED",
+              closeReason: "REJECTED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: reason?.trim() || "Invoice rejected by finance.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      vendorRespondToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "VENDOR", message, createdAt: now }] } };
+          }),
+        ),
+      vendorCreateInvoiceResubmission: (oldInvoiceId, lineItems, invoiceNumber) => {
+        const old = tenantVendorInvoices.find((inv) => inv.id === oldInvoiceId);
+        if (!old) return null;
+        const now = new Date().toISOString();
+        const subtotal = lineItems.reduce((s, li) => s + (li.lineTotal || li.freightCharge || 0), 0);
+        const gstAmount = Math.round((old.grandTotal && old.subtotal ? old.gstAmount / old.subtotal : 0.12) * subtotal);
+        const newNumber = invoiceNumber ?? `${old.invoiceNumber}-R`;
+        const newInvoice: TenantVendorInvoiceRecord = {
+          ...old,
+          id: newNumber,
+          invoiceNumber: newNumber,
+          invoiceDate: now.slice(0, 10),
+          createdAt: now,
+          lineItems,
+          subtotal,
+          gstAmount,
+          grandTotal: subtotal + gstAmount,
+          status: "PENDING",
+          closeReason: undefined,
+          supersedesInvoiceId: old.id,
+          supersededByInvoiceId: undefined,
+          pdfUrl: `/invoices/${newNumber}.pdf`,
+          dispute: undefined,
+        };
+        setTenantVendorInvoices((current) => [
+          newInvoice,
+          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, supersededByInvoiceId: newNumber } : inv)),
+        ]);
+        return newInvoice;
+      },
       listTenantLrPools: (tenantId) => tenantLrPools.filter((item) => item.tenantId === tenantId),
       listTenantLrs: (tenantId) => tenantLrs.filter((item) => item.tenantId === tenantId),
       createTenantLrs: (records) => {
@@ -7097,6 +7221,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       tenantBookings,
       tenantCustomers,
       tenantDrivers,
+      tenantVendorInvoices,
       tenantLRConfigs,
       tenantLrs,
       tenantLrPools,

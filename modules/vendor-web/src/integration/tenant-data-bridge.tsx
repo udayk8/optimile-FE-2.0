@@ -1,5 +1,18 @@
 import { createContext, useContext, type PropsWithChildren } from 'react'
-import type { Driver, Indent, Trip, Vehicle } from '@vendor/types'
+import type { Driver, Indent, Trip, Vehicle, Invoice, Dispute, InvoiceLineItem } from '@vendor/types'
+
+/** Payload the vendor portal sends when generating an invoice (embedded mode). */
+export interface VendorInvoiceSubmitPayload {
+  invoiceNumber: string
+  invoiceDate: string
+  paymentDueDate: string
+  lineItems: InvoiceLineItem[]
+  subtotal: number
+  gstAmount: number
+  grandTotal: number
+  billingPeriod: { from: string; to: string }
+  tripReferences: string[]
+}
 
 /**
  * Cross-module integration PORT.
@@ -87,6 +100,18 @@ export interface TenantDataBridge {
   assignVehicleResolved: (bookingId: string, vehicle: Vehicle, driver: Driver) => void
   /** Full booking detail (consignor/consignee, documents, LR) for the detail page. */
   getBookingDetail: (bookingRef: string) => VendorBookingDetail | null
+
+  // Vendor (AP) invoices — single source of truth shared with the finance module.
+  // The vendor reads its own invoices/disputes here and the finance decisions
+  // (approve/dispute/resubmission/reject) are reflected automatically.
+  vendorInvoices: Invoice[]
+  vendorDisputes: Dispute[]
+  /** Vendor generates a new invoice for the selected completed trips. */
+  submitInvoice: (payload: VendorInvoiceSubmitPayload) => void
+  /** Vendor posts a reply on an open dispute thread. */
+  respondToInvoiceDispute: (invoiceId: string, message: string) => void
+  /** Vendor raises a corrected invoice that supersedes a resubmission-required one. */
+  createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[], invoiceNumber?: string) => void
 }
 
 const TenantDataBridgeContext = createContext<TenantDataBridge | null>(null)

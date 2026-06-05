@@ -10,9 +10,9 @@ import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument
 import { PageHero } from '@shared-ui/page-hero'
 import { formatDate } from '@vendor/lib/date-utils'
 import { downloadElementAsPdf } from '@vendor/lib/pdf'
-import { useAppStore } from '@vendor/stores/app.store'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
 import { ArrowLeft, Download, FileText, MessageSquareWarning, ReceiptText, Route } from 'lucide-react'
 
@@ -24,8 +24,7 @@ export default function InvoiceDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
   const bridge = useTenantBridge()
-  const invoices = useAppStore((state) => state.invoices)
-  const disputes = useAppStore((state) => state.disputes)
+  const { invoices, disputes } = useVendorInvoices()
   // Merged bookings (bridge + mock) so PDF line items resolve truck/lane/dates
   // for cross-module bookings too.
   const { trips, getBookingDetail } = useVendorBookings()

@@ -4,6 +4,8 @@ import {
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
 import { logAudit } from '@finance/lib/auditStore'
+import { useFinanceBridge } from '@finance/integration/finance-data-bridge'
+import type { ARTrip } from '@finance/lib/receivablesStore'
 
 /* ============================================================
    Shared payables (AP) store — PER-MODE MODULE SINGLETONS.
@@ -40,6 +42,16 @@ export interface VendorBill {
   category?: string
   commodity?: string
   stage: BillStage
+  // Real bridged bills (embedded mode) — synthesized from bookings. All optional
+  // so mock bills + the standalone build render unchanged.
+  linkedBookings?: ARTrip[]                       // full per-booking detail
+  vendorGstin?: string
+  customerGstin?: string
+  pdfUrl?: string
+  subtotal?: number
+  gst?: number
+  total?: number
+  billingPeriod?: { from: string; to: string }
 }
 
 export interface SubvendorRow {
@@ -287,8 +299,21 @@ export function usePayables() {
   const mode = useContext(PayablesModeContext)
   const store = storeFor(mode)
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
+  const bridge = useFinanceBridge()
+  // Embedded in the tenant shell: serve REAL vendor bills synthesized from the
+  // shared bookings' vendor assignments. Approve/dispute are handled in the UI
+  // (VendorMatch) for bridged bills. Standalone (no bridge) keeps the mock bills.
+  const bills = bridge && bridge.vendorBills && bridge.vendorBills.length > 0 ? bridge.vendorBills : state.bills
   return {
     ...state,
+    bills,
+    // Bridged AP lifecycle (embedded). Undefined standalone → VendorMatch falls
+    // back to the local approveBill/disputeBill mock behaviour.
+    bridgedAP: !!(bridge && bridge.vendorBills),
+    vendorApprove: bridge?.approveVendorBill,
+    vendorDispute: bridge?.disputeVendorBill,
+    vendorRequestResubmission: bridge?.requestVendorResubmission,
+    vendorReject: bridge?.rejectVendorBill,
     setTolerance: store.setTolerance,
     approveBill: store.approveBill,
     autoApproveMatched: store.autoApproveMatched,
