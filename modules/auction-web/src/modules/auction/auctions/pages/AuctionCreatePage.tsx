@@ -88,8 +88,8 @@ const VEHICLE_CAPACITY: Record<(typeof VEHICLE_TYPE_OPTIONS)[number], string> = 
 
 const LANE_OPTIONS = [
   'Mumbai → Delhi',
-  'Mumbai → Bangalore',
-  'Bangalore → Chennai',
+  'Mumbai → Bengaluru',
+  'Bengaluru → Chennai',
   'Chennai → Mumbai',
   'Delhi → Lucknow',
   'Pune → Jaipur',
@@ -122,7 +122,7 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
 }
 
 function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
-  const lane = laneName ?? (type === 'SPOT' ? 'Mumbai → Delhi' : 'Mumbai → Bangalore')
+  const lane = laneName ?? (type === 'SPOT' ? 'Mumbai → Delhi' : 'Mumbai → Bengaluru')
   return {
     lane,
     vehicleType: '20 MT Open Body',
@@ -640,7 +640,7 @@ export default function AuctionCreatePage() {
   const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
     if (auctionRegion === 'North India') return lane === 'Mumbai → Delhi' || lane === 'Delhi → Lucknow'
     if (auctionRegion === 'South India')
-      return lane === 'Mumbai → Bangalore' || lane === 'Bangalore → Chennai' || lane === 'Chennai → Mumbai'
+      return lane === 'Mumbai → Bengaluru' || lane === 'Bengaluru → Chennai' || lane === 'Chennai → Mumbai'
     if (auctionRegion === 'West India') return lane === 'Pune → Jaipur' || lane === 'Ahmedabad → Surat'
     return true
   })
@@ -648,7 +648,7 @@ export default function AuctionCreatePage() {
   useEffect(() => {
     if (!effectiveType) return
     const defaultBooking = bookings[0] ?? selectedBooking
-    const defaultLane = effectiveType === 'LOT' ? 'Mumbai → Bangalore' : 'Mumbai → Delhi'
+    const defaultLane = effectiveType === 'LOT' ? 'Mumbai → Bengaluru' : 'Mumbai → Delhi'
     setTitle(
       effectiveType === 'SPOT'
         ? `Spot | ${defaultBooking.id} | ${bookingLaneLabel(defaultBooking)}`
@@ -665,7 +665,7 @@ export default function AuctionCreatePage() {
 
   const addLane = () => {
     if (!effectiveType || effectiveType === 'SPOT' || effectiveType === 'BULK') return
-    setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bangalore')])
+    setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bengaluru')])
   }
 
   const handleLaneFileImport = async (file: File) => {

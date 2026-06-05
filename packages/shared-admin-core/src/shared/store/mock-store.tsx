@@ -692,6 +692,23 @@ const SEED_ADDRESS_BOOK = [
   { id: "addr-seed-ixe", name: "Mangaluru Port Godown", type: "BOTH", city: "Mangaluru", state: "Karnataka", pincode: "575001", linkedCustomerId: "", status: "active" },
   { id: "addr-seed-ccu", name: "Kolkata Freight Terminal", type: "BOTH", city: "Kolkata", state: "West Bengal", pincode: "700001", linkedCustomerId: "", status: "active" },
   { id: "addr-seed-nag", name: "Nagpur Central Yard", type: "BOTH", city: "Nagpur", state: "Maharashtra", pincode: "440001", linkedCustomerId: "", status: "active" },
+  // Cities referenced by demo lanes/trips across modules — every mock
+  // source/destination city must exist here so the lane is bookable.
+  { id: "addr-seed-cnd", name: "Chandausi Cement Depot", type: "BOTH", city: "Chandausi", state: "Uttar Pradesh", pincode: "244412", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bhr", name: "Bharuch Chemical Park", type: "BOTH", city: "Bharuch", state: "Gujarat", pincode: "392001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bwd", name: "Bhiwandi Warehouse Cluster", type: "BOTH", city: "Bhiwandi", state: "Maharashtra", pincode: "421302", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hld", name: "Haldia Port Yard", type: "BOTH", city: "Haldia", state: "West Bengal", pincode: "721602", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hbx", name: "Hubballi Freight Point", type: "BOTH", city: "Hubballi", state: "Karnataka", pincode: "580020", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-idr", name: "Indore Logistics Hub", type: "BOTH", city: "Indore", state: "Madhya Pradesh", pincode: "452001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ixw", name: "Jamshedpur Steel Yard", type: "BOTH", city: "Jamshedpur", state: "Jharkhand", pincode: "831001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-cok", name: "Kochi Harbour Godown", type: "BOTH", city: "Kochi", state: "Kerala", pincode: "682001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mog", name: "Moga Agro Depot", type: "BOTH", city: "Moga", state: "Punjab", pincode: "142001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mdr", name: "Mundra Port Terminal", type: "BOTH", city: "Mundra", state: "Gujarat", pincode: "370421", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mgr", name: "Munger Factory Gate", type: "BOTH", city: "Munger", state: "Bihar", pincode: "811201", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mys", name: "Mysuru Distribution Center", type: "BOTH", city: "Mysuru", state: "Karnataka", pincode: "570001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-slm", name: "Salem Steel Yard", type: "BOTH", city: "Salem", state: "Tamil Nadu", pincode: "636001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-tmk", name: "Tumakuru Industrial Park", type: "BOTH", city: "Tumakuru", state: "Karnataka", pincode: "572101", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-vga", name: "Vijayawada Trade Hub", type: "BOTH", city: "Vijayawada", state: "Andhra Pradesh", pincode: "520001", linkedCustomerId: "", status: "active" },
 ];
 
 function seedAddressBookForDemoTenants(): void {

@@ -165,7 +165,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       {
         id: 'lane-bulk-1',
         originCity: 'Mumbai',
-        destinationCity: 'Bangalore',
+        destinationCity: 'Bengaluru',
         region: 'South India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -187,7 +187,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'lane-bulk-2',
-        originCity: 'Bangalore',
+        originCity: 'Bengaluru',
         destinationCity: 'Chennai',
         region: 'South India',
         vehicleType: '20 MT Open Body',
