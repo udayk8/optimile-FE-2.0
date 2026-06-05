@@ -10,7 +10,7 @@ import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { formatLaneDisplay } from '@shared-utils'
 import { useSourcingBridge, withEffectiveState } from '@vendor/integration/auctionBridge'
-import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Gavel, Clock, MapPin, Package, Zap, Search, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 import type { Auction, AuctionState } from '@vendor/types'
 
 type SourcingTab = 'ALL' | 'UPCOMING' | 'LIVE' | 'ENDED' | 'CANCELLED'
@@ -233,6 +233,15 @@ export default function SourcingPage() {
                             <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
                               <Gavel className="mr-2 h-4 w-4" /> View
                             </Button>
+                          ) : auction.state === 'AWARDED' && auction.contractReference ? (
+                            <div className="flex flex-col items-end gap-1.5">
+                              <Button size="sm" onClick={() => navigate(`/vendor/contracts/${auction.contractReference}`)}>
+                                <FileText className="mr-2 h-4 w-4" /> View Contract
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
+                                Details
+                              </Button>
+                            </div>
                           ) : (
                             <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/sourcing/auctions/${auction.id}`)}>
                               Details

@@ -146,6 +146,8 @@ export interface AuctionLane {
   bidCount?: number
   /** This vendor's live rank on the lane (1 = L1/lowest); undefined if no bid. */
   myRank?: number
+  /** Anonymized top bid amounts (L1, L2, L3) for the live leaderboard. */
+  topBids?: number[]
 }
 
 export interface Auction {
@@ -195,6 +197,8 @@ export interface Contract {
   status: ContractStatus
   amendments: Amendment[]
   signedAt?: string
+  /** When the auction award that produced this contract was won (AUCTION_WIN only). */
+  awardedOn?: string
   pdfUrl: string
   createdAt: string
 }

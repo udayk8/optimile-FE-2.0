@@ -346,7 +346,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     slaClauses: [{ name: 'Placement SLA', valueHours: 4, description: 'Vehicle must report within 4 hours of indent' }],
     penaltyClauses: [{ breachType: 'Late Placement', penaltyType: 'FIXED', penaltyValue: 5000, description: 'Per late placement event' }],
     validityFrom: '2026-05-01', validityTo: '2026-10-31', renewalTerms: 'Re-auction on expiry',
-    amendments: [], signedAt: '2026-04-28T11:00:00Z', pdfUrl: '/contracts/CNT-AW-101.pdf', createdAt: '2026-04-27T16:30:00Z',
+    amendments: [], signedAt: '2026-04-28T11:00:00Z', awardedOn: '2026-04-27T16:30:00Z', pdfUrl: '/contracts/CNT-AW-101.pdf', createdAt: '2026-04-27T16:30:00Z',
   },
   {
     id: 'CNT-AW-102', status: 'ACTIVE', source: 'AUCTION_WIN', laneCode: 'BRC-BLR',
@@ -357,7 +357,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     slaClauses: [{ name: 'Placement SLA', valueHours: 6, description: 'Vehicle must report within 6 hours of indent' }],
     penaltyClauses: [{ breachType: 'Missed Placement', penaltyType: 'PERCENTAGE', penaltyValue: 10, description: '10% of freight rate' }],
     validityFrom: '2026-03-01', validityTo: '2026-08-31', renewalTerms: 'Re-auction on expiry',
-    amendments: [], signedAt: '2026-02-26T09:45:00Z', pdfUrl: '/contracts/CNT-AW-102.pdf', createdAt: '2026-02-25T18:10:00Z',
+    amendments: [], signedAt: '2026-02-26T09:45:00Z', awardedOn: '2026-02-25T18:10:00Z', pdfUrl: '/contracts/CNT-AW-102.pdf', createdAt: '2026-02-25T18:10:00Z',
   },
   {
     id: 'CNT-AW-103', status: 'EXPIRED', source: 'AUCTION_WIN', laneCode: 'DEL-LKO',
@@ -367,7 +367,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
     slaClauses: [], penaltyClauses: [],
     validityFrom: '2025-07-01', validityTo: '2025-12-31', renewalTerms: 'None',
-    amendments: [], signedAt: '2025-06-27T10:00:00Z', pdfUrl: '/contracts/CNT-AW-103.pdf', createdAt: '2025-06-25T12:00:00Z',
+    amendments: [], signedAt: '2025-06-27T10:00:00Z', awardedOn: '2025-06-25T12:00:00Z', pdfUrl: '/contracts/CNT-AW-103.pdf', createdAt: '2025-06-25T12:00:00Z',
   },
 ]
 

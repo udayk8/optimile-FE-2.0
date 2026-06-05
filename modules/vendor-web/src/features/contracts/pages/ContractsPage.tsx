@@ -83,7 +83,7 @@ export default function ContractsPage() {
             <table className="w-full min-w-[1100px] text-left">
               <thead className="text-gray-500">
                 <tr>
-                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Start Date', 'End Date', 'Source', 'Status'].map((header) => (
+                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Award Won On', 'Start Date', 'End Date', 'Source', 'Status'].map((header) => (
                     <th
                       key={header}
                       className="border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] last:border-r-0"
@@ -116,6 +116,9 @@ export default function ContractsPage() {
                     {contract.volumeAllocation.unit === '%'
                       ? `${contract.volumeAllocation.volume}%`
                       : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
+                  </td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
+                    {contract.awardedOn ? formatDate(contract.awardedOn) : '—'}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityFrom)}</td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityTo)}</td>
