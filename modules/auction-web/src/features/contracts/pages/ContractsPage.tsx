@@ -113,7 +113,7 @@ export default function ContractsPage() {
       { key: 'status', header: 'Status', render: (contract) => <StatusBadge status={contract.status} /> },
       {
         key: 'awardedAt',
-        header: 'Award Won On',
+        header: 'Created On',
         render: (contract) => (
           <span className="text-sm text-[#0F172A]">{contract.awardedAt ? formatDate(contract.awardedAt) : '—'}</span>
         ),
@@ -205,7 +205,7 @@ export default function ContractsPage() {
                   </p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
-                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award Won On</p>
+                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Created On</p>
                   <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.awardedAt ? formatDate(selectedContract.awardedAt) : '—'}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
