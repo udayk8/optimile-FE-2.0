@@ -160,9 +160,9 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'MUM-PNQ', vehicleType: '20ft Container', price: 8500 },
-        { lane: 'MUM-NSK', vehicleType: '20ft Container', price: 12000 },
-        { lane: 'PNQ-NAG', vehicleType: '32ft SXL', price: 18500 },
+        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8500 },
+        { lane: 'Mumbai - Nashik', vehicleType: '20ft Container', price: 12000 },
+        { lane: 'Pune - Nagpur', vehicleType: '32ft SXL', price: 18500 },
       ],
     },
     {
@@ -173,10 +173,10 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'MUM-PNQ', vehicleType: '20ft Container', price: 8200 },
-        { lane: 'MUM-NSK', vehicleType: '20ft Container', price: 11800 },
-        { lane: 'PNQ-NAG', vehicleType: '32ft SXL', price: 17500 },
-        { lane: 'DEL-JAI', vehicleType: '20ft Container', price: 9000 },
+        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8200 },
+        { lane: 'Mumbai - Nashik', vehicleType: '20ft Container', price: 11800 },
+        { lane: 'Pune - Nagpur', vehicleType: '32ft SXL', price: 17500 },
+        { lane: 'Delhi - Jaipur', vehicleType: '20ft Container', price: 9000 },
       ],
     },
     {
@@ -187,9 +187,9 @@ export const useAppStore = create<AppState>((set) => ({
       uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
       uploadedBy: 'Procurement User',
       rows: [
-        { lane: 'MUM-PNQ', vehicleType: '20ft Container', price: 8800 },
-        { lane: 'DEL-JAI', vehicleType: '20ft Container', price: 9500 },
-        { lane: 'MAA-BLR', vehicleType: '32ft SXL', price: 14200 },
+        { lane: 'Mumbai - Pune', vehicleType: '20ft Container', price: 8800 },
+        { lane: 'Delhi - Jaipur', vehicleType: '20ft Container', price: 9500 },
+        { lane: 'Chennai - Bengaluru', vehicleType: '32ft SXL', price: 14200 },
       ],
     },
   ],

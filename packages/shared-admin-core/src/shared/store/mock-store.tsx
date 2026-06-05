@@ -716,11 +716,74 @@ function seedAddressBookForDemoTenants(): void {
   }
 }
 
+// Manual vendor-contract seed (shared `optimile.vendor-contracts` store the
+// Tenant Admin vendor detail + Vendor Portal both read). City-pair lanes from
+// the seeded Address Book — cross-module consistent sample data.
+const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
+const VENDOR_CONTRACT_SEED_LANES: Array<{
+  suffix: string;
+  originCity: string;
+  destinationCity: string;
+  vehicleType: string;
+  rate: number;
+  rateType: "PER_TRIP" | "PER_MT" | "PER_KM";
+}> = [
+  { suffix: "a", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP" },
+  { suffix: "b", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT" },
+  { suffix: "c", originCity: "Pune", destinationCity: "Nagpur", vehicleType: "32FT", rate: 52, rateType: "PER_KM" },
+];
+
+function seedVendorContractsForDemoTenants(): void {
+  try {
+    const raw = window.localStorage.getItem(VENDOR_CONTRACTS_SEED_KEY);
+    const stored: Array<{ contractId: string }> = raw ? JSON.parse(raw) : [];
+    const existingIds = new Set(stored.map((contract) => contract.contractId));
+    const today = new Date();
+    const startDate = today.toISOString().slice(0, 10);
+    const endDate = new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const created: unknown[] = [];
+    for (const tenantId of DEMO_TENANT_IDS) {
+      const vendors = mockTenantVendors.filter((vendor) => vendor.tenantId === tenantId).slice(0, 3);
+      vendors.forEach((vendor, vendorIndex) => {
+        // Two lanes per vendor, rotated so vendors don't all share lanes.
+        [0, 1].forEach((laneIndex) => {
+          const pick = VENDOR_CONTRACT_SEED_LANES[(vendorIndex + laneIndex) % VENDOR_CONTRACT_SEED_LANES.length];
+          const contractId = `VC-SEED-${vendor.id}-${pick.suffix}`;
+          if (existingIds.has(contractId)) return;
+          existingIds.add(contractId);
+          created.push({
+            contractId,
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            tenantId,
+            originCity: pick.originCity,
+            destinationCity: pick.destinationCity,
+            laneCode: `${pick.originCity} - ${pick.destinationCity}`,
+            vehicleType: pick.vehicleType,
+            rate: pick.rate,
+            rateType: pick.rateType,
+            startDate,
+            endDate,
+            createdFrom: "MANUAL_UPLOAD",
+            status: "ACTIVE",
+          });
+        });
+      });
+    }
+    if (created.length > 0) {
+      window.localStorage.setItem(VENDOR_CONTRACTS_SEED_KEY, JSON.stringify([...stored, ...created]));
+    }
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
+
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
     seedVendorContracts();
     seedAddressBookForDemoTenants();
+    seedVendorContractsForDemoTenants();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
