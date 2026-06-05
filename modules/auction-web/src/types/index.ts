@@ -143,6 +143,8 @@ export interface Contract {
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
   allocationRank: 'L1' | 'L2' | 'L3'
+  /** When the award that produced this contract was confirmed. */
+  awardedAt?: string
   startDate: string
   endDate: string
   estimatedTrips: number

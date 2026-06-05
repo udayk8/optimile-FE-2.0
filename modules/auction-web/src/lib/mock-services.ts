@@ -311,6 +311,7 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
             rateUnit: lane.rateUnit,
             volumeAllocationPercent: d.allocationPercent,
             allocationRank: d.allocationRank,
+            awardedAt: new Date().toISOString(),
             startDate: auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
             endDate: auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
             estimatedTrips: lane.estimatedTrips ?? 0,

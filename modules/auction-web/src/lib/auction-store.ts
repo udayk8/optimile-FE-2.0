@@ -75,16 +75,20 @@ function sweepExpiredAuctions(snapshot: AuctionStoreSnapshot): AuctionStoreSnaps
     if (lastEnd > now) return auction
     changed = true
     const closedAt = new Date(lastEnd).toISOString()
+    // Zero bids across all lanes → NO_BIDS, not a fake pending award.
+    const hasBids = auction.lanes.some((lane) => lane.ranking.length > 0)
     return {
       ...auction,
-      status: 'COMPLETED' as const,
+      status: (hasBids ? 'COMPLETED' : 'NO_BIDS') as 'COMPLETED' | 'NO_BIDS',
       completedAt: auction.completedAt ?? closedAt,
       auditTrail: [
         ...auction.auditTrail,
         {
           id: `e-auto-${lastEnd}`,
           type: 'COMPLETED' as const,
-          message: 'Bidding window closed automatically (timer ended).',
+          message: hasBids
+            ? 'Bidding window closed automatically (timer ended).'
+            : 'Bidding window closed automatically (timer ended) — no bids received.',
           actor: 'system',
           timestamp: closedAt,
         },

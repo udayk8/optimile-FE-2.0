@@ -109,6 +109,24 @@ export default function AuctionDetailPage() {
   const rankOrder = { L1: 0, L2: 1, L3: 2 } as const
   const hasAnyBids = auction?.lanes.some((lane) => lane.ranking.length > 0) ?? false
 
+  // Invited vendors with bid / no-bid status. Names resolve from the lane
+  // rankings (bidders); silent invitees fall back to their vendor id.
+  const participation = (() => {
+    if (!auction) return [] as Array<{ id: string; name: string; hasBid: boolean }>
+    const bidders = new Map<string, string>()
+    auction.lanes.forEach((lane) =>
+      lane.ranking.forEach((bid) => bidders.set(bid.vendorId, bid.vendorName)),
+    )
+    const invited = auction.invitedVendorIds.length
+      ? auction.invitedVendorIds
+      : Array.from(bidders.keys())
+    return invited.map((vendorId) => ({
+      id: vendorId,
+      name: bidders.get(vendorId) ?? vendorId,
+      hasBid: bidders.has(vendorId),
+    }))
+  })()
+
   const getDefaultSelection = (laneId: string, rank: 'L1' | 'L2' | 'L3') => {
     const selected = awardSelection[laneId]?.[rank]
     if (selected) return selected
@@ -353,10 +371,6 @@ export default function AuctionDetailPage() {
                   <p className="mt-1 text-xs text-[#64748B]">{booking.commodity} - {booking.quantity} {booking.uom}</p>
                 </div>
               )}
-              <div className="rounded-xl border border-[#E5E7EB] p-4">
-                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award deadline</p>
-                <div className="mt-2">{(auction.status === 'LIVE' || auction.status === 'COMPLETED') ? <SLACountdown deadline={auction.awardDeadline} /> : <span className="text-sm text-[#64748B]">Not active</span>}</div>
-              </div>
               {auction.type !== 'SPOT' && (
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Contract Window</p>
@@ -397,6 +411,25 @@ export default function AuctionDetailPage() {
                   <p className="mt-1 text-xs text-[#64748B]">{contract.lane} · {contract.allocationRank}</p>
                 </Link>
               ))}
+              {participation.length > 0 && (
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Vendor Participation</p>
+                  <ul className="mt-3 space-y-2">
+                    {participation.map((vendor) => (
+                      <li key={vendor.id} className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm text-[#0F172A]">{vendor.name}</span>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            vendor.hasBid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {vendor.hasBid ? 'Bid placed' : 'No bid yet'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

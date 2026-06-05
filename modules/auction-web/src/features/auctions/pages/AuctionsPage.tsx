@@ -98,6 +98,8 @@ export default function AuctionsPage() {
         header: 'Action',
         align: 'right',
         render: (auction) => (
+          // Awarding happens inside the auction detail page (Award tab) —
+          // the queue only offers navigation.
           <div className="flex justify-end">
             <Button
               variant="outline"
@@ -107,7 +109,7 @@ export default function AuctionsPage() {
                 navigate(`/auction/auctions/${auction.id}`)
               }}
             >
-              {auction.status === 'LIVE' ? 'Enter' : 'View'}
+              {auction.status === 'LIVE' ? 'Enter' : auction.status === 'COMPLETED' ? 'Review & Award' : 'View'}
             </Button>
           </div>
         ),

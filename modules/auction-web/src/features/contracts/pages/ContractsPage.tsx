@@ -111,6 +111,13 @@ export default function ContractsPage() {
       { key: 'lane', header: 'Lane', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.lane}</span> },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },
       { key: 'status', header: 'Status', render: (contract) => <StatusBadge status={contract.status} /> },
+      {
+        key: 'awardedAt',
+        header: 'Award Won On',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.awardedAt ? formatDate(contract.awardedAt) : '—'}</span>
+        ),
+      },
       { key: 'startDate', header: 'Start Date', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.startDate)}</span> },
       { key: 'endDate', header: 'End Date', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.endDate)}</span> },
       {
@@ -196,6 +203,10 @@ export default function ContractsPage() {
                   <p className="mt-2 text-sm font-semibold text-[#0F172A]">
                     <CurrencyDisplay amount={selectedContract.contractedRate} /> · {getRateTypeLabel(selectedContract.rateUnit)}
                   </p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award Won On</p>
+                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.awardedAt ? formatDate(selectedContract.awardedAt) : '—'}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Validity</p>
