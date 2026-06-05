@@ -120,11 +120,14 @@ export function loadStore(): AuctionStoreSnapshot {
       auctions: parsed.auctions ?? [],
       contracts: parsed.contracts ?? [],
     }
-    // Merge-missing seed contracts (by id) so demo data added to the seed
-    // reaches browsers whose store was created before the seed grew.
+    // Merge-missing seed auctions/contracts (by id) so demo data added to
+    // the seed reaches browsers whose store was created before the seed grew.
+    const existingAuctionIds = new Set(snapshot.auctions.map((a) => a.id))
+    const missingAuctions = MOCK_AUCTIONS.filter((a) => !existingAuctionIds.has(a.id))
     const existingContractIds = new Set(snapshot.contracts.map((c) => c.id))
     const missingContracts = MOCK_CONTRACTS.filter((c) => !existingContractIds.has(c.id))
-    if (missingContracts.length > 0) {
+    if (missingAuctions.length > 0 || missingContracts.length > 0) {
+      snapshot.auctions = [...snapshot.auctions, ...missingAuctions]
       snapshot.contracts = [...snapshot.contracts, ...missingContracts]
       window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
     }
