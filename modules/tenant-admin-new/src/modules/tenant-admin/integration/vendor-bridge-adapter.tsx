@@ -575,7 +575,6 @@ function toVendorTrip(
     slaFlag: status === "IN_TRANSIT" ? "ON_TIME" : undefined,
     exceptionFlag,
     freightRate: assignment?.vendorFreight ?? 0,
-    expenseSummary: { total: 0, approved: 0, pending: 0 },
     isInvoiced: booking.isInvoiced ?? false,
     createdAt: booking.createdAt,
   };

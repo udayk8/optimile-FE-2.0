@@ -50,6 +50,53 @@ function notify() {
   window.dispatchEvent(new CustomEvent('optimile-auction-store'))
 }
 
+/**
+ * LIVE auctions whose bidding timer has fully run out flip straight to
+ * COMPLETED (shown as "Pending Award") — no manual "Complete" click needed.
+ * Runs on every store read so every surface (auction-web, the tenant-admin
+ * embed, and the vendor portal bridge) converges on the same status.
+ *
+ * The write-back deliberately skips notify(): loadStore() runs during React
+ * renders, and dispatching the store event synchronously there could trigger
+ * setState-in-render warnings. The flip is persisted, so the next read (or
+ * the next user-driven store event) picks it up everywhere.
+ */
+function sweepExpiredAuctions(snapshot: AuctionStoreSnapshot): AuctionStoreSnapshot {
+  const now = Date.now()
+  let changed = false
+  const auctions = snapshot.auctions.map((auction) => {
+    if (auction.status !== 'LIVE') return auction
+    if (auction.startAt && new Date(auction.startAt).getTime() > now) return auction
+    const laneEnds = auction.lanes
+      .map((lane) => new Date(lane.timerEndsAt).getTime())
+      .filter((time) => !Number.isNaN(time))
+    if (!laneEnds.length) return auction
+    const lastEnd = Math.max(...laneEnds)
+    if (lastEnd > now) return auction
+    changed = true
+    const closedAt = new Date(lastEnd).toISOString()
+    return {
+      ...auction,
+      status: 'COMPLETED' as const,
+      completedAt: auction.completedAt ?? closedAt,
+      auditTrail: [
+        ...auction.auditTrail,
+        {
+          id: `e-auto-${lastEnd}`,
+          type: 'COMPLETED' as const,
+          message: 'Bidding window closed automatically (timer ended).',
+          actor: 'system',
+          timestamp: closedAt,
+        },
+      ],
+    }
+  })
+  if (!changed) return snapshot
+  const swept = { ...snapshot, auctions }
+  window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(swept))
+  return swept
+}
+
 export function loadStore(): AuctionStoreSnapshot {
   if (typeof window === 'undefined') {
     return { auctions: [...MOCK_AUCTIONS], contracts: [...MOCK_CONTRACTS] }
@@ -61,14 +108,14 @@ export function loadStore(): AuctionStoreSnapshot {
       contracts: [...MOCK_CONTRACTS],
     }
     window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(seeded))
-    return seeded
+    return sweepExpiredAuctions(seeded)
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AuctionStoreSnapshot>
-    return {
+    return sweepExpiredAuctions({
       auctions: parsed.auctions ?? [],
       contracts: parsed.contracts ?? [],
-    }
+    })
   } catch {
     return { auctions: [], contracts: [] }
   }

@@ -7,6 +7,8 @@ import { Card, Pill, Money, SectionTitle, Btn } from "@finance/components/primit
 import { PENDING_POD_DETAILS, contractRateFor } from "@finance/data/mock";
 import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
 import { Kpis } from "@finance/modules/finance/threepl/revenue/pages/Invoicing";
+import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
+import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
 import { useReceivables, type PodStage } from "@finance/lib/receivablesStore";
 import { exportCsv } from "@finance/lib/csv";
 
@@ -71,6 +73,17 @@ function PodFollowUp({ trip, onBack, toast }: any) {
           <p className="mt-1 text-sm text-slate-500">{trip.client} · {trip.lane} · {trip.truck} · revenue at risk <Money value={trip.revenue} className="font-semibold text-red-600" /></p>
         </div>
       </div>
+
+      <div className="mb-6">
+        <div className="mb-3 font-semibold text-slate-800">Booking details</div>
+        <BookingDetailCard trip={trip} />
+      </div>
+
+      {trip.expenseItems && trip.expenseItems.length > 0 && (
+        <div className="mb-6">
+          <ExpenseTable items={trip.expenseItems} title="Booking expenses recorded on this trip" toast={toast} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-5">
@@ -145,8 +158,11 @@ export default function PendingPOD({ toast, toggle }: { toast: (m: string) => vo
   const totalRisk = pending.reduce((s, t) => s + t.revenue, 0);
 
   // Same booking-module KPIs as Generate Invoice, over the filtered pending set.
-  const kpiFreight = pending.reduce((s, t) => s + contractRateFor(t.lane, t.truck, t.client).base, 0);
-  const kpiExpense = pending.reduce((s, t) => s + (t.expense ?? 0), 0);
+  // Prefer the real booking freight (embedded mode); fall back to the contract-rate
+  // lookup only when the trip carries no revenue (standalone mock trips).
+  const kpiFreight = pending.reduce((s, t) => s + (t.revenue && t.revenue > 0 ? t.revenue : contractRateFor(t.lane, t.truck, t.client).base), 0);
+  const kpiApproved = pending.reduce((s, t) => s + (t.approvedExpenses ?? 0), 0);
+  const kpiPending = pending.reduce((s, t) => s + (t.pendingExpenses ?? 0), 0);
   const kpiDrops = pending.length;
   const kpiBookings = new Set(pending.map((t) => t.bookingId ?? t.id)).size;
 
@@ -193,7 +209,7 @@ export default function PendingPOD({ toast, toggle }: { toast: (m: string) => vo
         </div>
       </Card>
 
-      <Kpis freight={kpiFreight} bookings={kpiBookings} drops={kpiDrops} expense={kpiExpense} />
+      <Kpis freight={kpiFreight} bookings={kpiBookings} drops={kpiDrops} approvedExpenses={kpiApproved} pendingExpenses={kpiPending} />
 
       <Card className="overflow-hidden">
         <table className="w-full text-sm">

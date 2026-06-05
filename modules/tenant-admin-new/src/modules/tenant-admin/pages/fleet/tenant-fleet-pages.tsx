@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Edit3,
   FileCheck,
   Plus,
   PowerOff,
+  Search,
   ShieldCheck,
   ShieldX,
   Ship,
@@ -167,6 +170,79 @@ const DRIVER_DOC_CONFIG: Array<{ key: DriverDocKey; label: string; refPlaceholde
   { key: "MedicalCertificate", label: "Medical Certificate", refPlaceholder: "Certificate Number" },
 ];
 
+const FLEET_PAGE_SIZE = 10;
+
+function FleetSearchBar({
+  value,
+  onChange,
+  placeholder,
+  trailing,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 md:flex-row md:items-center md:justify-between">
+      <div className="relative w-full md:w-80">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="pl-9"
+        />
+      </div>
+      {trailing}
+    </div>
+  );
+}
+
+function PaginationFooter({
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalItems <= FLEET_PAGE_SIZE) return null;
+  const start = (page - 1) * FLEET_PAGE_SIZE + 1;
+  const end = Math.min(page * FLEET_PAGE_SIZE, totalItems);
+  return (
+    <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4 text-sm text-gray-600">
+      <span>
+        Showing {start}-{end} of {totalItems}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+          disabled={page === 1}
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+        >
+          <ChevronLeft className="h-4 w-4" /> Previous
+        </button>
+        <span className="rounded-lg bg-gray-50 px-3 py-1.5 font-semibold text-gray-800">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+          disabled={page === totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+        >
+          Next <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ============================ VEHICLES ============================
 
 // Human label for a master-data record's origin module. Records created before
@@ -202,6 +278,22 @@ export function TenantVehiclesPage() {
   const activeVehicleTypes = vehicleTypes.filter((vt) => vt.status === "active");
   const [isOpen, setIsOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<TenantVehicle | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filteredVehicles = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return vehicles;
+    return vehicles.filter((vehicle) => {
+      const vendorName = vehicle.vendorId ? vendorMap.get(vehicle.vendorId)?.name ?? vehicle.vendorName ?? "" : "Own Fleet";
+      return `${vehicle.registrationNumber} ${vehicle.make} ${vehicle.model} ${vehicle.baseLocation ?? ""} ${vendorName}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [vehicles, search, vendorMap]);
+  const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / FLEET_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedVehicles = filteredVehicles.slice((safePage - 1) * FLEET_PAGE_SIZE, safePage * FLEET_PAGE_SIZE);
 
   function openAdd() {
     setEditingVehicle(null);
@@ -237,7 +329,16 @@ export function TenantVehiclesPage() {
         <TenantSummaryCard label="Active" value={String(vehicles.filter((v) => v.isActive).length)} helper="Visible for assignment" />
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <FleetSearchBar
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          placeholder="Search by registration, make, model, location, or vendor"
+          trailing={<span className="text-sm text-gray-500">{filteredVehicles.length} vehicle{filteredVehicles.length === 1 ? "" : "s"}</span>}
+        />
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b bg-gray-50">
@@ -251,18 +352,22 @@ export function TenantVehiclesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {vehicles.length === 0 ? (
+              {filteredVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-gray-500">No vehicles yet. Click Add Vehicle.</td>
+                  <td colSpan={6} className="p-8 text-center text-sm text-gray-500">
+                    {search ? "No vehicles match the search." : "No vehicles yet. Click Add Vehicle."}
+                  </td>
                 </tr>
               ) : null}
-              {vehicles.map((vehicle) => {
+              {pagedVehicles.map((vehicle) => {
                   const compliance = vehicle.complianceStatus ?? "PENDING_DOCS";
                   return (
-                    <tr key={vehicle.id} className="hover:bg-gray-50">
+                    <tr key={vehicle.id} className="transition-colors hover:bg-blue-50/40">
                       <td className="p-4 align-top">
                         <div className="flex items-center gap-3">
-                          <ComplianceIcon status={compliance} />
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                            <Truck className="h-5 w-5 text-primary" />
+                          </span>
                           <div>
                             <div className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</div>
                             <p className="text-xs text-gray-500">
@@ -310,6 +415,12 @@ export function TenantVehiclesPage() {
             </tbody>
           </table>
         </div>
+        <PaginationFooter
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filteredVehicles.length}
+          onPageChange={setPage}
+        />
       </div>
 
       <VehicleModal
@@ -610,6 +721,24 @@ export function TenantDriversPage() {
   const activeVendors = vendors.filter((v) => v.status === "active");
   const [isOpen, setIsOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<TenantDriver | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const filteredDrivers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return drivers;
+    return drivers.filter((driver) => {
+      const vendorName = driver.vendorId
+        ? vendors.find((v) => v.id === driver.vendorId)?.name ?? driver.vendorName ?? ""
+        : "Own Driver";
+      return `${driver.name} ${driver.phone ?? ""} ${driver.licenseNumber ?? ""} ${driver.baseLocation ?? ""} ${vendorName}`
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [drivers, search, vendors]);
+  const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / FLEET_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedDrivers = filteredDrivers.slice((safePage - 1) * FLEET_PAGE_SIZE, safePage * FLEET_PAGE_SIZE);
 
   function openAdd() {
     setEditingDriver(null);
@@ -645,7 +774,16 @@ export function TenantDriversPage() {
         <TenantSummaryCard label="Active" value={String(drivers.filter((d) => d.isActive).length)} helper="Visible for assignment" />
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <FleetSearchBar
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setPage(1);
+          }}
+          placeholder="Search by name, phone, license, location, or vendor"
+          trailing={<span className="text-sm text-gray-500">{filteredDrivers.length} driver{filteredDrivers.length === 1 ? "" : "s"}</span>}
+        />
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="border-b bg-gray-50">
@@ -660,18 +798,22 @@ export function TenantDriversPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {drivers.length === 0 ? (
+              {filteredDrivers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-sm text-gray-500">No drivers yet. Click Add Driver.</td>
+                  <td colSpan={7} className="p-8 text-center text-sm text-gray-500">
+                    {search ? "No drivers match the search." : "No drivers yet. Click Add Driver."}
+                  </td>
                 </tr>
               ) : null}
-              {drivers.map((driver) => {
+              {pagedDrivers.map((driver) => {
                   const compliance = driver.complianceStatus ?? "PENDING_DOCS";
                   return (
-                    <tr key={driver.id} className="hover:bg-gray-50">
+                    <tr key={driver.id} className="transition-colors hover:bg-blue-50/40">
                       <td className="p-4 align-top">
                         <div className="flex items-center gap-3">
-                          <ComplianceIcon status={compliance} />
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                            {driver.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                          </span>
                           <div>
                             <div className="text-sm font-bold">{driver.name}</div>
                             <p className="text-xs text-gray-500">
@@ -726,6 +868,12 @@ export function TenantDriversPage() {
             </tbody>
           </table>
         </div>
+        <PaginationFooter
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filteredDrivers.length}
+          onPageChange={setPage}
+        />
       </div>
 
       <DriverModal
@@ -1012,8 +1160,11 @@ function DriverModal({
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="space-y-4 rounded-2xl border bg-muted/20 p-4">
-      <p className="text-sm font-semibold">{title}</p>
+    <div className="space-y-4 rounded-2xl border border-border/70 bg-gradient-to-br from-white to-slate-50/60 p-5 shadow-sm">
+      <p className="flex items-center gap-2 text-sm font-bold">
+        <span className="h-4 w-1 rounded-full bg-primary" />
+        {title}
+      </p>
       {children}
     </div>
   );

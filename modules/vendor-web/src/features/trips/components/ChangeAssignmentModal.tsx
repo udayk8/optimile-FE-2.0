@@ -39,7 +39,11 @@ export function ChangeAssignmentModal({ isOpen, onClose, tripId }: ChangeAssignm
   const reasonRequiresVehicle = reason === 'VEHICLE_BREAKDOWN' || reason === 'VEHICLE_OR_DRIVER_BREAKDOWN'
   const reasonRequiresDriver = reason === 'DRIVER_BREAKDOWN' || reason === 'VEHICLE_OR_DRIVER_BREAKDOWN'
 
-  const availableVehicles = vehicles.filter((v) => v.id !== trip.assignedVehicle.id)
+  // Replacement must keep the booking's vehicle type (the type the booking was created with).
+  const expectedVehicleType = trip.assignedVehicle.type && trip.assignedVehicle.type !== '—' ? trip.assignedVehicle.type : null
+  const availableVehicles = vehicles.filter(
+    (v) => v.id !== trip.assignedVehicle.id && (!expectedVehicleType || v.vehicleType === expectedVehicleType),
+  )
   const availableDrivers = drivers.filter((d) => d.id !== trip.assignedDriver.id)
 
   const canSubmit =

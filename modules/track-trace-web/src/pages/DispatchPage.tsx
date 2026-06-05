@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Search, Send, X } from 'lucide-react';
+import { ArrowRight, Search, Send, X, Filter as FilterIcon } from 'lucide-react';
 import { Trip, TripStatus, Vehicle, Driver } from '../types/fleet.types';
 import { TripAPI, VehicleAPI, DriverAPI } from '../services/mockDatabase';
 import { IconEdit, IconArrowRight } from '../components/Icons';
@@ -27,10 +27,16 @@ export const DispatchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '');
-  // activeFilter: TripStatus string | 'delayed' | 'offline' | ''
-  const [activeFilter, setActiveFilter] = useState<string>('');
+  // Multi-select filters. statusFilters: ('booked' | 'delayed' | 'offline' | TripStatus)[]
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  // sourceFilters: ('GPS_DEVICE' | 'FASTAG' | 'DRIVER_APP' | 'MANUAL')[]
+  const [sourceFilters, setSourceFilters] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  const toggleInArray = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) =>
+    setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
 
 
   useEffect(() => {
@@ -55,7 +61,7 @@ export const DispatchPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { setPage(1) }, [searchTerm, activeFilter])
+  useEffect(() => { setPage(1) }, [searchTerm, statusFilters, sourceFilters])
 
   const getName = (id: string | null, list: any[], key: string) => {
     if (!id) return '-';
@@ -64,13 +70,18 @@ export const DispatchPage: React.FC = () => {
 
   const getStatusBadge = (status: TripStatus) => {
     switch(status) {
-      case TripStatus.PLANNED:    return 'bg-gray-100 text-gray-600';
+      case TripStatus.PLANNED:
       case TripStatus.DISPATCHED: return 'bg-primary/10 text-primary';
       case TripStatus.IN_TRANSIT: return 'bg-blue-100 text-blue-700';
       case TripStatus.COMPLETED:  return 'bg-emerald-100 text-emerald-700';
       case TripStatus.CANCELLED:  return 'bg-red-100 text-red-600';
       default:                    return 'bg-gray-100 text-gray-500';
     }
+  };
+
+  const getStatusLabel = (status: TripStatus) => {
+    if (status === TripStatus.PLANNED || status === TripStatus.DISPATCHED) return 'Booked';
+    return status;
   };
 
   const filteredTrips = useMemo(() => {
@@ -82,33 +93,42 @@ export const DispatchPage: React.FC = () => {
                             t.destination.toLowerCase().includes(term) ||
                             vehicleName.includes(term)
 
-      let matchesFilter = true
-      if (activeFilter === 'delayed') {
-        const at = activeTrips.find(at => at.id === t.trip_id)
-        matchesFilter = !!at && at.delayMinutes > 0
-      } else if (activeFilter === 'offline') {
-        const at = activeTrips.find(at => at.id === t.trip_id)
-        matchesFilter = !!at && at.isOffline
-      } else if (activeFilter) {
-        matchesFilter = t.status === activeFilter
-      }
+      const at = activeTrips.find(at => at.id === t.trip_id)
 
-      return matchesSearch && matchesFilter
+      // Status group: trip must match ALL selected statuses (AND).
+      const matchesStatus = (value: string) => {
+        if (value === 'booked') return t.status === TripStatus.PLANNED || t.status === TripStatus.DISPATCHED
+        if (value === 'delayed') return !!at && at.delayMinutes > 0
+        if (value === 'offline') return !!at && at.isOffline
+        return t.status === value
+      }
+      const matchesFilter = statusFilters.length === 0 || statusFilters.every(matchesStatus)
+
+      // Source group: trip must match ALL selected sources (AND).
+      const matchesOneSource = (value: string) => {
+        const srcs = at ? [at.primarySource, at.activeSource] : []
+        return value === 'MANUAL'
+          // "Manual" = nothing tracking it electronically (no GPS/SIM/App source).
+          ? !srcs.some(s => s === 'GPS_DEVICE' || s === 'FASTAG' || s === 'DRIVER_APP')
+          : srcs.includes(value as typeof srcs[number])
+      }
+      const matchesSource = sourceFilters.length === 0 || sourceFilters.every(matchesOneSource)
+
+      return matchesSearch && matchesFilter && matchesSource
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trips, vehicles, searchTerm, activeFilter, activeTrips])
+  }, [trips, vehicles, searchTerm, statusFilters, sourceFilters, activeTrips])
 
   const totalPages = Math.max(1, Math.ceil(filteredTrips.length / PAGE_SIZE))
   const pagedTrips = filteredTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const stats = useMemo(() => {
-    const unassigned = trips.filter(t => t.status === TripStatus.PLANNED && (!t.vehicle_id || !t.driver_id)).length
-    const dispatched = trips.filter(t => t.status === TripStatus.DISPATCHED).length
+    const booked = trips.filter(t => t.status === TripStatus.PLANNED || t.status === TripStatus.DISPATCHED).length
     const enRoute = trips.filter(t => t.status === TripStatus.IN_TRANSIT).length
     const delayed = activeTrips.filter(t => t.delayMinutes > 0 && !['Completed', 'Cancelled'].includes(t.status)).length
     const offline = activeTrips.filter(t => t.isOffline).length
     const openAlerts = alerts.filter(a => a.status !== 'Resolved').length
-    return { unassigned, dispatched, enRoute, delayed, offline, openAlerts }
+    return { booked, enRoute, delayed, offline, openAlerts }
   }, [trips, activeTrips, alerts])
 
   const alertsByTripId = useMemo(() => {
@@ -158,20 +178,12 @@ export const DispatchPage: React.FC = () => {
 
         {([
           {
-            label: 'Planned',
-            value: stats.unassigned,
-            dot: 'bg-gray-400',
-            numColor: 'text-gray-900',
-            bg: '',
-            filter: TripStatus.PLANNED,
-          },
-          {
-            label: 'Dispatched',
-            value: stats.dispatched,
+            label: 'Booked',
+            value: stats.booked,
             dot: 'bg-primary',
             numColor: 'text-gray-900',
             bg: '',
-            filter: TripStatus.DISPATCHED,
+            filter: 'booked',
           },
           {
             label: 'In Transit',
@@ -198,12 +210,12 @@ export const DispatchPage: React.FC = () => {
             filter: 'offline',
           },
         ] as const).map(({ label, value, dot, numColor, bg, filter }) => {
-          const isActive = activeFilter === filter
+          const isActive = statusFilters.includes(filter)
           return (
             <button
               key={label}
               type="button"
-              onClick={() => setActiveFilter(isActive ? '' : filter)}
+              onClick={() => toggleInArray(setStatusFilters, filter)}
               className={[
                 'flex min-w-0 flex-1 flex-col justify-center border-l border-gray-200 px-5 py-4 text-left transition cursor-pointer',
                 bg,
@@ -243,6 +255,98 @@ export const DispatchPage: React.FC = () => {
               </button>
             )}
           </label>
+
+          {/* Filter button + popover (multi-select) */}
+          {(() => {
+            const activeFilterCount = statusFilters.length + sourceFilters.length
+            const statusOptions = [
+              { label: 'Booked', value: 'booked' },
+              { label: 'In Transit', value: TripStatus.IN_TRANSIT },
+              { label: 'Delayed', value: 'delayed' },
+              { label: 'Offline', value: 'offline' },
+              { label: 'Completed', value: TripStatus.COMPLETED },
+              { label: 'Cancelled', value: TripStatus.CANCELLED },
+            ]
+            const sourceOptions = [
+              { label: 'GPS', value: 'GPS_DEVICE' },
+              { label: 'SIM', value: 'FASTAG' },
+              { label: 'App', value: 'DRIVER_APP' },
+              { label: 'Manual', value: 'MANUAL' },
+            ]
+            const chip = (selected: boolean) =>
+              `rounded-full px-3 py-1 text-xs font-semibold transition ${selected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`
+            return (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen((v) => !v)}
+                  className={`flex h-12 items-center gap-2 rounded-2xl border px-5 text-sm font-semibold transition ${
+                    activeFilterCount > 0 || filterOpen
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <FilterIcon className="h-4 w-4" />
+                  Filter
+                  {activeFilterCount > 0 && (
+                    <span className="ml-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                {filterOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
+                    <div className="absolute right-0 z-20 mt-2 w-72 rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="text-sm font-bold text-gray-900">Filters</p>
+                        {activeFilterCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => { setStatusFilters([]); setSourceFilters([]) }}
+                            className="text-xs font-semibold text-primary hover:underline"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">Status</p>
+                      <div className="mb-4 flex flex-wrap gap-1.5">
+                        <button type="button" onClick={() => setStatusFilters([])} className={chip(statusFilters.length === 0)}>All</button>
+                        {statusOptions.map((o) => (
+                          <button
+                            key={o.label}
+                            type="button"
+                            onClick={() => toggleInArray(setStatusFilters, o.value)}
+                            className={chip(statusFilters.includes(o.value))}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400">Tracking Source</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button type="button" onClick={() => setSourceFilters([])} className={chip(sourceFilters.length === 0)}>All</button>
+                        {sourceOptions.map((o) => (
+                          <button
+                            key={o.label}
+                            type="button"
+                            onClick={() => toggleInArray(setSourceFilters, o.value)}
+                            className={chip(sourceFilters.includes(o.value))}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -401,7 +505,7 @@ export const DispatchPage: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusBadge(trip.status)}`}>{trip.status}</span>
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${getStatusBadge(trip.status)}`}>{getStatusLabel(trip.status)}</span>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col items-end gap-1">

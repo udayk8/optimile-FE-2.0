@@ -54,7 +54,7 @@ export const MOCK_VENDORS: VendorOption[] = [
 export const MOCK_BOOKINGS: BookingReference[] = [
   {
     id: 'BK-2026-11203',
-    lane: 'Mumbai → Delhi',
+    lane: 'MUM-DEL',
     vehicleType: '20 MT Open Body',
     commodity: 'FMCG - packaged snacks',
     quantity: 18,
@@ -64,7 +64,7 @@ export const MOCK_BOOKINGS: BookingReference[] = [
   },
   {
     id: 'BK-2026-11261',
-    lane: 'Pune → Jaipur',
+    lane: 'PNQ-JAI',
     vehicleType: '32 FT Closed Body',
     commodity: 'Consumer durables',
     quantity: 22,
@@ -95,7 +95,7 @@ export const MOCK_DASHBOARD: DashboardData = {
 export const MOCK_AUCTIONS: Auction[] = [
   {
     id: 'AUC-SPOT-042',
-    title: 'Spot | BK-2026-11203 | Mumbai → Delhi',
+    title: 'Spot | BK-2026-11203 | MUM-DEL',
     type: 'SPOT',
     status: 'COMPLETED',
     createdBy: 'Arjun Mehta',
@@ -114,7 +114,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-1',
-        lane: 'Mumbai → Delhi',
+        lane: 'MUM-DEL',
         region: 'North India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -164,7 +164,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-1',
-        lane: 'Mumbai → Bangalore',
+        lane: 'MUM-BLR',
         region: 'South India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -214,7 +214,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-lot-1',
-        lane: 'Delhi → Lucknow',
+        lane: 'DEL-LKO',
         region: 'North India',
         vehicleType: '32 FT Closed Body',
         capacityMt: 32,
@@ -239,7 +239,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       { id: 'e7', type: 'CREATED', message: 'Lot auction created for North India lanes.', actor: 'Naina Kapoor', timestamp: iso(-15 * 24 * 60 * 60 * 1000) },
       { id: 'e8', type: 'LAUNCHED', message: 'Auction launched and vendors notified.', actor: 'Naina Kapoor', timestamp: iso(-13 * 24 * 60 * 60 * 1000) },
       { id: 'e9', type: 'COMPLETED', message: 'Auction completed.', actor: 'System', timestamp: iso(-10 * 24 * 60 * 60 * 1000) },
-      { id: 'e10', type: 'OVERRIDE', message: 'Award pending for Delhi → Lucknow with selected mappings frozen.', actor: 'Naina Kapoor', timestamp: iso(-9 * 24 * 60 * 60 * 1000) },
+      { id: 'e10', type: 'OVERRIDE', message: 'Award pending for DEL-LKO with selected mappings frozen.', actor: 'Naina Kapoor', timestamp: iso(-9 * 24 * 60 * 60 * 1000) },
     ],
   },
   {
@@ -264,7 +264,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-bulk-3',
-        lane: 'Ahmedabad → Surat',
+        lane: 'AMD-SRT',
         region: 'West India',
         vehicleType: 'LCV',
         capacityMt: 8,
@@ -289,7 +289,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-SPOT-055',
-    title: 'Spot | Ahmedabad → Vadodara',
+    title: 'Spot | AMD-BDQ',
     type: 'SPOT',
     status: 'LIVE',
     createdBy: 'Arjun Mehta',
@@ -307,7 +307,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-spot-55',
-        lane: 'Ahmedabad → Vadodara',
+        lane: 'AMD-BDQ',
         region: 'West India',
         vehicleType: 'LCV',
         capacityMt: 8,
@@ -331,7 +331,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-BULK-031',
-    title: 'Bulk | Chennai → Coimbatore',
+    title: 'Bulk | MAA-CJB',
     type: 'BULK',
     status: 'DRAFT',
     createdBy: 'Naina Kapoor',
@@ -370,7 +370,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'lane-lot-25',
-        lane: 'Jaipur → Udaipur',
+        lane: 'JAI-UDR',
         region: 'North India',
         vehicleType: '20 MT Open Body',
         capacityMt: 20,
@@ -395,7 +395,7 @@ export const MOCK_AUCTIONS: Auction[] = [
   },
   {
     id: 'AUC-SPOT-061',
-    title: 'Spot | Nashik → Surat',
+    title: 'Spot | NSK-SRT',
     type: 'SPOT',
     status: 'CANCELLED',
     createdBy: 'Arjun Mehta',
@@ -425,7 +425,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-2',
     vendorName: 'BlueAxle Freight',
-    lane: 'Delhi → Lucknow',
+    lane: 'DEL-LKO',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 13100,
@@ -437,6 +437,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     estimatedTrips: 220,
     status: 'ACTIVE',
     l1OverrideReason: 'R1 assigned to the R2 bidder due to recent placement failure scorecard for MetroFleet Movers.',
+    createdFrom: 'AUCTION_WIN',
     rateSyncedToTms: true,
     placementFailures: [],
     rateDeviationOpen: false,
@@ -447,7 +448,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-4',
     vendorName: 'MetroFleet Movers',
-    lane: 'Delhi → Lucknow',
+    lane: 'DEL-LKO',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 12900,
@@ -458,6 +459,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     endDate: dateOnly(175 * 24 * 60 * 60 * 1000),
     estimatedTrips: 220,
     status: 'ACTIVE',
+    createdFrom: 'AUCTION_WIN',
     rateSyncedToTms: true,
     placementFailures: [],
     rateDeviationOpen: false,
@@ -468,7 +470,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'LOT',
     vendorId: 'ven-1',
     vendorName: 'SwiftHaul Logistics',
-    lane: 'Delhi → Lucknow',
+    lane: 'DEL-LKO',
     region: 'North India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 13250,
@@ -479,6 +481,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     endDate: dateOnly(175 * 24 * 60 * 60 * 1000),
     estimatedTrips: 220,
     status: 'ACTIVE',
+    createdFrom: 'AUCTION_WIN',
     rateSyncedToTms: true,
     placementFailures: [],
     rateDeviationOpen: false,
@@ -489,7 +492,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     contractType: 'BULK',
     vendorId: 'ven-3',
     vendorName: 'RoadBridge Carriers',
-    lane: 'Pune → Jaipur',
+    lane: 'PNQ-JAI',
     region: 'West India',
     vehicleType: '32 FT Closed Body',
     contractedRate: 48800,
@@ -500,6 +503,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     endDate: dateOnly(10 * 24 * 60 * 60 * 1000),
     estimatedTrips: 75,
     status: 'EXPIRING_SOON',
+    createdFrom: 'AUCTION_WIN',
     rateSyncedToTms: true,
     placementFailures: [
       {
@@ -519,7 +523,7 @@ export const MOCK_RFIS: RfiType[] = [
   {
     id: 'RFI-2026-014',
     title: 'Q2 Bulk lanes — capacity discovery',
-    description: 'Discovering vendor capacity and equipment readiness for Pune → Jaipur and Mumbai → Delhi BULK lanes for the upcoming quarter.',
+    description: 'Discovering vendor capacity and equipment readiness for PNQ-JAI and MUM-DEL BULK lanes for the upcoming quarter.',
     deadline: iso(7 * 24 * 60 * 60 * 1000),
     status: 'PUBLISHED',
     targetEmails: ['ops@swifthaul.com', 'sales@blueaxle.com', 'bd@roadbridge.com'],
@@ -580,7 +584,7 @@ export const MOCK_RFQS: RfqType[] = [
   },
   {
     id: 'RFQ-2026-021',
-    title: 'Spot — Bangalore → Chennai express',
+    title: 'Spot — BLR-MAA express',
     deadline: iso(-1 * 24 * 60 * 60 * 1000),
     status: 'EVALUATING',
     targetEmails: ['ops@swifthaul.com', 'sales@blueaxle.com'],
@@ -593,7 +597,7 @@ export const MOCK_RFQS: RfqType[] = [
   },
   {
     id: 'RFQ-2026-020',
-    title: 'Delhi → Lucknow LOT contract',
+    title: 'DEL-LKO LOT contract',
     deadline: iso(-10 * 24 * 60 * 60 * 1000),
     status: 'AWARDED',
     targetEmails: ['ops@swifthaul.com', 'sales@blueaxle.com', 'bd@roadbridge.com'],
@@ -616,8 +620,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-4 * 24 * 60 * 60 * 1000),
     uploadedBy: 'ops@swifthaul.com',
     rows: [
-      { lane: 'Pune → Jaipur', vehicleType: '32 FT Closed Body', price: 48500 },
-      { lane: 'Mumbai → Delhi', vehicleType: '20 MT Open Body', price: 62200 },
+      { lane: 'PNQ-JAI', vehicleType: '32 FT Closed Body', price: 48500 },
+      { lane: 'MUM-DEL', vehicleType: '20 MT Open Body', price: 62200 },
     ],
   },
   {
@@ -628,8 +632,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-3 * 24 * 60 * 60 * 1000),
     uploadedBy: 'sales@blueaxle.com',
     rows: [
-      { lane: 'Pune → Jaipur', vehicleType: '32 FT Closed Body', price: 49100 },
-      { lane: 'Mumbai → Delhi', vehicleType: '20 MT Open Body', price: 61800 },
+      { lane: 'PNQ-JAI', vehicleType: '32 FT Closed Body', price: 49100 },
+      { lane: 'MUM-DEL', vehicleType: '20 MT Open Body', price: 61800 },
     ],
   },
   {
@@ -640,8 +644,8 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-2 * 24 * 60 * 60 * 1000),
     uploadedBy: 'rfq@metrofleet.com',
     rows: [
-      { lane: 'Pune → Jaipur', vehicleType: '32 FT Closed Body', price: 48900 },
-      { lane: 'Mumbai → Delhi', vehicleType: '20 MT Open Body', price: 62500 },
+      { lane: 'PNQ-JAI', vehicleType: '32 FT Closed Body', price: 48900 },
+      { lane: 'MUM-DEL', vehicleType: '20 MT Open Body', price: 62500 },
     ],
   },
   {
@@ -652,7 +656,7 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-6 * 24 * 60 * 60 * 1000),
     uploadedBy: 'ops@swifthaul.com',
     rows: [
-      { lane: 'Bangalore → Chennai', vehicleType: '20 MT Open Body', price: 28500 },
+      { lane: 'BLR-MAA', vehicleType: '20 MT Open Body', price: 28500 },
     ],
   },
   {
@@ -663,7 +667,7 @@ export const MOCK_RFQ_RESPONSES: RfqResponse[] = [
     uploadedAt: iso(-5 * 24 * 60 * 60 * 1000),
     uploadedBy: 'sales@blueaxle.com',
     rows: [
-      { lane: 'Bangalore → Chennai', vehicleType: '20 MT Open Body', price: 29200 },
+      { lane: 'BLR-MAA', vehicleType: '20 MT Open Body', price: 29200 },
     ],
   },
 ]
@@ -673,14 +677,14 @@ export const MOCK_DASHBOARD_RESPONSE = {
   pendingAwards: { value: 3, insight: MOCK_DASHBOARD.pendingAwards.insight },
   expiringContracts: { value: 4, insight: MOCK_DASHBOARD.expiringContracts.insight },
   priorityAuctions: [
-    { id: 'AUC-LOT-019', title: 'Bulk | LOT-Q2 | Delhi → Lucknow', type: 'LOT', status: 'AWAITING_APPROVAL', updatedAt: iso(-2 * 60 * 60 * 1000), awardDeadline: iso(2 * 24 * 60 * 60 * 1000) },
-    { id: 'AUC-BULK-027', title: 'Bulk | BK-2026-11261 | Pune → Jaipur', type: 'BULK', status: 'AWAITING_APPROVAL', updatedAt: iso(-6 * 60 * 60 * 1000), awardDeadline: iso(1 * 24 * 60 * 60 * 1000) },
-    { id: 'AUC-SPOT-042', title: 'Spot | BK-2026-11203 | Mumbai → Delhi', type: 'SPOT', status: 'AWAITING_APPROVAL', updatedAt: iso(-12 * 60 * 60 * 1000), awardDeadline: iso(12 * 60 * 60 * 1000) },
+    { id: 'AUC-LOT-019', title: 'Bulk | LOT-Q2 | DEL-LKO', type: 'LOT', status: 'AWAITING_APPROVAL', updatedAt: iso(-2 * 60 * 60 * 1000), awardDeadline: iso(2 * 24 * 60 * 60 * 1000) },
+    { id: 'AUC-BULK-027', title: 'Bulk | BK-2026-11261 | PNQ-JAI', type: 'BULK', status: 'AWAITING_APPROVAL', updatedAt: iso(-6 * 60 * 60 * 1000), awardDeadline: iso(1 * 24 * 60 * 60 * 1000) },
+    { id: 'AUC-SPOT-042', title: 'Spot | BK-2026-11203 | MUM-DEL', type: 'SPOT', status: 'AWAITING_APPROVAL', updatedAt: iso(-12 * 60 * 60 * 1000), awardDeadline: iso(12 * 60 * 60 * 1000) },
   ],
   expiringContractsList: [
-    { id: 'CNT-2026-0117', vendorName: 'RoadBridge Carriers', lane: 'Pune → Jaipur', endDate: dateOnly(10 * 24 * 60 * 60 * 1000), status: 'EXPIRING_SOON' },
-    { id: 'CNT-2026-0101', vendorName: 'BlueAxle Freight', lane: 'Delhi → Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
-    { id: 'CNT-2026-0102', vendorName: 'MetroFleet Movers', lane: 'Delhi → Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
-    { id: 'CNT-2026-0103', vendorName: 'SwiftHaul Logistics', lane: 'Delhi → Lucknow', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0117', vendorName: 'RoadBridge Carriers', lane: 'PNQ-JAI', endDate: dateOnly(10 * 24 * 60 * 60 * 1000), status: 'EXPIRING_SOON' },
+    { id: 'CNT-2026-0101', vendorName: 'BlueAxle Freight', lane: 'DEL-LKO', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0102', vendorName: 'MetroFleet Movers', lane: 'DEL-LKO', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
+    { id: 'CNT-2026-0103', vendorName: 'SwiftHaul Logistics', lane: 'DEL-LKO', endDate: dateOnly(28 * 24 * 60 * 60 * 1000), status: 'ACTIVE' },
   ],
 }

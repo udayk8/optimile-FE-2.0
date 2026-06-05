@@ -1,5 +1,5 @@
 import type {
-  DashboardData, Auction, Contract, Indent, Trip, Expense,
+  DashboardData, Auction, Contract, Indent, Trip,
   Vehicle, Driver, CapacityDeclaration, Invoice, LedgerEntry, Notification,
   CompanyInfo, BankDetails, Vendor,
 } from '@vendor/types'
@@ -30,7 +30,6 @@ export const MOCK_DASHBOARD: DashboardData = {
 export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n1', type: 'TRIPS', title: 'New Indent Request', message: 'Indent IND-001 for Mumbai → Delhi', deepLink: '/vendor/trips/indents/IND-001', isRead: false, createdAt: new Date(Date.now() - 120000).toISOString() },
   { id: 'n2', type: 'SOURCING', title: 'Auction Going Live', message: 'Reverse Auction AUC-012 starts in 30 min', deepLink: '/vendor/sourcing/auctions/AUC-012', isRead: false, createdAt: new Date(Date.now() - 600000).toISOString() },
-  { id: 'n3', type: 'EXPENSES', title: 'Expense Added', message: 'Expense ₹2,500 added for TRP-045', deepLink: '/vendor/bookings/completed/TRP-045', isRead: false, createdAt: new Date(Date.now() - 1800000).toISOString() },
   { id: 'n4', type: 'INVOICES', title: 'Payment Received', message: '₹1,45,000 credited for INV-2026-028', deepLink: '/vendor/invoices/INV-2026-028', isRead: true, createdAt: new Date(Date.now() - 3600000).toISOString() },
   { id: 'n5', type: 'CONTRACTS', title: 'Contract Ready', message: 'Contract CNT-005 from Tata Steel awaiting your signature', deepLink: '/vendor/contracts/CNT-005', isRead: false, createdAt: new Date(Date.now() - 7200000).toISOString() },
 ]
@@ -173,7 +172,7 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
-    id: 'CNT-001', customerName: 'Hindustan Unilever', customerGSTIN: '27AABCU9603R1ZM', status: 'ACTIVE',
+    id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD', laneCode: 'MUM-DEL',
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     rateCard: [{ vehicleType: '20ft Container', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
@@ -184,7 +183,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-01-05T10:30:00Z', pdfUrl: '/contracts/CNT-001.pdf', createdAt: '2025-12-20T14:00:00Z',
   },
   {
-    id: 'CNT-005', customerName: 'Tata Steel Ltd.', customerGSTIN: '20AABCT1234D1ZP', status: 'DRAFT',
+    id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD', laneCode: 'JSR-HLD',
     laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'Flatbed', rateType: 'PER_TRIP', rate: 28000, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
@@ -195,7 +194,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], pdfUrl: '/contracts/CNT-005.pdf', createdAt: '2026-04-20T09:00:00Z',
   },
   {
-    id: 'CNT-003', customerName: 'Godrej Consumer', customerGSTIN: '27AABCU9603R1ZA', status: 'EXPIRED',
+    id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD', laneCode: 'MUM-SRT',
     laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'LCV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },
@@ -250,7 +249,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    freightRate: 45000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 45000, isInvoiced: false,
     createdAt: '2026-04-22T08:00:00Z',
   },
   {
@@ -259,7 +258,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-04-20T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-043',
-    freightRate: 45000, expenseSummary: { total: 5500 }, isInvoiced: false,
+    freightRate: 45000, isInvoiced: false,
     createdAt: '2026-04-18T08:00:00Z',
   },
   {
@@ -267,7 +266,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Pune', city: 'Pune', state: 'MH' }, destination: { name: 'Chennai', city: 'Chennai', state: 'TN' }, distanceKm: 1200 },
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
-    freightRate: 65000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 65000, isInvoiced: false,
     createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
@@ -276,7 +275,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-04-10T16:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-041',
-    freightRate: 45000, expenseSummary: { total: 4800 }, isInvoiced: true,
+    freightRate: 45000, isInvoiced: true,
     createdAt: '2026-04-05T08:00:00Z',
   },
   {
@@ -284,7 +283,7 @@ export const MOCK_TRIPS: Trip[] = [
     laneDetails: { origin: { name: 'Chennai', city: 'Chennai', state: 'TN' }, destination: { name: 'Bangalore', city: 'Bangalore', state: 'KA' }, distanceKm: 350 },
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
-    freightRate: 15000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 15000, isInvoiced: false,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
@@ -293,7 +292,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-05-11T10:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-046',
-    freightRate: 32000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 32000, isInvoiced: false,
     createdAt: '2026-05-10T07:00:00Z',
   },
   {
@@ -302,7 +301,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-05-12T15:30:00Z', podStatus: 'CONFIRMED', podReference: 'POD-047',
-    freightRate: 28000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 28000, isInvoiced: false,
     createdAt: '2026-05-11T06:30:00Z',
   },
   {
@@ -311,7 +310,7 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-001', registrationNumber: 'MH-04-AB-1234', type: '20ft Container' },
     assignedDriver: { id: 'DR-001', name: 'Suresh Yadav', mobile: '+91 9876500001' },
     deliveredDate: '2026-05-17T17:30:00Z', podStatus: 'PENDING',
-    freightRate: 36000, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 36000, isInvoiced: false,
     createdAt: '2026-05-16T08:30:00Z',
   },
   {
@@ -320,53 +319,11 @@ export const MOCK_TRIPS: Trip[] = [
     assignedVehicle: { id: 'VH-002', registrationNumber: 'MH-04-CD-5678', type: '20ft Container' },
     assignedDriver: { id: 'DR-002', name: 'Manoj Sharma', mobile: '+91 9876500002' },
     deliveredDate: '2026-05-18T09:30:00Z', podStatus: 'PENDING',
-    freightRate: 34500, expenseSummary: { total: 0 }, isInvoiced: false,
+    freightRate: 34500, isInvoiced: false,
     createdAt: '2026-05-17T07:45:00Z',
   }
 ]
 
-export const MOCK_EXPENSES: Expense[] = [
-  {
-    id: 'EXP-101',
-    tripId: 'TRP-043',
-    tripReference: 'TRP-043',
-    lineItems: [
-      { id: 'EXP-101-1', expenseType: 'EXPENSE', amount: 3000, description: 'Mumbai-Delhi highway toll' },
-    ],
-    amount: 3000,
-    submittedAt: '2026-04-21T10:00:00Z',
-  },
-  {
-    id: 'EXP-102',
-    tripId: 'TRP-043',
-    tripReference: 'TRP-043',
-    lineItems: [
-      { id: 'EXP-102-1', expenseType: 'DETENTION', amount: 2500, description: 'Detention at delivery - 4 hours' },
-    ],
-    amount: 2500,
-    submittedAt: '2026-04-21T10:00:00Z',
-  },
-  {
-    id: 'EXP-103',
-    tripId: 'TRP-042',
-    tripReference: 'TRP-042',
-    lineItems: [
-      { id: 'EXP-103-1', expenseType: 'EXPENSE', amount: 1800 },
-    ],
-    amount: 1800,
-    submittedAt: '2026-04-22T14:00:00Z',
-  },
-  {
-    id: 'EXP-104',
-    tripId: 'TRP-045',
-    tripReference: 'TRP-045',
-    lineItems: [
-      { id: 'EXP-104-1', expenseType: 'WEIGHBRIDGE', amount: 500, description: 'Weighbridge mismatch' },
-    ],
-    amount: 500,
-    submittedAt: '2026-04-22T15:00:00Z',
-  }
-]
 
 export const MOCK_VEHICLES: Vehicle[] = [
   {
@@ -432,8 +389,8 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-04-01', to: '2026-04-15' },
     paymentDueDate: '2026-05-15', status: 'APPROVED', paymentDate: '2026-05-12',
     lineItems: [
-      { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 50000, expenses: [], lineTotal: 50000 },
-      { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 50000, expenses: [], lineTotal: 50000 },
+      { tripId: 'TRP-040', tripReference: 'TRP-040', freightCharge: 50000, lineTotal: 50000 },
+      { tripId: 'TRP-041', tripReference: 'TRP-041', freightCharge: 50000, lineTotal: 50000 },
     ],
     subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-001.pdf', createdAt: '2026-04-15T12:00:00Z',
   },
@@ -442,7 +399,7 @@ export const MOCK_INVOICES: Invoice[] = [
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-01', to: '2026-05-13' },
     paymentDueDate: '2026-06-12', status: 'APPROVED',
     lineItems: [
-      { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 100000, expenses: [], lineTotal: 100000 }
+      { tripId: 'TRP-042', tripReference: 'TRP-042', freightCharge: 100000, lineTotal: 100000 }
     ],
     subtotal: 100000, gstAmount: 12000, grandTotal: 112000, pdfUrl: '/invoices/INV-2026-002.pdf', createdAt: '2026-05-13T10:00:00Z',
   },
@@ -450,21 +407,21 @@ export const MOCK_INVOICES: Invoice[] = [
     id: 'INV-2026-003', invoiceNumber: 'INV-2026-003', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-046', tripReference: 'TRP-046', freightCharge: 85000, expenses: [], lineTotal: 85000 }],
+    lineItems: [{ tripId: 'TRP-046', tripReference: 'TRP-046', freightCharge: 85000, lineTotal: 85000 }],
     subtotal: 85000, gstAmount: 10200, grandTotal: 95200, pdfUrl: '/invoices/INV-2026-003.pdf', createdAt: '2026-05-17T10:00:00Z',
   },
   {
     id: 'INV-2026-004', invoiceNumber: 'INV-2026-004', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-15', to: '2026-05-18' },
     paymentDueDate: '2026-06-17', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 92000, expenses: [], lineTotal: 92000 }],
+    lineItems: [{ tripId: 'TRP-047', tripReference: 'TRP-047', freightCharge: 92000, lineTotal: 92000 }],
     subtotal: 92000, gstAmount: 11040, grandTotal: 103040, pdfUrl: '/invoices/INV-2026-004.pdf', createdAt: '2026-05-18T10:00:00Z',
   },
   {
     id: 'INV-2026-005', invoiceNumber: 'INV-2026-005', invoiceDate: '2026-05-19', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-16', to: '2026-05-19' },
     paymentDueDate: '2026-06-18', status: 'APPROVED',
-    lineItems: [{ tripId: 'TRP-048', tripReference: 'TRP-048', freightCharge: 68000, expenses: [], lineTotal: 68000 }],
+    lineItems: [{ tripId: 'TRP-048', tripReference: 'TRP-048', freightCharge: 68000, lineTotal: 68000 }],
     subtotal: 68000, gstAmount: 8160, grandTotal: 76160, pdfUrl: '/invoices/INV-2026-005.pdf', createdAt: '2026-05-19T10:00:00Z',
   },
   {
@@ -473,10 +430,9 @@ export const MOCK_INVOICES: Invoice[] = [
     paymentDueDate: '2026-06-18', status: 'PENDING',
     lineItems: [{
       tripId: 'TRP-049', tripReference: 'TRP-049', freightCharge: 74000,
-      expenses: [{ type: 'WEIGHBRIDGE', amount: 800 }],
-      lineTotal: 74800,
+      lineTotal: 74000,
     }],
-    subtotal: 74800, gstAmount: 8976, grandTotal: 83776, pdfUrl: '/invoices/INV-2026-006.pdf', createdAt: '2026-05-19T11:00:00Z',
+    subtotal: 74000, gstAmount: 8880, grandTotal: 82880, pdfUrl: '/invoices/INV-2026-006.pdf', createdAt: '2026-05-19T11:00:00Z',
   },
   {
     id: 'INV-2026-007', invoiceNumber: 'INV-2026-007', invoiceDate: '2026-05-18', vendorGstin: '29AABCF1234M1ZP',
@@ -484,19 +440,15 @@ export const MOCK_INVOICES: Invoice[] = [
     paymentDueDate: '2026-06-17', status: 'CLOSED', closeReason: 'REJECTED',
     lineItems: [{
       tripId: 'TRP-050', tripReference: 'TRP-050', freightCharge: 58000,
-      expenses: [
-        { type: 'DETENTION', amount: 3000 },
-        { type: 'LOADING_UNLOADING', amount: 1500 },
-      ],
-      lineTotal: 62500,
+      lineTotal: 58000,
     }],
-    subtotal: 62500, gstAmount: 7500, grandTotal: 70000, pdfUrl: '/invoices/INV-2026-007.pdf', notes: 'POD missing for TRP-050 and expense amounts need correction', createdAt: '2026-05-18T09:30:00Z',
+    subtotal: 58000, gstAmount: 6960, grandTotal: 64960, pdfUrl: '/invoices/INV-2026-007.pdf', notes: 'POD missing for TRP-050', createdAt: '2026-05-18T09:30:00Z',
   },
   {
     id: 'INV-2026-008', invoiceNumber: 'INV-2026-008', invoiceDate: '2026-05-17', vendorGstin: '29AABCF1234M1ZP',
     customerGstin: '27AABCU9603R1ZM', billingPeriod: { from: '2026-05-14', to: '2026-05-17' },
     paymentDueDate: '2026-06-16', status: 'RESUBMISSION_REQUIRED',
-    lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, expenses: [], lineTotal: 47000 }],
+    lineItems: [{ tripId: 'TRP-051', tripReference: 'TRP-051', freightCharge: 47000, lineTotal: 47000 }],
     subtotal: 47000, gstAmount: 5640, grandTotal: 52640, pdfUrl: '/invoices/INV-2026-008.pdf', notes: 'Duplicate of INV-2026-005, cancelled by vendor', createdAt: '2026-05-17T16:00:00Z',
   }
 ]

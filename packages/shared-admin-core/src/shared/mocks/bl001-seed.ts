@@ -264,6 +264,18 @@ export const bl001Roles = [
     ],
     "dataScope": "OWN_RECORDS",
     "active": true
+  },
+  {
+    "id": "role-bl001-auction-only",
+    "tenantId": "tenant-bl001",
+    "name": "Auction Specialist",
+    "description": "Full access to the Auction module only.",
+    "hierarchyLevelId": "level-region",
+    "moduleCodes": [
+      "AUCTION"
+    ],
+    "dataScope": "ALL_TENANT",
+    "active": true
   }
 ] as unknown as RoleDefinition[];
 export const bl001RolePermissions = [
@@ -657,6 +669,25 @@ export const bl001Users = [
     ],
     "status": "active",
     "lastActive": "2026-06-02T08:08:31.253Z",
+    "password": "Admin@123",
+    "linkedVendorId": null,
+    "linkedCustomerId": null,
+    "linkedDriverId": null,
+    "driverName": "",
+    "driverCode": ""
+  },
+  {
+    "id": "user-bl001-auction-only",
+    "tenantId": "tenant-bl001",
+    "name": "Arjun Mehta",
+    "email": "arjun.mehta@bluedart.co",
+    "userType": "INTERNAL",
+    "roleId": "role-bl001-auction-only",
+    "orgUnitIds": [
+      "ou-w7w26b4"
+    ],
+    "status": "active",
+    "lastActive": "2026-06-05T09:00:00.000Z",
     "password": "Admin@123",
     "linkedVendorId": null,
     "linkedCustomerId": null,
@@ -5228,6 +5259,74 @@ export const bl001RolePermissionMatrix: Record<string, Record<string, Record<str
         "export": true
       },
       "SHIPMENT_DOCUMENTS": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      }
+    }
+  },
+  "role-bl001-auction-only": {
+    "AUCTION": {
+      "AUCTION_DASHBOARD": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "AUCTION_CLIENT_HUB": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "AUCTION_RFQ_RESPONSES": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "AUCTION_AUCTIONS": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "AUCTION_CONTRACTS": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "CREATE_AUCTION": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "CREATE_RFI": {
+        "view": true,
+        "create": true,
+        "edit": true,
+        "delete": true,
+        "approve": true,
+        "export": true
+      },
+      "CREATE_RFQ": {
         "view": true,
         "create": true,
         "edit": true,

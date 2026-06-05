@@ -35,6 +35,20 @@ export interface Accessorial {
   rate: number
 }
 
+// A single booking expense, surfaced verbatim from the booking module so the
+// finance team can see each charge (not just the rolled-up totals). Read-only
+// in finance — the booking workspace owns create/approve/reject.
+export interface LedgerExpense {
+  type: string                                   // e.g. "Toll charge"
+  amount: number
+  paymentMode?: string                           // e.g. "UPI"
+  paidBy?: string                                // e.g. "Driver"
+  status: 'Pending' | 'Approved' | 'Rejected'
+  billReceipt?: string | null                    // uploaded bill/receipt reference
+  date?: string
+  notes?: string
+}
+
 export interface ARTrip {
   id: string
   bookingId?: string
@@ -56,6 +70,21 @@ export interface ARTrip {
   vehicle?: string
   podStage: PodStage
   podRejectReason?: string
+  // Rich booking detail surfaced from the booking module (embedded mode only;
+  // all optional so the standalone mock + existing pages render unchanged).
+  expenseItems?: LedgerExpense[]                 // every expense line on the booking
+  qty?: number
+  weight?: number
+  uom?: string
+  weightUom?: string
+  commodity?: string
+  pickupAddress?: string
+  dropAddress?: string
+  consigneeName?: string
+  commercialType?: string                        // e.g. "SPOT"
+  rateType?: string                              // e.g. "PER_TRIP"
+  buyingFreight?: number
+  margin?: number
 }
 
 export interface ARInvoice {
@@ -80,6 +109,9 @@ export interface ARInvoice {
   daysUntil?: number
   drops?: { trip: string; lane: string; amount: number }[]   // consolidated multi-drop bookings
   bookingIds?: string[]
+  // Approved booking expenses billed on this invoice, itemised for the finance
+  // team (embedded mode only; optional so existing/standalone invoices are fine).
+  expenseItems?: LedgerExpense[]
 }
 
 export interface LedgerEntry {
@@ -89,6 +121,9 @@ export interface LedgerEntry {
   amt: number
   bal: number
   client?: string   // AR rows carry their client; AP/vendor rows omit it
+  id?: string        // ledger row id → "Reference" column (led-001)
+  particular?: string // bold label → "Particular" column
+  desc?: string      // narrative → "Description" column
 }
 
 export interface SeriesRow {

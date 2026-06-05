@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@vendor/components/ui/button'
 import { useFleetData } from '@vendor/integration/useFleetData'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useAppStore } from '@vendor/stores/app.store'
 
 interface AssignVehicleModalProps {
@@ -14,6 +15,8 @@ interface AssignVehicleModalProps {
 export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleModalProps) {
   const { vehicles, drivers } = useFleetData()
   const bridge = useTenantBridge()
+  // Bookings (bridge + mock merged) so we can read the booking's expected vehicle type.
+  const { indents, trips } = useVendorBookings()
   // Mock/demo trips live in the local store; real bookings come from the bridge.
   const mockTrips = useAppStore((state) => state.trips)
   const assignResolved = useAppStore((state) => state.assignVehicleToTripResolved)
@@ -21,8 +24,21 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
   const [selectedVehicle, setSelectedVehicle] = useState<string>('')
   const [selectedDriver, setSelectedDriver] = useState<string>('')
 
-  // Filter for ACTIVE resources
-  const availableVehicles = vehicles.filter(v => v.operationalStatus === 'ACTIVE')
+  // Expected vehicle type for this booking: pre-assignment trips carry the
+  // booking's vehicle type on assignedVehicle.type; fall back to the indent.
+  const trip = trips.find((t) => t.id === tripId)
+  const indent = indents.find((i) => i.id === tripId || i.id === trip?.indentId)
+  const rawExpectedType =
+    trip?.assignedVehicle.type && trip.assignedVehicle.type !== '—'
+      ? trip.assignedVehicle.type
+      : indent?.vehicleTypeRequired
+  const expectedVehicleType = rawExpectedType && rawExpectedType !== '—' ? rawExpectedType : null
+
+  // Filter for ACTIVE resources; vehicles must also match the booking's expected type.
+  const activeVehicles = vehicles.filter(v => v.operationalStatus === 'ACTIVE')
+  const availableVehicles = expectedVehicleType
+    ? activeVehicles.filter((v) => v.vehicleType === expectedVehicleType)
+    : activeVehicles
   const availableDrivers = drivers.filter(d => d.currentStatus === 'ACTIVE')
 
   const handleAssign = () => {
@@ -54,6 +70,12 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          {expectedVehicleType && (
+            <div className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Expected vehicle type</span>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">{expectedVehicleType}</span>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <label className="text-sm font-medium">Select Vehicle</label>
             <select 
@@ -68,6 +90,11 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
                 </option>
               ))}
             </select>
+            {expectedVehicleType && availableVehicles.length === 0 && (
+              <p className="text-xs text-amber-600">
+                No active {expectedVehicleType} vehicles in your fleet. Onboard a {expectedVehicleType} vehicle to assign this booking.
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">

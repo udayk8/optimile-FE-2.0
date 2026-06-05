@@ -27,7 +27,9 @@ const EMPTY_DOC: DocEntry = { fileName: '', referenceNo: '', expiryDate: '' }
 const DEFAULT_DOCS: VehicleDocs = { RC: { ...EMPTY_DOC }, Insurance: { ...EMPTY_DOC }, PUC: { ...EMPTY_DOC }, FC: { ...EMPTY_DOC }, NationalPermit: { ...EMPTY_DOC } }
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'EV']
-const VEHICLE_TYPES = ['20ft Container', '40ft Container', 'Open Truck', 'Trailer', 'Mini Truck', 'Tanker']
+// MGV first — it is the tenant's seeded vehicle-type master (create-booking
+// bookings are raised against it), so standalone mock onboarding matches too.
+const VEHICLE_TYPES = ['MGV', '20ft Container', '40ft Container', 'Open Truck', 'Trailer', 'Mini Truck', 'Tanker']
 const OPERATIONAL_STATUSES: Array<{ value: Vehicle['operationalStatus']; label: string }> = [
   { value: 'ACTIVE', label: 'Active' },
   { value: 'UNDER_MAINTENANCE', label: 'Under Maintenance' },

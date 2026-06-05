@@ -9,20 +9,26 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { useSourcingBridge, withEffectiveState } from '@vendor/integration/auctionBridge'
+import { formatLaneDisplay, getRateTypeLabel } from '@shared-utils'
 import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  // Cross-module: read the auction from the shared auction-web store and write
-  // bids back into it; fall back to the local demo store when not present.
-  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid, hasShared } = useSourcingBridge()
+  // Cross-module: shared-store auctions (auction-web) take precedence; the
+  // permanent local mock samples stay reachable alongside them. Bids on a
+  // shared auction write back through the bridge; bids on a local mock
+  // auction stay in the local demo store.
+  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid } = useSourcingBridge()
   const { auctions: storeAuctions, submitBid } = useAppStore()
-  const auctions = hasShared ? bridgeAuctions : storeAuctions
-  const submitBidFn = hasShared ? bridgePlaceBid : submitBid
+  const bridgeAuction = bridgeAuctions.find(a => a.id === id)
+  const submitBidFn = bridgeAuction ? bridgePlaceBid : submitBid
 
-  const auction = auctions.find(a => a.id === id)
+  const found = bridgeAuction ?? storeAuctions.find(a => a.id === id)
+  // Ended-by-timer live auctions render as ended (no bidding), even when the
+  // local demo store still has them marked LIVE.
+  const auction = found ? withEffectiveState(found) : undefined
 
   // Local state for bidding
   const [bids, setBids] = useState<Record<string, number>>({})
@@ -85,14 +91,9 @@ export default function AuctionDetailPage() {
     setSubmitted(true)
   }
 
-  const getPricingUnitLabel = () => {
-    switch(auction.pricingUnit) {
-      case 'PER_MT': return 'per MT'
-      case 'PER_KM': return 'per Km'
-      case 'PER_TRIP':
-      default: return 'per Trip'
-    }
-  }
+  // Every bid carries the auction's rate type (PER_TRIP / PER_MT / PER_KM).
+  const rateType = auction.pricingUnit ?? 'PER_TRIP'
+  const rateTypeLabel = getRateTypeLabel(rateType)
 
   return (
     <div className="pb-20">
@@ -137,8 +138,8 @@ export default function AuctionDetailPage() {
             </div>
           </div>
           <div>
-            <div className="mb-1 text-sm text-gray-500">Pricing Model</div>
-            <div className="font-bold text-text">{getPricingUnitLabel()}</div>
+            <div className="mb-1 text-sm text-gray-500">Rate Type</div>
+            <div className="font-bold text-text">{rateTypeLabel}</div>
           </div>
           <div>
             <div className="mb-1 text-sm text-gray-500">Total Lanes</div>
@@ -162,6 +163,7 @@ export default function AuctionDetailPage() {
               <tr>
                 <th className="min-w-[180px] px-4 py-3 text-xs font-bold uppercase tracking-wide">Lane Details</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Volume</th>
+                <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Rate Type</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Initial Base Price</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Winning Bid</th>
                 <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide">Your Active Bid</th>
@@ -172,8 +174,16 @@ export default function AuctionDetailPage() {
             <tbody className="divide-y divide-gray-200">
               {auction.lanes.map((lane) => {
                 const activeBid = auction.vendorBids.find(b => b.laneId === lane.id && b.status === 'ACTIVE')
-                const isWinning = activeBid && lane.currentBestBid ? activeBid.amount <= lane.currentBestBid : false
-                const rank = activeBid ? (isWinning ? 'Winning' : 'Outbid') : '-'
+                const isWinning = activeBid
+                  ? lane.myRank != null
+                    ? lane.myRank === 1
+                    : lane.currentBestBid != null && activeBid.amount <= lane.currentBestBid
+                  : false
+                // Live rank from the shared store (L1 = lowest bid); falls back to
+                // Winning/Outbid when running off the local demo store.
+                const rank = activeBid
+                  ? lane.myRank != null ? `L${lane.myRank}` : (isWinning ? 'Winning' : 'Outbid')
+                  : '-'
 
                 return (
                   <tr key={lane.id} className="transition-colors hover:bg-gray-50">
@@ -181,7 +191,7 @@ export default function AuctionDetailPage() {
                       <div className="flex items-start gap-2">
                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                         <div>
-                          <div className="font-bold text-text">{lane.laneDetails.origin.city} → {lane.laneDetails.destination.city}</div>
+                          <div className="font-mono font-bold text-text">{formatLaneDisplay(lane.laneDetails.origin.city, lane.laneDetails.destination.city)}</div>
                           <div className="text-xs text-gray-500">{lane.laneDetails.distanceKm} km</div>
                         </div>
                       </div>
@@ -193,6 +203,9 @@ export default function AuctionDetailPage() {
                           <div className="text-xs text-gray-500">{lane.volumeRequirement.frequency}</div>
                         </div>
                       ) : '-'}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-block rounded bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{rateTypeLabel}</span>
                     </td>
                     <td className="px-4 py-4">
                       {lane.basePrice ? (
@@ -228,9 +241,14 @@ export default function AuctionDetailPage() {
                     </td>
                     <td className="px-4 py-4">
                       {activeBid ? (
-                        <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isWinning ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}>
-                          {rank}
-                        </span>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-semibold ${isWinning ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>
+                            {rank}{isWinning && lane.myRank != null ? ' · Leading' : ''}
+                          </span>
+                          {lane.bidCount != null && lane.bidCount > 0 && (
+                            <span className="text-[11px] text-gray-500">of {lane.bidCount} bid{lane.bidCount > 1 ? 's' : ''}</span>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-gray-500">-</span>
                       )}
@@ -241,7 +259,7 @@ export default function AuctionDetailPage() {
                           <input 
                             type="number"
                             className={`h-10 w-full max-w-[150px] rounded-lg border bg-white px-3 text-sm outline-none transition ${bidErrors[lane.id] ? 'border-danger ring-danger/20 focus:border-danger focus:ring-4' : 'border-gray-300 ring-primary/20 focus:border-primary focus:ring-4'}`}
-                            placeholder={`Rate ${getPricingUnitLabel()}`}
+                            placeholder={`Rate (${rateTypeLabel})`}
                             value={bids[lane.id] || ''}
                             onChange={(e) => handleBidChange(lane.id, e.target.value)}
                           />

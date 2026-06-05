@@ -88,7 +88,7 @@ export interface AuthState {
 }
 
 // ==================== NOTIFICATION TYPES ====================
-export type NotificationCategory = 'ONBOARDING' | 'SOURCING' | 'CONTRACTS' | 'TRIPS' | 'EXPENSES' | 'INVOICES'
+export type NotificationCategory = 'ONBOARDING' | 'SOURCING' | 'CONTRACTS' | 'TRIPS' | 'INVOICES'
 
 export interface Notification {
   id: string
@@ -142,6 +142,10 @@ export interface AuctionLane {
   basePrice?: number
   currentBestBid?: number
   minBidDecrement?: number
+  /** Total bids currently ranked on this lane (live, from the shared store). */
+  bidCount?: number
+  /** This vendor's live rank on the lane (1 = L1/lowest); undefined if no bid. */
+  myRank?: number
 }
 
 export interface Auction {
@@ -171,12 +175,16 @@ export interface AuctionBid {
 // ==================== CONTRACT TYPES ====================
 export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED'
 
+/** MANUAL_UPLOAD = uploaded by tenant admin; AUCTION_WIN = produced by an auction award. */
+export type ContractSource = 'MANUAL_UPLOAD' | 'AUCTION_WIN'
+
 export interface Contract {
   id: string
-  customerName: string
-  customerGSTIN: string
+  /** AAA-BBB lane code (e.g. MUM-BLR); laneDetails carries the display fallback. */
+  laneCode?: string
   laneDetails: LaneDetails
   rateCard: RateCardEntry[]
+  source: ContractSource
   volumeAllocation: { volume: number; unit: string; frequency: string }
   paymentTerms: { creditPeriodDays: number; billingCycle: string }
   slaClauses: { name: string; valueHours: number; description: string }[]
@@ -193,7 +201,7 @@ export interface Contract {
 
 export interface RateCardEntry {
   vehicleType: string
-  rateType: 'PER_TRIP' | 'PER_KM'
+  rateType: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   rate: number
   surcharges: { name: string; amount: number }[]
 }
@@ -277,7 +285,6 @@ export interface Trip {
   documents?: TripDocument[]
   timeline?: TripTimelineEvent[]
   freightRate: number
-  expenseSummary: { total: number }
   isInvoiced: boolean
   createdAt: string
 }
@@ -301,26 +308,6 @@ export interface TripTimelineEvent {
   description: string
   timestamp: string
   status?: string
-}
-
-// ==================== EXPENSE TYPES ====================
-export type ExpenseType = 'EXPENSE' | 'DETENTION' | 'LOADING_UNLOADING' | 'WEIGHBRIDGE' | 'OTHER'
-
-export interface ExpenseLineItem {
-  id: string
-  expenseType: ExpenseType
-  amount: number
-  description?: string
-  supportingDocumentUrl?: string
-}
-
-export interface Expense {
-  id: string
-  tripId: string
-  tripReference: string
-  lineItems: ExpenseLineItem[]
-  amount: number
-  submittedAt: string
 }
 
 // ==================== FLEET TYPES ====================
@@ -466,7 +453,6 @@ export interface InvoiceLineItem {
   tripId: string
   tripReference: string
   freightCharge: number
-  expenses: { type: ExpenseType; amount: number }[]
   lineTotal: number
 }
 

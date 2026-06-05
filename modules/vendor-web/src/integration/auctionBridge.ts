@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { isValidLaneCode, normalizeLaneCode, splitLaneCode } from '@shared-utils'
 import type {
   Auction,
   AuctionBid,
@@ -91,13 +92,24 @@ interface SourceStore {
   contracts: SourceContract[]
 }
 
-interface VendorIdentity {
+// A live auction whose end time has passed is ended (awaiting award) — show
+// it as Ended with a Details-only action instead of an expired live row.
+// Applied by pages on top of either source (shared bridge or local demo
+// store) so the rule holds even for local-store fallback data.
+export function withEffectiveState(auction: Auction): Auction {
+  if (auction.state === 'LIVE' && auction.endTime && new Date(auction.endTime).getTime() <= Date.now()) {
+    return { ...auction, state: 'PENDING_AWARD' }
+  }
+  return auction
+}
+
+export interface VendorIdentity {
   vendorId: string
   vendorName: string
   tenantId?: string
 }
 
-function readIdentity(): VendorIdentity {
+export function readIdentity(): VendorIdentity {
   const fallback: VendorIdentity = { vendorId: 'v-001', vendorName: 'My Transport Co' }
   if (typeof window === 'undefined') return fallback
   try {
@@ -138,8 +150,11 @@ function writeStore(store: SourceStore) {
   window.dispatchEvent(new CustomEvent('optimile-auction-store'))
 }
 
-// "Mumbai → Delhi" / "Mumbai -> Delhi" → ["Mumbai", "Delhi"]
+// "Mumbai → Delhi" / "Mumbai -> Delhi" → ["Mumbai", "Delhi"];
+// lane codes ("MUM-BLR") split into their two location codes.
 function splitLane(lane: string): [string, string] {
+  const codeParts = splitLaneCode(lane)
+  if (codeParts) return codeParts
   const parts = lane.split(/→|->/).map((p) => p.trim())
   return [parts[0] ?? lane, parts[1] ?? '']
 }
@@ -150,8 +165,21 @@ function toLocation(city: string): Location {
 
 function mapState(source: SourceAuction, won: boolean): AuctionState {
   switch (source.status) {
-    case 'LIVE':
-      return source.startAt && new Date(source.startAt).getTime() > Date.now() ? 'UPCOMING' : 'LIVE'
+    case 'LIVE': {
+      if (source.startAt && new Date(source.startAt).getTime() > Date.now()) return 'UPCOMING'
+      // A live auction whose timers have all run out is ended (awaiting
+      // award) — never show it as still-live/expired or allow further
+      // bidding. Mirrors auction-web's auto-complete sweep (last lane timer).
+      const laneEnds = source.lanes
+        .map((lane) => new Date(lane.timerEndsAt).getTime())
+        .filter((time) => !Number.isNaN(time))
+      const endsAt = laneEnds.length
+        ? Math.max(...laneEnds)
+        : source.awardDeadline
+          ? new Date(source.awardDeadline).getTime()
+          : Number.NaN
+      return !Number.isNaN(endsAt) && endsAt <= Date.now() ? 'PENDING_AWARD' : 'LIVE'
+    }
     case 'COMPLETED':
       return 'PENDING_AWARD'
     case 'AWARDED':
@@ -165,11 +193,15 @@ function mapState(source: SourceAuction, won: boolean): AuctionState {
   }
 }
 
-function mapLane(lane: SourceLane): AuctionLane {
+function mapLane(lane: SourceLane, identity: VendorIdentity): AuctionLane {
   const [origin, destination] = splitLane(lane.lane)
   const best = lane.ranking.length
     ? Math.min(...lane.ranking.map((b) => b.amount))
     : undefined
+  const myName = identity.vendorName.toLowerCase()
+  const myBid = lane.ranking.find(
+    (b) => b.vendorId === identity.vendorId || b.vendorName.toLowerCase() === myName,
+  )
   return {
     id: lane.id,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
@@ -178,6 +210,8 @@ function mapLane(lane: SourceLane): AuctionLane {
       : undefined,
     basePrice: lane.ceilingRate || undefined,
     currentBestBid: best,
+    bidCount: lane.ranking.length,
+    myRank: myBid?.rank,
   }
 }
 
@@ -208,7 +242,7 @@ function mapAuction(source: SourceAuction, identity: VendorIdentity): Auction {
     endTime: firstLane?.timerEndsAt ?? source.awardDeadline,
     state: mapState(source, won),
     lanes: source.lanes.map((lane) => ({
-      ...mapLane(lane),
+      ...mapLane(lane, identity),
       minBidDecrement: source.minBidDecrement,
     })),
     vendorBids,
@@ -238,13 +272,13 @@ function mapContract(source: SourceContract): Contract {
   const [origin, destination] = splitLane(source.lane)
   return {
     id: source.id,
-    customerName: source.region ?? 'Optimile Customer',
-    customerGSTIN: '—',
+    laneCode: isValidLaneCode(source.lane) ? normalizeLaneCode(source.lane) : undefined,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
+    source: 'AUCTION_WIN',
     rateCard: [
       {
         vehicleType: source.vehicleType,
-        rateType: source.rateUnit === 'PER_TRIP' ? 'PER_TRIP' : 'PER_KM',
+        rateType: source.rateUnit,
         rate: source.contractedRate,
         surcharges: [],
       },
@@ -275,10 +309,14 @@ function useStoreRevision(): number {
     window.addEventListener('storage', onStorage)
     window.addEventListener('optimile-auction-store', bump)
     window.addEventListener('focus', bump)
+    // Time-based states (LIVE → PENDING_AWARD when the timer lapses) are
+    // computed at read time, so tick periodically to flip them on screen.
+    const timer = window.setInterval(bump, 15_000)
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('optimile-auction-store', bump)
       window.removeEventListener('focus', bump)
+      window.clearInterval(timer)
     }
   }, [])
   return revision

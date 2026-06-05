@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { Card, CardContent, CardHeader, CardTitle } from '@vendor/components/ui/card'
@@ -6,17 +6,31 @@ import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
+import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
 import { PageHero } from '@shared-ui/page-hero'
 import { formatDate } from '@vendor/lib/date-utils'
+import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useAppStore } from '@vendor/stores/app.store'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
 import { ArrowLeft, Download, FileText, MessageSquareWarning, ReceiptText, Route } from 'lucide-react'
+
+// Customer block for the printable invoice (the tenant the vendor bills).
+const CUSTOMER_ADDRESS =
+  '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
 export default function InvoiceDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
+  const bridge = useTenantBridge()
   const invoices = useAppStore((state) => state.invoices)
-  const trips = useAppStore((state) => state.trips)
   const disputes = useAppStore((state) => state.disputes)
+  // Merged bookings (bridge + mock) so PDF line items resolve truck/lane/dates
+  // for cross-module bookings too.
+  const { trips, getBookingDetail } = useVendorBookings()
+  const pdfRef = useRef<HTMLDivElement>(null)
+  const [downloading, setDownloading] = useState(false)
 
   const invoice = useMemo(() => invoices.find((item) => item.id === params.id), [invoices, params.id])
   const dispute = useMemo(() => (invoice ? disputes.find((item) => item.invoiceId === invoice.id) : undefined), [disputes, invoice])
@@ -35,6 +49,19 @@ export default function InvoiceDetailPage() {
 
   const supersededBy = invoice.supersededByInvoiceId ? invoices.find((item) => item.id === invoice.supersededByInvoiceId) : undefined
   const supersedes = invoice.supersedesInvoiceId ? invoices.find((item) => item.id === invoice.supersedesInvoiceId) : undefined
+
+  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
+  const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      await downloadElementAsPdf(pdfRef.current, `${invoice.invoiceNumber || invoice.id}.pdf`)
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -55,8 +82,8 @@ export default function InvoiceDetailPage() {
           <div className="flex flex-wrap gap-2">
             <span className="font-mono text-sm font-semibold text-text">{invoice.invoiceNumber || invoice.id}</span>
             <StatusBadge status={invoice.status} />
-            <Button variant="outline" onClick={() => window.alert(`Mock download for ${invoice.pdfUrl}`)}>
-              <Download className="mr-2 h-4 w-4" /> Download PDF
+            <Button variant="outline" onClick={handleDownload} disabled={downloading}>
+              <Download className="mr-2 h-4 w-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
             </Button>
             <Button variant="outline" onClick={() => navigate('/vendor/invoices')}>
               <ReceiptText className="mr-2 h-4 w-4" /> Back to list
@@ -116,7 +143,7 @@ export default function InvoiceDetailPage() {
                 <FileText className="h-5 w-5 text-primary" /> Summary
               </CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <CardContent className="grid gap-4 md:grid-cols-3">
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Date</div>
                 <div className="mt-1 text-sm font-bold text-text">{formatDate(invoice.invoiceDate)}</div>
@@ -124,10 +151,6 @@ export default function InvoiceDetailPage() {
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total bookings</div>
                 <div className="mt-1 text-sm font-bold text-text">{invoice.lineItems.length}</div>
-              </div>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payment due</div>
-                <div className="mt-1 text-sm font-bold text-text">{formatDate(invoice.paymentDueDate)}</div>
               </div>
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Grand total</div>
@@ -203,6 +226,21 @@ export default function InvoiceDetailPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Off-screen render of the printable invoice — captured for the PDF download. */}
+      <div aria-hidden style={{ position: 'fixed', left: -10000, top: 0, pointerEvents: 'none' }}>
+        <InvoicePdfDocument
+          ref={pdfRef}
+          invoice={invoice}
+          trips={trips}
+          companyName={companyName}
+          companyInfo={MOCK_COMPANY_INFO}
+          bank={MOCK_BANK}
+          customerName={customerName}
+          customerAddress={CUSTOMER_ADDRESS}
+          getLrNumber={getLrNumber}
+        />
       </div>
 
       {dispute ? (

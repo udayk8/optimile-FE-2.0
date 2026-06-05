@@ -5,7 +5,6 @@ import {
   MOCK_AUCTIONS,
   MOCK_VEHICLES,
   MOCK_DRIVERS,
-  MOCK_EXPENSES,
   MOCK_CONTRACTS,
   MOCK_INVOICES,
   MOCK_LEDGER,
@@ -15,8 +14,8 @@ import {
   MOCK_DISPUTES,
 } from '@vendor/lib/mock-data'
 import {
-  Indent, Trip, Auction, Vehicle, Driver, Expense, AuctionBid, AuctionLane,
-  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, ExpenseType, NBFCApplication, NBFCDiscountingStatus,
+  Indent, Trip, Auction, Vehicle, Driver, AuctionBid, AuctionLane,
+  Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
   Dispute, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
 } from '@vendor/types'
@@ -27,7 +26,6 @@ interface AppState {
   auctions: Auction[]
   vehicles: Vehicle[]
   drivers: Driver[]
-  expenses: Expense[]
   contracts: Contract[]
   invoices: Invoice[]
   ledger: LedgerEntry[]
@@ -82,7 +80,6 @@ interface AppState {
   updateVehicle: (vehicle: Vehicle) => void
   addDriver: (driver: Driver) => void
   updateDriver: (driver: Driver) => void
-  addExpense: (expense: Expense) => void
   generateInvoice: (payload: {
     tripIds: string[]
     invoiceDate?: string
@@ -183,7 +180,6 @@ type VendorDataCollections = Pick<
   | 'auctions'
   | 'vehicles'
   | 'drivers'
-  | 'expenses'
   | 'contracts'
   | 'invoices'
   | 'ledger'
@@ -201,7 +197,6 @@ const EMPTY_DATA: VendorDataCollections = {
   auctions: [],
   vehicles: [],
   drivers: [],
-  expenses: [],
   contracts: [],
   invoices: [],
   ledger: [],
@@ -220,7 +215,6 @@ function buildFullData(): VendorDataCollections {
     auctions: [...MOCK_AUCTIONS],
     vehicles: [...MOCK_VEHICLES],
     drivers: [...MOCK_DRIVERS],
-    expenses: [...MOCK_EXPENSES],
     contracts: [...MOCK_CONTRACTS],
     invoices: [...MOCK_INVOICES],
     ledger: [...MOCK_LEDGER],
@@ -372,12 +366,13 @@ export const useAppStore = create<AppState>((set) => ({
         contractId: indent.contractId,
         indentId: indent.id,
         laneDetails: indent.laneDetails,
-        assignedVehicle: { id: '', registrationNumber: '—', type: '—' },
+        // Carry the booking's expected vehicle type so the assign modal can
+        // filter the fleet before a vehicle is attached.
+        assignedVehicle: { id: '', registrationNumber: '—', type: indent.vehicleTypeRequired || '—' },
         assignedDriver: { id: '', name: '—', mobile: '—' },
         status: 'ACCEPTED',
         slaFlag: 'ON_TIME',
         freightRate: 0,
-        expenseSummary: { total: 0 },
         isInvoiced: false,
         createdAt: new Date().toISOString(),
       }
@@ -506,48 +501,20 @@ export const useAppStore = create<AppState>((set) => ({
     }))
   },
 
-  addExpense: (expense) => {
-    set((state) => {
-      const tripIndex = state.trips.findIndex((t) => t.id === expense.tripId)
-      const existingExpense = state.expenses.find((item) => item.tripId === expense.tripId)
-      let updatedTrips = state.trips
-
-      if (tripIndex !== -1) {
-        const trip = state.trips[tripIndex] as Trip
-
-        updatedTrips = [...state.trips]
-        updatedTrips[tripIndex] = {
-          ...trip,
-          expenseSummary: {
-            total: trip.expenseSummary.total - (existingExpense?.amount ?? 0) + expense.amount,
-          },
-        }
-      }
-
-      const updatedExpenses = existingExpense
-        ? [expense, ...state.expenses.filter((item) => item.tripId !== expense.tripId)]
-        : [expense, ...state.expenses]
-
-      return {
-        expenses: updatedExpenses,
-        trips: updatedTrips,
-      }
-    })
-  },
-
   generateInvoice: (payload) => {
     set((state) => {
       const { tripIds, invoiceDate = new Date().toISOString(), dueDate, gstRate = 12, invoiceNumber } = payload
       if (tripIds.length === 0) return state
 
+      // Only COMPLETED, not-yet-invoiced bookings are billable.
       const selectedTrips = tripIds
         .map((id) => state.trips.find((trip) => trip.id === id))
-        .filter((trip): trip is Trip => Boolean(trip))
+        .filter((trip): trip is Trip => Boolean(trip && trip.status === 'COMPLETED' && !trip.isInvoiced))
 
       if (selectedTrips.length === 0) return state
 
       const subtotal = selectedTrips.reduce(
-        (sum, trip) => sum + (trip.freightRate || 0) + (trip.expenseSummary.total || 0),
+        (sum, trip) => sum + (trip.freightRate || 0),
         0
       )
       const gstAmount = Math.round(subtotal * (gstRate / 100))
@@ -556,16 +523,11 @@ export const useAppStore = create<AppState>((set) => ({
 
       const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
         const freightCharge = trip.freightRate || 0
-        const expenses: { type: ExpenseType; amount: number }[] = trip.expenseSummary.total > 0
-          ? [{ type: 'OTHER', amount: trip.expenseSummary.total }]
-          : []
-        const lineTotal = freightCharge + trip.expenseSummary.total
         return {
           tripId: trip.id,
           tripReference: trip.id,
           freightCharge,
-          expenses,
-          lineTotal,
+          lineTotal: freightCharge,
         }
       })
 
@@ -594,9 +556,10 @@ export const useAppStore = create<AppState>((set) => ({
         createdAt: invoiceDate,
       } as unknown as Invoice
 
-      // Mark trips as invoiced
-      const updatedTrips = state.trips.map(t => 
-        tripIds.includes(t.id) ? { ...t, isInvoiced: true } : t
+      // Mark only the actually-billed trips as invoiced
+      const billedIds = new Set(selectedTrips.map((trip) => trip.id))
+      const updatedTrips = state.trips.map(t =>
+        billedIds.has(t.id) ? { ...t, isInvoiced: true } : t
       )
 
       return {

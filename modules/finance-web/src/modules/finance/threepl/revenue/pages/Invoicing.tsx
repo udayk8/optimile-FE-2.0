@@ -1,17 +1,30 @@
 import React, { useRef, useState, type ReactNode } from "react";
 import {
   ReceiptIndianRupee, ArrowLeft, Plus, Send, Check, AlertTriangle,
-  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, X, Package, Users, PackageCheck, Loader2, ShieldCheck,
+  ScrollText, FileText, Download, CheckCircle2, RefreshCw, ChevronRight, ChevronDown, X, Package, Users, PackageCheck, Loader2, ShieldCheck,
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
-import { ACCESSORIAL_LIBRARY, AR_TOLERANCE_PCT, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
-import { useReceivables, type ARInvoice, type ARTrip } from "@finance/lib/receivablesStore";
+import { ACCESSORIAL_LIBRARY, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
+import { useReceivables, type ARInvoice, type ARTrip, type LedgerExpense } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
 import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
+import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
+import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
+
+/* Real booking freight for a trip — falls back to the contract-rate lookup only
+   for standalone mock trips that carry no revenue. */
+function tripFreight(t: ARTrip): number {
+  return t.revenue && t.revenue > 0 ? t.revenue : contractRateFor(t.lane, t.truck, t.client).base;
+}
+
+/* Collect every expense line behind a set of trips (for the expandable detail). */
+function tripExpenses(trips: ARTrip[]): LedgerExpense[] {
+  return trips.flatMap((t) => t.expenseItems ?? []);
+}
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -36,9 +49,15 @@ const SELLER = {
 
 /* Map an AR invoice into the shape InvoiceDocument expects. */
 function toInvoiceDoc(inv: ARInvoice) {
-  const detention = inv.accessorials.filter((a) => a.code === "DET").reduce((s, a) => s + a.rate, 0);
-  const loading = inv.accessorials.filter((a) => a.code === "LUL").reduce((s, a) => s + a.rate, 0);
-  const other = inv.accessorials.filter((a) => a.code !== "DET" && a.code !== "LUL").reduce((s, a) => s + a.rate, 0);
+  // Approved booking expenses billed on this invoice, bucketed by type so the
+  // printable invoice itemises them alongside any manual accessorials.
+  const billed = (inv.expenseItems ?? []).filter((e) => e.status === "Approved");
+  const expDetention = billed.filter((e) => /detention/i.test(e.type)).reduce((s, e) => s + e.amount, 0);
+  const expLoading = billed.filter((e) => /load|unload/i.test(e.type)).reduce((s, e) => s + e.amount, 0);
+  const expOther = billed.filter((e) => !/detention|load|unload/i.test(e.type)).reduce((s, e) => s + e.amount, 0);
+  const detention = inv.accessorials.filter((a) => a.code === "DET").reduce((s, a) => s + a.rate, 0) + expDetention;
+  const loading = inv.accessorials.filter((a) => a.code === "LUL").reduce((s, a) => s + a.rate, 0) + expLoading;
+  const other = inv.accessorials.filter((a) => a.code !== "DET" && a.code !== "LUL").reduce((s, a) => s + a.rate, 0) + expOther;
   const [origin, destination] = inv.lane.split("→").map((s) => s.trim());
   const taxableValue = inv.invoiced;
   const igst = Math.round(taxableValue * 0.18);
@@ -134,17 +153,8 @@ function buildArTrace(inv: ARInvoice, trip?: ARTrip | null): TraceStep[] {
   return steps;
 }
 
-function VariancePill({ inv }: { inv: ARInvoice }) {
-  if (inv.contracted === inv.invoiced) return <Pill tone="green"><Check size={11} />Matches contract</Pill>;
-  const sign = inv.variancePct > 0 ? "+" : "";
-  return (
-    <Pill tone={inv.flagged ? "red" : "amber"}>
-      {inv.flagged && <AlertTriangle size={11} />}{sign}{inv.variancePct.toFixed(1)}% vs contract
-    </Pill>
-  );
-}
 
-function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => void; toast: (m: string) => void }) {
+function PreviewModal({ inv, onClose, toast, onConfirm, confirmLabel }: { inv: ARInvoice; onClose: () => void; toast: (m: string) => void; onConfirm?: () => void; confirmLabel?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const { trips } = useReceivables();
   const doc = toInvoiceDoc(inv);
@@ -172,7 +182,7 @@ function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => 
   };
   return (
     <Modal onClose={onClose} maxW="max-w-4xl">
-      <ModalHeader title={`Draft invoice ${inv.id}`} tone="blue" icon={FileText} onClose={onClose} />
+      <ModalHeader title={onConfirm ? "Preview invoice" : `Draft invoice ${inv.id}`} tone="blue" icon={FileText} onClose={onClose} />
       <div className="max-h-[70vh] overflow-auto bg-slate-100 p-6">
         <div ref={ref} className="mx-auto w-fit">
           <InvoiceDocument invoice={doc.invoice} seller={SELLER} billTo={doc.billTo} />
@@ -180,11 +190,43 @@ function PreviewModal({ inv, onClose, toast }: { inv: ARInvoice; onClose: () => 
         </div>
       </div>
       <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
-        <Btn variant="ghost" onClick={onClose}>Close</Btn>
-        <Btn onClick={download}><Download size={14} />Download PDF</Btn>
+        <Btn variant="ghost" onClick={onClose}>{onConfirm ? "Cancel" : "Close"}</Btn>
+        {onConfirm
+          ? <Btn onClick={onConfirm}><Check size={14} />{confirmLabel ?? "Confirm & generate invoice"}</Btn>
+          : <Btn onClick={download}><Download size={14} />Download PDF</Btn>}
       </div>
     </Modal>
   );
+}
+
+/* Synthesize a draft ARInvoice from the booking drops to preview BEFORE writing
+   anything — feeds the same toInvoiceDoc/InvoiceDocument the real invoice uses. */
+function previewInvoiceFromDrops(drops: ARTrip[]): ARInvoice {
+  const freight = drops.reduce((s, d) => s + tripFreight(d), 0);
+  const expenseItems = drops.flatMap((d) => d.expenseItems ?? []);
+  const approved = expenseItems.filter((e) => e.status === "Approved").reduce((s, e) => s + e.amount, 0);
+  const invoiced = freight + approved;
+  const first = drops[0];
+  return {
+    id: "Draft preview",
+    tripId: first?.bookingId ?? first?.id,
+    client: first?.client ?? "—",
+    lane: first?.lane ?? "—",
+    truck: first?.truck,
+    date: today(),
+    terms: "Net 30",
+    base: freight,
+    accessorials: [],
+    contracted: freight,
+    invoiced,
+    amount: invoiced + 2 * Math.round(invoiced * 0.09),
+    variancePct: 0,
+    flagged: false,
+    stage: "draft",
+    drops: drops.length > 1 ? drops.map((d) => ({ trip: d.id, lane: d.lane, amount: tripFreight(d) })) : undefined,
+    bookingIds: [...new Set(drops.map((d) => d.bookingId ?? d.id))],
+    expenseItems,
+  };
 }
 
 function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
@@ -232,9 +274,7 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
     clientDecision(inv.id, "dispute");
     addDispute({
       id: inv.id, client: inv.client, amount: inv.invoiced,
-      reason: inv.flagged
-        ? `Invoiced ${fmtINR(inv.invoiced)} exceeds contracted ${fmtINR(inv.contracted)} by ${inv.variancePct.toFixed(1)}% (beyond ±${AR_TOLERANCE_PCT}% tolerance)`
-        : "Client disputed the submitted invoice",
+      reason: "Client disputed the submitted invoice",
       stage: "raised", raised: today(), slaHrs: 48, owner: "—", kind: "customer",
     });
     toast(`${inv.id} disputed — sent to Disputes`);
@@ -272,6 +312,19 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         <Stepper steps={WORKFLOW_STEPS} current={stepIndex(inv.stage)} />
       </Card>
 
+      {podTrips[0] && (
+        <div className="mb-6">
+          <div className="mb-3 font-semibold text-slate-800">Booking details</div>
+          <BookingDetailCard trip={podTrips[0]} />
+        </div>
+      )}
+
+      {inv.expenseItems && inv.expenseItems.length > 0 && (
+        <div className="mb-6">
+          <ExpenseTable items={inv.expenseItems} title="Booking expenses (approved charges billed on this invoice)" toast={toast} />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Accessorials — BRD step: accessorial addition */}
         <Card className="p-5">
@@ -284,6 +337,16 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
               <span className="text-slate-600">Base freight (contract rate)</span>
               <Money value={inv.base} className="font-semibold text-slate-800" />
             </div>
+            {/* Approved booking expenses billed on this invoice (toll, loading, …) */}
+            {(inv.expenseItems ?? []).filter((e) => e.status === "Approved").map((e, i) => (
+              <div key={`exp-${i}`} className="flex items-center justify-between rounded-lg bg-emerald-50/60 px-3 py-2 text-sm">
+                <span className="flex items-center gap-2 text-slate-600">
+                  {e.type}
+                  <Pill tone="green">Booking expense</Pill>
+                </span>
+                <Money value={e.amount} className="font-semibold text-emerald-700" />
+              </div>
+            ))}
             {inv.accessorials.map((a, i) => (
               <div key={i} className="flex items-center justify-between rounded-lg bg-amber-50/60 px-3 py-2 text-sm">
                 <span className="text-slate-600">{a.label}</span>
@@ -295,30 +358,25 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
                 </span>
               </div>
             ))}
-            {inv.accessorials.length === 0 && <div className="px-3 text-xs text-slate-400">No accessorial charges added.</div>}
+            {inv.accessorials.length === 0 && (inv.expenseItems ?? []).filter((e) => e.status === "Approved").length === 0 && (
+              <div className="px-3 text-xs text-slate-400">No accessorial charges added.</div>
+            )}
           </div>
         </Card>
 
         {/* Contracted vs invoiced — BRD step: client-side approval (±tolerance) */}
         <Card className="p-5">
           <div className="mb-3 flex items-center justify-between">
-            <span className="font-semibold text-slate-800">Contracted vs invoiced</span>
-            <VariancePill inv={inv} />
+            <span className="font-semibold text-slate-800">Invoice summary</span>
           </div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span className="text-slate-500">Contracted rate</span><Money value={inv.contracted} className="text-slate-800" /></div>
-            <div className="flex justify-between"><span className="text-slate-500">Invoiced amount</span><Money value={inv.invoiced} className="font-semibold text-slate-800" /></div>
-            <div className="flex justify-between border-t border-slate-100 pt-2"><span className="text-slate-500">Variance</span>
-              <Money value={inv.invoiced - inv.contracted} className={inv.flagged ? "font-semibold text-red-600" : "text-slate-600"} />
-            </div>
+            <div className="flex justify-between"><span className="text-slate-500">Base freight</span><Money value={inv.base} className="text-slate-800" /></div>
+            {inv.invoiced - inv.base > 0 && (
+              <div className="flex justify-between"><span className="text-slate-500">Approved expenses</span><Money value={inv.invoiced - inv.base} className="text-emerald-700" /></div>
+            )}
+            <div className="flex justify-between border-t border-slate-100 pt-2"><span className="text-slate-500">Total invoiced</span><Money value={inv.invoiced} className="font-semibold text-slate-800" /></div>
             <div className="flex justify-between"><span className="text-slate-500">Payment terms</span><span className="text-slate-700">{inv.terms}</span></div>
           </div>
-          {inv.flagged && inv.stage === "submitted" && (
-            <div className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              Variance exceeds the ±{AR_TOLERANCE_PCT}% tolerance — flagged for the client's finance team.
-            </div>
-          )}
         </Card>
       </div>
 
@@ -518,7 +576,7 @@ function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string)
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
-            {["Invoice", "Customer", "Lane", "Invoiced", "Variance", "Stage", ""].map((h, i) => <th key={i} className="px-5 py-3 font-semibold">{h}</th>)}
+            {["Invoice", "Customer", "Lane", "Invoiced", "Stage", ""].map((h, i) => <th key={i} className="px-5 py-3 font-semibold">{h}</th>)}
           </tr>
         </thead>
         <tbody>
@@ -528,7 +586,6 @@ function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string)
               <td className="px-5 py-3.5 text-slate-700">{inv.client}</td>
               <td className="px-5 py-3.5 text-slate-500">{inv.lane}</td>
               <td className="px-5 py-3.5"><Money value={inv.invoiced} className="font-semibold text-slate-800" /></td>
-              <td className="px-5 py-3.5"><VariancePill inv={inv} /></td>
               <td className="px-5 py-3.5"><Pill tone={STAGE_TONE[inv.stage]}>{STAGE_LABEL[inv.stage]}</Pill></td>
               <td className="px-5 py-3.5 text-right">
                 <button onClick={() => onOpen(inv.id)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
@@ -537,7 +594,7 @@ function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string)
               </td>
             </tr>
           ))}
-          {rows.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No drafts yet — generate one from a customer's bookings above.</td></tr>}
+          {rows.length === 0 && <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400">No drafts yet — generate one from a customer's bookings above.</td></tr>}
         </tbody>
       </table>
     </Card>
@@ -550,6 +607,9 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
   const [cust, setCust] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [validating, setValidating] = useState<ARTrip | null>(null);
+  const [openBooking, setOpenBooking] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<{ ids: string[]; drops: ARTrip[]; label: string } | null>(null);
+  const [draftClient, setDraftClient] = useState("all");
 
   const open = openId ? invoices.find((i) => i.id === openId) : null;
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
@@ -561,17 +621,21 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
   // ---------- Customer drill: all bookings for one customer + KPIs + bill ----------
   if (c) {
     const toggle = (bid: string) => setSelected((s) => { const n = new Set(s); n.has(bid) ? n.delete(bid) : n.add(bid); return n; });
+    // Preview first — the invoice is only created on Confirm in the modal.
     const genBooking = (g: BookingGroup) => {
-      const id = generateConsolidatedInvoice(g.drops.map((d) => d.id));
-      if (id) toast(`Draft ${id} generated for ${g.bookingId} (${g.drops.length} drop${g.drops.length > 1 ? "s" : ""})`);
-      setSelected((s) => { const n = new Set(s); n.delete(g.bookingId); return n; });
+      setConfirming({ ids: g.drops.map((d) => d.id), drops: g.drops, label: g.bookingId });
     };
     const genSelected = () => {
       const chosen = c.bookings.filter((b) => selected.has(b.bookingId));
-      const ids = chosen.flatMap((b) => b.drops.map((d) => d.id));
-      const id = generateConsolidatedInvoice(ids);
-      if (id) toast(`One invoice ${id} for ${c.customer} across ${chosen.length} booking${chosen.length > 1 ? "s" : ""}`);
+      const drops = chosen.flatMap((b) => b.drops);
+      setConfirming({ ids: drops.map((d) => d.id), drops, label: `${chosen.length} booking${chosen.length > 1 ? "s" : ""} · ${c.customer}` });
+    };
+    const confirmGenerate = () => {
+      if (!confirming) return;
+      const id = generateConsolidatedInvoice(confirming.ids);
+      if (id) toast(`Invoice ${id} generated for ${confirming.label}`);
       setSelected(new Set());
+      setConfirming(null);
     };
     const custDrafts = working.filter((i) => i.client === c.customer);
 
@@ -592,7 +656,10 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
         )}
 
         <div className="space-y-4">
-          {c.bookings.map((g) => (
+          {c.bookings.map((g) => {
+            const expanded = openBooking === g.bookingId;
+            const expenses = tripExpenses(g.drops);
+            return (
             <Card key={g.bookingId} className="p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <label className="flex items-center gap-3">
@@ -611,7 +678,12 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
                     </div>
                   </div>
                 </label>
-                <Btn onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setOpenBooking(expanded ? null : g.bookingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                    {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{expanded ? "Hide details" : "View details"}
+                  </button>
+                  <Btn onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
+                </div>
               </div>
               <div className="mt-3 space-y-1.5">
                 {g.drops.map((d) => (
@@ -622,13 +694,20 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
                         <button onClick={() => setValidating(d)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><ShieldCheck size={12} />Validate</button>
                       )}
                       <Pill tone={POD_STAGE[d.podStage]?.tone ?? "blue"}>{POD_STAGE[d.podStage]?.label ?? "POD uploaded"}</Pill>
-                      <Money value={contractRateFor(d.lane, d.truck, d.client).base} className="font-semibold text-slate-800" />
+                      <Money value={tripFreight(d)} className="font-semibold text-slate-800" />
                     </span>
                   </div>
                 ))}
               </div>
+              {expanded && (
+                <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+                  <BookingDetailCard trip={g.drops[0]} />
+                  {expenses.length > 0 && <ExpenseTable items={expenses} title="Booking expenses" toast={toast} />}
+                </div>
+              )}
             </Card>
-          ))}
+            );
+          })}
           {c.bookings.length === 0 && <Card className="p-12 text-center text-slate-400">All bookings for {c.customer} have been invoiced.</Card>}
         </div>
 
@@ -641,6 +720,16 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
               toast(ok ? `POD validated for ${validating.id}` : `POD rejected for ${validating.id} — flagged for review`);
               setValidating(null);
             }} />
+        )}
+
+        {confirming && (
+          <PreviewModal
+            inv={previewInvoiceFromDrops(confirming.drops)}
+            onClose={() => setConfirming(null)}
+            onConfirm={confirmGenerate}
+            confirmLabel="Confirm & generate invoice"
+            toast={toast}
+          />
         )}
       </div>
     );
@@ -677,7 +766,18 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
         </div>
       )}
 
-      <div className="mt-6"><DraftsTable rows={working} onOpen={setOpenId} /></div>
+      <div className="mt-6">
+        {working.length > 0 && (
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Filter drafts by client</span>
+            <select value={draftClient} onChange={(e) => setDraftClient(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-300">
+              <option value="all">All clients</option>
+              {[...new Set(working.map((i) => i.client))].sort().map((cl) => <option key={cl} value={cl}>{cl}</option>)}
+            </select>
+          </div>
+        )}
+        <DraftsTable rows={working.filter((i) => draftClient === "all" || i.client === draftClient)} onOpen={setOpenId} />
+      </div>
     </div>
   );
 }

@@ -1,11 +1,14 @@
 import { useMemo, useState, type ReactNode } from "react";
 import {
   Building2,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   FileBadge2,
+  FileText,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -18,19 +21,31 @@ import {
   type VendorOnboardingDraft,
 } from "./types";
 
+export type VendorOnboardingExtraStep = {
+  label: string;
+  icon?: LucideIcon;
+  content: ReactNode;
+};
+
 export type VendorOnboardingWizardProps = {
   initialDraft?: Partial<VendorOnboardingDraft>;
   onSubmit: (draft: VendorOnboardingDraft) => void;
   onChange?: (draft: VendorOnboardingDraft) => void;
   submitLabel?: string;
   header?: ReactNode;
+  /** Custom steps rendered between Bank and Review (e.g. contract upload). */
+  extraSteps?: VendorOnboardingExtraStep[];
   extraReviewContent?: ReactNode;
   chrome?: boolean;
   lockCompanyName?: boolean;
   lockPrimaryContactPhone?: boolean;
 };
 
-const steps = ["Company", "Coverage", "Bank", "Review"] as const;
+const BASE_STEPS: { label: string; icon: LucideIcon }[] = [
+  { label: "Company", icon: Building2 },
+  { label: "Coverage", icon: FileBadge2 },
+  { label: "Bank", icon: Wallet },
+];
 
 export function VendorOnboardingWizard({
   initialDraft,
@@ -38,6 +53,7 @@ export function VendorOnboardingWizard({
   onChange,
   submitLabel = "Submit for review",
   header,
+  extraSteps = [],
   extraReviewContent,
   chrome = true,
   lockCompanyName = false,
@@ -65,12 +81,22 @@ export function VendorOnboardingWizard({
     });
   };
 
+  const steps = useMemo(
+    () => [
+      ...BASE_STEPS,
+      ...extraSteps.map((extra) => ({ label: extra.label, icon: extra.icon ?? FileText })),
+      { label: "Review", icon: CheckCircle2 },
+    ],
+    [extraSteps],
+  );
+  const reviewIndex = steps.length - 1;
+
   const progress = useMemo(
     () => Math.round(((step + 1) / steps.length) * 100),
-    [step],
+    [step, steps.length],
   );
 
-  const next = () => setStep((s) => Math.min(s + 1, steps.length - 1));
+  const next = () => setStep((s) => Math.min(s + 1, reviewIndex));
   const back = () => setStep((s) => Math.max(s - 1, 0));
   const finish = () => onSubmit(draft);
 
@@ -78,26 +104,44 @@ export function VendorOnboardingWizard({
     <>
       <div className="mb-6 rounded-full bg-primary/10 p-1">
         <div
-          className="h-2 rounded-full bg-primary transition-all"
+          className="h-2 rounded-full bg-gradient-to-r from-primary to-indigo-500 transition-all"
           style={{ width: `${progress}%` }}
         />
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        {steps.map((label, index) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => setStep(index)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-              step === index
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-primary"
-            }`}
-          >
-            {index + 1}. {label}
-          </button>
-        ))}
+        {steps.map(({ label, icon: StepIcon }, index) => {
+          const isActive = step === index;
+          const isDone = step > index;
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setStep(index)}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : isDone
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                    : "border border-border bg-card text-muted-foreground hover:bg-muted hover:text-primary"
+              }`}
+            >
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : isDone
+                      ? "bg-emerald-600 text-white"
+                      : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isDone ? <Check className="h-3 w-3" /> : index + 1}
+              </span>
+              <StepIcon className="h-4 w-4" />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       <Card className="shadow-sm">
@@ -338,7 +382,17 @@ export function VendorOnboardingWizard({
             </div>
           )}
 
-          {step === 3 && (
+          {step >= 3 && step < reviewIndex && (
+            <div className="space-y-5">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-extrabold">{extraSteps[step - 3]?.label}</h2>
+              </div>
+              {extraSteps[step - 3]?.content}
+            </div>
+          )}
+
+          {step === reviewIndex && (
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600" />

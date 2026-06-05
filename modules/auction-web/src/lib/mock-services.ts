@@ -314,6 +314,7 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
             startDate: auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
             endDate: auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
             estimatedTrips: lane.estimatedTrips ?? 0,
+            createdFrom: 'AUCTION_WIN' as const,
             status: 'ACTIVE' as const,
             l1OverrideReason: d.overrideReason,
             rateSyncedToTms: true,
@@ -369,10 +370,39 @@ export async function rejectAuction(auctionId: string, reason?: string): Promise
   }))
   return fetchAuction(auctionId)
 }
+// Cross-module: vendors onboarded in tenant-admin live under this shared key.
+// Surfacing them here means auctions can be awarded to those vendors, and the
+// resulting contracts (stamped with the tenant vendor id/name) flow back under
+// the same vendor in Tenant Admin → Vendor Detail → Contracts.
+const TENANT_VENDORS_KEY = 'optimile.tenant.vendors'
+
+function readTenantVendorOptions(): VendorOption[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(TENANT_VENDORS_KEY)
+    if (!raw) return []
+    const vendors = JSON.parse(raw) as { id: string; name: string; status?: string; tenantId?: string }[]
+    const { tenantId } = readSessionPrincipal()
+    return vendors
+      .filter((v) => v.status !== 'inactive')
+      .filter((v) => !tenantId || !v.tenantId || v.tenantId === tenantId)
+      .map((v) => ({ id: v.id, name: v.name, score: 80 }))
+  } catch {
+    return []
+  }
+}
+
 export async function fetchVendors(search?: string): Promise<VendorOption[]> {
-  if (!search) return MOCK_VENDORS
+  const seenNames = new Set<string>()
+  const merged = [...readTenantVendorOptions(), ...MOCK_VENDORS].filter((v) => {
+    const key = v.name.toLowerCase()
+    if (seenNames.has(key)) return false
+    seenNames.add(key)
+    return true
+  })
+  if (!search) return merged
   const q = search.toLowerCase()
-  return MOCK_VENDORS.filter((v) => v.name.toLowerCase().includes(q))
+  return merged.filter((v) => v.name.toLowerCase().includes(q))
 }
 export async function fetchBookings(): Promise<BookingReference[]> {
   return MOCK_BOOKINGS.filter((b) => b.status === 'PENDING_AUCTION')

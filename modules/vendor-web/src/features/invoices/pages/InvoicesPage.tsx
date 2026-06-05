@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
@@ -10,9 +10,56 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate } from '@vendor/lib/date-utils'
+import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useAppStore } from '@vendor/stores/app.store'
-import { CreditCard, Download, Eye, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
-import type { Dispute, Invoice, InvoiceLineItem } from '@vendor/types'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
+import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
+import type { Dispute, Invoice, InvoiceLineItem, Trip } from '@vendor/types'
+
+const CUSTOMER_ADDRESS =
+  '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
+
+/** Renders the invoice off-screen and downloads it as a PDF on mount. */
+function HiddenInvoicePdf({
+  invoice,
+  trips,
+  companyName,
+  customerName,
+  getLrNumber,
+  onDone,
+}: {
+  invoice: Invoice
+  trips: Trip[]
+  companyName: string
+  customerName: string
+  getLrNumber: (tripId: string) => string | null
+  onDone: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    void downloadElementAsPdf(ref.current, `${invoice.invoiceNumber || invoice.id}.pdf`).finally(onDone)
+    // download once per mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return (
+    <div aria-hidden style={{ position: 'fixed', left: -10000, top: 0, pointerEvents: 'none' }}>
+      <InvoicePdfDocument
+        ref={ref}
+        invoice={invoice}
+        trips={trips}
+        companyName={companyName}
+        companyInfo={MOCK_COMPANY_INFO}
+        bank={MOCK_BANK}
+        customerName={customerName}
+        customerAddress={CUSTOMER_ADDRESS}
+        getLrNumber={getLrNumber}
+      />
+    </div>
+  )
+}
 
 type InvoiceWorkspaceTab = 'all' | 'pending' | 'approved' | 'disputed' | 'resubmission' | 'closed'
 type StatusTab = Exclude<InvoiceWorkspaceTab, 'all'>
@@ -55,8 +102,15 @@ export default function InvoicesPage() {
   const [invoicePage, setInvoicePage] = useState(1)
   const [editModalInvoiceId, setEditModalInvoiceId] = useState<string | null>(null)
   const [editedItems, setEditedItems] = useState<InvoiceLineItem[]>([])
+  const [downloadInvoiceId, setDownloadInvoiceId] = useState<string | null>(null)
 
   const { invoices, disputes, createResubmissionInvoice } = useAppStore()
+  const bridge = useTenantBridge()
+  const { trips: allBookings, getBookingDetail } = useVendorBookings()
+  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
+  const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
+  const downloadInvoice = downloadInvoiceId ? invoices.find((item) => item.id === downloadInvoiceId) : null
 
   const disputeByInvoice = useMemo(() => {
     const map: Record<string, Dispute | undefined> = {}
@@ -119,24 +173,8 @@ export default function InvoicesPage() {
   const openEditModal = (invoiceId: string) => {
     const invoice = invoices.find((item) => item.id === invoiceId)
     if (!invoice) return
-    setEditedItems(invoice.lineItems.map((item) => ({ ...item, expenses: item.expenses.map((expense) => ({ ...expense })) })))
+    setEditedItems(invoice.lineItems.map((item) => ({ ...item })))
     setEditModalInvoiceId(invoiceId)
-  }
-
-  const handleExpenseChange = (lineIdx: number, expIdx: number, value: number) => {
-    setEditedItems((prev) =>
-      prev.map((item, index) => {
-        if (index !== lineIdx) return item
-        const nextExpenses = item.expenses.map((expense, expenseIndex) =>
-          expenseIndex !== expIdx ? expense : { ...expense, amount: Math.max(0, value) },
-        )
-        return {
-          ...item,
-          expenses: nextExpenses,
-          lineTotal: item.freightCharge + nextExpenses.reduce((sum, expense) => sum + expense.amount, 0),
-        }
-      }),
-    )
   }
 
   const handleFreightChange = (lineIdx: number, value: number) => {
@@ -147,7 +185,7 @@ export default function InvoicesPage() {
         return {
           ...item,
           freightCharge,
-          lineTotal: freightCharge + item.expenses.reduce((sum, expense) => sum + expense.amount, 0),
+          lineTotal: freightCharge,
         }
       }),
     )
@@ -248,7 +286,7 @@ export default function InvoicesPage() {
               />
             </div>
           ) : (
-            <table className="w-full min-w-[1040px] text-left text-sm">
+            <table className="w-full min-w-[1200px] text-left text-sm">
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
@@ -256,6 +294,8 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Freight Cost</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                 </tr>
@@ -285,6 +325,12 @@ export default function InvoicesPage() {
                       </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
                       <td className="p-4 text-right">
+                        <CurrencyDisplay amount={invoice.subtotal} />
+                      </td>
+                      <td className="p-4 text-right text-gray-600">
+                        <CurrencyDisplay amount={invoice.gstAmount} />
+                      </td>
+                      <td className="p-4 text-right">
                         <CurrencyDisplay amount={invoice.grandTotal} className="font-semibold" />
                       </td>
                       <td className="p-4 text-right">
@@ -301,14 +347,14 @@ export default function InvoicesPage() {
                               Create New Invoice
                             </Button>
                           ) : null}
-                          {invoice.status === 'APPROVED' ? (
-                            <Button size="sm" variant="ghost" title="Download invoice PDF" onClick={() => window.alert('Downloading Invoice PDF...')}>
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
-                            <Eye className="mr-1 h-3.5 w-3.5" />
-                            View
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Download invoice PDF"
+                            disabled={downloadInvoiceId === invoice.id}
+                            onClick={() => setDownloadInvoiceId(invoice.id)}
+                          >
+                            <Download className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -345,7 +391,7 @@ export default function InvoicesPage() {
               </button>
             </div>
 
-            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight and expense amounts. This creates a new PENDING invoice for finance review; {editInvoice.invoiceNumber} will be closed as superseded.</p>
+            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight amounts. This creates a new PENDING invoice for finance review; {editInvoice.invoiceNumber} will be closed as superseded.</p>
 
             <div className="mt-4 space-y-3">
               {editedItems.map((item, lineIdx) => (
@@ -367,22 +413,6 @@ export default function InvoicesPage() {
                       />
                     </div>
                   </div>
-                  {item.expenses.map((expense, expIdx) => (
-                    <div key={expIdx} className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-sm capitalize text-gray-600">{expense.type.replace(/_/g, ' ').toLowerCase()}</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-gray-400">Rs</span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={expense.amount}
-                          onChange={(e) => handleExpenseChange(lineIdx, expIdx, Number(e.target.value))}
-                          className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-right text-sm font-semibold text-text outline-none focus:border-primary focus:bg-white"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  {item.expenses.length === 0 ? <p className="mt-2 text-xs text-gray-400">No expenses on this line.</p> : null}
                 </div>
               ))}
             </div>
@@ -407,6 +437,17 @@ export default function InvoicesPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {downloadInvoice ? (
+        <HiddenInvoicePdf
+          invoice={downloadInvoice}
+          trips={allBookings}
+          companyName={companyName}
+          customerName={customerName}
+          getLrNumber={getLrNumber}
+          onDone={() => setDownloadInvoiceId(null)}
+        />
       ) : null}
     </div>
   )

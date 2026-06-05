@@ -8,6 +8,7 @@ import { formatDateTime } from '@vendor/lib/date-utils'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { KPICard } from '@vendor/components/cards/KPICard'
 import { useAppStore } from '@vendor/stores/app.store'
+import { formatLaneDisplay } from '@shared-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 
 export default function DashboardPage() {
@@ -24,8 +25,8 @@ export default function DashboardPage() {
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
-  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && (t.freightRate > 0 || t.expenseSummary.total > 0))
-  const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0) + (booking.expenseSummary.total || 0), 0)
+  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && t.freightRate > 0)
+  const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0), 0)
 
   const activeBookings = vendorTrips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
   
@@ -84,7 +85,7 @@ export default function DashboardPage() {
                   <SLACountdown deadline={auction.endTime} showLabel={false} />
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
-                  <span className="truncate">{auction.lanes.length === 1 ? `${auction.lanes[0]?.laneDetails.origin.city} → ${auction.lanes[0]?.laneDetails.destination.city}` : `${auction.lanes.length} lanes`}</span>
+                  <span className="truncate">{auction.lanes.length === 1 ? formatLaneDisplay(auction.lanes[0]?.laneDetails.origin.city ?? '', auction.lanes[0]?.laneDetails.destination.city ?? '') : `${auction.lanes.length} lanes`}</span>
                   <span className="truncate">Ends soon</span>
                 </div>
               </div>
@@ -109,7 +110,7 @@ export default function DashboardPage() {
                   <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent">Starts soon</span>
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-gray-500">
-                  <span className="truncate">{auction.lanes.length === 1 ? `${auction.lanes[0]?.laneDetails.origin.city} → ${auction.lanes[0]?.laneDetails.destination.city}` : `${auction.lanes.length} lanes`}</span>
+                  <span className="truncate">{auction.lanes.length === 1 ? formatLaneDisplay(auction.lanes[0]?.laneDetails.origin.city ?? '', auction.lanes[0]?.laneDetails.destination.city ?? '') : `${auction.lanes.length} lanes`}</span>
                   <span className="truncate">{formatDateTime(auction.startTime)}</span>
                 </div>
               </div>

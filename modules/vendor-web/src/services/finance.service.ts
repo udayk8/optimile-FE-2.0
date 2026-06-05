@@ -9,15 +9,6 @@ export const InvoiceService = {
   dispute: async (id: string, reason: string) => (await apiClient.post(`/invoices/${id}/dispute`, { reason })).data,
 }
 
-export const ExpenseService = {
-  list: async (params?: { bookingId?: string; status?: string }) =>
-    (await apiClient.get('/expenses', { params })).data,
-  get: async (id: string) => (await apiClient.get(`/expenses/${id}`)).data,
-  create: async (data: any) => (await apiClient.post('/expenses', data)).data,
-  submit: async (id: string) => (await apiClient.post(`/expenses/${id}/submit`)).data,
-  remove: async (id: string) => (await apiClient.delete(`/expenses/${id}`)).data,
-}
-
 export const LedgerService = {
   list: async (params?: { from?: string; to?: string }) => (await apiClient.get('/ledger', { params })).data,
   payments: async (status?: string) => (await apiClient.get('/payments', { params: status ? { status } : undefined })).data,
