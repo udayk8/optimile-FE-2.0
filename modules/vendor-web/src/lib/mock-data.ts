@@ -678,6 +678,71 @@ export const MOCK_TRIPS: Trip[] = [
     freightRate: 28000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-24T08:00:00Z',
   },
+  // Completed, POD-confirmed, not yet invoiced — feed the Create Invoice flow.
+  {
+    id: 'BKG-2026-1055', contractId: 'CNT-001', indentId: 'BKG-2026-1106', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Pune', city: 'Pune', state: '' }, distanceKm: 840 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-20T14:30:00Z', podStatus: 'CONFIRMED', podReference: 'POD-055',
+    documents: [
+      { id: 'td-101', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-055.pdf', fileUrl: '/docs/pod-trp-055.pdf', createdAt: '2026-05-20T15:00:00Z' },
+      { id: 'td-102', type: 'LR_COPY', title: 'LR copy', fileName: 'lr-trp-055.pdf', fileUrl: '/docs/lr-trp-055.pdf', createdAt: '2026-05-18T08:30:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-101', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-05-18T09:00:00Z', status: 'IN_TRANSIT' },
+      { id: 'tt-102', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-20T14:30:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 36500, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-05-18T07:30:00Z',
+  },
+  {
+    id: 'BKG-2026-1056', contractId: 'CNT-001', indentId: 'BKG-2026-1107', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Coimbatore', city: 'Coimbatore', state: '' }, distanceKm: 365 },
+    assignedVehicle: { id: 'VH-002', registrationNumber: 'KA05MN5678', type: 'LCV' },
+    assignedDriver: { id: 'DR-002', name: 'Suresh Kumar', mobile: '+91 9886011223' },
+    deliveredDate: '2026-05-24T11:15:00Z', podStatus: 'CONFIRMED', podReference: 'POD-056',
+    documents: [
+      { id: 'td-103', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-056.pdf', fileUrl: '/docs/pod-trp-056.pdf', createdAt: '2026-05-24T11:45:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-103', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-24T11:15:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 21500, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-05-23T06:45:00Z',
+  },
+  {
+    id: 'BKG-2026-1057', contractId: 'CNT-002', indentId: 'BKG-2026-1108', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mumbai', city: 'Mumbai', state: '' }, distanceKm: 985 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-28T18:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-057',
+    documents: [
+      { id: 'td-104', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-057.pdf', fileUrl: '/docs/pod-trp-057.pdf', createdAt: '2026-05-28T18:30:00Z' },
+      { id: 'td-105', type: 'EWAY_BILL', title: 'E-way bill', fileName: 'eway-trp-057.pdf', fileUrl: '/docs/eway-trp-057.pdf', createdAt: '2026-05-26T07:00:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-104', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-05-26T08:00:00Z', status: 'IN_TRANSIT' },
+      { id: 'tt-105', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-28T18:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 48500, slaFlag: 'DELAYED', isInvoiced: false,
+    createdAt: '2026-05-26T06:00:00Z',
+  },
+  {
+    id: 'BKG-2026-1058', contractId: 'CNT-002', indentId: 'BKG-2026-1109', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-002', registrationNumber: 'KA05MN5678', type: 'LCV' },
+    assignedDriver: { id: 'DR-002', name: 'Suresh Kumar', mobile: '+91 9886011223' },
+    deliveredDate: '2026-06-02T09:40:00Z', podStatus: 'CONFIRMED', podReference: 'POD-058',
+    documents: [
+      { id: 'td-106', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-058.pdf', fileUrl: '/docs/pod-trp-058.pdf', createdAt: '2026-06-02T10:00:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-106', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-06-02T09:40:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 23800, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-06-01T07:15:00Z',
+  },
   {
     id: 'BKG-2026-1054', contractId: 'CNT-002', indentId: 'BKG-2026-1105', status: 'CANCELLED',
     laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
