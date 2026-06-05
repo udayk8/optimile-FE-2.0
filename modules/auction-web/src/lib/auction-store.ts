@@ -1,4 +1,4 @@
-import { cityLaneKey } from '@shared-utils'
+import { cityLaneKey, locationCodeToCity, splitLaneCode } from '@shared-utils'
 import type { Auction, Contract } from '@auction/types'
 import { MOCK_AUCTIONS, MOCK_CONTRACTS } from '@auction/lib/mock-data'
 
@@ -102,6 +102,36 @@ function sweepExpiredAuctions(snapshot: AuctionStoreSnapshot): AuctionStoreSnaps
   return swept
 }
 
+/**
+ * Pre-city-pair records carried one combined `lane` string ("Mumbai - Delhi"
+ * or "MUM-DEL"). Derive the source/destination cities for anything stored
+ * before the refactor so old browsers keep rendering complete rows.
+ */
+function legacyLaneToCities(lane: unknown): [string, string] {
+  if (typeof lane !== 'string' || !lane) return ['', '']
+  const codeParts = splitLaneCode(lane)
+  if (codeParts) return [locationCodeToCity(codeParts[0]), locationCodeToCity(codeParts[1])]
+  const parts = lane.split(/→|->| - /).map((part) => part.trim()).filter(Boolean)
+  return [parts[0] ?? '', parts[1] ?? '']
+}
+
+function migrateLegacyLanes(snapshot: AuctionStoreSnapshot): { snapshot: AuctionStoreSnapshot; changed: boolean } {
+  let changed = false
+  const fill = <T extends { originCity?: string; destinationCity?: string }>(record: T): T => {
+    if (record.originCity && record.destinationCity) return record
+    const [originCity, destinationCity] = legacyLaneToCities((record as { lane?: unknown }).lane)
+    if (!originCity && !destinationCity) return record
+    changed = true
+    return { ...record, originCity, destinationCity }
+  }
+  const auctions = snapshot.auctions.map((auction) => {
+    const lanes = auction.lanes.map(fill)
+    return lanes.some((lane, index) => lane !== auction.lanes[index]) ? { ...auction, lanes } : auction
+  })
+  const contracts = snapshot.contracts.map(fill)
+  return { snapshot: changed ? { auctions, contracts } : snapshot, changed }
+}
+
 export function loadStore(): AuctionStoreSnapshot {
   if (typeof window === 'undefined') {
     return { auctions: [...MOCK_AUCTIONS], contracts: [...MOCK_CONTRACTS] }
@@ -117,9 +147,13 @@ export function loadStore(): AuctionStoreSnapshot {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AuctionStoreSnapshot>
-    const snapshot: AuctionStoreSnapshot = {
+    const migration = migrateLegacyLanes({
       auctions: parsed.auctions ?? [],
       contracts: parsed.contracts ?? [],
+    })
+    const snapshot = migration.snapshot
+    if (migration.changed) {
+      window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
     }
     // Merge-missing seed auctions/contracts (by id) so demo data added to
     // the seed reaches browsers whose store was created before the seed grew.

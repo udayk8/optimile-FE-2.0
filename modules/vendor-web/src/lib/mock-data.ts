@@ -47,7 +47,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n7',  type: 'INVOICES',   title: 'Invoice Rejected',            message: 'Invoice INV-2026-026 was rejected. Raise a dispute if you disagree.',                deepLink: '/vendor/invoices/INV-2026-026',        isRead: false, createdAt: new Date(Date.now() - 5   * 3600 * 1000).toISOString() },
   { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip BKG-2026-1051 (Bengaluru → Hyderabad)',                       deepLink: '/vendor/bookings/completed/BKG-2026-1051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
   { id: 'n9',  type: 'SOURCING',   title: 'Auction Awarded',             message: 'You won R1 allocation on AUC-009 – Mumbai → Nashik lane',                           deepLink: '/vendor/sourcing',                    isRead: true,  createdAt: new Date(Date.now() - 12  * 3600 * 1000).toISOString() },
-  { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-007 for Delhi → Jaipur is ready for review',                     deepLink: '/vendor/contracts',                   isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
+  { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-005 for Jamshedpur → Haldia is ready for review',                deepLink: '/vendor/contracts/CNT-005',           isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
   { id: 'n12', type: 'INVOICES',   title: 'Invoice Approved',            message: 'Invoice INV-2026-024 approved. Payment due in 15 days.',                            deepLink: '/vendor/invoices/INV-2026-024',        isRead: true,  createdAt: new Date(Date.now() - 48  * 3600 * 1000).toISOString() },
   { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent BKG-2026-1008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
   { id: 'n14', type: 'ONBOARDING', title: 'Document Verification Done',  message: 'Your GST and PAN documents have been verified successfully.',                       deepLink: '/vendor/profile/company',              isRead: true,  createdAt: new Date(Date.now() - 5   * 86400 * 1000).toISOString() },
@@ -259,7 +259,8 @@ export const MOCK_AUCTIONS: Auction[] = [
     }],
     vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
     awardDate: new Date(Date.now() - 86400000).toISOString(),
-    contractReference: 'CNT-008 / MAHINDRA',
+    // Matches the CNT-AW-101 auction-win contract sample (same lane/rate).
+    contractReference: 'CNT-AW-101',
     vendorBids: [{ id: 'b6', laneId: 'L1', amount: 16500, placedAt: new Date(Date.now() - 200000000).toISOString(), status: 'ACTIVE' }],
     createdAt: new Date(Date.now() - 345600000).toISOString(),
   },
@@ -304,8 +305,9 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
+    // Kanodia Cements lane — the contract behind the BKG-2026-10xx indents/trips.
     id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'Mumbai', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, distanceKm: 1420 },
+    laneDetails: { origin: { name: 'Bengaluru Depot', city: 'Bengaluru', state: 'Karnataka' }, destination: { name: 'Kanodia Cement Depot', city: 'Chandausi', state: 'Uttar Pradesh' }, distanceKm: 1980 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
@@ -313,6 +315,18 @@ export const MOCK_CONTRACTS: Contract[] = [
     penaltyClauses: [{ breachType: 'Late Placement', penaltyType: 'FIXED', penaltyValue: 5000, description: 'Per late placement event' }],
     validityFrom: '2026-01-01', validityTo: '2026-12-31', renewalTerms: 'Auto-renew unless 30-day notice',
     amendments: [], signedAt: '2026-01-05T10:30:00Z', pdfUrl: '/contracts/CNT-001.pdf', createdAt: '2025-12-20T14:00:00Z',
+  },
+  {
+    // Shree Cements lane — the contract behind the CNT-002 indents/trips.
+    id: 'CNT-002', status: 'ACTIVE', source: 'MANUAL_UPLOAD',
+    laneDetails: { origin: { name: 'Bengaluru Depot', city: 'Bengaluru', state: 'Karnataka' }, destination: { name: 'Shree Cements Yard', city: 'Hyderabad', state: 'Telangana' }, distanceKm: 570 },
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 42000, surcharges: [{ name: 'Fuel Surcharge', amount: 1500 }] }],
+    volumeAllocation: { volume: 40, unit: 'trucks', frequency: 'Monthly' },
+    paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
+    slaClauses: [{ name: 'Placement SLA', valueHours: 4, description: 'Vehicle must report within 4 hours of acceptance' }],
+    penaltyClauses: [{ breachType: 'Late Placement', penaltyType: 'FIXED', penaltyValue: 4000, description: 'Per late placement event' }],
+    validityFrom: '2026-02-01', validityTo: '2026-12-31', renewalTerms: 'Auto-renew unless 30-day notice',
+    amendments: [], signedAt: '2026-02-03T12:00:00Z', pdfUrl: '/contracts/CNT-002.pdf', createdAt: '2026-01-28T10:00:00Z',
   },
   {
     id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD',
