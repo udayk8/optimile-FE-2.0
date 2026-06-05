@@ -129,6 +129,8 @@ export function useAppStore(tenantId: string) {
         store.appendPlatformAuditLog(input),
       syncLrsForBooking: (bookingId: string, status: BookingRecord["status"]) =>
         store.syncTenantLrsForBooking(bookingId, status),
+      sendBookingVendorIndent: (bookingId: string, actor: string, knownBooking?: BookingRecord) =>
+        store.sendBookingVendorIndent(bookingId, actor, null, null, knownBooking),
     };
   }, [store, tenantId]);
 }

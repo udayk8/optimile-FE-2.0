@@ -21,30 +21,6 @@ import {
 } from 'lucide-react'
 import '../styles/global.css'
 
-// The unified login page (shared-admin-core) writes the signed-in session here.
-// When a customer signs in from tenant master data (Admin → Customers) the
-// session carries which customer they are; the portal then acts AS that customer.
-const SESSION_CONTEXT_KEY = 'optimile.session.context'
-
-type PortalCustomerIdentity = { customerId?: string; customerName?: string; phone?: string }
-
-function readPortalCustomerIdentity(): PortalCustomerIdentity | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
-    if (!raw) return null
-    const session = JSON.parse(raw) as {
-      loginType?: string
-      customerId?: string
-      customerName?: string
-      phone?: string
-    }
-    if (session?.loginType !== 'CUSTOMER') return null
-    return { customerId: session.customerId, customerName: session.customerName, phone: session.phone }
-  } catch {
-    return null
-  }
-}
 
 type CustomerSection = 'overview' | 'requests' | 'shipments' | 'contracts'
 

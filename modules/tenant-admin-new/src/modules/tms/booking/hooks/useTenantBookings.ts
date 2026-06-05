@@ -30,5 +30,7 @@ export function useTenantBookings(tenantId: string) {
       appStore.replaceBookingVehicle(bookingId, input),
     actionBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) =>
       appStore.actionBookingVehicleReplacement(bookingId, input),
+    sendBookingVendorIndent: (bookingId: string, actor: string, knownBooking?: BookingRecord) =>
+      appStore.sendBookingVendorIndent(bookingId, actor, knownBooking),
   };
 }

@@ -149,6 +149,21 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
           pod: d.pod ? "Captured" : "Pending",
         })),
         timeline,
+        documents: (record.shipmentDocuments?.deliveries ?? []).flatMap((d) =>
+          (d.invoices ?? []).map((inv) => ({
+            invoiceNumber: inv.invoiceNumber,
+            invoiceDate: inv.invoiceDate ?? null,
+            ewayBillNumber: d.ewayBill?.ewayBillNumber ?? null,
+            ewayBillExpiry: d.ewayBill?.validToDate ?? null,
+            uploadedAt: inv.uploadedAt,
+          }))
+        ),
+        destinationChangeRequests: (record.destinationChangeRequests ?? []).map((r) => ({
+          id: r.id,
+          reason: r.reason,
+          status: (r.status === 'APPROVED' || r.status === 'IMPLEMENTED' ? 'APPROVED' : r.status === 'REJECTED' ? 'REJECTED' : 'PENDING') as 'PENDING' | 'APPROVED' | 'REJECTED',
+          raisedAt: r.raisedAt,
+        })),
       };
     }
 
@@ -185,6 +200,29 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
       addresses,
       materials: materialOptions,
       vehicleTypes,
+      requestDestinationChange: (bookingId, reason) => {
+        const record = store.getTenantBookingById(bookingId)
+        if (!record) return
+        const now = new Date().toISOString()
+        const firstDelivery = record.deliveries?.[0]
+        if (!firstDelivery) return
+        store.updateTenantBooking(bookingId, {
+          destinationChangeRequests: [
+            ...(record.destinationChangeRequests ?? []),
+            {
+              id: `dcr-${Date.now()}`,
+              bookingId,
+              deliveryId: firstDelivery.id,
+              remarkType: 'DESTINATION_CHANGED',
+              reason,
+              raisedBy: customerName,
+              raisedAt: now,
+              priority: 'LOW',
+              status: 'SUBMITTED',
+            },
+          ],
+        })
+      },
       createBooking: (input) => {
         const now = new Date().toISOString();
         const originCity = cityOf(input.originAddressId);
@@ -230,9 +268,7 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
           vehicleTypeId: input.vehicleTypeId,
           lrType: "MANUAL",
           manualLrPoolPreference: "GENERAL",
-          // Customer-created bookings enter the normal lifecycle at rate
-          // approval so the internal Operations team picks them up.
-          status: "PENDING_RATE_APPROVAL",
+          status: "PENDING_ASSIGNMENT",
           opsRemark: null,
           pod: null,
           documents: [],
@@ -254,7 +290,7 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
               weight: input.weight,
               weightUom: input.uom,
               distanceKm: null,
-              status: "PENDING_RATE_APPROVAL",
+              status: "PENDING_ASSIGNMENT",
               lrNumber: null,
               pod: null,
             },
@@ -270,11 +306,15 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
             },
           ],
           statusTimeline: [
-            { id: `booking-status-${Date.now()}-draft`, status: "DRAFT", timestamp: now, actor: customerName, note: "Booking created via Customer Portal." },
-            { id: `booking-status-${Date.now()}-routed`, status: "PENDING_RATE_APPROVAL", timestamp: now, actor: "System", note: "Routed to operations for rate approval." },
+            { id: `booking-status-${Date.now()}-created`, status: "PENDING_ASSIGNMENT", timestamp: now, actor: customerName, note: "Booking created via Customer Portal." },
           ],
           createdBy: customerName,
         });
+        try {
+          store.sendBookingVendorIndent(created.id, customerName, null, null);
+        } catch {
+          // No active vendors — booking stays in PENDING_ASSIGNMENT for ops to handle
+        }
         return created.bookingId;
       },
       // Reuse the exact internal Create Booking page, locked to this customer

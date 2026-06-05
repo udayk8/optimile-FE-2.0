@@ -19,7 +19,7 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
 import { useTenantBookings } from "./hooks/useTenantBookings";
-import { calculateMarginAmount, calculateMarginPercent } from "@/modules/tms/booking/services/booking-engine";
+import { calculateMarginAmount, calculateMarginPercent, getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
 import {
   buildCustomerLookup,
   buildVendorLookup,

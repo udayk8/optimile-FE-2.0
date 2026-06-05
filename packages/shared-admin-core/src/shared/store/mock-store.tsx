@@ -244,6 +244,7 @@ interface MockStoreValue {
     actor: string,
     lrPlaceId?: string | null,
     lrPlaceName?: string | null,
+    knownBooking?: BookingRecord,
   ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
@@ -5136,8 +5137,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName) => {
-        const booking = tenantBookings.find((item) => item.id === bookingId);
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, knownBooking) => {
+        const booking = knownBooking ?? tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
           throw new Error("Indents can only be sent for bookings pending assignment.");

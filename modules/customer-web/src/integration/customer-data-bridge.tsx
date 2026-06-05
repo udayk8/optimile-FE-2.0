@@ -77,6 +77,19 @@ export interface CustomerBookingView {
     pod: 'Captured' | 'Pending' | 'Not applicable'
   }>
   timeline: Array<{ label: string; time: string; state: 'done' | 'current' | 'future' | 'issue' }>
+  documents?: Array<{
+    invoiceNumber: string
+    invoiceDate: string | null
+    ewayBillNumber: string | null
+    ewayBillExpiry: string | null
+    uploadedAt: string
+  }>
+  destinationChangeRequests?: Array<{
+    id: string
+    reason: string
+    status: 'PENDING' | 'APPROVED' | 'REJECTED'
+    raisedAt: string
+  }>
 }
 
 // Master-data options for the customer Create Booking form (pre-filtered to the
@@ -133,6 +146,8 @@ export interface CustomerDataBridge {
   // method the internal module uses (source=CUSTOMER_PORTAL). Returns the new
   // booking id so the UI can navigate to it.
   createBooking: (input: CustomerCreateBookingInput) => string
+
+  requestDestinationChange: (bookingId: string, reason: string) => void
 
   // Renders the FULL internal Create Booking page (reused — not duplicated),
   // locked to this customer with the customer selector hidden. Provided only

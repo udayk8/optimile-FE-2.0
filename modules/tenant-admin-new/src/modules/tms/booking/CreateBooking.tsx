@@ -141,7 +141,7 @@ export function CreateBookingPage({
   // hides the customer selector. Internal flow (no lockedCustomerId) unchanged.
   const customerLocked = Boolean(lockedCustomerId) || isDirectCustomerTenant(tenant);
   const canCreateBooking = Boolean(lockedCustomerId) || access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
-  const { getBookingById, createBooking, updateBooking } = useTenantBookings(tenant.id);
+  const { getBookingById, createBooking, updateBooking, sendBookingVendorIndent } = useTenantBookings(tenant.id);
   const { createAddress } = useTenantCustomers(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
   const [draft, setDraft] = useState<BookingDraft>(initialDraft);
@@ -209,9 +209,10 @@ export function CreateBookingPage({
     if (isEditMode || editingBooking || draft.customerId) {
       return;
     }
-    // Customer Portal: lock to the logged-in customer.
+    // Customer Portal: lock to the logged-in customer and force SPOT so the
+    // booking always goes to PENDING_ASSIGNMENT (no rate deviation gate).
     if (lockedCustomerId) {
-      setDraft((current) => ({ ...current, customerId: lockedCustomerId }));
+      setDraft((current) => ({ ...current, customerId: lockedCustomerId, commercialType: 'SPOT' }));
       return;
     }
     if (!isDirectCustomerTenant(tenant)) {
@@ -719,6 +720,13 @@ export function CreateBookingPage({
       remarks: audit.remarks,
       statusTimeline: audit.statusTimeline,
     });
+    if (lockedCustomerId) {
+      try {
+        sendBookingVendorIndent(created.id, createdByLabel ?? "Customer", created);
+      } catch {
+        // No active vendors — booking stays in PENDING_ASSIGNMENT for ops
+      }
+    }
     if (onAfterSubmit) {
       onAfterSubmit(created.bookingId);
       return;
@@ -1141,12 +1149,12 @@ export function CreateBookingPage({
           <span className="text-base font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
         </div>
         <div className="flex gap-2">
-          {access.can("CREATE_BOOKING", "CREATE") ? (
+          {(canCreateBooking || access.can("CREATE_BOOKING", "CREATE")) ? (
             <Button variant="outline" onClick={() => persistBooking("DRAFT", false)}>
               Save Draft
             </Button>
           ) : null}
-          {access.can("CREATE_BOOKING", "SUBMIT_BOOKING") ? (
+          {(canCreateBooking || access.can("CREATE_BOOKING", "SUBMIT_BOOKING")) ? (
             <Button onClick={() => persistBooking(submitStatus, true)}>Submit Booking</Button>
           ) : null}
         </div>
