@@ -4,7 +4,7 @@ import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/ho
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
-import { formatDate } from '@vendor/lib/date-utils'
+import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useAuctionContractsBridge } from '@vendor/integration/auctionBridge'
 import { useManualContractsBridge } from '@vendor/integration/manualContractsBridge'
@@ -118,7 +118,7 @@ export default function ContractsPage() {
                       : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
-                    {formatDate(contract.awardedOn ?? contract.createdAt)}
+                    {formatDateTime(contract.awardedOn ?? contract.createdAt)}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityFrom)}</td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityTo)}</td>

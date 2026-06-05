@@ -8,7 +8,7 @@ import { Button } from '@auction/components/ui/button'
 import { Input } from '@auction/components/ui/input'
 import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
-import { formatDate } from '@auction/lib/date-utils'
+import { formatDate, formatDateTime } from '@auction/lib/date-utils'
 import { fetchContract, fetchContracts, terminateContract } from '@auction/lib/mock-services'
 import { getContractSourceLabel, getRateTypeLabel } from '@shared-utils'
 import type { Contract } from '@auction/types'
@@ -115,7 +115,7 @@ export default function ContractsPage() {
         key: 'awardedAt',
         header: 'Created On',
         render: (contract) => (
-          <span className="text-sm text-[#0F172A]">{contract.awardedAt ? formatDate(contract.awardedAt) : '—'}</span>
+          <span className="text-sm text-[#0F172A]">{contract.awardedAt ? formatDateTime(contract.awardedAt) : '—'}</span>
         ),
       },
       { key: 'startDate', header: 'Start Date', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.startDate)}</span> },
@@ -206,7 +206,7 @@ export default function ContractsPage() {
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Created On</p>
-                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.awardedAt ? formatDate(selectedContract.awardedAt) : '—'}</p>
+                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.awardedAt ? formatDateTime(selectedContract.awardedAt) : '—'}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Validity</p>
