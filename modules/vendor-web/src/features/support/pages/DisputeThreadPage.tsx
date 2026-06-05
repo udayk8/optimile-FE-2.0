@@ -6,14 +6,12 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { ArrowLeft, CheckCircle2, Clock, MessageSquareMore, Paperclip, Send, X } from 'lucide-react'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 
 export default function DisputeThreadPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const disputes = useAppStore((state) => state.disputes)
-  const respondToDispute = useAppStore((state) => state.respondToDispute)
-  const invoices = useAppStore((state) => state.invoices)
+  const { disputes, invoices, respondToDispute } = useVendorInvoices()
 
   const dispute = disputes.find((item) => item.id === id)
   const invoice = invoices.find((item) => item.id === dispute?.invoiceId)

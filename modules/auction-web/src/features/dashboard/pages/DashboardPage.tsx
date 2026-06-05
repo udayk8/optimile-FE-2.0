@@ -36,6 +36,15 @@ export default function DashboardPage() {
   const liveAuctions = useMemo(() => auctions.filter((item) => item.status === 'LIVE'), [auctions])
   const pendingAwards = useMemo(() => auctions.filter((item) => item.status === 'COMPLETED'), [auctions])
   const expiringContracts = useMemo(() => contracts.filter((item) => item.status === 'EXPIRING_SOON'), [contracts])
+  // Aging signal (no hard SLA): how long the oldest completed auction has
+  // been waiting for an award decision.
+  const oldestPendingDays = useMemo(() => {
+    const ages = pendingAwards
+      .map((item) => (item.completedAt ? Date.now() - new Date(item.completedAt).getTime() : Number.NaN))
+      .filter((age) => !Number.isNaN(age))
+    if (!ages.length) return null
+    return Math.floor(Math.max(...ages) / (24 * 60 * 60 * 1000))
+  }, [pendingAwards])
 
   if (loading) {
     return (
@@ -59,7 +68,7 @@ export default function DashboardPage() {
       <HeroCard
         eyebrow="Auction Control Tower"
         title="Procurement Control Dashboard"
-        subtitle="Monitor live auctions, award deadlines, and contract outcomes from a single operational view."
+        subtitle="Monitor live auctions, pending awards, and contract outcomes from a single operational view."
         icon={<Gavel className="h-5 w-5 text-primary" />}
         action={
           <Button asChild variant="outline">
@@ -79,7 +88,11 @@ export default function DashboardPage() {
         <KPICard
           title="Pending Awards"
           value={pendingAwards.length}
-          insight="Completed auctions waiting for award decision."
+          insight={
+            oldestPendingDays != null && oldestPendingDays > 0
+              ? `Oldest waiting ${oldestPendingDays} day${oldestPendingDays > 1 ? 's' : ''} for a decision.`
+              : 'Completed auctions waiting for award decision.'
+          }
           icon={<FileClock className="h-4 w-4 text-warning" />}
           onClick={() => navigate('/auction/auctions?tab=COMPLETED')}
         />

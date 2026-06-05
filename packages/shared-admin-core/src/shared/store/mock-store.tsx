@@ -105,6 +105,10 @@ import type {
   TenantVehicleInput,
 } from "@/types/fleet";
 import type {
+  TenantVendorInvoiceRecord,
+  TenantVendorInvoiceLineItem,
+} from "@/types/vendor-invoice";
+import type {
   LRAllocationApprovalFlow,
   LRAllocationFlowConfig,
   LRAllocationFlowLevel,
@@ -257,6 +261,16 @@ interface MockStoreValue {
   actionTenantBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) => BookingRecord;
   listTenantInvoices: (tenantId: string) => TenantInvoiceRecord[];
   createTenantInvoice: (input: TenantInvoiceRecord) => TenantInvoiceRecord;
+  // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
+  listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
+  vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
+  financeApproveVendorInvoice: (invoiceId: string) => void;
+  financeDisputeVendorInvoice: (invoiceId: string, reason: string) => void;
+  financeRequestVendorResubmission: (invoiceId: string, message?: string) => void;
+  financeRejectVendorInvoice: (invoiceId: string, reason?: string) => void;
+  financeReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
+  vendorRespondToInvoiceDispute: (invoiceId: string, message: string) => void;
+  vendorCreateInvoiceResubmission: (oldInvoiceId: string, lineItems: TenantVendorInvoiceLineItem[], invoiceNumber?: string) => TenantVendorInvoiceRecord | null;
   listTenantVendorRateCards: (tenantVendorId: string) => TenantVendorRateCard[];
   createTenantVendorRateCard: (
     input: Omit<TenantVendorRateCard, "id" | "createdAt" | "updatedAt">,
@@ -617,12 +631,49 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // onboarded via the wizard. If the user's localStorage exists but doesn't
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v5";
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v6";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
+
+// Manual vendor-contract seed for the Bluedart vendors — the shared
+// `optimile.vendor-contracts` store both Tenant Admin vendor detail and the
+// Vendor Portal read. Idempotent by contractId; runs every boot.
+const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
+const SEED_VENDOR_CONTRACTS = [
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "MUM-DEL", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "BLR-MAA", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "DEL-LKO", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "MUM-BLR", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "PNQ-JAI", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "AMD-SRT", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+];
+
+function seedVendorContracts(): void {
+  try {
+    const raw = window.localStorage.getItem(VENDOR_CONTRACTS_SEED_KEY);
+    const stored: Array<{ contractId: string }> = raw ? JSON.parse(raw) : [];
+    const existingIds = new Set(stored.map((contract) => contract.contractId));
+    const startDate = new Date().toISOString().slice(0, 10);
+    const created = SEED_VENDOR_CONTRACTS.filter((seed) => !existingIds.has(seed.contractId)).map(
+      ({ months, ...seed }) => ({
+        ...seed,
+        startDate,
+        endDate: new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        createdFrom: "MANUAL_UPLOAD",
+        status: "ACTIVE",
+      }),
+    );
+    if (created.length > 0) {
+      window.localStorage.setItem(VENDOR_CONTRACTS_SEED_KEY, JSON.stringify([...stored, ...created]));
+    }
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
 
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
+    seedVendorContracts();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
@@ -3603,6 +3654,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   const [tenantInvoices, setTenantInvoices] = useState<TenantInvoiceRecord[]>(() =>
     loadSeededState(storageKeys.tenantInvoices, mockTenantInvoices),
   );
+  // Vendor (AP) invoices — single source of truth shared by the vendor portal
+  // and the finance module. Seeded empty; populated as vendors generate invoices.
+  const [tenantVendorInvoices, setTenantVendorInvoices] = useState<TenantVendorInvoiceRecord[]>(() =>
+    loadSeededState<TenantVendorInvoiceRecord[]>(storageKeys.tenantVendorInvoices, []),
+  );
   const [tenantLrs, setTenantLrs] = useState<TenantLrRecord[]>(() =>
     normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, mockTenantLrs)),
   );
@@ -3746,6 +3802,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     writeStoredValue(storageKeys.tenantInvoices, tenantInvoices);
   }, [tenantInvoices]);
+
+  useEffect(() => {
+    writeStoredValue(storageKeys.tenantVendorInvoices, tenantVendorInvoices);
+  }, [tenantVendorInvoices]);
 
   useEffect(() => {
     writeStoredValue(storageKeys.tenantLrs, tenantLrs);
@@ -5146,10 +5206,22 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         if (bookingVendorIndents.some((indent) => indent.bookingId === bookingId && indent.status === "PENDING")) {
           throw new Error("An active indent already exists for this booking.");
         }
+        // Spot-contract bookings send a TARGETED indent to the contract's
+        // winning vendor only; everything else broadcasts to all active vendors.
+        const spotVendorId = booking.spotContract?.vendorId ?? null;
         const eligibleVendors = tenantVendors.filter(
-          (vendor) => vendor.tenantId === booking.tenantId && vendor.status === "active",
+          (vendor) =>
+            vendor.tenantId === booking.tenantId &&
+            vendor.status === "active" &&
+            (!spotVendorId || vendor.id === spotVendorId),
         );
-        if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
+        if (eligibleVendors.length === 0) {
+          throw new Error(
+            spotVendorId
+              ? "The spot-contract vendor is not active for this tenant."
+              : "No active vendors to send the indent to.",
+          );
+        }
         const now = new Date().toISOString();
         // Vendor assignment always uses Auto LR generated from the booking owner's
         // place — captured here at send time so the vendor never picks LR.
@@ -5182,8 +5254,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       status: item.status,
                       timestamp: now,
                       actor,
-                      eventLabel: "INDENT_SENT_TO_VENDORS",
-                      note: `Indent sent to ${created.length} vendor(s)`,
+                      eventLabel: spotVendorId ? "INDENT_SENT_SPOT_CONTRACT" : "INDENT_SENT_TO_VENDORS",
+                      note: spotVendorId
+                        ? `Indent sent to ${created[0]?.vendorName ?? "spot-contract vendor"} (spot contract ${booking.spotContract?.contractId ?? ""} @ ₹${booking.spotContract?.rate?.toLocaleString("en-IN") ?? ""})`
+                        : `Indent sent to ${created.length} vendor(s)`,
                     },
                   ],
                   updatedAt: now,
@@ -5995,6 +6069,117 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       createTenantInvoice: (input) => {
         setTenantInvoices((current) => [input, ...current]);
         return input;
+      },
+      // ---- Vendor (AP) invoice lifecycle ----------------------------------
+      listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),
+      vendorSubmitInvoice: (input) => {
+        setTenantVendorInvoices((current) => [input, ...current]);
+        return input;
+      },
+      financeApproveVendorInvoice: (invoiceId) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) =>
+            inv.id === invoiceId && (inv.status === "PENDING" || inv.status === "DISPUTED")
+              ? { ...inv, status: "APPROVED", dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
+              : inv,
+          ),
+        ),
+      financeDisputeVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "PENDING") return inv;
+            const now = new Date().toISOString();
+            return {
+              ...inv,
+              status: "DISPUTED",
+              dispute: {
+                reason,
+                status: "OPEN",
+                raisedAt: now,
+                responseDueAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                messages: [{ id: `dmsg-${invoiceId}-1`, sender: "FINANCE", message: reason, createdAt: now }],
+              },
+            };
+          }),
+        ),
+      financeRequestVendorResubmission: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "DISPUTED") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "RESUBMISSION_REQUIRED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: message?.trim() || "Resubmission required. Please create a corrected invoice.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      financeRejectVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || (inv.status !== "PENDING" && inv.status !== "DISPUTED")) return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "CLOSED",
+              closeReason: "REJECTED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: reason?.trim() || "Invoice rejected by finance.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      vendorRespondToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "VENDOR", message, createdAt: now }] } };
+          }),
+        ),
+      financeReplyToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message, createdAt: now }] } };
+          }),
+        ),
+      vendorCreateInvoiceResubmission: (oldInvoiceId, lineItems, invoiceNumber) => {
+        const old = tenantVendorInvoices.find((inv) => inv.id === oldInvoiceId);
+        if (!old) return null;
+        const now = new Date().toISOString();
+        const subtotal = lineItems.reduce((s, li) => s + (li.lineTotal || li.freightCharge || 0), 0);
+        const gstAmount = Math.round((old.grandTotal && old.subtotal ? old.gstAmount / old.subtotal : 0.12) * subtotal);
+        const newNumber = invoiceNumber ?? `${old.invoiceNumber}-R`;
+        const newInvoice: TenantVendorInvoiceRecord = {
+          ...old,
+          id: newNumber,
+          invoiceNumber: newNumber,
+          invoiceDate: now.slice(0, 10),
+          createdAt: now,
+          lineItems,
+          subtotal,
+          gstAmount,
+          grandTotal: subtotal + gstAmount,
+          status: "PENDING",
+          closeReason: undefined,
+          supersedesInvoiceId: old.id,
+          supersededByInvoiceId: undefined,
+          pdfUrl: `/invoices/${newNumber}.pdf`,
+          dispute: undefined,
+        };
+        setTenantVendorInvoices((current) => [
+          newInvoice,
+          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, supersededByInvoiceId: newNumber } : inv)),
+        ]);
+        return newInvoice;
       },
       listTenantLrPools: (tenantId) => tenantLrPools.filter((item) => item.tenantId === tenantId),
       listTenantLrs: (tenantId) => tenantLrs.filter((item) => item.tenantId === tenantId),
@@ -7098,6 +7283,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       tenantBookings,
       tenantCustomers,
       tenantDrivers,
+      tenantVendorInvoices,
       tenantLRConfigs,
       tenantLrs,
       tenantLrPools,

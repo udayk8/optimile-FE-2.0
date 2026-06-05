@@ -5,6 +5,7 @@ import { Button } from '@shared-ui/button'
 import { Input } from '@shared-ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
 import { useAppStore } from '@vendor/stores/app.store'
+import { formatDateTime } from '@vendor/lib/date-utils'
 import type { CustomerLedgerEntryType, PaymentKind } from '@vendor/types'
 
 const PAGE_SIZE = 8
@@ -123,6 +124,7 @@ export default function PaymentsPage() {
                 <th className="px-5 py-3 font-semibold">Invoice</th>
                 <th className="px-5 py-3 font-semibold">Party</th>
                 <th className="px-5 py-3 font-semibold">Date</th>
+                <th className="px-5 py-3 font-semibold">Recorded At</th>
                 <th className="px-5 py-3 font-semibold">Transaction Type</th>
                 <th className="px-5 py-3 font-semibold text-right">Amount</th>
               </tr>
@@ -134,6 +136,7 @@ export default function PaymentsPage() {
                   <td className="px-5 py-4 font-mono text-sm text-gray-700">{payment.invoiceId}</td>
                   <td className="px-5 py-4 text-sm text-gray-700">{payment.paymentKind === 'NBFC_REPAYMENT' || payment.paymentKind === 'NBFC_CHARGE' || payment.paymentKind === 'NBFC_DISBURSEMENT' ? 'NBFC' : 'Customer'}</td>
                   <td className="px-5 py-4 text-sm text-gray-600">{payment.paymentDate}</td>
+                  <td className="px-5 py-4 text-sm text-gray-600">{formatDateTime(payment.recordedAt ?? payment.createdAt)}</td>
                   <td className="px-5 py-4 text-sm text-gray-700">{KIND_LABEL[payment.paymentKind]}</td>
                   <td className="px-5 py-4 text-right text-sm font-semibold text-text">₹{(payment.cashAmount + payment.tdsAmount).toLocaleString('en-IN')}</td>
                 </tr>

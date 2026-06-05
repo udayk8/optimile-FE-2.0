@@ -7,6 +7,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   ACTIVE: { variant: 'success', label: 'Active' },
   AWARDED: { variant: 'success', label: 'Awarded' },
   LIVE: { variant: 'info', label: 'Live' },
+  UPCOMING: { variant: 'warning', label: 'Upcoming' },
   COMPLETED: { variant: 'info', label: 'Pending Award' },
   DRAFT: { variant: 'muted', label: 'Draft' },
   NO_BIDS: { variant: 'warning', label: 'No Bids' },
@@ -14,6 +15,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   CANCELLED: { variant: 'destructive', label: 'Cancelled' },
   TERMINATED: { variant: 'destructive', label: 'Terminated' },
   EXPIRED: { variant: 'destructive', label: 'Expired' },
+  USED: { variant: 'muted', label: 'Used' },
 }
 
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {

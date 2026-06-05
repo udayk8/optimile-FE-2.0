@@ -50,6 +50,57 @@ function notify() {
   window.dispatchEvent(new CustomEvent('optimile-auction-store'))
 }
 
+/**
+ * LIVE auctions whose bidding timer has fully run out flip straight to
+ * COMPLETED (shown as "Pending Award") — no manual "Complete" click needed.
+ * Runs on every store read so every surface (auction-web, the tenant-admin
+ * embed, and the vendor portal bridge) converges on the same status.
+ *
+ * The write-back deliberately skips notify(): loadStore() runs during React
+ * renders, and dispatching the store event synchronously there could trigger
+ * setState-in-render warnings. The flip is persisted, so the next read (or
+ * the next user-driven store event) picks it up everywhere.
+ */
+function sweepExpiredAuctions(snapshot: AuctionStoreSnapshot): AuctionStoreSnapshot {
+  const now = Date.now()
+  let changed = false
+  const auctions = snapshot.auctions.map((auction) => {
+    if (auction.status !== 'LIVE') return auction
+    if (auction.startAt && new Date(auction.startAt).getTime() > now) return auction
+    const laneEnds = auction.lanes
+      .map((lane) => new Date(lane.timerEndsAt).getTime())
+      .filter((time) => !Number.isNaN(time))
+    if (!laneEnds.length) return auction
+    const lastEnd = Math.max(...laneEnds)
+    if (lastEnd > now) return auction
+    changed = true
+    const closedAt = new Date(lastEnd).toISOString()
+    // Zero bids across all lanes → NO_BIDS, not a fake pending award.
+    const hasBids = auction.lanes.some((lane) => lane.ranking.length > 0)
+    return {
+      ...auction,
+      status: (hasBids ? 'COMPLETED' : 'NO_BIDS') as 'COMPLETED' | 'NO_BIDS',
+      completedAt: auction.completedAt ?? closedAt,
+      auditTrail: [
+        ...auction.auditTrail,
+        {
+          id: `e-auto-${lastEnd}`,
+          type: 'COMPLETED' as const,
+          message: hasBids
+            ? 'Bidding window closed automatically (timer ended).'
+            : 'Bidding window closed automatically (timer ended) — no bids received.',
+          actor: 'system',
+          timestamp: closedAt,
+        },
+      ],
+    }
+  })
+  if (!changed) return snapshot
+  const swept = { ...snapshot, auctions }
+  window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(swept))
+  return swept
+}
+
 export function loadStore(): AuctionStoreSnapshot {
   if (typeof window === 'undefined') {
     return { auctions: [...MOCK_AUCTIONS], contracts: [...MOCK_CONTRACTS] }
@@ -61,14 +112,26 @@ export function loadStore(): AuctionStoreSnapshot {
       contracts: [...MOCK_CONTRACTS],
     }
     window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(seeded))
-    return seeded
+    return sweepExpiredAuctions(seeded)
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AuctionStoreSnapshot>
-    return {
+    const snapshot: AuctionStoreSnapshot = {
       auctions: parsed.auctions ?? [],
       contracts: parsed.contracts ?? [],
     }
+    // Merge-missing seed auctions/contracts (by id) so demo data added to
+    // the seed reaches browsers whose store was created before the seed grew.
+    const existingAuctionIds = new Set(snapshot.auctions.map((a) => a.id))
+    const missingAuctions = MOCK_AUCTIONS.filter((a) => !existingAuctionIds.has(a.id))
+    const existingContractIds = new Set(snapshot.contracts.map((c) => c.id))
+    const missingContracts = MOCK_CONTRACTS.filter((c) => !existingContractIds.has(c.id))
+    if (missingAuctions.length > 0 || missingContracts.length > 0) {
+      snapshot.auctions = [...snapshot.auctions, ...missingAuctions]
+      snapshot.contracts = [...snapshot.contracts, ...missingContracts]
+      window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+    }
+    return sweepExpiredAuctions(snapshot)
   } catch {
     return { auctions: [], contracts: [] }
   }
@@ -104,6 +167,15 @@ export function updateAuction(id: string, updater: (auction: Auction) => Auction
   saveStore({
     ...store,
     auctions: store.auctions.map((a) => (a.id === id ? updater(a) : a)),
+  })
+}
+
+/** Replace one contract in place (matched by id). */
+export function updateContract(id: string, updater: (contract: Contract) => Contract) {
+  const store = loadStore()
+  saveStore({
+    ...store,
+    contracts: store.contracts.map((c) => (c.id === id ? updater(c) : c)),
   })
 }
 

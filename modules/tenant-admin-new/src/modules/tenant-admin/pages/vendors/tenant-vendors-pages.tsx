@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { FileText, PencilLine, Plus } from "lucide-react";
 import { z } from "zod";
@@ -16,7 +16,9 @@ import {
   VendorContractCsvUpload,
   VendorContractFormDialog,
   VendorContractsTable,
+  VendorSpotContractsTable,
   useVendorContracts,
+  useVendorSpotContracts,
 } from "@/modules/tenant-admin/components/vendor-contracts";
 import { createVendorContracts, type VendorContractCsvRow } from "@shared-utils";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
@@ -425,9 +427,21 @@ export function TenantVendorDetailPage() {
         vendor={{ id: tenantVendor.id, name: tenantVendor.name, tenantId: tenant.id }}
         onUploaded={(count) => setMessage(`${count} vendor contract${count === 1 ? "" : "s"} imported.`)}
       />
+
+      <VendorSpotContractsSection vendor={{ id: tenantVendor.id, name: tenantVendor.name }} />
     </div>
   );
 }
+
+// Spot auction contracts — one-time lane contracts won by this vendor in
+// SPOT auctions. Rendered with the same columns as the vendor contracts
+// table, plus the spot auction reference. View only; no manual marking —
+// status flips to Used automatically when a spot booking consumes it.
+function VendorSpotContractsSection({ vendor }: { vendor: { id: string; name: string } }) {
+  const spotContracts = useVendorSpotContracts(vendor);
+  return <VendorSpotContractsTable contracts={spotContracts} />;
+}
+
 
 function TenantVendorContractsSection({
   vendor,

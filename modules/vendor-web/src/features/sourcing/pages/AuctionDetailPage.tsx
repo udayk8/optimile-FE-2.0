@@ -9,21 +9,26 @@ import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { useAppStore } from '@vendor/stores/app.store'
-import { useSourcingBridge } from '@vendor/integration/auctionBridge'
+import { useSourcingBridge, withEffectiveState } from '@vendor/integration/auctionBridge'
 import { formatLaneDisplay, getRateTypeLabel } from '@shared-utils'
 import { ArrowLeft, Gavel, MapPin, Clock, Truck } from 'lucide-react'
 
 export default function AuctionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  // Cross-module: read the auction from the shared auction-web store and write
-  // bids back into it; fall back to the local demo store when not present.
-  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid, hasShared } = useSourcingBridge()
+  // Cross-module: shared-store auctions (auction-web) take precedence; the
+  // permanent local mock samples stay reachable alongside them. Bids on a
+  // shared auction write back through the bridge; bids on a local mock
+  // auction stay in the local demo store.
+  const { auctions: bridgeAuctions, placeBid: bridgePlaceBid } = useSourcingBridge()
   const { auctions: storeAuctions, submitBid } = useAppStore()
-  const auctions = hasShared ? bridgeAuctions : storeAuctions
-  const submitBidFn = hasShared ? bridgePlaceBid : submitBid
+  const bridgeAuction = bridgeAuctions.find(a => a.id === id)
+  const submitBidFn = bridgeAuction ? bridgePlaceBid : submitBid
 
-  const auction = auctions.find(a => a.id === id)
+  const found = bridgeAuction ?? storeAuctions.find(a => a.id === id)
+  // Ended-by-timer live auctions render as ended (no bidding), even when the
+  // local demo store still has them marked LIVE.
+  const auction = found ? withEffectiveState(found) : undefined
 
   // Local state for bidding
   const [bids, setBids] = useState<Record<string, number>>({})
@@ -47,7 +52,14 @@ export default function AuctionDetailPage() {
     const errors: Record<string, string> = {}
     auction.lanes.forEach(lane => {
       const amount = bids[lane.id] || 0
-      if (amount > 0 && lane.currentBestBid) {
+      if (amount <= 0) return
+      // First bid is capped by the lane ceiling (base price); later bids must
+      // beat the current best by at least the decrement.
+      if (lane.basePrice && amount > lane.basePrice) {
+        errors[lane.id] = `Above ceiling ₹${lane.basePrice.toLocaleString()}`
+        return
+      }
+      if (lane.currentBestBid) {
         const requiredMax = lane.currentBestBid - (lane.minBidDecrement || 0)
         if (amount > requiredMax) {
           errors[lane.id] = `Must be ≤ ₹${requiredMax.toLocaleString()}`
@@ -219,6 +231,19 @@ export default function AuctionDetailPage() {
                           </div>
                           {lane.minBidDecrement && (
                             <div className="text-xs text-gray-500">Dec: ₹{lane.minBidDecrement}</div>
+                          )}
+                          {/* Anonymized live leaderboard — top three amounts. */}
+                          {lane.topBids && lane.topBids.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {lane.topBids.map((amount, index) => (
+                                <span
+                                  key={index}
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${index === 0 ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  L{index + 1} ₹{amount.toLocaleString('en-IN')}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ) : (

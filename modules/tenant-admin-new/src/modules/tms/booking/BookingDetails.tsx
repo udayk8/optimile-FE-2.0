@@ -17,11 +17,12 @@ import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
+import { BookingPageHeader, BookingSummaryStrip } from "./components/BookingPageHeader";
 import { BookingRemarksTimeline, BookingStatusTimeline } from "@/modules/tms/booking/components/BookingTimeline";
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
 import { useTenantBookings } from "./hooks/useTenantBookings";
 import { useMockStore } from "@/shared/store/mock-store";
-import { areAllDeliveryPodsCaptured, areAllDeliveriesPhysicallyCompleted, calculateMarginAmount, calculateMarginPercent, canCancelBooking, getBookingEditability, getPrimaryBookingStatus, isBookingDelayCandidate, normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
+import { areAllDeliveryPodsCaptured, areAllDeliveriesPhysicallyCompleted, calculateMarginAmount, calculateMarginPercent, canCancelBooking, getBookingEditability, getDeliveryPodCount, getPrimaryBookingStatus, isDeliveryPodUploaded, isBookingDelayCandidate, normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
 import {
   buildAddressLookup,
   buildCustomerLookup,
@@ -1709,12 +1710,19 @@ export function BookingDetailsPage() {
       return;
     }
     const capturedAt = new Date().toISOString();
+    const prevPod = (bookingRecord.deliveries ?? []).find((delivery) => delivery.id === deliveryId)?.pod;
+    const newFile = (form.podDocument ?? "").trim();
+    // Append to the existing POD file list (multiple-POD support); migrate
+    // legacy single-file PODs into the list on first re-save. No overwrite.
+    const priorFiles = prevPod?.podFiles ?? (prevPod?.podDocument ? [prevPod.podDocument] : []);
+    const podFiles = Array.from(new Set([...priorFiles, newFile])).filter(Boolean);
     const nextDeliveries = (bookingRecord.deliveries ?? []).map((delivery) =>
       delivery.id === deliveryId
         ? {
             ...delivery,
             pod: {
-              podDocument: (form.podDocument ?? "").trim(),
+              podDocument: newFile,
+              podFiles,
               podUploaded: true,
               podUploadedAt: capturedAt,
               photoName: (form.photoName ?? "").trim(),
@@ -1730,6 +1738,8 @@ export function BookingDetailsPage() {
       deliveries: nextDeliveries,
       pod: nextDeliveries.find((delivery) => delivery.id === deliveryId)?.pod ?? bookingRecord.pod ?? null,
     });
+    // Clear only the file field so "Add More POD" starts fresh (keep consignee/remark).
+    setPodForms((current) => ({ ...current, [deliveryId]: { ...current[deliveryId], podDocument: "", photoName: "" } }));
   }
 
   function markBookingCompleted() {
@@ -1829,27 +1839,51 @@ export function BookingDetailsPage() {
     resetRemarkDialog();
   }
 
+  // Shared POD upload form (used by the prominent POD card and the Documents tab).
+  const renderPodForm = (deliveryId: string) => {
+    const pod = podForms[deliveryId] ?? null;
+    const podLocked = bookingRecord.status === "COMPLETED";
+    return (
+      <div className="mt-2 rounded-lg border border-gray-200 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className={`inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium ${podLocked ? "pointer-events-none opacity-60" : ""}`}>
+            <input type="file" className="hidden" disabled={podLocked} onChange={(event) => { const file = event.target.files?.[0] ?? null; if (!file) { return; } setPodForms((current) => ({ ...current, [deliveryId]: { ...current[deliveryId], podDocument: file.name, photoName: file.name, podUploaded: false } })); event.target.value = ""; }} />
+            {pod?.podDocument ? "Replace selected file" : "Choose POD file"}
+          </label>
+          <span className="text-xs text-gray-500">{pod?.podDocument || "No file selected"}</span>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Input value={pod?.consigneeName ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [deliveryId]: { ...current[deliveryId], consigneeName: event.target.value } }))} placeholder="Consignee name" />
+          <Input value={pod?.podRemark ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [deliveryId]: { ...current[deliveryId], podRemark: event.target.value } }))} placeholder="POD remark" />
+        </div>
+        <div className="mt-2">
+          <Button size="sm" disabled={podLocked} onClick={() => { saveDeliveryPod(deliveryId); setPodEditId(null); }}>Save POD</Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-3">
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-            <div className="flex items-center gap-3">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Booking</p>
-                <p className="text-lg font-bold text-gray-900">{bookingRecord.bookingId}</p>
-              </div>
-              <BookingStatusBadge status={bookingRecord.status} />
-            </div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Customer</p><p className="text-sm font-semibold text-gray-900">{customer?.name ?? "-"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Vehicle</p><p className="text-sm font-semibold text-gray-900">{assignedVehicle?.registrationNumber ?? "Not assigned"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Driver</p><p className="text-sm font-semibold text-gray-900">{assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Vendor</p><p className="text-sm font-semibold text-gray-900">{assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Freight</p><p className="text-sm font-semibold text-gray-900">Rs {customerFreight.toLocaleString()}</p></div>
-                            <div className="flex flex-wrap gap-1.5">
-                  <Button asChild size="sm" variant="outline">
-                    <Link to={`/tenant/${tenant.id}/bookings`}>Back</Link>
-                  </Button>
+    <div className="space-y-2.5">
+      <BookingPageHeader
+        backTo={`/tenant/${tenant.id}/bookings`}
+        backLabel="Bookings"
+        title={bookingRecord.bookingId}
+        subtitle={`${customer?.name ?? "-"} · ${sourceAddress?.city ?? "-"} → ${destinationAddress?.city ?? "-"}`}
+        summary={
+          <BookingSummaryStrip
+            items={[
+              { label: "Status", value: bookingRecord.status === "POD_PENDING" && allDeliveryPodsCaptured ? <Badge variant="success">POD UPLOADED</Badge> : <BookingStatusBadge status={bookingRecord.status} /> },
+              { label: "Customer", value: customer?.name ?? "-" },
+              { label: "Vehicle", value: assignedVehicle?.registrationNumber ?? "Not assigned" },
+              { label: "Driver", value: assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned" },
+              { label: "Vendor", value: assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet" },
+              { label: "Freight", value: `Rs ${customerFreight.toLocaleString()}` },
+            ]}
+          />
+        }
+        actions={
+          <div className="flex flex-wrap gap-1.5">
                     {getBookingEditability(bookingRecord.status) ? (
                       <Button asChild size="sm" variant="outline">
                         <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}/edit`}>Edit</Link>
@@ -1876,7 +1910,6 @@ export function BookingDetailsPage() {
                         Cancel Booking
                       </Button>
                     ) : null}
-                  {bookingRecord.status === "PENDING_ASSIGNMENT" && access.can("BOOKING_DETAIL", "ASSIGN_VEHICLE") ? <Button size="sm" onClick={() => setAssignmentOpen(true)}>Assign Vehicle</Button> : null}
                   {bookingRecord.status === "PENDING_ASSIGNMENT" ? (() => {
                     const myIndents = listBookingVendorIndents(tenant.id).filter((indent) => indent.bookingId === bookingRecord.id);
                     const pendingCount = myIndents.filter((indent) => indent.status === "PENDING").length;
@@ -1922,19 +1955,75 @@ export function BookingDetailsPage() {
                   ) : null}
                   {bookingRecord.status === "POD_PENDING" && allDeliveryPodsCaptured && access.can("BOOKING_DETAIL", "MARK_COMPLETED") ? <Button size="sm" onClick={markBookingCompleted}>Complete Booking</Button> : null}
                   {["DELAYED", "EXCEPTION"].includes(bookingRecord.status) ? <Button size="sm" variant="outline" onClick={resumeTransit}>Move to Transit</Button> : null}
-                </div>
           </div>
-                          {bookingRecord.status === "CANCELLED" && latestCancellationReason ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-                    Cancellation reason: {latestCancellationReason}
-                  </div>
-                ) : null}
-        </CardContent>
-      </Card>
+        }
+      />
+      {bookingRecord.status === "CANCELLED" && latestCancellationReason ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+          Cancellation reason: {latestCancellationReason}
+        </div>
+      ) : null}
 
+      {/* Prominent POD & completion card — above the fold, not hidden in tabs. */}
+      {bookingRecord.status === "POD_PENDING" && access.can("BOOKING_DETAIL", "UPLOAD_POD") ? (
+        <section className="overflow-hidden rounded-xl border border-slate-300 border-l-[3px] border-l-primary/70 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-primary/[0.09] to-transparent px-4 py-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">P</span>
+              <span className="text-[15px] font-semibold text-slate-900">Proof of Delivery</span>
+              <span className="text-[11px] text-slate-500">
+                {(bookingRecord.deliveries ?? []).filter((d) => isDeliveryPodUploaded(d)).length}/{bookingRecord.deliveries?.length ?? 0} uploaded
+              </span>
+            </div>
+            <Button size="sm" onClick={markBookingCompleted} disabled={!allDeliveryPodsCaptured}>
+              Move Booking To Completed
+            </Button>
+          </div>
+          <div className="space-y-2 px-4 py-3">
+            {allDeliveryPodsCaptured ? (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50/70 px-3 py-1.5 text-[12px] font-medium text-emerald-800">
+                ✓ All deliveries POD uploaded — ready to complete.
+              </div>
+            ) : null}
+            {(bookingRecord.deliveries ?? []).map((delivery) => {
+              const podCount = getDeliveryPodCount(delivery);
+              const uploaded = isDeliveryPodUploaded(delivery);
+              const podOpen = podEditId === delivery.id;
+              const podFileList = delivery.pod?.podFiles ?? (delivery.pod?.podDocument ? [delivery.pod.podDocument] : []);
+              return (
+                <div key={`pod-card-${delivery.id}`} className="rounded-lg border border-slate-200 px-3 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-[13px]">
+                      <span className="font-semibold text-slate-900">Delivery {delivery.deliveryNo}</span>
+                      <span className={`ml-2 text-[12px] font-medium ${uploaded ? "text-emerald-600" : "text-amber-600"}`}>
+                        {uploaded ? `✓ POD Uploaded${podCount > 1 ? ` (${podCount} files)` : ""}` : "⚠ POD Pending"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant={podOpen ? "default" : uploaded ? "outline" : "default"} onClick={() => setPodEditId(podOpen ? null : delivery.id)}>
+                        {uploaded ? "Add More POD" : "Upload POD"}
+                      </Button>
+                    </div>
+                  </div>
+                  {uploaded && podFileList.length ? (
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-slate-600">
+                      {podFileList.map((file, fileIndex) => (
+                        <li key={`${delivery.id}-pod-${fileIndex}`} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5">{file}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {podOpen ? renderPodForm(delivery.id) : null}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {bookingRecord.status !== "PENDING_ASSIGNMENT" ? (
       <Card>
-        <CardContent className="p-4">
-          <div className="space-y-3">
+        <CardContent className="p-3">
+          <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Tabs tabs={["Overview", "Deliveries", "Documents", "Timeline", "Expenses"]} active={activeTab} onChange={setActiveTab} />
                           {activeTab === "Deliveries" && actionableReassignmentRemarks.length ? (
@@ -2231,30 +2320,20 @@ export function BookingDetailsPage() {
                       key={`selector-${delivery.id}`}
                       type="button"
                       onClick={() => setActiveDeliveryWorkspaceId(delivery.id)}
-                      className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      className={`rounded-lg border px-3 py-2 text-left transition ${
                         isActive
                           ? "border-primary bg-primary/5"
                           : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">Delivery {delivery.deliveryNo}</p>
-                          <p className="mt-0.5 text-xs text-gray-500">{formatStatusLabel(delivery.status)}</p>
-                          <p className="mt-1 text-[11px] text-gray-500">
-                            {delivery.trackingId || "Tracking pending"}{visibleDeliveryLrNumber ? ` | LR ${visibleDeliveryLrNumber}` : ""}
-                          </p>
-                        </div>
-                        <Badge variant={delivery.pod?.podUploaded ? "success" : "warning"}>
-                          {delivery.pod?.podUploaded ? "POD" : "Open"}
-                        </Badge>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[13px] font-semibold text-gray-900">Delivery {delivery.deliveryNo}</span>
+                        <Badge variant={isDeliveryPodUploaded(delivery) ? "success" : "warning"}>{isDeliveryPodUploaded(delivery) ? `POD${getDeliveryPodCount(delivery) > 1 ? ` ${getDeliveryPodCount(delivery)}` : ""}` : "Open"}</Badge>
                       </div>
-                      <div className="mt-1.5 text-gray-600">
-                        <p className="line-clamp-1 text-sm font-medium">{deliveryDestinationConsignee}</p>
-                        <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
-                          {deliveryDestinationFullAddress}
-                        </p>
-                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                        {formatStatusLabel(delivery.status)} · {delivery.trackingId || "Tracking pending"}{visibleDeliveryLrNumber ? ` · LR ${visibleDeliveryLrNumber}` : ""}
+                      </p>
+                      <p className="mt-0.5 truncate text-[12px] font-medium text-gray-700">{deliveryDestinationConsignee}</p>
                     </button>
                   );
                 })}
@@ -2317,16 +2396,17 @@ export function BookingDetailsPage() {
                 const visibleDeliveryLrNumber = getVisibleDeliveryLrNumber(delivery);
 
                 return (
-                  <div key={delivery.id} className="max-h-[68vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <p className="text-base font-semibold tracking-[-0.02em] text-slate-950">Delivery {delivery.deliveryNo}</p>
-                        <p className="mt-1 text-xs text-slate-500">Tracking: {delivery.trackingId || "Pending"}{visibleDeliveryLrNumber ? ` | LR: ${visibleDeliveryLrNumber}` : ""}</p>
+                  <div key={delivery.id} className="max-h-[70vh] overflow-y-auto rounded-xl border border-gray-200 bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-base font-semibold tracking-[-0.02em] text-slate-950">Delivery {delivery.deliveryNo}</p>
+                          <span className="text-slate-300">•</span>
+                          <BookingStatusBadge status={delivery.status} />
+                        </div>
+                        <p className="mt-0.5 text-xs text-slate-500">{delivery.trackingId || "Tracking pending"}{visibleDeliveryLrNumber ? ` • LR ${visibleDeliveryLrNumber}` : ""}</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline">{deliveryMaterial?.materialCode ?? "-"}</Badge>
-                        <Badge variant={delivery.pod?.podUploaded ? "success" : "warning"}>{delivery.pod?.podUploaded ? "POD Uploaded" : "POD Pending"}</Badge>
-                        <BookingStatusBadge status={delivery.status} />
                         {visibleDeliveryLrNumber ? (
                           <Button asChild size="sm" variant="outline">
                             <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}/lr`}>View LR</Link>
@@ -2528,7 +2608,7 @@ export function BookingDetailsPage() {
                           ) : null}
                           {access.can("BOOKING_DETAIL", "UPLOAD_POD") && ["POD_PENDING", "COMPLETED"].includes(bookingRecord.status) ? (
                             <Button size="sm" variant={podOpen ? "default" : "outline"} onClick={() => setPodEditId(podOpen ? null : delivery.id)}>
-                              {pod?.podUploaded ? "Edit POD" : "Upload POD"}
+                              {isDeliveryPodUploaded(delivery) ? "Add More POD" : "Upload POD"}
                             </Button>
                           ) : null}
                         </div>
@@ -2537,33 +2617,19 @@ export function BookingDetailsPage() {
                         <DetailRow label="Invoice" value={invoices.map((invoice) => invoice.invoiceNumber).filter(Boolean).join(", ") || "—"} />
                         <DetailRow label="E-Way Bill" value={docs?.ewayBill?.ewayBillNumber ?? "—"} />
                         <DetailRow label="LR" value={lrNumber ?? "—"} />
-                        <DetailRow label="POD" value={pod?.podUploaded ? "Uploaded" : "Pending"} />
+                        <DetailRow label="POD" value={isDeliveryPodUploaded(delivery) ? `Uploaded${getDeliveryPodCount(delivery) > 1 ? ` (${getDeliveryPodCount(delivery)})` : ""}` : "Pending"} />
                       </div>
-                      {invoices.length || docs?.ewayBill?.fileName || pod?.podDocument ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {invoices.map((invoice) => (<Badge key={invoice.id} variant="outline">{invoice.fileName || invoice.invoiceNumber || "Invoice"}</Badge>))}
-                          {docs?.ewayBill?.fileName ? <Badge variant="outline">{docs.ewayBill.fileName}</Badge> : null}
-                          {pod?.podDocument ? <Badge variant="outline">{pod.podDocument}</Badge> : null}
-                        </div>
-                      ) : null}
-                      {podOpen ? (
-                        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <label className={`inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium ${podLocked ? "pointer-events-none opacity-60" : ""}`}>
-                              <input type="file" className="hidden" disabled={podLocked} onChange={(event) => { const file = event.target.files?.[0] ?? null; if (!file) { return; } setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], podDocument: file.name, photoName: file.name, podUploaded: false } })); event.target.value = ""; }} />
-                              {pod?.podDocument ? "Replace POD" : "Choose POD"}
-                            </label>
-                            <span className="text-xs text-gray-500">{pod?.podDocument || "No document uploaded"}</span>
+                      {(() => {
+                        const podFileList = delivery.pod?.podFiles ?? (delivery.pod?.podDocument ? [delivery.pod.podDocument] : []);
+                        return invoices.length || docs?.ewayBill?.fileName || podFileList.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {invoices.map((invoice) => (<Badge key={invoice.id} variant="outline">{invoice.fileName || invoice.invoiceNumber || "Invoice"}</Badge>))}
+                            {docs?.ewayBill?.fileName ? <Badge variant="outline">{docs.ewayBill.fileName}</Badge> : null}
+                            {podFileList.map((file, fileIndex) => <Badge key={`pod-file-${fileIndex}`} variant="outline">{file}</Badge>)}
                           </div>
-                          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                            <Input value={pod?.consigneeName ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], consigneeName: event.target.value } }))} placeholder="Consignee name" />
-                            <Input value={pod?.podRemark ?? ""} disabled={podLocked} onChange={(event) => setPodForms((current) => ({ ...current, [delivery.id]: { ...current[delivery.id], podRemark: event.target.value } }))} placeholder="POD remark" />
-                          </div>
-                          <div className="mt-2">
-                            <Button size="sm" disabled={podLocked} onClick={() => { saveDeliveryPod(delivery.id); setPodEditId(null); }}>Save POD</Button>
-                          </div>
-                        </div>
-                      ) : null}
+                        ) : null;
+                      })()}
+                      {podOpen ? renderPodForm(delivery.id) : null}
                     </div>
                   );
                 })}
@@ -2650,6 +2716,7 @@ export function BookingDetailsPage() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
       <Dialog
         open={expenseModalOpen}
@@ -3401,176 +3468,175 @@ export function BookingDetailsPage() {
         </div>
       </Dialog>
 
-      <Dialog
-        open={assignmentOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            resetAssignmentDialog();
-          }
-        }}
-        title="Assign Booking"
-        description={`${getAssignmentModeLabel(tenant.assignmentMode)} with ${getCommercialModeLabel(tenant.commercialMode)} on this tenant.`}
-        footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={resetAssignmentDialog}>Cancel</Button>
-            <Button
-              onClick={submitAssignment}
-              disabled={
-                !vendorId ||
-                !vehicleId ||
-                !driverId ||
-                Number(vendorFreight) <= 0 ||
-                  (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
-                  !activeLrOrgUnitId
-                }
-            >
-              Assign Vehicle
-            </Button>
+      {bookingRecord.status === "PENDING_ASSIGNMENT" && access.can("BOOKING_DETAIL", "ASSIGN_VEHICLE") ? (
+      <section className="overflow-hidden rounded-xl border border-slate-300 border-l-[3px] border-l-primary/70 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-gradient-to-r from-primary/[0.09] to-transparent px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">A</span>
+            <span className="text-[15px] font-semibold text-slate-900">Assign Vehicle</span>
+            <span className="text-[11px] text-slate-500">{getAssignmentModeLabel(tenant.assignmentMode)} · {getCommercialModeLabel(tenant.commercialMode)}</span>
           </div>
-        }
-      >
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="md:col-span-2 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Booking</p><p className="text-sm font-semibold text-gray-900">{bookingRecord.bookingId}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Customer</p><p className="text-sm font-semibold text-gray-900">{customer?.name ?? "-"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Route</p><p className="text-sm font-semibold text-gray-900">{sourceAddress?.city ?? "-"} → {destinationAddress?.city ?? "-"}</p></div>
-            <div><p className="text-[11px] font-medium uppercase tracking-wide text-gray-400">Freight</p><p className="text-sm font-semibold text-gray-900">Rs {customerFreight.toLocaleString()}</p></div>
-            <div className="ml-auto"><BookingStatusBadge status={bookingRecord.status} /></div>
-          </div>
-          <CompactField label="Vendor">
-            <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
-              <option value="">Select vendor</option>
-              <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
-              {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
-              ))}
-            </Select>
-          </CompactField>
-          <CompactField label="Customer Freight / Selling Rate">
-            <Input value={customerFreight.toLocaleString()} disabled />
-          </CompactField>
-          <CompactField label="Vehicle">
-            <Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setDriverId(""); }} disabled={!vendorId}>
-              <option value="">Select vehicle</option>
-              {availableVehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.ownershipType === "OWN" ? `${vehicle.registrationNumber} (OWN)` : `${vehicle.registrationNumber} (${vendorMap.get(vehicle.vendorId ?? "")?.name ?? "Vendor"})`}
-                </option>
-              ))}
-            </Select>
-          </CompactField>
-          <CompactField label="Driver">
-            <Select value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={!selectedVehicle}>
-              <option value="">Select driver</option>
-              {availableDrivers.map((driver) => (
-                <option key={driver.id} value={driver.id}>{driver.name}</option>
-              ))}
-            </Select>
-          </CompactField>
-          <CompactField label="Vendor Freight / Buying Rate">
-            <Input value={vendorFreight} onChange={(event) => setVendorFreight(event.target.value)} />
-          </CompactField>
-          {access.can("BOOKING_DETAIL", "VIEW_MARGIN") ? (
-            <>
-              <CompactField label="Margin Amount">
-                <Input value={Number.isFinite(marginAmount) ? String(marginAmount) : ""} disabled />
-              </CompactField>
-              <CompactField label="Margin %">
-                <Input value={Number.isFinite(marginPercent) ? String(marginPercent) : ""} disabled />
-              </CompactField>
-            </>
-          ) : null}
-          {vendorRateWarning ? (
-            <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              {vendorRateWarning}
-            </div>
-          ) : null}
-          {!vendorRateWarning && buyingRateLabel ? (
-            <div className="md:col-span-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-              Vendor contract applied automatically: {buyingRateLabel}
-            </div>
-            ) : null}
-            <CompactField label="LR Mode">
-              <Select value={selectedLrMode} onChange={(event) => setSelectedLrMode(event.target.value as "MANUAL" | "PRE_GENERATED" | "AUTO")}>
-                {canUseManualLr ? <option value="MANUAL">Manual LR</option> : null}
-                {canUseManualLr ? <option value="PRE_GENERATED">Pre-generated / Customer LR</option> : null}
-                {canUseAutoLr ? <option value="AUTO">Auto LR</option> : null}
-              </Select>
-            </CompactField>
-          <CompactField label="Active Place">
-            <Select
-              value={activeLrOrgUnitId}
-              onChange={(event) =>
-                setSession({
-                  ...session,
-                  tenantId: tenant.id,
-                  activeTenantOrgUnitId: event.target.value || null,
-                })
+          <Button
+            size="sm"
+            onClick={submitAssignment}
+            disabled={
+              !vendorId ||
+              !vehicleId ||
+              !driverId ||
+              Number(vendorFreight) <= 0 ||
+                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                !activeLrOrgUnitId
               }
-            >
-              <option value="">{availableLrOrgUnits.length > 1 ? "Select active LR place" : activeLrOrgUnit?.name ?? "No place"}</option>
-              {availableLrOrgUnits.map((orgUnit) => (
-                  <option key={orgUnit.id} value={orgUnit.id}>
-                    {orgUnit.name}
-                  </option>
-                ))}
-            </Select>
-          </CompactField>
-            {selectedLrMode !== "AUTO" ? (
-              <>
-                <CompactField label="Manual LR Selection">
-                  <div className="space-y-2">
-                    <Select value={preferredLrNumber} onChange={(event) => setPreferredLrNumber(event.target.value)}>
-                      <option value="">
-                        {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
-                    </option>
-                    {availableManualPools.map((pool) => (
-                      <option key={pool.id} value={pool.lrNumber}>
-                        {pool.lrNumber}{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED" ? " • Reserved" : " • General"}
+          >
+            Assign Vehicle
+          </Button>
+        </div>
+        <div className="px-4 py-3.5">
+        <div className="space-y-3">
+          {/* Two-column: Assignment Details (left) | Commercial & LR (right) */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assignment Details</p>
+              <div className="space-y-2.5">
+                <CompactField label="Vendor">
+                  <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
+                    <option value="">Select vendor</option>
+                    <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
+                    {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                    ))}
+                  </Select>
+                </CompactField>
+                <CompactField label="Vehicle">
+                  <Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setDriverId(""); }} disabled={!vendorId}>
+                    <option value="">Select vehicle</option>
+                    {availableVehicles.map((vehicle) => (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {vehicle.ownershipType === "OWN" ? `${vehicle.registrationNumber} (OWN)` : `${vehicle.registrationNumber} (${vendorMap.get(vehicle.vendorId ?? "")?.name ?? "Vendor"})`}
                       </option>
                     ))}
                   </Select>
-                </div>
                 </CompactField>
-                {requiresActiveLrScope ? (
-                  <div className="md:col-span-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Select active place to view available LR numbers.
+                <CompactField label="Driver">
+                  <Select value={driverId} onChange={(event) => setDriverId(event.target.value)} disabled={!selectedVehicle}>
+                    <option value="">Select driver</option>
+                    {availableDrivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>{driver.name}</option>
+                    ))}
+                  </Select>
+                </CompactField>
+                <CompactField label="Active Place">
+                  <Select
+                    value={activeLrOrgUnitId}
+                    onChange={(event) =>
+                      setSession({
+                        ...session,
+                        tenantId: tenant.id,
+                        activeTenantOrgUnitId: event.target.value || null,
+                      })
+                    }
+                  >
+                    <option value="">{availableLrOrgUnits.length > 1 ? "Select active LR place" : activeLrOrgUnit?.name ?? "No place"}</option>
+                    {availableLrOrgUnits.map((orgUnit) => (
+                      <option key={orgUnit.id} value={orgUnit.id}>
+                        {orgUnit.name}
+                      </option>
+                    ))}
+                  </Select>
+                </CompactField>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Commercial &amp; LR</p>
+              <div className="space-y-2.5">
+                <CompactField label="Customer Freight / Selling Rate">
+                  <Input value={customerFreight.toLocaleString()} disabled />
+                </CompactField>
+                <CompactField label="Vendor Freight / Buying Rate">
+                  <Input value={vendorFreight} onChange={(event) => setVendorFreight(event.target.value)} />
+                </CompactField>
+                {access.can("BOOKING_DETAIL", "VIEW_MARGIN") ? (
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <CompactField label="Margin Amount">
+                      <Input value={Number.isFinite(marginAmount) ? String(marginAmount) : ""} disabled />
+                    </CompactField>
+                    <CompactField label="Margin %">
+                      <Input value={Number.isFinite(marginPercent) ? String(marginPercent) : ""} disabled />
+                    </CompactField>
                   </div>
+                ) : null}
+                {vendorRateWarning ? (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    {vendorRateWarning}
+                  </div>
+                ) : null}
+                {!vendorRateWarning && buyingRateLabel ? (
+                  <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    Vendor contract applied: {buyingRateLabel}
+                  </div>
+                ) : null}
+                <CompactField label="LR Mode">
+                  <Select value={selectedLrMode} onChange={(event) => setSelectedLrMode(event.target.value as "MANUAL" | "PRE_GENERATED" | "AUTO")}>
+                    {canUseManualLr ? <option value="MANUAL">Manual LR</option> : null}
+                    {canUseManualLr ? <option value="PRE_GENERATED">Pre-generated / Customer LR</option> : null}
+                    {canUseAutoLr ? <option value="AUTO">Auto LR</option> : null}
+                  </Select>
+                </CompactField>
+                {selectedLrMode !== "AUTO" ? (
+                  <>
+                    <CompactField label="Manual LR Selection">
+                      <Select value={preferredLrNumber} onChange={(event) => setPreferredLrNumber(event.target.value)}>
+                        <option value="">
+                          {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
+                        </option>
+                        {availableManualPools.map((pool) => (
+                          <option key={pool.id} value={pool.lrNumber}>
+                            {pool.lrNumber}{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED" ? " • Reserved" : " • General"}
+                          </option>
+                        ))}
+                      </Select>
+                    </CompactField>
+                    {requiresActiveLrScope ? (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        ⚠ Select active place to view LR numbers.
+                      </div>
+                    ) : availableManualPools.length > 0 ? (
+                      <p className="px-1 text-[11px] text-gray-500">
+                        Available LR at <span className="font-medium text-gray-700">{activeLrOrgUnit?.name ?? "place"}</span>: <span className="font-medium text-gray-700">{availableManualPools.length}</span>
+                      </p>
+                    ) : null}
+                  </>
                 ) : (
-                  <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600">
-                    Active place: <span className="font-medium text-gray-900">{activeLrOrgUnit?.name ?? "Not selected"}</span> · Available LR: <span className="font-medium text-gray-900">{availableManualPools.length}</span> · {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved" : "General"}
+                  <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                    Auto LR will be generated during assignment for <span className="font-medium">{activeLrOrgUnit?.name ?? "the active place"}</span>.
                   </div>
                 )}
-              </>
-            ) : (
-            <div className="md:col-span-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-              Auto LR will be generated during assignment for <span className="font-medium">{activeLrOrgUnit?.name ?? "the active place"}</span>.
-            </div>
-          )}
-            {selectedLrMode !== "AUTO" && !selectedLrConfig ? (
-              <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Manual LR configuration is missing. Configure LR before assignment.
+                {selectedLrMode !== "AUTO" && !selectedLrConfig ? (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Manual LR configuration is missing. Configure LR before assignment.
+                  </div>
+                ) : null}
+                {selectedLrMode === "AUTO" && !selectedAutoLrConfig ? (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    Auto LR configuration is missing. Configure Auto LR before assignment.
+                  </div>
+                ) : null}
+                {selectedLrMode !== "AUTO" && selectedLrConfig && !requiresActiveLrScope && availableManualPools.length === 0 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <span>⚠ No LR available for selected place.</span>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/tenant/${tenant.id}/lr`}>Open LR Workspace</Link>
+                    </Button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          {selectedLrMode === "AUTO" && !selectedAutoLrConfig ? (
-            <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Auto LR configuration is missing. Configure Auto LR before assignment.
             </div>
-          ) : null}
-            {selectedLrMode !== "AUTO" && selectedLrConfig && !requiresActiveLrScope && availableManualPools.length === 0 ? (
-              <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <span>
-                  {selectedLrMode === "PRE_GENERATED"
-                    ? "No customer-reserved LR available for this place."
-                    : "No LR numbers available for this place."}
-                </span>
-                <Button asChild size="sm" variant="outline">
-                  <Link to={`/tenant/${tenant.id}/lr`}>Open LR Workspace</Link>
-                </Button>
-              </div>
-          ) : null}
+          </div>
         </div>
-      </Dialog>
+        </div>
+      </section>
+      ) : null}
     </div>
   );
 }

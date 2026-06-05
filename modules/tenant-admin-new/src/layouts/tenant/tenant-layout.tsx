@@ -34,6 +34,7 @@ import { useTenantPaths } from "@platform-admin/hooks/useTenantPaths";
 import { hasPermission, usePermissionMatrixVersion, type PermissionAction } from "@/modules/tenant-admin/lib/tenant-permissions";
 import { isTenantAdminRole } from "@/modules/tenant-admin/lib/tenant-modules";
 import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-profile-menu";
+import { HeaderNotificationBell } from "@vendor/components/shared/HeaderNotificationBell";
 import { manifestSidebarToTenantChildren } from "@/embedded-module";
 import { vendorManifest } from "@vendor/app/manifest";
 import { auctionManifest } from "@auction/app/manifest";
@@ -433,14 +434,20 @@ export function TenantLayout() {
       navItems={filteredTenantNav}
       actorLabel={tenant.code || "Tenant"}
       searchPlaceholder="Search tenant setup, users, roles, org units, and activity"
-      headerRight={<TenantProfileMenu />}
+      headerRight={
+        <div className="flex items-center gap-2">
+          {/* Vendor sessions get the vendor notification bell in the top bar. */}
+          {portalModule === "VENDOR" && <HeaderNotificationBell />}
+          <TenantProfileMenu />
+        </div>
+      }
     >
       <motion.main
         key={location.pathname}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className={bookingFocused ? "flex-1 p-4 xl:p-5" : "flex-1 p-5 xl:p-6"}
+        className={bookingFocused ? "flex-1 p-3 xl:p-4" : "flex-1 p-5 xl:p-6"}
       >
         {!routeAccess.allowed && routeAccess.matchedPage ? (
           <TenantEmptyState

@@ -5,7 +5,6 @@ import { ArrowLeft, ArrowRight, CheckCircle2, FilePlus, ReceiptText } from 'luci
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
 import { Card, CardContent } from '@vendor/components/ui/card'
-import { useAppStore } from '@vendor/stores/app.store'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
@@ -14,6 +13,7 @@ import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument
 import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import type { Invoice } from '@vendor/types'
 
 type Step = 'select' | 'review'
@@ -25,7 +25,8 @@ const CUSTOMER_ADDRESS =
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
-  const { trips, generateInvoice } = useAppStore()
+  const { trips } = useVendorBookings()
+  const { generateInvoice } = useVendorInvoices()
   const [step, setStep] = useState<Step>('select')
   const [page, setPage] = useState(1)
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])

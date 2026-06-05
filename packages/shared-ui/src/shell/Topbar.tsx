@@ -14,6 +14,8 @@ interface TopbarProps {
   user: ShellUser | null
   onLogout: () => void
   notificationCount?: number
+  /** When provided, the bell popover gets a "View all" action. */
+  onNotificationsClick?: () => void
 }
 
 function getCrumb(modules: ModuleManifest[], pathname: string): { moduleLabel: string; pageLabel: string } | null {
@@ -28,7 +30,7 @@ function getCrumb(modules: ModuleManifest[], pathname: string): { moduleLabel: s
   return { moduleLabel: mod.label, pageLabel: best?.label ?? mod.label }
 }
 
-export function ShellTopbar({ modules, user, onLogout, notificationCount = 0 }: TopbarProps) {
+export function ShellTopbar({ modules, user, onLogout, notificationCount = 0, onNotificationsClick }: TopbarProps) {
   const [notifOpen, setNotifOpen] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
   const location = useLocation()
@@ -81,6 +83,18 @@ export function ShellTopbar({ modules, user, onLogout, notificationCount = 0 }: 
               <p className="mt-2 text-xs text-gray-500">
                 {notificationCount > 0 ? `${notificationCount} unread` : 'No new alerts.'}
               </p>
+              {onNotificationsClick && (
+                <button
+                  type="button"
+                  className="mt-3 w-full rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-text transition hover:bg-gray-50"
+                  onClick={() => {
+                    setNotifOpen(false)
+                    onNotificationsClick()
+                  }}
+                >
+                  View all notifications
+                </button>
+              )}
             </div>
           )}
         </div>

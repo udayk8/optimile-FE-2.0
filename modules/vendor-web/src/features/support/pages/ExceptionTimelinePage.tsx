@@ -80,7 +80,7 @@ export default function ExceptionTimelinePage() {
         title={exception.id}
         subtitle={`${exception.issueType} · ${exception.route}`}
         icon={<AlertTriangle className="h-6 w-6 text-primary" />}
-        action={<Button variant="outline" onClick={() => navigate('/vendor/support')}>Back</Button>}
+        onBack={() => navigate('/vendor/support')}
       />
 
       {/* Status bar */}

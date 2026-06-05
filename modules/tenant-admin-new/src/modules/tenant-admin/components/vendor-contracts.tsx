@@ -10,7 +10,6 @@ import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
   buildVendorContractCsvTemplate,
-  getContractSourceLabel,
   getLaneCodeError,
   getRateTypeLabel,
   isValidRateType,
@@ -38,6 +37,8 @@ const AUCTION_STORE_KEY = "optimile.auction-store";
 
 interface AuctionStoreContract {
   id: string;
+  sourceAuctionId?: string;
+  contractType?: "BULK" | "LOT" | "SPOT";
   vendorId: string;
   vendorName: string;
   lane: string;
@@ -59,6 +60,9 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
     const contracts = (JSON.parse(raw)?.contracts ?? []) as AuctionStoreContract[];
     const name = vendor.name.toLowerCase();
     return contracts
+      // SPOT one-time contracts render in their own table — keep the main
+      // vendor-contracts list to manual uploads + BULK/LOT auction wins.
+      .filter((contract) => contract.contractType !== "SPOT")
       .filter((contract) => contract.vendorId === vendor.id || contract.vendorName.toLowerCase() === name)
       .map((contract) => ({
         contractId: contract.id,
@@ -71,6 +75,7 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
         startDate: contract.startDate,
         endDate: contract.endDate,
         createdFrom: "AUCTION_WIN" as const,
+        contractKind: contract.contractType,
         status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
         allocationRank: contract.allocationRank,
         volumeAllocationPercent: contract.volumeAllocationPercent,
@@ -104,6 +109,96 @@ export function useVendorContracts(vendor: { id: string; name: string }): Vendor
   );
 }
 
+/** Spot-auction one-time contract rows for the dedicated spot table. */
+export interface VendorSpotContract extends VendorContract {
+  sourceAuctionId: string;
+  consumedByBookingId?: string;
+}
+
+function readSpotContracts(vendor: { id: string; name: string }): VendorSpotContract[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AUCTION_STORE_KEY);
+    if (!raw) return [];
+    const contracts = (JSON.parse(raw)?.contracts ?? []) as (AuctionStoreContract & {
+      consumedByBookingId?: string;
+    })[];
+    const name = vendor.name.toLowerCase();
+    return contracts
+      .filter((contract) => contract.contractType === "SPOT")
+      .filter((contract) => contract.vendorId === vendor.id || contract.vendorName.toLowerCase() === name)
+      .map((contract) => ({
+        contractId: contract.id,
+        sourceAuctionId: contract.sourceAuctionId ?? "",
+        consumedByBookingId: contract.consumedByBookingId,
+        vendorId: contract.vendorId,
+        vendorName: contract.vendorName,
+        laneCode: contract.lane,
+        vehicleType: contract.vehicleType,
+        rate: contract.contractedRate,
+        rateType: contract.rateUnit,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+        createdFrom: "AUCTION_WIN" as const,
+        status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
+        volumeAllocationPercent: contract.volumeAllocationPercent,
+        allocationRank: contract.allocationRank,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Spot contracts for a vendor, refreshed on shared-store changes. */
+export function useVendorSpotContracts(vendor: { id: string; name: string }): VendorSpotContract[] {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setRevision((value) => value + 1);
+    window.addEventListener("optimile-auction-store", bump);
+    window.addEventListener("storage", bump);
+    return () => {
+      window.removeEventListener("optimile-auction-store", bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => readSpotContracts(vendor), [vendor.id, vendor.name, revision]);
+}
+
+/**
+ * Spot-auction contracts table — same columns as the vendor contracts table
+ * plus the spot auction id. A spot contract is just a contract with that
+ * extra reference; no manual lifecycle marking here.
+ */
+export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotContract[] }) {
+  return (
+    <DataTable
+      title="Spot auction contracts"
+      description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
+      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
+      rows={contracts.map((contract) => [
+        <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
+        contract.vehicleType,
+        contract.rate.toLocaleString("en-IN"),
+        <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
+        <span key={`${contract.contractId}-volume`}>{contract.volumeAllocationPercent ?? 100}%</span>,
+        contract.endDate,
+        <span key={`${contract.contractId}-auction`} className="font-mono text-xs">
+          {contract.sourceAuctionId || "—"}
+          {contract.consumedByBookingId ? (
+            <span className="ml-1 text-muted-foreground">· used in {contract.consumedByBookingId}</span>
+          ) : null}
+        </span>,
+        <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
+          {contract.status}
+        </Badge>,
+      ])}
+      emptyMessage="No spot auction contracts yet — award a spot auction to this vendor."
+      pageSize={10}
+    />
+  );
+}
+
 export function downloadVendorContractCsvTemplate() {
   const blob = new Blob([buildVendorContractCsvTemplate()], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -119,7 +214,7 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
     <DataTable
       title="Vendor contracts"
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Source", "Status"]}
+      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
         <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
         contract.vehicleType,
@@ -131,8 +226,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
         </span>,
         contract.startDate,
         contract.endDate,
-        <Badge key={`${contract.contractId}-source`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
-          {getContractSourceLabel(contract.createdFrom)}
+        <Badge key={`${contract.contractId}-type`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
+          {contract.contractKind === "LOT" ? "Lot" : contract.contractKind === "BULK" ? "Bulk" : "Manual"}
         </Badge>,
         <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
           {contract.status}

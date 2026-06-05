@@ -312,17 +312,25 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         <Stepper steps={WORKFLOW_STEPS} current={stepIndex(inv.stage)} />
       </Card>
 
-      {podTrips[0] && (
-        <div className="mb-6">
-          <div className="mb-3 font-semibold text-slate-800">Booking details</div>
-          <BookingDetailCard trip={podTrips[0]} />
-        </div>
-      )}
-
-      {inv.expenseItems && inv.expenseItems.length > 0 && (
-        <div className="mb-6">
-          <ExpenseTable items={inv.expenseItems} title="Booking expenses (approved charges billed on this invoice)" toast={toast} />
-        </div>
+      {podTrips.length > 1 ? (
+        /* Consolidated invoice — show expenses grouped per booking. */
+        (() => {
+          const groups = podTrips.filter((t) => (t.expenseItems ?? []).length > 0);
+          return groups.length > 0 ? (
+            <div className="mb-6 space-y-3">
+              <div className="font-semibold text-slate-800">Booking expenses</div>
+              {groups.map((t) => (
+                <ExpenseTable key={t.id} items={t.expenseItems!} title={`${t.bookingId ?? t.id} · ${t.lane}`} toast={toast} />
+              ))}
+            </div>
+          ) : null;
+        })()
+      ) : (
+        inv.expenseItems && inv.expenseItems.length > 0 && (
+          <div className="mb-6">
+            <ExpenseTable items={inv.expenseItems} title="Booking expenses (approved charges billed on this invoice)" toast={toast} />
+          </div>
+        )
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -379,6 +387,22 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
           </div>
         </Card>
       </div>
+
+      {/* Booking details — collapsible, one per booking (consolidated invoices carry many). */}
+      {podTrips.length > 0 && (
+        <div className="mt-6 space-y-3">
+          <div className="font-semibold text-slate-800">Booking details{podTrips.length > 1 ? ` (${podTrips.length} bookings)` : ""}</div>
+          {podTrips.map((t) => (
+            <details key={t.id} className="group rounded-xl bg-white ring-1 ring-slate-200/80 shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm font-medium text-slate-700">
+                <span className="font-mono text-xs text-slate-500">{t.bookingId ?? t.id}</span>
+                <span className="flex items-center gap-2 text-slate-500">{t.lane}<ChevronDown size={15} className="transition group-open:rotate-180" /></span>
+              </summary>
+              <div className="border-t border-slate-100 p-4"><BookingDetailCard trip={t} bare /></div>
+            </details>
+          ))}
+        </div>
+      )}
 
       {/* Shipment trace — customer-side lineage, mirrors the vendor-bill match view */}
       <Card className="mt-6 p-5">

@@ -2,8 +2,11 @@ import React, { useState } from "react";
 import { AlertTriangle, Check, Clock, Bell, FileText, RefreshCw, MessageSquare, Send } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Stepper, Modal, ModalHeader } from "@finance/components/primitives";
 import { useDisputes } from "@finance/lib/disputesStore";
+import { usePayables } from "@finance/lib/payablesStore";
 import { VENDOR_BILLS, VENDOR_BILL_DETAILS } from "@finance/data/mock";
 import { VendorBillDetail } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
+
+const hoursUntil = (iso?: string) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000) : 24);
 
 const STAGES = ["Raised", "Vendor Response", "Escalated (SLA)", "Resolved"];
 const STAGE_IDX = { raised: 0, "vendor-response": 1, escalated: 2, resolved: 3 };
@@ -15,7 +18,7 @@ function DisputeChatModal({ dispute, onClose, onSend }: any) {
   const [text, setText] = useState("");
   const closed = dispute.stage === "resolved";
   const msgs = [
-    { from: "vendor", text: dispute.vendorResponse, at: dispute.respondedAt, docs: dispute.vendorDocs },
+    ...(dispute.vendorResponse ? [{ from: "vendor", text: dispute.vendorResponse, at: dispute.respondedAt, docs: dispute.vendorDocs }] : []),
     ...(dispute.thread ?? []),
   ];
   const send = () => { if (text.trim()) { onSend(text.trim()); setText(""); } };
@@ -62,13 +65,39 @@ const billFor = (d: any) =>
 
 export default function Disputes({ toast }: any) {
   const { disputes, resolveDispute, escalateDispute, replyToDispute } = useDisputes();
+  const { bills, bridgedAP, vendorApprove, vendorRequestResubmission, vendorReplyToDispute } = usePayables();
   const [tab, setTab] = useState("all");
   const [viewing, setViewing] = useState<any>(null);
   const [chatId, setChatId] = useState<any>(null);
-  const chatDispute = disputes.find((x) => x.id === chatId);
 
-  const resolve = (id: any, how: any) => {
-    resolveDispute(id, how);
+  // Real vendor-invoice disputes (shared collection) projected into the same card
+  // shape as the mock disputesStore, so they list + chat alongside the others.
+  const bridgedDisputes = (bridgedAP ? bills : [])
+    .filter((b: any) => b.stage === "disputed" && b.dispute)
+    .map((b: any) => ({
+      id: b.id,
+      billId: b.id,
+      bridged: true,
+      kind: "subvendor" as const,
+      client: b.vendor,
+      amount: b.billed,
+      reason: b.dispute.reason,
+      stage: b.dispute.messages.some((m: any) => m.sender === "VENDOR") ? "vendor-response" : "raised",
+      slaHrs: hoursUntil(b.dispute.responseDueAt),
+      thread: b.dispute.messages.map((m: any) => ({ from: m.sender === "FINANCE" ? "admin" : "vendor", text: m.message, at: (m.createdAt ?? "").slice(0, 16).replace("T", " ") })),
+      bill: b,
+    }));
+
+  const allDisputes: any[] = [...bridgedDisputes, ...disputes];
+  const chatDispute = allDisputes.find((x) => x.id === chatId);
+
+  const resolve = (d: any, how: any) => {
+    if (d.bridged) {
+      if (how === "approve") vendorApprove?.(d.billId);
+      else vendorRequestResubmission?.(d.billId);
+    } else {
+      resolveDispute(d.id, how);
+    }
     toast(how === "approve" ? "Invoice approved — dispute closed" : "Vendor to resubmit corrected invoice — dispute closed");
   };
 
@@ -77,11 +106,16 @@ export default function Disputes({ toast }: any) {
     toast(`${id} escalated to finance heads (SLA breached)`);
   };
 
-  const items = disputes.filter((d) => tab === "all" || (d.kind || "customer") === tab);
+  const sendChat = (d: any, text: string) => {
+    if (d.bridged) vendorReplyToDispute?.(d.billId, text);
+    else replyToDispute(d.id, text);
+  };
+
+  const items = allDisputes.filter((d) => tab === "all" || (d.kind || "customer") === tab);
 
   if (viewing) {
-    const d = disputes.find((x) => x.id === viewing);
-    if (d) return <VendorBillDetail bill={billFor(d)} disputed onBack={() => setViewing(null)} onAct={() => {}} onDispute={() => {}} backLabel="Back to disputes" toast={toast} />;
+    const d = allDisputes.find((x) => x.id === viewing);
+    if (d) return <VendorBillDetail bill={(d as any).bridged ? (d as any).bill : billFor(d)} disputed onBack={() => setViewing(null)} onAct={() => {}} onDispute={() => {}} backLabel="Back to disputes" toast={toast} />;
   }
 
   return (
@@ -99,14 +133,14 @@ export default function Disputes({ toast }: any) {
           const idx = STAGE_IDX[d.stage as keyof typeof STAGE_IDX];
           const overdue = d.slaHrs < 0;
           const kind = d.kind || "customer";
-          const hasDetail = !!(VENDOR_BILL_DETAILS as Record<string, any>)[d.id];
+          const hasDetail = (d as any).bridged || !!(VENDOR_BILL_DETAILS as Record<string, any>)[d.id];
           return (
             <Card key={d.id} className={`p-5 ${overdue && d.stage !== "resolved" ? "ring-1 ring-red-200" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-mono text-sm font-semibold text-slate-800">{d.id}</span>
-                    <Pill tone={kind === "subvendor" ? "violet" : "blue"}>{KIND_LABEL[kind]}</Pill>
+                    <Pill tone={kind === "subvendor" ? "violet" : "blue"}>{KIND_LABEL[kind as keyof typeof KIND_LABEL]}</Pill>
                     <span className="text-sm text-slate-400">·</span>
                     <span className="text-sm text-slate-600">{d.client}</span>
                     <Money value={d.amount} className="text-sm font-semibold text-slate-800" />
@@ -152,11 +186,14 @@ export default function Disputes({ toast }: any) {
                 )}
                 {d.stage !== "resolved" && (
                   <>
+                    {(d as any).bridged && (
+                      <button onClick={() => setChatId(d.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><MessageSquare size={13} />Chat{d.thread?.length ? ` (${d.thread.length})` : ""}</button>
+                    )}
                     {d.slaHrs < 0 && d.stage !== "escalated" && (
                       <button onClick={() => escalate(d.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={13} />Escalate to finance heads</button>
                     )}
-                    <button onClick={() => resolve(d.id, "approve")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><Check size={13} />Approve invoice &amp; close dispute</button>
-                    <button onClick={() => resolve(d.id, "resubmit")} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><RefreshCw size={13} />Resubmit invoice &amp; close dispute</button>
+                    <button onClick={() => resolve(d, "approve")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><Check size={13} />Approve invoice &amp; close dispute</button>
+                    <button onClick={() => resolve(d, "resubmit")} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><RefreshCw size={13} />Resubmit invoice &amp; close dispute</button>
                   </>
                 )}
               </div>
@@ -166,7 +203,7 @@ export default function Disputes({ toast }: any) {
         {items.length === 0 && <Card className="p-12 text-center text-slate-400">No disputes in this view.</Card>}
       </div>
 
-      {chatDispute && <DisputeChatModal dispute={chatDispute} onClose={() => setChatId(null)} onSend={(text: string) => replyToDispute(chatDispute.id, text)} />}
+      {chatDispute && <DisputeChatModal dispute={chatDispute} onClose={() => setChatId(null)} onSend={(text: string) => sendChat(chatDispute, text)} />}
     </div>
   );
 }

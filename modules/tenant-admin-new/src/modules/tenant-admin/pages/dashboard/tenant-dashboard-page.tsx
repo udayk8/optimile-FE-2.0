@@ -263,6 +263,7 @@ export function TenantDashboardPage() {
     ...(can("BOOKING_ASSIGNMENT") ? [{ label: "Booking Assignment", icon: Truck, to: paths.assignment }] : []),
     ...(can("SHIPMENT_DOCUMENTS") ? [{ label: "Shipment Documents", icon: ScrollText, to: paths.completed }] : []),
     ...(can("POD") ? [{ label: "POD", icon: ShieldCheck, to: paths.liveTracking }] : []),
+    ...(can("BOOKING_REPORTS") ? [{ label: "Dashboard", icon: ScrollText, to: `${paths.root}/booking-reports` }] : []),
     ...(canViewPage("FLEET_DASHBOARD") ? [{ label: "Fleet Dashboard", icon: Truck, to: "/fleet/dashboard" }] : []),
     ...(canViewPage("AUCTION_DASHBOARD") ? [{ label: "Auction Dashboard", icon: Layers, to: "/auction/dashboard" }] : []),
     ...(canViewPage("VENDOR_DASHBOARD") ? [{ label: "Vendor App", icon: Users, to: "/vendor" }] : []),

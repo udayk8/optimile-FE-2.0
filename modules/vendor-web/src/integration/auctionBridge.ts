@@ -8,7 +8,9 @@ import type {
   Contract,
   ContractStatus,
   Location,
+  Notification,
 } from '@vendor/types'
+import { useAppStore } from '@vendor/stores/app.store'
 
 /**
  * Cross-module integration with auction-web.
@@ -51,6 +53,7 @@ interface SourceLane {
   estimatedTrips?: number
   eligibleVendorIds: string[]
   timerEndsAt: string
+  extensionCount?: number
   bidCount: number
   ranking: SourceLaneBid[]
   awardDecision?: { vendorId: string; vendorName: string; allocationRank: string; awardedAmount: number }[]
@@ -67,6 +70,9 @@ interface SourceAuction {
   completedAt?: string
   minBidDecrement: number
   biddingWindowMinutes: number
+  extensionTriggerMinutes?: number
+  extensionDurationMinutes?: number
+  maxExtensions?: number
   region?: string
   invitedVendorIds: string[]
   awardDeadline: string
@@ -75,6 +81,7 @@ interface SourceAuction {
 interface SourceContract {
   id: string
   sourceAuctionId: string
+  contractType?: 'BULK' | 'LOT' | 'SPOT'
   vendorId: string
   vendorName: string
   lane: string
@@ -83,13 +90,27 @@ interface SourceContract {
   contractedRate: number
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
+  awardedAt?: string
+  oneTime?: boolean
+  consumedByBookingId?: string
   startDate: string
   endDate: string
-  status: 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED'
+  status: 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED' | 'USED'
 }
 interface SourceStore {
   auctions: SourceAuction[]
   contracts: SourceContract[]
+}
+
+// A live auction whose end time has passed is ended (awaiting award) — show
+// it as Ended with a Details-only action instead of an expired live row.
+// Applied by pages on top of either source (shared bridge or local demo
+// store) so the rule holds even for local-store fallback data.
+export function withEffectiveState(auction: Auction): Auction {
+  if (auction.state === 'LIVE' && auction.endTime && new Date(auction.endTime).getTime() <= Date.now()) {
+    return { ...auction, state: 'PENDING_AWARD' }
+  }
+  return auction
 }
 
 export interface VendorIdentity {
@@ -154,8 +175,17 @@ function toLocation(city: string): Location {
 
 function mapState(source: SourceAuction, won: boolean): AuctionState {
   switch (source.status) {
-    case 'LIVE':
-      return source.startAt && new Date(source.startAt).getTime() > Date.now() ? 'UPCOMING' : 'LIVE'
+    case 'LIVE': {
+      if (source.startAt && new Date(source.startAt).getTime() > Date.now()) return 'UPCOMING'
+      // A live auction whose timers have all run out is ended (awaiting
+      // award) — never show it as still-live/expired or allow further
+      // bidding. Mirrors auction-web's auto-complete sweep (last lane timer).
+      // There is no award-deadline SLA: only the lane bid timers matter.
+      const laneEnds = source.lanes
+        .map((lane) => new Date(lane.timerEndsAt).getTime())
+        .filter((time) => !Number.isNaN(time))
+      return laneEnds.length && Math.max(...laneEnds) <= Date.now() ? 'PENDING_AWARD' : 'LIVE'
+    }
     case 'COMPLETED':
       return 'PENDING_AWARD'
     case 'AWARDED':
@@ -188,14 +218,26 @@ function mapLane(lane: SourceLane, identity: VendorIdentity): AuctionLane {
     currentBestBid: best,
     bidCount: lane.ranking.length,
     myRank: myBid?.rank,
+    // Anonymized live leaderboard — top three bid amounts (L1/L2/L3).
+    topBids: [...lane.ranking]
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 3)
+      .map((b) => b.amount),
   }
 }
 
-function mapAuction(source: SourceAuction, identity: VendorIdentity): Auction {
+function mapAuction(source: SourceAuction, identity: VendorIdentity, contracts: SourceContract[] = []): Auction {
   const myId = identity.vendorId
   const myName = identity.vendorName.toLowerCase()
   const won = source.lanes.some((l) =>
     (l.awardDecision ?? []).some((d) => d.vendorId === myId || d.vendorName.toLowerCase() === myName),
+  )
+  // Contract produced for this vendor by this auction (BULK/LOT awards) so
+  // the sourcing list can deep-link straight to the won contract.
+  const myContract = contracts.find(
+    (c) =>
+      c.sourceAuctionId === source.id &&
+      (c.vendorId === myId || c.vendorName.toLowerCase() === myName),
   )
   const vendorBids: AuctionBid[] = source.lanes.flatMap((lane) =>
     lane.ranking
@@ -224,6 +266,7 @@ function mapAuction(source: SourceAuction, identity: VendorIdentity): Auction {
     vendorBids,
     pricingUnit: firstLane?.rateUnit,
     awardDate: source.completedAt,
+    contractReference: myContract?.id,
     createdAt: source.createdAt,
   }
 }
@@ -241,6 +284,7 @@ function isVisibleToVendor(source: SourceAuction, identity: VendorIdentity): boo
 function mapContractStatus(status: SourceContract['status']): ContractStatus {
   if (status === 'TERMINATED') return 'TERMINATED'
   if (status === 'EXPIRED') return 'EXPIRED'
+  if (status === 'USED') return 'USED'
   return 'ACTIVE'
 }
 
@@ -268,6 +312,10 @@ function mapContract(source: SourceContract): Contract {
     renewalTerms: 'Auto-generated from auction award.',
     status: mapContractStatus(source.status),
     amendments: [],
+    awardedOn: source.awardedAt,
+    contractKind: source.contractType,
+    oneTime: source.oneTime,
+    consumedByBookingId: source.consumedByBookingId,
     pdfUrl: `/contracts/${source.id}.pdf`,
     createdAt: source.startDate,
   }
@@ -285,10 +333,14 @@ function useStoreRevision(): number {
     window.addEventListener('storage', onStorage)
     window.addEventListener('optimile-auction-store', bump)
     window.addEventListener('focus', bump)
+    // Time-based states (LIVE → PENDING_AWARD when the timer lapses) are
+    // computed at read time, so tick periodically to flip them on screen.
+    const timer = window.setInterval(bump, 15_000)
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('optimile-auction-store', bump)
       window.removeEventListener('focus', bump)
+      window.clearInterval(timer)
     }
   }, [])
   return revision
@@ -311,7 +363,7 @@ export function useSourcingBridge(): SourcingBridge {
     const store = readStore()
     return store.auctions
       .filter((a) => isVisibleToVendor(a, identity))
-      .map((a) => mapAuction(a, identity))
+      .map((a) => mapAuction(a, identity, store.contracts))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision, identity])
 
@@ -320,13 +372,23 @@ export function useSourcingBridge(): SourcingBridge {
   const placeBid = useCallback(
     (auctionId: string, laneId: string, amount: number) => {
       const store = readStore()
-      const timestamp = new Date().toISOString()
+      const now = Date.now()
+      const timestamp = new Date(now).toISOString()
       const auctions = store.auctions.map((auction) => {
         if (auction.id !== auctionId) return auction
+        // Stale-tab guard: reject bids on auctions that are no longer live
+        // (manually completed, cancelled, or every lane timer lapsed).
+        if (auction.status !== 'LIVE') return auction
+        if (auction.startAt && new Date(auction.startAt).getTime() > now) return auction
         return {
           ...auction,
           lanes: auction.lanes.map((lane) => {
             if (lane.id !== laneId) return lane
+            // Lane timer already lapsed — bid arrives too late.
+            const laneEndsAt = new Date(lane.timerEndsAt).getTime()
+            if (!Number.isNaN(laneEndsAt) && laneEndsAt <= now) return lane
+            // Ceiling enforcement — bids above the lane ceiling are rejected.
+            if (lane.ceilingRate > 0 && amount > lane.ceilingRate) return lane
             const others = lane.ranking.filter((b) => b.vendorId !== identity.vendorId)
             const ranking = [
               ...others,
@@ -341,7 +403,27 @@ export function useSourcingBridge(): SourcingBridge {
             ]
               .sort((a, b) => a.amount - b.amount)
               .map((b, index) => ({ ...b, rank: index + 1 }))
-            return { ...lane, ranking, bidCount: ranking.length }
+            // Anti-sniping auto-extension: a bid inside the trigger window
+            // pushes the lane timer out, up to maxExtensions times.
+            const triggerMs = (auction.extensionTriggerMinutes ?? 0) * 60_000
+            const extensionMs = (auction.extensionDurationMinutes ?? 0) * 60_000
+            const extensionCount = lane.extensionCount ?? 0
+            const shouldExtend =
+              triggerMs > 0 &&
+              extensionMs > 0 &&
+              extensionCount < (auction.maxExtensions ?? 0) &&
+              laneEndsAt - now <= triggerMs
+            return {
+              ...lane,
+              ranking,
+              bidCount: ranking.length,
+              ...(shouldExtend
+                ? {
+                    timerEndsAt: new Date(laneEndsAt + extensionMs).toISOString(),
+                    extensionCount: extensionCount + 1,
+                  }
+                : {}),
+            }
           }),
         }
       })
@@ -365,4 +447,106 @@ export function useAuctionContractsBridge(): Contract[] {
       .map(mapContract)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [revision, identity])
+}
+
+/**
+ * Derives sourcing notifications from the shared auction store and pushes
+ * them into the vendor notification feed. Stable per-event ids keep the push
+ * idempotent — an event already in the feed is never duplicated. Mounted once
+ * in the route wrapper so every page keeps the bell in sync.
+ */
+export function useAuctionNotificationsSync(): void {
+  const revision = useStoreRevision()
+  const identity = useMemo(() => readIdentity(), [])
+  const addNotification = useAppStore((state) => state.addNotification)
+
+  useEffect(() => {
+    const store = readStore()
+    const existing = new Set(useAppStore.getState().notifications.map((n) => n.id))
+    const push = (notification: Notification) => {
+      if (existing.has(notification.id)) return
+      existing.add(notification.id)
+      addNotification(notification)
+    }
+    const base = (id: string, title: string, message: string, deepLink: string): Notification => ({
+      id,
+      type: 'SOURCING',
+      title,
+      message,
+      deepLink,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    })
+
+    store.auctions
+      .filter((a) => isVisibleToVendor(a, identity))
+      .forEach((source) => {
+        const myId = identity.vendorId
+        const myName = identity.vendorName.toLowerCase()
+        const won = source.lanes.some((l) =>
+          (l.awardDecision ?? []).some((d) => d.vendorId === myId || d.vendorName.toLowerCase() === myName),
+        )
+        const participated = source.lanes.some((l) =>
+          l.ranking.some((b) => b.vendorId === myId || b.vendorName.toLowerCase() === myName),
+        )
+        const state = mapState(source, won)
+        const detailLink = `/vendor/sourcing/auctions/${source.id}`
+
+        if (state === 'LIVE') {
+          if (!participated) {
+            push(base(
+              `ntf-auc-live-${source.id}`,
+              'New auction live',
+              `${source.title} (${source.id}) is open for bidding. Place your bid before the lane timer ends.`,
+              detailLink,
+            ))
+          }
+          source.lanes.forEach((lane) => {
+            const myBid = lane.ranking.find(
+              (b) => b.vendorId === myId || b.vendorName.toLowerCase() === myName,
+            )
+            if (myBid && myBid.rank > 1) {
+              const best = Math.min(...lane.ranking.map((b) => b.amount))
+              push(base(
+                `ntf-auc-outbid-${source.id}-${lane.id}`,
+                `Outbid on ${lane.lane}`,
+                `Your bid on ${lane.lane} in ${source.id} is now L${myBid.rank}. Best bid is ₹${best.toLocaleString('en-IN')}.`,
+                detailLink,
+              ))
+            }
+          })
+        }
+
+        if (state === 'PENDING_AWARD' && participated) {
+          push(base(
+            `ntf-auc-ended-${source.id}`,
+            'Auction ended — pending award',
+            `Bidding on ${source.title} (${source.id}) has closed. The award decision is pending.`,
+            detailLink,
+          ))
+        }
+
+        if (state === 'AWARDED' && won) {
+          const myContract = store.contracts.find(
+            (c) => c.sourceAuctionId === source.id && (c.vendorId === myId || c.vendorName.toLowerCase() === myName),
+          )
+          push(base(
+            `ntf-auc-won-${source.id}`,
+            'Auction won 🎉',
+            `You won ${source.title} (${source.id}).${myContract ? ` Contract ${myContract.id} has been generated.` : ''}`,
+            myContract ? `/vendor/contracts/${myContract.id}` : detailLink,
+          ))
+        }
+
+        if (state === 'NOT_AWARDED' && participated && !won) {
+          push(base(
+            `ntf-auc-lost-${source.id}`,
+            'Auction not awarded',
+            `${source.title} (${source.id}) was awarded to another vendor. Better luck on the next lane.`,
+            detailLink,
+          ))
+        }
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision, identity, addNotification])
 }

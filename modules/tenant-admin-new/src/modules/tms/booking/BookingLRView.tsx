@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { PageHeader } from "@/shared/components/common/page-header";
+import { BookingPageHeader } from "./components/BookingPageHeader";
 import { TenantEmptyState, TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
 import { Button } from "@/shared/components/ui/button";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
@@ -671,24 +672,28 @@ export function BookingLRViewPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow="TMS"
+    <div className="space-y-3">
+      <BookingPageHeader
+        backTo={`/tenant/${tenant.id}/bookings/${bookingRecord.id}`}
+        backLabel="Booking Details"
         title={primaryGeneratedLr?.lrNumber ?? lr?.number ?? "LR Preview"}
-        description={`Reference-format delivery-wise LR preview for booking ${bookingRecord.bookingId}.`}
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}`}>Back to booking</Link>
-            </Button>
-          </div>
+        subtitle={`Delivery-wise LR preview for booking ${bookingRecord.bookingId}.`}
+        actions={
+          <>
+            {deliveryPreviews.length ? (
+              <Button variant="outline" size="sm" onClick={() => deliveryPreviews.forEach((preview) => downloadDeliveryPdf(preview))}>
+                Download PDF
+              </Button>
+            ) : null}
+            <Button size="sm" onClick={() => window.print()}>Print</Button>
+          </>
         }
       />
 
       {deliveryPreviews.map((preview) => (
         <TenantPanel key={preview.deliveryId} title={`LR - ${preview.lrNumber}`} description={preview.fileName}>
-          <div className="mb-3 flex gap-2">
-            <Button variant="outline" onClick={() => downloadDeliveryPdf(preview)}>
+          <div className="mb-2 flex justify-end">
+            <Button size="sm" variant="ghost" className="h-7" onClick={() => downloadDeliveryPdf(preview)}>
               Download PDF
             </Button>
           </div>

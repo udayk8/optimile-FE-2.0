@@ -244,6 +244,19 @@ export function areAllDeliveryPodsCaptured(deliveries?: BookingRecord["deliverie
   return deliveryList.length > 0 && deliveryList.every((delivery) => Boolean(delivery.pod?.podUploaded));
 }
 
+/** Single source of truth for POD display. Counts uploaded POD files for a
+ *  delivery (multiple-POD support); falls back to the podUploaded flag. */
+export function getDeliveryPodCount(delivery?: { pod?: NonNullable<BookingRecord["deliveries"]>[number]["pod"] }): number {
+  const pod = delivery?.pod;
+  if (!pod) return 0;
+  if (pod.podFiles && pod.podFiles.length) return pod.podFiles.length;
+  return pod.podUploaded ? 1 : 0;
+}
+
+export function isDeliveryPodUploaded(delivery?: { pod?: NonNullable<BookingRecord["deliveries"]>[number]["pod"] }): boolean {
+  return Boolean(delivery?.pod?.podUploaded) || getDeliveryPodCount(delivery) > 0;
+}
+
 export function buildMockLRNumber(existingBookings: BookingRecord[], sourceCode = "BLR") {
   const nextSequence = existingBookings
     .map((booking) => booking.assignment?.lrNumber?.match(/(\d+)$/)?.[1])

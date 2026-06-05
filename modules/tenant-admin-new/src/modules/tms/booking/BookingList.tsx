@@ -17,7 +17,7 @@ import {
   buildDriverLookup,
   buildMaterialLookup,
 } from "@/modules/tms/booking/services/booking-selectors";
-import { getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
+import { areAllDeliveryPodsCaptured, getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
 import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
 import type { TenantCustomerAddress } from "@/types/customer";
 
@@ -736,7 +736,11 @@ function BookingSummaryRow({
       </div>
 
       <div className="flex items-center lg:justify-center">
-        <BookingStatusBadge status={booking.status} />
+        {booking.status === "POD_PENDING" && areAllDeliveryPodsCaptured(booking.deliveries) ? (
+          <Badge variant="success">POD UPLOADED</Badge>
+        ) : (
+          <BookingStatusBadge status={booking.status} />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-1.5">
@@ -752,7 +756,9 @@ function BookingSummaryRow({
           ? rowAction("Assign", onOpen, "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100")
           : null}
         {showActions && primaryStatus === "POD_PENDING"
-          ? rowAction("Upload POD", onOpen, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")
+          ? areAllDeliveryPodsCaptured(booking.deliveries)
+            ? rowAction("Move To Completed", onOpen, "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100")
+            : rowAction("Upload POD", onOpen, "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100")
           : null}
         {showActions && primaryStatus === "COMPLETED" && onInvoice
           ? rowAction("Create Invoice", onInvoice, "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100")
