@@ -375,6 +375,9 @@ export interface BookingPricingSnapshot {
 
 export interface BookingPodSnapshot {
   podDocument?: string | null;
+  /** All uploaded POD file names for this delivery (multiple-POD support).
+   *  `podUploaded` remains the single source of truth for completion. */
+  podFiles?: string[];
   podUploaded?: boolean;
   podUploadedAt?: string | null;
   photoName?: string | null;

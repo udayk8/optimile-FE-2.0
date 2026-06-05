@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/shared/components/common/page-header";
+import { BookingPageHeader } from "./components/BookingPageHeader";
 import { TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantCustomers } from "@/modules/tenant-admin/hooks/useTenantCustomers";
@@ -753,11 +754,12 @@ export function CreateBookingPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-3 px-4 py-5 pb-28">
-      <PageHeader
-        eyebrow="TMS"
+    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-2.5 px-4 py-3 pb-28">
+      <BookingPageHeader
+        backTo={`/tenant/${tenant.id}/bookings`}
+        backLabel="Bookings"
         title={isEditMode ? "Edit Booking" : "Create Booking"}
-        description="Fast, operations-first booking flow."
+        subtitle="Fast, operations-first booking flow."
       />
 
       {error ? (
@@ -836,11 +838,11 @@ export function CreateBookingPage({
         </div>
       </StepSection>
 
-      {/* STEP 2 — Route */}
+      {/* STEP 2 — Deliveries (route + material, delivery-wise) */}
       <StepSection
         step={2}
-        title="Route"
-        summary={`${deliveries.length} ${deliveries.length === 1 ? "delivery" : "deliveries"}`}
+        title="Deliveries"
+        summary={`${deliveries.length} ${deliveries.length === 1 ? "delivery" : "deliveries"}${totalWeight ? ` · ${totalQuantity} ${deliveries[0]?.uom || ""} · ${formatUOMWeight(totalWeight)} ${PRICING_WEIGHT_UOM}`.trimEnd() : ""}`}
         defaultOpen
         action={
           <Button type="button" size="sm" variant="outline" onClick={addDelivery}>
@@ -856,8 +858,10 @@ export function CreateBookingPage({
               customerAddresses.find((address) => address.id === delivery.destinationAddressId)?.addressName ??
               delivery.destinationCity ??
               "Destination";
+            const selectedMaterial = customerMaterials.find((material) => material.id === delivery.materialId) ?? null;
+            const mapping = getMaterialUOMMapping(selectedMaterial, selectedCustomer, adminSources.uomMappings);
             return (
-              <div key={delivery.id} className="rounded-xl border border-gray-200 bg-white p-3">
+              <div key={delivery.id} className="rounded-xl border border-slate-300 bg-slate-50/40 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                     <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-xs font-semibold text-primary">
@@ -973,43 +977,11 @@ export function CreateBookingPage({
                     </Field>
                   ) : null}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </StepSection>
-
-      {/* STEP 3 — Material */}
-      <StepSection
-        step={3}
-        title="Material"
-        summary={totalWeight ? `${totalQuantity} ${deliveries[0]?.uom || ""} · ${formatUOMWeight(totalWeight)} ${PRICING_WEIGHT_UOM}`.trim() : "No material yet"}
-        defaultOpen
-        action={
-          <Button type="button" size="sm" variant="outline" onClick={addDelivery}>
-            + Add Material
-          </Button>
-        }
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <th className="px-2 py-2 font-semibold">#</th>
-                <th className="px-2 py-2 font-semibold">Material</th>
-                <th className="px-2 py-2 font-semibold">Sub Brand</th>
-                <th className="px-2 py-2 font-semibold">Quantity</th>
-                <th className="px-2 py-2 font-semibold">Weight</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deliveries.map((delivery, index) => {
-                const selectedMaterial = customerMaterials.find((material) => material.id === delivery.materialId) ?? null;
-                const mapping = getMaterialUOMMapping(selectedMaterial, selectedCustomer, adminSources.uomMappings);
-                return (
-                  <tr key={delivery.id} className="border-b border-gray-100 align-top">
-                    <td className="px-2 py-2 text-gray-500">{index + 1}</td>
-                    <td className="px-2 py-2">
+                {/* Material for this delivery — one material per delivery (delivery-wise). */}
+                <div className="mt-3 border-t border-gray-100 pt-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Material</p>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <Field label="Material">
                       <Select value={delivery.materialId} onChange={(event) => updateDelivery(index, "materialId", event.target.value)}>
                         <option value="">Select material</option>
                         {customerMaterials.map((material) => (
@@ -1018,19 +990,19 @@ export function CreateBookingPage({
                           </option>
                         ))}
                       </Select>
-                    </td>
-                    <td className="px-2 py-2">
+                    </Field>
+                    <Field label="Sub Brand">
                       <Input value={selectedMaterial?.description ?? "—"} disabled />
-                    </td>
-                    <td className="px-2 py-2">
+                    </Field>
+                    <Field label="Quantity">
                       <div className="grid grid-cols-[1fr_88px] gap-2">
                         <Input value={delivery.quantity} onChange={(event) => updateDelivery(index, "quantity", event.target.value)} />
                         <div className="flex items-center justify-center rounded-lg border border-gray-300 bg-gray-50 px-2 text-xs font-semibold text-gray-700">
                           {delivery.uom || selectedMaterial?.quantityUOM || "UOM"}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-2 py-2">
+                    </Field>
+                    <Field label="Weight">
                       <div className="grid grid-cols-[1fr_104px] gap-2">
                         <Input value={delivery.weight} onChange={(event) => updateDelivery(index, "weight", event.target.value)} />
                         <Select value={delivery.weightUom} onChange={(event) => updateDelivery(index, "weightUom", event.target.value)}>
@@ -1045,18 +1017,18 @@ export function CreateBookingPage({
                       {mapping ? (
                         <p className="mt-1 text-[11px] text-gray-400">{`Auto: 1 ${mapping.quantityUOM} = ${mapping.conversionValue} ${mapping.weightUOM}`}</p>
                       ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </StepSection>
 
-      {/* STEP 4 — Vehicle Requirement */}
+      {/* STEP 3 — Vehicle Requirement */}
       <StepSection
-        step={4}
+        step={3}
         title="Vehicle Requirement"
         summary={`${selectedVehicleTypeCode ?? (rateType === "PER_MT" ? "Any vehicle" : "No vehicle")}${draft.pickupDateTime ? ` · ${draft.pickupDateTime.replace("T", " ")}` : ""}`}
         defaultOpen
@@ -1080,7 +1052,7 @@ export function CreateBookingPage({
         </div>
       </StepSection>
 
-      {/* STEP 5 — Commercial Preview (only after customer + route + material) */}
+      {/* STEP 4 — Commercial Preview (only after customer + route + material) */}
       {(() => {
         const routeReady = deliveries.some((delivery) => delivery.originAddressId && delivery.destinationCity);
         const materialReady = deliveries.some(
@@ -1092,42 +1064,42 @@ export function CreateBookingPage({
         }
         return (
           <StepSection
-            step={5}
+            step={4}
             title="Commercial Preview"
             summary={calculatedFreight ? formatCurrency(calculatedFreight) : "—"}
             defaultOpen
           >
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {draft.commercialType === "SPOT" ? (
                 <Field label="Spot Rate (Manual)">
                   <Input value={draft.enteredRate} onChange={(event) => setDraft((current) => ({ ...current, enteredRate: event.target.value }))} />
                 </Field>
               ) : null}
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                <div className="grid gap-2">
-                  <KV label="Rate Type" value={rateType} />
-                  {draft.commercialType === "CONTRACT" ? (
-                    <KV
-                      label="Matched Rate"
-                      value={
-                        rateLookupPending
-                          ? "Checking…"
-                          : baseRate != null
-                            ? formatCurrency(baseRate)
-                            : "No rate found"
-                      }
-                    />
-                  ) : (
-                    <KV label="Entered Rate" value={numericRate ? formatCurrency(numericRate) : "—"} />
-                  )}
-                  <div className="mt-1 flex items-center justify-between border-t border-gray-200 pt-2">
-                    <span className="text-sm font-semibold text-gray-900">Total Freight</span>
-                    <span className="text-lg font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
-                  </div>
+              {/* Compact one-row commercial summary (no large card). */}
+              <div className="flex flex-wrap items-end gap-x-8 gap-y-2 rounded-xl border border-gray-200 bg-slate-50/70 px-4 py-2.5">
+                <PreviewKV label="Rate Source" value={draft.commercialType === "CONTRACT" ? "Contract rate card" : "Spot · manual"} />
+                <PreviewKV label="Rate Type" value={rateType} />
+                <PreviewKV
+                  label="Entered Rate"
+                  value={
+                    draft.commercialType === "CONTRACT"
+                      ? rateLookupPending
+                        ? "Checking…"
+                        : baseRate != null
+                          ? formatCurrency(baseRate)
+                          : "No rate found"
+                      : numericRate
+                        ? formatCurrency(numericRate)
+                        : "—"
+                  }
+                />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Total Freight</span>
+                  <span className="text-lg font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
                 </div>
               </div>
               <Field label="Ops Remark">
-                <Textarea value={draft.opsRemark} onChange={(event) => setDraft((current) => ({ ...current, opsRemark: event.target.value }))} className="min-h-[72px]" />
+                <Textarea value={draft.opsRemark} onChange={(event) => setDraft((current) => ({ ...current, opsRemark: event.target.value }))} className="min-h-[44px]" />
               </Field>
             </div>
           </StepSection>
@@ -1491,8 +1463,8 @@ function StepSection({
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center gap-3 border-b border-gray-100 bg-primary/5 px-4 py-2.5">
+    <section className="overflow-hidden rounded-xl border border-slate-300 border-l-[3px] border-l-primary/70 bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-primary/[0.09] to-transparent px-4 py-2">
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
@@ -1528,6 +1500,15 @@ function KV({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-4 text-sm">
       <span className="text-gray-500">{label}</span>
       <span className="font-medium text-gray-900">{value}</span>
+    </div>
+  );
+}
+
+function PreviewKV({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">{label}</span>
+      <span className="truncate text-sm font-semibold text-gray-900">{value}</span>
     </div>
   );
 }

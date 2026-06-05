@@ -11,6 +11,7 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
 import { useTenantBookings } from "./hooks/useTenantBookings";
 import { normalizeBookingId } from "@/modules/tms/booking/services/booking-engine";
+import { BookingPageHeader, BookingSummaryStrip } from "./components/BookingPageHeader";
 import { formatCurrency } from "@/shared/lib/format-currency";
 import {
   buildAddressLookup,
@@ -47,6 +48,35 @@ const stepOrder = [
   { status: "DOCUMENT_COMPLETED", label: "Document Completed" },
 ] as const;
 
+/** Numbered, visually-distinct workflow section for the documents page. */
+function WorkflowSection({ step, title, hint, children }: { step: number; title: string; hint?: string; children: ReactNode }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-1.5">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-600 text-[11px] font-bold text-white">{step}</span>
+        <span className="text-[13px] font-semibold text-slate-900">{title}</span>
+        {hint ? <span className="ml-auto text-[11px] text-slate-400">{hint}</span> : null}
+      </div>
+      <div className="px-3 py-2.5">{children}</div>
+    </section>
+  );
+}
+
+/** Large click/drag upload area. Reuses the caller's existing upload handler. */
+function UploadDropzone({ label, accept, onFile }: { label: string; accept: string; onFile: (file: File | null) => void }) {
+  return (
+    <label
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => { event.preventDefault(); onFile(event.dataTransfer.files?.[0] ?? null); }}
+      className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50/60 px-3 py-2.5 text-center transition hover:border-sky-400 hover:bg-sky-50/40"
+    >
+      <input type="file" accept={accept} className="hidden" onChange={(event) => { onFile(event.target.files?.[0] ?? null); event.target.value = ""; }} />
+      <span className="text-[12px] font-semibold text-slate-700">{label}</span>
+      <span className="text-[11px] text-slate-400">— drag &amp; drop or browse (PDF / TXT)</span>
+    </label>
+  );
+}
+
 export function BookingDocumentsPage() {
   const navigate = useNavigate();
   const { bookingId } = useParams();
@@ -60,8 +90,8 @@ export function BookingDocumentsPage() {
   // `expandedDeliveryId` is repurposed as "selected delivery" in the new
   // 3-zone layout — the left list selects, the centre workspace renders
   // it. The setter name is kept to preserve all existing callers.
-  const [activeDocumentTab, setActiveDocumentTab] = useState<"INVOICES" | "EWB" | "PACKAGE" | "CONSIGNEE">("INVOICES");
   const [error, setError] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [debugParseText, setDebugParseText] = useState("");
 
@@ -149,6 +179,7 @@ export function BookingDocumentsPage() {
   function updateShipmentDocuments(updater: (current: BookingShipmentDocuments) => BookingShipmentDocuments) {
     setDocumentDraft((current) => updater(current ?? ensureShipmentDocuments(bookingRecord)));
     setError("");
+    setSaveNotice("");
   }
 
   function updateDeliveryDocuments(
@@ -373,6 +404,35 @@ export function BookingDocumentsPage() {
     }
   }
 
+  // Save Draft — persist the in-progress documents without running the
+  // submit validation or the status transition. Shallow-merges only the
+  // shipmentDocuments field, so no booking lifecycle/logic is touched.
+  function saveDocumentDraft() {
+    if (isSubmitting || bookingRecord.status === "DOCUMENT_COMPLETED") {
+      return;
+    }
+    const latestBooking = routeBookingKey ? getBookingById(routeBookingKey) : null;
+    if (!latestBooking) {
+      setError("Unable to save draft. Please retry.");
+      return;
+    }
+    try {
+      updateBooking(latestBooking.id, {
+        shipmentDocuments: {
+          ...shipmentDocuments,
+          totalFreightRate: freightPreview?.totalFreightRate ?? shipmentDocuments.totalFreightRate ?? null,
+          freightStatus: freightPreview?.freightStatus ?? shipmentDocuments.freightStatus,
+          freightMessage: freightPreview?.freightMessage ?? shipmentDocuments.freightMessage ?? null,
+        },
+      });
+      setError("");
+      setSaveNotice("Draft saved");
+    } catch (saveError) {
+      console.error("[BookingDocuments] save draft failed", saveError);
+      setError("Unable to save draft. Please retry.");
+    }
+  }
+
   function submitDocuments() {
     if (isSubmitting) {
       return;
@@ -556,32 +616,20 @@ export function BookingDocumentsPage() {
 
   return (
     <div className="flex h-full flex-col gap-2">
-      {/* ── ZONE 1 — TOP COMPACT BOOKING HEADER ──────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-white px-3 py-2">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-slate-700">
-          <span className="text-[11px] uppercase tracking-[0.08em] text-slate-500">Documents</span>
-          <span className="font-semibold text-slate-900">{bookingRecord.bookingId}</span>
-          <span><span className="font-medium">Customer:</span> {customerName}</span>
-          <span><span className="font-medium">Vehicle:</span> {assignedVehicle?.registrationNumber ?? bookingRecord.assignment?.vehicleLabel ?? "—"}</span>
-          <span><span className="font-medium">Driver:</span> {driverName}</span>
-          <Badge variant={bookingRecord.status === "DOCUMENT_COMPLETED" ? "success" : "warning"}>
-            {bookingRecord.status.replace(/_/g, " ")}
-          </Badge>
-          <span><span className="font-medium">Deliveries:</span> {bookingRecord.deliveries?.length ?? 0}</span>
-          <span><span className="font-medium">Total Qty:</span> {finalQuantity || 0}</span>
-          <span><span className="font-medium">Freight:</span> {freightPreview?.totalFreightRate != null ? formatCurrency(freightPreview.totalFreightRate) : "—"}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}`}>Back</Link>
-          </Button>
-          {bookingRecord.shipmentDocuments?.lr?.number ? (
+      {/* ── ZONE 1 — TOP COMPACT BOOKING HEADER (shared design) ───────── */}
+      <BookingPageHeader
+        backTo={`/tenant/${tenant.id}/bookings/${bookingRecord.id}`}
+        backLabel="Booking Details"
+        title={`Documents · ${bookingRecord.bookingId}`}
+        subtitle={`${customerName} · ${bookingRecord.deliveries?.length ?? 0} ${(bookingRecord.deliveries?.length ?? 0) === 1 ? "delivery" : "deliveries"}`}
+        actions={
+          bookingRecord.shipmentDocuments?.lr?.number ? (
             <Button asChild variant="outline" size="sm">
               <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}/lr`}>Open LR</Link>
             </Button>
-          ) : null}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       {error ? (
         <div className="rounded-md border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">{error}</div>
@@ -595,7 +643,7 @@ export function BookingDocumentsPage() {
       ) : null}
 
       {/* ── ZONE 2 — LEFT LIST · ZONE 3 — MAIN WORKSPACE (full width) ── */}
-      <div className="grid flex-1 min-h-0 gap-3 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid flex-1 min-h-0 gap-2.5 lg:grid-cols-[210px_minmax(0,1fr)]">
 
         {/* ── ZONE 2 — LEFT DELIVERY LIST ───────────────────────────── */}
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-md border bg-white">
@@ -622,18 +670,15 @@ export function BookingDocumentsPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">D{index + 1} · {consignee}</span>
-                    <Badge variant={complete ? "success" : "warning"}>{complete ? "Done" : "Pending"}</Badge>
+                    <span className="font-semibold text-slate-900">Delivery {index + 1}</span>
+                    <span className={`text-[10px] font-semibold uppercase ${complete ? "text-emerald-600" : "text-amber-600"}`}>{complete ? "Done" : "Pending"}</span>
                   </div>
-                  <p className="mt-0.5 truncate text-slate-600">
-                    {addressMap.get(delivery.destinationAddressId)?.addressName ?? delivery.destinationCity ?? "—"}
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Inv: {docs?.invoices.length ?? 0} · EWB: {docs?.ewayBill?.ewayBillNumber ? 1 : 0}
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    Qty: {totals.quantity || 0} · Wt: {totals.weight || 0}
-                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-500">{delivery.trackingId || "Tracking pending"}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5 text-[11px]">
+                    <span className={(docs?.invoices.length ?? 0) > 0 ? "font-medium text-emerald-600" : "text-slate-400"}>{(docs?.invoices.length ?? 0) > 0 ? "✓" : "✗"} Invoice</span>
+                    <span className={docs?.ewayBill?.ewayBillNumber ? "font-medium text-emerald-600" : "text-slate-400"}>{docs?.ewayBill?.ewayBillNumber ? "✓" : "✗"} EWB</span>
+                    <span className={delivery.consigneeFinalizationStatus === "CONFIRMED" ? "font-medium text-emerald-600" : "text-slate-400"}>{delivery.consigneeFinalizationStatus === "CONFIRMED" ? "✓" : "✗"} Consignee</span>
+                  </div>
                 </button>
               );
             })}
@@ -652,83 +697,27 @@ export function BookingDocumentsPage() {
             const comparison = selectedComparison;
             return (
               <>
-                {/* Workspace header — delivery identity on its own row, with
-                    a status ribbon below replacing the old right summary
-                    panel. Frees up the centre column for the actual work. */}
-                <div className="border-b px-5 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[15px] font-semibold text-slate-900">{delivery.trackingId}</p>
-                      <p className="mt-0.5 text-[12px] text-slate-500">
-                        {addressMap.get(delivery.originAddressId)?.addressName ?? delivery.originCity ?? "—"}
-                        {" → "}
-                        {addressMap.get(delivery.destinationAddressId)?.addressName ?? delivery.destinationCity ?? "—"}
-                      </p>
-                    </div>
-                    <div className="text-right text-[12px] text-slate-600">
-                      <p><span className="text-slate-500">Qty</span> <span className="font-medium text-slate-900">{selectedDeliveryTotals.quantity || 0}</span></p>
-                      <p><span className="text-slate-500">Wt</span> <span className="font-medium text-slate-900">{selectedDeliveryTotals.weight || 0}</span></p>
-                      <p><span className="text-slate-500">Value</span> <span className="font-medium text-slate-900">{selectedDeliveryTotals.invoiceValue ? formatCurrency(selectedDeliveryTotals.invoiceValue) : "—"}</span></p>
-                    </div>
+                {/* Compact workspace header — identity + totals on one row. */}
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b px-4 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-900">Delivery {delivery.deliveryNo} · {delivery.trackingId || "Tracking pending"}</p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {addressMap.get(delivery.originAddressId)?.addressName ?? delivery.originCity ?? "—"}
+                      {" → "}
+                      {addressMap.get(delivery.destinationAddressId)?.addressName ?? delivery.destinationCity ?? "—"}
+                    </p>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                    <Badge variant={deliveryDocuments.invoices.length ? "success" : "warning"}>
-                      Invoices · {deliveryDocuments.invoices.length}
-                    </Badge>
-                    <Badge variant={deliveryDocuments.ewayBill?.ewayBillNumber ? "success" : "warning"}>
-                      E-Way Bill · {deliveryDocuments.ewayBill?.ewayBillNumber ? "Ready" : "Missing"}
-                    </Badge>
-                    <Badge variant={delivery.consigneeFinalizationStatus === "CONFIRMED" ? "success" : "warning"}>
-                      Consignee · {delivery.consigneeFinalizationStatus === "CONFIRMED" ? "Confirmed" : "Pending"}
-                    </Badge>
-                    {comparison && comparison.matchStatus !== "MATCH" ? (
-                      <Badge variant="warning">Address {Math.round(comparison.confidence * 100)}%</Badge>
-                    ) : null}
+                  <div className="flex items-center gap-3 text-[11px] text-slate-600">
+                    <span className="text-slate-500">Qty <span className="font-medium text-slate-900">{selectedDeliveryTotals.quantity || 0}</span></span>
+                    <span className="text-slate-500">Wt <span className="font-medium text-slate-900">{selectedDeliveryTotals.weight || 0}</span></span>
+                    <span className="text-slate-500">Value <span className="font-medium text-slate-900">{selectedDeliveryTotals.invoiceValue ? formatCurrency(selectedDeliveryTotals.invoiceValue) : "—"}</span></span>
                   </div>
                 </div>
 
-                {/* Tabs on their own row — full width, breathing room. */}
-                <div className="flex items-center gap-1 border-b bg-slate-50/60 px-5 py-2">
-                  {(["INVOICES", "EWB", "PACKAGE", "CONSIGNEE"] as const).map((tab) => {
-                    const label = tab === "INVOICES" ? `Invoices (${deliveryDocuments.invoices.length})` : tab === "EWB" ? "E-Way Bills" : tab === "PACKAGE" ? "Package" : "Consignee";
-                    const active = activeDocumentTab === tab;
-                    return (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setActiveDocumentTab(tab)}
-                        className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition ${
-                          active ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-600 hover:bg-white/60"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex-1 overflow-y-auto px-5 py-4">
-                  {activeDocumentTab === "INVOICES" ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">
-                          {deliveryDocuments.invoices.length} invoice{deliveryDocuments.invoices.length === 1 ? "" : "s"}
-                        </p>
-                        <label className="inline-flex cursor-pointer items-center">
-                          <input
-                            type="file"
-                            accept=".pdf,.txt"
-                            className="hidden"
-                            onChange={(event) => {
-                              void handleInvoiceUpload(delivery.id, event.target.files?.[0] ?? null);
-                              event.target.value = "";
-                            }}
-                          />
-                          <span className="inline-flex rounded-md border bg-white px-2.5 py-1 text-[12px] font-medium text-slate-700 hover:bg-slate-50">
-                            + Add Invoice
-                          </span>
-                        </label>
-                      </div>
+                <div className="flex-1 space-y-2.5 overflow-y-auto bg-slate-50/40 px-4 py-3">
+                  <WorkflowSection step={1} title="Upload Invoice" hint={`${deliveryDocuments.invoices.length} uploaded`}>
+                    <div className="space-y-3">
+                      <UploadDropzone label="Upload Invoice" accept=".pdf,.txt" onFile={(file) => void handleInvoiceUpload(delivery.id, file)} />
 
                       {deliveryDocuments.invoices.length ? (
                         <div className="overflow-x-auto rounded-md border">
@@ -786,34 +775,16 @@ export function BookingDocumentsPage() {
                           </table>
                         </div>
                       ) : (
-                        <div className="rounded-md border border-dashed bg-slate-50/50 px-3 py-6 text-center text-[12px] text-slate-500">
-                          No invoices yet. Click "+ Add Invoice" to upload.
+                        <div className="rounded-md border border-dashed bg-white px-3 py-4 text-center text-[12px] text-slate-500">
+                          No invoices yet — upload above to extract details.
                         </div>
                       )}
                     </div>
-                  ) : null}
+                  </WorkflowSection>
 
-                  {activeDocumentTab === "EWB" ? (
+                  <WorkflowSection step={2} title="Upload E-Way Bill" hint={deliveryDocuments.ewayBill?.ewayBillNumber ? "attached" : "none yet"}>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">
-                          E-Way Bill {deliveryDocuments.ewayBill?.ewayBillNumber ? "·  attached" : "·  none yet"}
-                        </p>
-                        <label className="inline-flex cursor-pointer items-center">
-                          <input
-                            type="file"
-                            accept=".pdf,.txt"
-                            className="hidden"
-                            onChange={(event) => {
-                              void handleEwayUpload(delivery.id, event.target.files?.[0] ?? null);
-                              event.target.value = "";
-                            }}
-                          />
-                          <span className="inline-flex rounded-md border bg-white px-2.5 py-1 text-[12px] font-medium text-slate-700 hover:bg-slate-50">
-                            Upload EWB
-                          </span>
-                        </label>
-                      </div>
+                      <UploadDropzone label="Upload E-Way Bill" accept=".pdf,.txt" onFile={(file) => void handleEwayUpload(delivery.id, file)} />
                       <div className="grid gap-2 md:grid-cols-2">
                         <Field label="EWB File*"><Input value={deliveryDocuments.ewayBill?.fileName ?? ""} onChange={(event) => updateEwayField(delivery.id, "fileName", event.target.value)} /></Field>
                         <Field label="EWB Number*"><Input value={deliveryDocuments.ewayBill?.ewayBillNumber ?? ""} onChange={(event) => updateEwayField(delivery.id, "ewayBillNumber", event.target.value)} /></Field>
@@ -821,119 +792,161 @@ export function BookingDocumentsPage() {
                         <Field label="Valid To"><Input type="date" value={deliveryDocuments.ewayBill?.validToDate ?? ""} onChange={(event) => updateEwayField(delivery.id, "validToDate", event.target.value)} /></Field>
                       </div>
                     </div>
-                  ) : null}
+                  </WorkflowSection>
 
-                  {activeDocumentTab === "PACKAGE" ? (
-                    <div className="overflow-x-auto rounded-md border">
-                      <table className="w-full text-[12px]">
-                        <thead className="bg-slate-50 text-[10px] uppercase tracking-[0.06em] text-slate-500">
-                          <tr>
-                            <th className="px-3 py-2 text-left">Material</th>
-                            <th className="px-3 py-2 text-right">Actual Qty</th>
-                            <th className="px-3 py-2 text-left">Qty UOM</th>
-                            <th className="px-3 py-2 text-right">Actual Wt</th>
-                            <th className="px-3 py-2 text-left">Wt UOM</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="border-t">
-                            <td className="px-3 py-2">{deliveryDocuments.actuals.material || "—"}</td>
-                            <td className="px-3 py-2 text-right">{deliveryDocuments.actuals.quantity ?? "—"}</td>
-                            <td className="px-3 py-2">{deliveryDocuments.actuals.quantityUOM ?? "—"}</td>
-                            <td className="px-3 py-2 text-right">{deliveryDocuments.actuals.weight ?? "—"}</td>
-                            <td className="px-3 py-2">{deliveryDocuments.actuals.weightUOM ?? "—"}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
+                  <WorkflowSection step={3} title="Package / Material">
+                    {(() => {
+                    // Display-only comparison of booking vs invoice (extracted) values.
+                    const totals = sumDeliveryInvoiceTotals(deliveryDocuments);
+                    const bookingMaterialRecord = materialMap.get(delivery.materialId);
+                    const bookingMaterial = bookingMaterialRecord?.description ?? bookingMaterialRecord?.materialCode ?? deliveryDocuments.actuals.material ?? "—";
+                    const invoiceMaterial = deliveryDocuments.actuals.material || "—";
+                    const bookingQty = Number(delivery.quantity ?? 0);
+                    const invoiceQty = Number(totals.quantity ?? 0);
+                    const bookingWeight = Number(delivery.weight ?? 0);
+                    const invoiceWeight = Number(totals.weight ?? 0);
+                    const qtyMismatch = invoiceQty > 0 && bookingQty > 0 && Math.abs(invoiceQty - bookingQty) > 0.001;
+                    const weightMismatch = invoiceWeight > 0 && bookingWeight > 0 && Math.abs(invoiceWeight - bookingWeight) > 0.001;
+                    const matchRows = [
+                      { label: "Material", ok: true, value: invoiceMaterial !== "—" ? invoiceMaterial : bookingMaterial },
+                      { label: "Quantity", ok: !qtyMismatch, value: `${(invoiceQty || bookingQty) || "—"} ${(delivery.uom ?? deliveryDocuments.actuals.quantityUOM ?? "")}`.trim() },
+                      { label: "Weight", ok: !weightMismatch, value: `${(invoiceWeight || bookingWeight) || "—"} ${(delivery.weightUom ?? deliveryDocuments.actuals.weightUOM ?? "")}`.trim() },
+                    ];
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        {matchRows.map((row) => (
+                          <div key={row.label} className={`flex min-w-[150px] flex-1 items-center gap-2 rounded-md border px-3 py-2 text-[12px] ${row.ok ? "border-emerald-200 bg-emerald-50/60" : "border-amber-300 bg-amber-50"}`}>
+                            <span className={`text-[13px] font-bold ${row.ok ? "text-emerald-600" : "text-amber-600"}`}>{row.ok ? "✓" : "✗"}</span>
+                            <span className="text-slate-500">{row.label}:</span>
+                            <span className="font-medium text-slate-900">{row.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  </WorkflowSection>
 
-                  {activeDocumentTab === "CONSIGNEE" ? (
-                    (delivery.destinationAddressSource === "FROM_INVOICE_LATER" || extractedConsignee || comparison) ? (
-                      <div className="space-y-3">
-                        <div className="rounded-md border bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                          <span className="font-medium">Source:</span> {delivery.destinationAddressSource === "FROM_INVOICE_LATER" ? "From Invoice Later" : "Saved Customer Address"}
-                          <span className="mx-2 text-slate-400">·</span>
-                          <span className="font-medium">Status:</span> {delivery.consigneeFinalizationStatus ?? "PENDING"}
-                        </div>
+                  <WorkflowSection step={4} title="Verify Consignee" hint={delivery.consigneeFinalizationStatus === "CONFIRMED" ? "Confirmed" : "Pending"}>
+                    {(delivery.destinationAddressSource === "FROM_INVOICE_LATER" || extractedConsignee || comparison) ? (
+                      <div className="space-y-2">
                         {extractedConsignee ? (
-                          <div className="rounded-md border border-sky-200 bg-sky-50/60 px-3 py-3">
-                            <p className="text-[12px] font-semibold text-slate-900">Consignee details extracted from invoice</p>
-                            <div className="mt-2 grid gap-2 md:grid-cols-2">
-                              <Field label="Name"><Input value={extractedConsignee.name} onChange={(event) => updateExtractedConsigneeField(delivery.id, "name", event.target.value)} /></Field>
-                              <Field label="City"><Input value={extractedConsignee.city} onChange={(event) => updateExtractedConsigneeField(delivery.id, "city", event.target.value)} /></Field>
-                              <div className="md:col-span-2">
-                                <Field label="Address"><Input value={extractedConsignee.addressLine} onChange={(event) => updateExtractedConsigneeField(delivery.id, "addressLine", event.target.value)} /></Field>
-                              </div>
-                              <Field label="Pincode"><Input value={extractedConsignee.pincode} onChange={(event) => updateExtractedConsigneeField(delivery.id, "pincode", event.target.value)} /></Field>
-                              <Field label="GSTIN"><Input value={extractedConsignee.gstin ?? ""} onChange={(event) => updateExtractedConsigneeField(delivery.id, "gstin", event.target.value)} /></Field>
-                            </div>
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            <Field label="Consignee Name"><Input value={extractedConsignee.name} onChange={(event) => updateExtractedConsigneeField(delivery.id, "name", event.target.value)} /></Field>
+                            <Field label="GSTIN"><Input value={extractedConsignee.gstin ?? ""} onChange={(event) => updateExtractedConsigneeField(delivery.id, "gstin", event.target.value)} /></Field>
+                            <Field label="City"><Input value={extractedConsignee.city} onChange={(event) => updateExtractedConsigneeField(delivery.id, "city", event.target.value)} /></Field>
                           </div>
                         ) : (
-                          <div className="rounded-md border border-dashed px-3 py-4 text-[12px] text-slate-500">
-                            Upload an invoice on the Invoices tab to extract consignee details.
-                          </div>
+                          <p className="text-[12px] text-slate-500">No invoice consignee extracted — choose the final address below.</p>
                         )}
-                        {comparison && comparison.matchStatus !== "MATCH" ? (
-                          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-                            <p className="font-medium">Destination differs from invoice address.</p>
-                            <p>Confidence: {Math.round(comparison.confidence * 100)}% — {comparison.reasons.join(" ")}</p>
+                        <details className="rounded-md border border-slate-200 bg-slate-50/50 text-[12px]">
+                          <summary className="cursor-pointer px-3 py-1.5 font-medium text-slate-600">
+                            View full address &amp; options{comparison && comparison.matchStatus !== "MATCH" ? ` · ⚠ address ${Math.round(comparison.confidence * 100)}%` : ""}
+                          </summary>
+                          <div className="space-y-2 border-t border-slate-100 px-3 py-2.5">
+                            {extractedConsignee ? (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div className="sm:col-span-2"><Field label="Address"><Input value={extractedConsignee.addressLine} onChange={(event) => updateExtractedConsigneeField(delivery.id, "addressLine", event.target.value)} /></Field></div>
+                                <Field label="Pincode"><Input value={extractedConsignee.pincode} onChange={(event) => updateExtractedConsigneeField(delivery.id, "pincode", event.target.value)} /></Field>
+                              </div>
+                            ) : null}
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <Field label="Final Address Action">
+                                <Select
+                                  value={deliveryDocuments.finalConsigneeChoice?.mode ?? defaultConsigneeChoiceMode(delivery, extractedConsignee)}
+                                  onChange={(event) =>
+                                    updateConsigneeChoice(delivery.id, (current) => ({
+                                      ...current,
+                                      finalConsigneeChoice: {
+                                        mode: event.target.value as NonNullable<typeof current.finalConsigneeChoice>["mode"],
+                                        selectedAddressId: current.finalConsigneeChoice?.selectedAddressId ?? delivery.destinationAddressId ?? null,
+                                        comparison: comparison ?? null,
+                                      },
+                                    }))
+                                  }
+                                >
+                                  {selectedDestinationAddress ? <option value="KEEP_SELECTED_ADDRESS">Keep selected address</option> : null}
+                                  {extractedConsignee ? <option value="USE_INVOICE_ADDRESS">Use invoice address</option> : null}
+                                  {extractedConsignee ? <option value="SAVE_INVOICE_ADDRESS_AND_USE_IT">Save invoice address as new customer address</option> : null}
+                                  <option value="USE_SAVED_ADDRESS">Select different saved address</option>
+                                </Select>
+                              </Field>
+                              {(
+                                (deliveryDocuments.finalConsigneeChoice?.mode ?? defaultConsigneeChoiceMode(delivery, extractedConsignee)) ===
+                                "USE_SAVED_ADDRESS"
+                              ) ? (
+                                <Field label="Saved Address">
+                                  <Select
+                                    value={deliveryDocuments.finalConsigneeChoice?.selectedAddressId ?? delivery.destinationAddressId ?? ""}
+                                    onChange={(event) =>
+                                      updateConsigneeChoice(delivery.id, (current) => ({
+                                        ...current,
+                                        finalConsigneeChoice: {
+                                          mode: "USE_SAVED_ADDRESS",
+                                          selectedAddressId: event.target.value,
+                                          comparison: comparison ?? null,
+                                        },
+                                      }))
+                                    }
+                                  >
+                                    <option value="">Select saved address</option>
+                                    {selectedCustomerAddresses.map((address) => (
+                                      <option key={address.id} value={address.id}>{address.addressName}</option>
+                                    ))}
+                                  </Select>
+                                </Field>
+                              ) : null}
+                            </div>
+                            {comparison && comparison.matchStatus !== "MATCH" ? (
+                              <p className="text-[11px] text-amber-700">Confidence {Math.round(comparison.confidence * 100)}% — {comparison.reasons.join(" ")}</p>
+                            ) : null}
                           </div>
-                        ) : null}
-                        <div className="grid gap-2 md:grid-cols-2">
-                          <Field label="Final Address Action">
-                            <Select
-                              value={deliveryDocuments.finalConsigneeChoice?.mode ?? defaultConsigneeChoiceMode(delivery, extractedConsignee)}
-                              onChange={(event) =>
-                                updateConsigneeChoice(delivery.id, (current) => ({
-                                  ...current,
-                                  finalConsigneeChoice: {
-                                    mode: event.target.value as NonNullable<typeof current.finalConsigneeChoice>["mode"],
-                                    selectedAddressId: current.finalConsigneeChoice?.selectedAddressId ?? delivery.destinationAddressId ?? null,
-                                    comparison: comparison ?? null,
-                                  },
-                                }))
-                              }
-                            >
-                              {selectedDestinationAddress ? <option value="KEEP_SELECTED_ADDRESS">Keep selected address</option> : null}
-                              {extractedConsignee ? <option value="USE_INVOICE_ADDRESS">Use invoice address</option> : null}
-                              {extractedConsignee ? <option value="SAVE_INVOICE_ADDRESS_AND_USE_IT">Save invoice address as new customer address</option> : null}
-                              <option value="USE_SAVED_ADDRESS">Select different saved address</option>
-                            </Select>
-                          </Field>
-                          {(
-                            (deliveryDocuments.finalConsigneeChoice?.mode ?? defaultConsigneeChoiceMode(delivery, extractedConsignee)) ===
-                            "USE_SAVED_ADDRESS"
-                          ) ? (
-                            <Field label="Saved Address">
-                              <Select
-                                value={deliveryDocuments.finalConsigneeChoice?.selectedAddressId ?? delivery.destinationAddressId ?? ""}
-                                onChange={(event) =>
-                                  updateConsigneeChoice(delivery.id, (current) => ({
-                                    ...current,
-                                    finalConsigneeChoice: {
-                                      mode: "USE_SAVED_ADDRESS",
-                                      selectedAddressId: event.target.value,
-                                      comparison: comparison ?? null,
-                                    },
-                                  }))
-                                }
-                              >
-                                <option value="">Select saved address</option>
-                                {selectedCustomerAddresses.map((address) => (
-                                  <option key={address.id} value={address.id}>{address.addressName}</option>
-                                ))}
-                              </Select>
-                            </Field>
-                          ) : null}
-                        </div>
+                        </details>
                       </div>
                     ) : (
-                      <p className="rounded-md border border-dashed px-3 py-4 text-[12px] text-slate-500">
-                        Destination is pre-confirmed for this delivery — no consignee reconciliation needed.
-                      </p>
-                    )
-                  ) : null}
+                      <p className="text-[12px] text-slate-500">Destination pre-confirmed for this delivery — no reconciliation needed.</p>
+                    )}
+                  </WorkflowSection>
+
+                  <WorkflowSection step={5} title="Review & Submit">
+                    {(() => {
+                    const totals = sumDeliveryInvoiceTotals(deliveryDocuments);
+                    const invoiceReady =
+                      deliveryDocuments.invoices.length > 0 &&
+                      deliveryDocuments.invoices.every(
+                        (invoice) => invoice.fileName.trim() && invoice.invoiceNumber.trim() && invoice.invoiceDate && invoice.material.trim() && (Number(invoice.weight) || 0) > 0,
+                      );
+                    const ewbReady = Boolean(deliveryDocuments.ewayBill?.fileName?.trim() && deliveryDocuments.ewayBill?.ewayBillNumber?.trim());
+                    const consigneeConfirmed = delivery.consigneeFinalizationStatus === "CONFIRMED";
+                    const bookingQty = Number(delivery.quantity ?? 0);
+                    const invoiceQty = Number(totals.quantity ?? 0);
+                    const bookingWeight = Number(delivery.weight ?? 0);
+                    const invoiceWeight = Number(totals.weight ?? 0);
+                    const qtyWeightMatched = !(
+                      (invoiceQty > 0 && bookingQty > 0 && Math.abs(invoiceQty - bookingQty) > 0.001) ||
+                      (invoiceWeight > 0 && bookingWeight > 0 && Math.abs(invoiceWeight - bookingWeight) > 0.001)
+                    );
+                    // Submit requires invoice + EWB per existing validation; consignee /
+                    // qty-weight are surfaced for review but are not submit blockers.
+                    const deliveryReady = invoiceReady && ewbReady;
+                    const rows = [
+                      { label: "Invoice", ok: invoiceReady, good: "Uploaded", bad: "Missing" },
+                      { label: "E-Way Bill", ok: ewbReady, good: "Uploaded", bad: "Missing" },
+                      { label: "Consignee", ok: consigneeConfirmed, good: "Confirmed", bad: "Pending" },
+                      { label: "Qty / Weight", ok: qtyWeightMatched, good: "Matched", bad: "Mismatch" },
+                    ];
+                    void deliveryReady;
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {rows.map((row) => (
+                          <span key={row.label} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] ${row.ok ? "border-emerald-200 bg-emerald-50/60 text-emerald-800" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+                            <span className={`font-bold ${row.ok ? "text-emerald-600" : "text-slate-400"}`}>{row.ok ? "✓" : "✗"}</span>
+                            {row.label}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  </WorkflowSection>
                 </div>
               </>
             );
@@ -947,12 +960,22 @@ export function BookingDocumentsPage() {
       </div>
 
       {/* ── BOTTOM STICKY ACTION BAR ─────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2 text-[12px]">
+      <div className="sticky bottom-0 z-20 flex items-center justify-between gap-3 rounded-md border bg-white/95 px-3 py-2 text-[12px] backdrop-blur">
         <span className="text-slate-600">
           <span className="font-medium text-slate-900">{completedDeliveries} of {bookingRecord.deliveries?.length ?? 0}</span> deliveries completed · {totalInvoices} invoice{totalInvoices === 1 ? "" : "s"} · {totalEwayBills} e-way bill{totalEwayBills === 1 ? "" : "s"}
         </span>
         <div className="flex items-center gap-2">
-          <span className="hidden text-[11px] text-slate-500 md:inline">{freightPreview?.freightMessage ?? "Freight updates in real time."}</span>
+          {saveNotice ? (
+            <span className="text-[11px] font-medium text-emerald-600">{saveNotice}</span>
+          ) : (
+            <span className="hidden text-[11px] text-slate-500 md:inline">{freightPreview?.freightMessage ?? "Freight updates in real time."}</span>
+          )}
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/tenant/${tenant.id}/bookings/${bookingRecord.id}`}>← Booking Details</Link>
+          </Button>
+          <Button size="sm" variant="outline" onClick={saveDocumentDraft} disabled={isSubmitting || bookingRecord.status === "DOCUMENT_COMPLETED"}>
+            Save Draft
+          </Button>
           <Button size="sm" onClick={submitDocuments} disabled={isSubmitting || bookingRecord.status === "DOCUMENT_COMPLETED"}>
             {isSubmitting || bookingRecord.status === "DOCUMENT_COMPLETED" ? "Documents Submitted" : "Submit Documents"}
           </Button>

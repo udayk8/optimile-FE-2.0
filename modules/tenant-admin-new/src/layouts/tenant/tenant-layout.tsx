@@ -440,7 +440,7 @@ export function TenantLayout() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: "easeOut" }}
-        className={bookingFocused ? "flex-1 p-4 xl:p-5" : "flex-1 p-5 xl:p-6"}
+        className={bookingFocused ? "flex-1 p-3 xl:p-4" : "flex-1 p-5 xl:p-6"}
       >
         {!routeAccess.allowed && routeAccess.matchedPage ? (
           <TenantEmptyState
