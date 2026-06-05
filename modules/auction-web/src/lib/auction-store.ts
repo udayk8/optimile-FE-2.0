@@ -116,10 +116,19 @@ export function loadStore(): AuctionStoreSnapshot {
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AuctionStoreSnapshot>
-    return sweepExpiredAuctions({
+    const snapshot: AuctionStoreSnapshot = {
       auctions: parsed.auctions ?? [],
       contracts: parsed.contracts ?? [],
-    })
+    }
+    // Merge-missing seed contracts (by id) so demo data added to the seed
+    // reaches browsers whose store was created before the seed grew.
+    const existingContractIds = new Set(snapshot.contracts.map((c) => c.id))
+    const missingContracts = MOCK_CONTRACTS.filter((c) => !existingContractIds.has(c.id))
+    if (missingContracts.length > 0) {
+      snapshot.contracts = [...snapshot.contracts, ...missingContracts]
+      window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+    }
+    return sweepExpiredAuctions(snapshot)
   } catch {
     return { auctions: [], contracts: [] }
   }

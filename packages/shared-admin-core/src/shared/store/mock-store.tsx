@@ -633,9 +633,46 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v6";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
+// Manual vendor-contract seed for the Bluedart vendors — the shared
+// `optimile.vendor-contracts` store both Tenant Admin vendor detail and the
+// Vendor Portal read. Idempotent by contractId; runs every boot.
+const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
+const SEED_VENDOR_CONTRACTS = [
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "MUM-DEL", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "BLR-MAA", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "DEL-LKO", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "MUM-BLR", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "PNQ-JAI", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "AMD-SRT", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+];
+
+function seedVendorContracts(): void {
+  try {
+    const raw = window.localStorage.getItem(VENDOR_CONTRACTS_SEED_KEY);
+    const stored: Array<{ contractId: string }> = raw ? JSON.parse(raw) : [];
+    const existingIds = new Set(stored.map((contract) => contract.contractId));
+    const startDate = new Date().toISOString().slice(0, 10);
+    const created = SEED_VENDOR_CONTRACTS.filter((seed) => !existingIds.has(seed.contractId)).map(
+      ({ months, ...seed }) => ({
+        ...seed,
+        startDate,
+        endDate: new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        createdFrom: "MANUAL_UPLOAD",
+        status: "ACTIVE",
+      }),
+    );
+    if (created.length > 0) {
+      window.localStorage.setItem(VENDOR_CONTRACTS_SEED_KEY, JSON.stringify([...stored, ...created]));
+    }
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
+
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
+    seedVendorContracts();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {

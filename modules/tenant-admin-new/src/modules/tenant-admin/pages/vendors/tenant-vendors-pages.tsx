@@ -16,7 +16,9 @@ import {
   VendorContractCsvUpload,
   VendorContractFormDialog,
   VendorContractsTable,
+  VendorSpotContractsTable,
   useVendorContracts,
+  useVendorSpotContracts,
 } from "@/modules/tenant-admin/components/vendor-contracts";
 import { createVendorContracts, type VendorContractCsvRow } from "@shared-utils";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
@@ -28,11 +30,6 @@ import {
   type VendorOnboardingDraft,
 } from "@/vendor-onboarding";
 import type { TenantVendor, TenantVendorInput } from "@/types/vendor";
-import {
-  AUCTION_STORE_KEY,
-  loadStore as loadAuctionStore,
-  updateContract as updateAuctionContract,
-} from "@auction/lib/auction-store";
 
 const vendorSchema = z.object({
   name: z.string().trim().min(2, "Vendor name is required."),
@@ -437,119 +434,14 @@ export function TenantVendorDetailPage() {
 }
 
 // Spot auction contracts — one-time lane contracts won by this vendor in
-// SPOT auctions. View + lifecycle marking only; they can never be added
-// manually (the Add Contract button above is for regular vendor contracts).
+// SPOT auctions. Rendered with the same columns as the vendor contracts
+// table, plus the spot auction reference. View only; no manual marking —
+// status flips to Used automatically when a spot booking consumes it.
 function VendorSpotContractsSection({ vendor }: { vendor: { id: string; name: string } }) {
-  const [revision, setRevision] = useState(0);
-  useEffect(() => {
-    const bump = () => setRevision((v) => v + 1);
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === AUCTION_STORE_KEY) bump();
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("optimile-auction-store", bump);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("optimile-auction-store", bump);
-    };
-  }, []);
-
-  const spotContracts = useMemo(() => {
-    const myName = vendor.name.toLowerCase();
-    return loadAuctionStore().contracts.filter(
-      (contract) =>
-        contract.contractType === "SPOT" &&
-        (contract.vendorId === vendor.id || contract.vendorName.toLowerCase() === myName),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [revision, vendor.id, vendor.name]);
-
-  const markStatus = (contractId: string, status: "ACTIVE" | "USED" | "TERMINATED") => {
-    updateAuctionContract(contractId, (contract) => ({ ...contract, status }));
-  };
-
-  const statusChip = (status: string) => {
-    const map: Record<string, string> = {
-      ACTIVE: "bg-emerald-50 text-emerald-700",
-      USED: "bg-gray-100 text-gray-600",
-      TERMINATED: "bg-red-50 text-red-700",
-      EXPIRED: "bg-red-50 text-red-700",
-      EXPIRING_SOON: "bg-amber-50 text-amber-700",
-    };
-    return (
-      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${map[status] ?? "bg-gray-100 text-gray-600"}`}>
-        {status === "USED" ? "Used" : status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, " ")}
-      </span>
-    );
-  };
-
-  return (
-    <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50/30 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold">Spot Auction Contracts</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            One-time lane contracts won in spot auctions. They are consumed by a single spot booking
-            and cannot be added manually.
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground">{spotContracts.length} contract{spotContracts.length === 1 ? "" : "s"}</span>
-      </div>
-      {spotContracts.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-amber-200 px-4 py-6 text-center text-sm text-muted-foreground">
-          No spot auction contracts for this vendor yet.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="border-b px-4 py-3">Contract</th>
-                <th className="border-b px-4 py-3">Lane</th>
-                <th className="border-b px-4 py-3">Rate</th>
-                <th className="border-b px-4 py-3">Won On</th>
-                <th className="border-b px-4 py-3">Valid Till</th>
-                <th className="border-b px-4 py-3">Status</th>
-                <th className="border-b px-4 py-3 text-right">Mark</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {spotContracts.map((contract) => (
-                <tr key={contract.id}>
-                  <td className="px-4 py-3">
-                    <div className="font-mono font-semibold">{contract.id}</div>
-                    <div className="mt-0.5 text-[11px] text-muted-foreground">
-                      Auction {contract.sourceAuctionId}
-                      {contract.consumedByBookingId ? ` · Used in ${contract.consumedByBookingId}` : ""}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono">{contract.lane}</td>
-                  <td className="px-4 py-3">₹{contract.contractedRate.toLocaleString("en-IN")} <span className="text-[11px] text-muted-foreground">{contract.rateUnit.replace("PER_", "/").toLowerCase()}</span></td>
-                  <td className="px-4 py-3">{contract.awardedAt ? new Date(contract.awardedAt).toLocaleString() : "—"}</td>
-                  <td className="px-4 py-3">{contract.endDate}</td>
-                  <td className="px-4 py-3">{statusChip(contract.status)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="inline-flex gap-2">
-                      {contract.status !== "USED" && (
-                        <Button size="sm" variant="outline" onClick={() => markStatus(contract.id, "USED")}>Used</Button>
-                      )}
-                      {contract.status !== "TERMINATED" && (
-                        <Button size="sm" variant="outline" onClick={() => markStatus(contract.id, "TERMINATED")}>Inactive</Button>
-                      )}
-                      {contract.status !== "ACTIVE" && (
-                        <Button size="sm" variant="outline" onClick={() => markStatus(contract.id, "ACTIVE")}>Reactivate</Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
+  const spotContracts = useVendorSpotContracts(vendor);
+  return <VendorSpotContractsTable contracts={spotContracts} />;
 }
+
 
 function TenantVendorContractsSection({
   vendor,
