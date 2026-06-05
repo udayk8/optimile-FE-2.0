@@ -81,6 +81,7 @@ interface SourceAuction {
 interface SourceContract {
   id: string
   sourceAuctionId: string
+  contractType?: 'BULK' | 'LOT' | 'SPOT'
   vendorId: string
   vendorName: string
   lane: string
@@ -90,9 +91,11 @@ interface SourceContract {
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
   awardedAt?: string
+  oneTime?: boolean
+  consumedByBookingId?: string
   startDate: string
   endDate: string
-  status: 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED'
+  status: 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED' | 'USED'
 }
 interface SourceStore {
   auctions: SourceAuction[]
@@ -281,6 +284,7 @@ function isVisibleToVendor(source: SourceAuction, identity: VendorIdentity): boo
 function mapContractStatus(status: SourceContract['status']): ContractStatus {
   if (status === 'TERMINATED') return 'TERMINATED'
   if (status === 'EXPIRED') return 'EXPIRED'
+  if (status === 'USED') return 'USED'
   return 'ACTIVE'
 }
 
@@ -309,6 +313,9 @@ function mapContract(source: SourceContract): Contract {
     status: mapContractStatus(source.status),
     amendments: [],
     awardedOn: source.awardedAt,
+    contractKind: source.contractType,
+    oneTime: source.oneTime,
+    consumedByBookingId: source.consumedByBookingId,
     pdfUrl: `/contracts/${source.id}.pdf`,
     createdAt: source.startDate,
   }

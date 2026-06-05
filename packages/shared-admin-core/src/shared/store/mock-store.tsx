@@ -5168,10 +5168,22 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         if (bookingVendorIndents.some((indent) => indent.bookingId === bookingId && indent.status === "PENDING")) {
           throw new Error("An active indent already exists for this booking.");
         }
+        // Spot-contract bookings send a TARGETED indent to the contract's
+        // winning vendor only; everything else broadcasts to all active vendors.
+        const spotVendorId = booking.spotContract?.vendorId ?? null;
         const eligibleVendors = tenantVendors.filter(
-          (vendor) => vendor.tenantId === booking.tenantId && vendor.status === "active",
+          (vendor) =>
+            vendor.tenantId === booking.tenantId &&
+            vendor.status === "active" &&
+            (!spotVendorId || vendor.id === spotVendorId),
         );
-        if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
+        if (eligibleVendors.length === 0) {
+          throw new Error(
+            spotVendorId
+              ? "The spot-contract vendor is not active for this tenant."
+              : "No active vendors to send the indent to.",
+          );
+        }
         const now = new Date().toISOString();
         // Vendor assignment always uses Auto LR generated from the booking owner's
         // place — captured here at send time so the vendor never picks LR.
@@ -5204,8 +5216,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       status: item.status,
                       timestamp: now,
                       actor,
-                      eventLabel: "INDENT_SENT_TO_VENDORS",
-                      note: `Indent sent to ${created.length} vendor(s)`,
+                      eventLabel: spotVendorId ? "INDENT_SENT_SPOT_CONTRACT" : "INDENT_SENT_TO_VENDORS",
+                      note: spotVendorId
+                        ? `Indent sent to ${created[0]?.vendorName ?? "spot-contract vendor"} (spot contract ${booking.spotContract?.contractId ?? ""} @ ₹${booking.spotContract?.rate?.toLocaleString("en-IN") ?? ""})`
+                        : `Indent sent to ${created.length} vendor(s)`,
                     },
                   ],
                   updatedAt: now,

@@ -15,6 +15,7 @@ const STATUS_MAP: Record<string, { variant: StatusVariant; label: string }> = {
   CANCELLED: { variant: 'destructive', label: 'Cancelled' },
   TERMINATED: { variant: 'destructive', label: 'Terminated' },
   EXPIRED: { variant: 'destructive', label: 'Expired' },
+  USED: { variant: 'muted', label: 'Used' },
 }
 
 interface StatusBadgeProps extends Omit<BadgeProps, 'variant'> {

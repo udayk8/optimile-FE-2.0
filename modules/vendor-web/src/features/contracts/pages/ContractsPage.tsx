@@ -125,6 +125,13 @@ export default function ContractsPage() {
                     <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${contract.source === 'AUCTION_WIN' ? 'bg-violet-50 text-violet-700' : 'bg-sky-50 text-sky-700'}`}>
                       {getContractSourceLabel(contract.source)}
                     </span>
+                    {contract.contractKind === 'SPOT' && (
+                      <div className="mt-1">
+                        <span className="inline-block rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                          Spot · One-time{contract.consumedByBookingId ? ` · Used in ${contract.consumedByBookingId}` : ''}
+                        </span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={contract.status} /></td>
                   </tr>

@@ -106,7 +106,20 @@ export default function ContractsPage() {
 
   const columns = useMemo<DataTableColumn<(typeof filteredContracts)[number]>[]>(
     () => [
-      { key: 'contract', header: 'Contract', render: (contract) => <span className="font-medium text-[#0F172A]">{contract.id}</span> },
+      {
+        key: 'contract',
+        header: 'Contract',
+        render: (contract) => (
+          <div>
+            <span className="font-medium text-[#0F172A]">{contract.id}</span>
+            <div className="mt-0.5 text-[11px] text-[#64748B]">
+              {contract.contractType}
+              {contract.oneTime ? ' · One-time' : ''}
+              {contract.consumedByBookingId ? ` · Used in ${contract.consumedByBookingId}` : ''}
+            </div>
+          </div>
+        ),
+      },
       { key: 'vendor', header: 'Vendor', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vendorName}</span> },
       { key: 'lane', header: 'Lane', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.lane}</span> },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },

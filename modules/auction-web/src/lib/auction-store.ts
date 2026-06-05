@@ -158,6 +158,15 @@ export function updateAuction(id: string, updater: (auction: Auction) => Auction
   })
 }
 
+/** Replace one contract in place (matched by id). */
+export function updateContract(id: string, updater: (contract: Contract) => Contract) {
+  const store = loadStore()
+  saveStore({
+    ...store,
+    contracts: store.contracts.map((c) => (c.id === id ? updater(c) : c)),
+  })
+}
+
 /**
  * Replace the contracts produced by one auction lane (removing any prior ones
  * for that lane) and append the freshly awarded set. Keeps award idempotent.

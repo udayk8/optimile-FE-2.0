@@ -175,7 +175,7 @@ export interface AuctionBid {
 }
 
 // ==================== CONTRACT TYPES ====================
-export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED'
+export type ContractStatus = 'DRAFT' | 'ACTIVE' | 'EXPIRED' | 'TERMINATED' | 'USED'
 
 /** MANUAL_UPLOAD = uploaded by tenant admin; AUCTION_WIN = produced by an auction award. */
 export type ContractSource = 'MANUAL_UPLOAD' | 'AUCTION_WIN'
@@ -199,6 +199,11 @@ export interface Contract {
   signedAt?: string
   /** When the auction award that produced this contract was won (AUCTION_WIN only). */
   awardedOn?: string
+  /** Auction contract flavour; SPOT means a one-time spot-lane contract. */
+  contractKind?: 'BULK' | 'LOT' | 'SPOT'
+  /** One-time contract consumed by a single spot booking. */
+  oneTime?: boolean
+  consumedByBookingId?: string
   pdfUrl: string
   createdAt: string
 }

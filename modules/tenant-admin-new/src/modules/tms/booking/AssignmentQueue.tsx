@@ -18,6 +18,7 @@ import { getAssignmentModeLabel, getCommercialModeLabel } from "@/shared/lib/ten
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { BookingStatusBadge } from "@/modules/tms/booking/components/BookingStatusBadge";
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
+import { updateContract as updateAuctionContract } from "@auction/lib/auction-store";
 import { useTenantBookings } from "./hooks/useTenantBookings";
 import { calculateMarginAmount, calculateMarginPercent } from "@/modules/tms/booking/services/booking-engine";
 import {
@@ -58,7 +59,7 @@ export function AssignmentQueuePage() {
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [vendorFreight, setVendorFreight] = useState("");
-  const [vendorFreightSource, setVendorFreightSource] = useState<"RATE_CARD" | "MANUAL">("MANUAL");
+  const [vendorFreightSource, setVendorFreightSource] = useState<"RATE_CARD" | "MANUAL" | "SPOT_AUCTION">("MANUAL");
   const [vendorRateWarning, setVendorRateWarning] = useState("");
   const [matchedVendorRateCardId, setMatchedVendorRateCardId] = useState<string | null>(null);
   const [matchedVendorRateType, setMatchedVendorRateType] = useState<"PER_TRIP" | "PER_KM" | "PER_MT" | null>(null);
@@ -329,6 +330,18 @@ export function AssignmentQueuePage() {
     );
   }, [adminSources.customerAddressMap, adminSources.vendorRateCardMap, adminSources.vehicleTypes, assigningBooking, vendorId]);
 
+  // Spot-contract bookings arrive with the winning vendor + locked rate from
+  // the one-time spot contract — prefill both so no manual amount is typed.
+  useEffect(() => {
+    const spot = assigningBooking?.spotContract;
+    if (!spot) return;
+    setVendorId(spot.vendorId);
+    setVendorFreight(String(spot.rate));
+    setVendorFreightSource("SPOT_AUCTION");
+    setBuyingRateLabel(`${spot.rateUnit} @ ${spot.rate.toLocaleString()} (Spot contract ${spot.contractId})`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assigningBooking?.id]);
+
   function submitAssignment() {
     const selectedDriver = adminSources.drivers.find((driver) => driver.id === driverId);
     if (!assigningBooking || !selectedVehicle || !selectedDriver || !vendorId || Number(vendorFreight) <= 0) {
@@ -368,6 +381,16 @@ export function AssignmentQueuePage() {
         preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
       });
+    // One-time spot contract consumed by this booking — mark it Used so it is
+    // never offered to another booking and the vendor sees it spent.
+    const spot = assigningBooking.spotContract;
+    if (spot && vendorFreightSource === "SPOT_AUCTION") {
+      updateAuctionContract(spot.contractId, (contract) => ({
+        ...contract,
+        status: "USED",
+        consumedByBookingId: assigningBooking.bookingId,
+      }));
+    }
     resetDialog();
   }
 

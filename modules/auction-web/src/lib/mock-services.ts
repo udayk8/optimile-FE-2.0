@@ -300,35 +300,40 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
   byLane.forEach((laneDecisions, laneId) => {
     const lane = auction.lanes.find((l) => l.id === laneId)
     if (!lane) return
-    const contracts: Contract[] =
-      auction.type === 'SPOT'
-        ? []
-        : laneDecisions.map((d) => ({
-            id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
-            sourceAuctionId: auction.id,
-            tenantId: auction.tenantId,
-            awardedByUserId: principal.userId,
-            contractType: auction.type as 'BULK' | 'LOT',
-            vendorId: d.vendorId,
-            vendorName: d.vendorName,
-            lane: lane.lane,
-            region: lane.region,
-            vehicleType: lane.vehicleType,
-            contractedRate: d.awardedAmount,
-            rateUnit: lane.rateUnit,
-            volumeAllocationPercent: d.allocationPercent,
-            allocationRank: d.allocationRank,
-            awardedAt: new Date().toISOString(),
-            startDate: auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
-            endDate: auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-            estimatedTrips: lane.estimatedTrips ?? 0,
-            createdFrom: 'AUCTION_WIN' as const,
-            status: 'ACTIVE' as const,
-            l1OverrideReason: d.overrideReason,
-            rateSyncedToTms: true,
-            placementFailures: [],
-            rateDeviationOpen: false,
-          }))
+    // SPOT awards produce a ONE-TIME lane contract: short validity, single
+    // trip, consumed by exactly one spot booking on the lane.
+    const isSpot = auction.type === 'SPOT'
+    const contracts: Contract[] = laneDecisions.map((d) => ({
+      id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
+      sourceAuctionId: auction.id,
+      tenantId: auction.tenantId,
+      awardedByUserId: principal.userId,
+      contractType: auction.type as 'BULK' | 'LOT' | 'SPOT',
+      vendorId: d.vendorId,
+      vendorName: d.vendorName,
+      lane: lane.lane,
+      region: lane.region,
+      vehicleType: lane.vehicleType,
+      contractedRate: d.awardedAmount,
+      rateUnit: lane.rateUnit,
+      volumeAllocationPercent: d.allocationPercent,
+      allocationRank: d.allocationRank,
+      awardedAt: new Date().toISOString(),
+      startDate: isSpot
+        ? new Date().toISOString().slice(0, 10)
+        : auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
+      endDate: isSpot
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        : auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      estimatedTrips: isSpot ? 1 : lane.estimatedTrips ?? 0,
+      createdFrom: 'AUCTION_WIN' as const,
+      oneTime: isSpot || undefined,
+      status: 'ACTIVE' as const,
+      l1OverrideReason: d.overrideReason,
+      rateSyncedToTms: true,
+      placementFailures: [],
+      rateDeviationOpen: false,
+    }))
     if (contracts.length > 0) replaceLaneContracts(auction.id, lane.lane, contracts)
   })
 

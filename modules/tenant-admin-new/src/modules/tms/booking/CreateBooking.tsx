@@ -12,6 +12,8 @@ import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
 import { Textarea } from "@/shared/components/ui/textarea";
 import { formatCurrency } from "@/shared/lib/format-currency";
+import { laneCodeFromCities, normalizeLaneCode } from "@shared-utils";
+import { loadStore as loadAuctionStore } from "@auction/lib/auction-store";
 import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useBookingAdminSources } from "./hooks/useBookingAdminSources";
@@ -254,6 +256,32 @@ export function CreateBookingPage({
       : null;
 
   const deliveries = draft.deliveries;
+  const [useSpotContract, setUseSpotContract] = useState(true);
+
+  // Spot-contract lane match: a SPOT booking on a lane with a live one-time
+  // spot-auction contract can consume it — no manual vendor rate, indent goes
+  // straight to the winning vendor.
+  const spotLaneCode = useMemo(() => {
+    const first = deliveries[0];
+    const last = deliveries[deliveries.length - 1] ?? first;
+    if (!first?.originCity || !last?.destinationCity) return "";
+    return laneCodeFromCities(first.originCity, last.destinationCity);
+  }, [deliveries]);
+
+  const spotContractMatch = useMemo(() => {
+    if (draft.commercialType !== "SPOT" || !spotLaneCode) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    return (
+      loadAuctionStore().contracts.find(
+        (contract) =>
+          contract.contractType === "SPOT" &&
+          contract.status === "ACTIVE" &&
+          !contract.consumedByBookingId &&
+          normalizeLaneCode(contract.lane) === spotLaneCode &&
+          contract.endDate >= today,
+      ) ?? null
+    );
+  }, [draft.commercialType, spotLaneCode]);
   const totalQuantity = deliveries.reduce((sum, delivery) => sum + Number(delivery.quantity || 0), 0);
   const totalWeight = deliveries.reduce(
     (sum, delivery) =>
@@ -613,6 +641,18 @@ export function CreateBookingPage({
       consigneeAddressId: lastDelivery?.destinationAddressId || draft.destinationAddressId,
       laneKey: matchedRateCard?.lanes ?? null,
       laneFound,
+      spotContract:
+        draft.commercialType === "SPOT" && useSpotContract && spotContractMatch
+          ? {
+              contractId: spotContractMatch.id,
+              sourceAuctionId: spotContractMatch.sourceAuctionId,
+              vendorId: spotContractMatch.vendorId,
+              vendorName: spotContractMatch.vendorName,
+              rate: spotContractMatch.contractedRate,
+              rateUnit: spotContractMatch.rateUnit,
+              lane: spotContractMatch.lane,
+            }
+          : null,
       poNumber: null,
       doNumber: null,
       ewayBillNumber: null,
@@ -1051,6 +1091,40 @@ export function CreateBookingPage({
           </Field>
         </div>
       </StepSection>
+
+      {/* Spot-auction contract match — surfaced BEFORE the commercial preview
+          so the dispatcher never types a manual vendor amount when a spot
+          contract already covers the lane. */}
+      {draft.commercialType === "SPOT" && spotContractMatch ? (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                ⚡ Spot contract available for {spotContractMatch.lane}
+              </p>
+              <p className="mt-1 text-xs text-amber-800">
+                {spotContractMatch.vendorName} @ ₹{spotContractMatch.contractedRate.toLocaleString("en-IN")}{" "}
+                {spotContractMatch.rateUnit.replace("PER_", "/").toLowerCase()} — won in auction{" "}
+                {spotContractMatch.sourceAuctionId}
+                {spotContractMatch.awardedAt ? ` on ${new Date(spotContractMatch.awardedAt).toLocaleDateString()}` : ""}, valid till {spotContractMatch.endDate}. One-time use.
+              </p>
+              <p className="mt-1 text-xs text-amber-700">
+                {useSpotContract
+                  ? `The indent will go directly to ${spotContractMatch.vendorName} at the contract rate.`
+                  : "Ignored — the booking follows the normal manual-rate flow."}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant={useSpotContract ? "outline" : "default"}
+              size="sm"
+              onClick={() => setUseSpotContract((v) => !v)}
+            >
+              {useSpotContract ? "Ignore contract" : "Use spot contract"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* STEP 4 — Commercial Preview (only after customer + route + material) */}
       {(() => {

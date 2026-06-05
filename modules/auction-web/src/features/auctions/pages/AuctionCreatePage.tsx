@@ -11,9 +11,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
-import { createAuction, fetchBookings, fetchVendors } from '@auction/lib/mock-services'
-import { getLaneCodeError, isValidLaneCode, normalizeLaneCode } from '@shared-utils'
-import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
+import { createAuction, fetchVendors } from '@auction/lib/mock-services'
+import { getLaneCodeError, isValidLaneCode, laneCodeToCityDisplay, normalizeLaneCode, knownLocationCodes } from '@shared-utils'
+import type { AuctionType, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
 // BULK  — single lane (manually chosen), single winner, no L1/L2/L3
@@ -140,17 +140,6 @@ function parseLaneMode(value: unknown): DraftLane['allocationMode'] {
   return normalizeText(value).toUpperCase() === 'SINGLE' ? 'SINGLE' : 'SPLIT'
 }
 
-const FALLBACK_BOOKING: BookingReference = {
-  id: 'BK-DEMO-0001',
-  lane: 'MUM-DEL',
-  vehicleType: '20 MT Open Body',
-  commodity: 'FMCG',
-  quantity: 18,
-  uom: 'Metric Tonnes',
-  loadingDate: new Date().toISOString().slice(0, 10),
-  status: 'PENDING_AUCTION',
-}
-
 export default function AuctionCreatePage() {
   const { type } = useParams()
   const navigate = useNavigate()
@@ -159,31 +148,23 @@ export default function AuctionCreatePage() {
   const { auctionUser } = useAuctionAuth()
   const { canCreateAuction } = useAuctionPermissions()
 
-  const [bookings, setBookings] = useState<BookingReference[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
   const [saving, setSaving] = useState(false)
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
 
   useEffect(() => {
-    fetchBookings()
-      .then(setBookings)
-      .catch(() => setBookings([]))
     fetchVendors()
       .then(setVendors)
       .catch(() => setVendors([]))
   }, [])
 
-  const selectedBooking = bookings[0] ?? FALLBACK_BOOKING
-
-  const [selectedBookingId, setSelectedBookingId] = useState(selectedBooking.id)
-  const [title, setTitle] = useState(`Spot | ${selectedBooking.id} | ${selectedBooking.lane}`)
+  const [title, setTitle] = useState('Spot | Lane Auction | MUM-DEL')
   const [auctionRegion, setAuctionRegion] = useState('North India')
-  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', selectedBooking.lane)])
+  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', 'MUM-DEL')])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
   const [importFileName, setImportFileName] = useState('')
 
-  const activeBooking = bookings.find((item) => item.id === selectedBookingId) ?? selectedBooking
   const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
     if (auctionRegion === 'North India') return lane === 'MUM-DEL' || lane === 'DEL-LKO'
     if (auctionRegion === 'South India') return lane === 'MUM-BLR' || lane === 'BLR-MAA' || lane === 'MAA-MUM'
@@ -193,20 +174,18 @@ export default function AuctionCreatePage() {
 
   useEffect(() => {
     if (!effectiveType) return
-    const defaultBooking = bookings[0] ?? FALLBACK_BOOKING
-    const defaultLane = effectiveType === 'SPOT' ? defaultBooking.lane : 'MUM-BLR'
+    const defaultLane = effectiveType === 'SPOT' ? 'MUM-DEL' : 'MUM-BLR'
     setTitle(
       effectiveType === 'SPOT'
-        ? `Spot | ${defaultBooking.id} | ${defaultBooking.lane}`
+        ? `Spot | Lane Auction | ${defaultLane}`
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
-    setSelectedBookingId(defaultBooking.id)
     setAuctionRegion('North India')
     setLanes([makeDefaultLane(effectiveType, defaultLane)])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
-  }, [effectiveType, bookings])
+  }, [effectiveType])
 
   const addLane = () => {
     if (effectiveType !== 'LOT') return
@@ -278,6 +257,13 @@ export default function AuctionCreatePage() {
       toast.error('Select an auction type first.')
       return
     }
+    // Lanes are restricted to AAA-BBB location codes so spot contracts can be
+    // matched back to bookings by lane.
+    const invalidLane = lanes.find((lane) => !isValidLaneCode(lane.lane))
+    if (invalidLane) {
+      toast.error(getLaneCodeError(invalidLane.lane) ?? 'Enter lanes as AAA-BBB codes (e.g. MUM-DEL).')
+      return
+    }
 
     // A future schedule turns "launch now" into a scheduled (Upcoming)
     // auction — it goes live automatically at the chosen time.
@@ -292,7 +278,6 @@ export default function AuctionCreatePage() {
       const payload = {
         type: effectiveType,
         title,
-        bookingId: effectiveType === 'SPOT' ? activeBooking.id : undefined,
         region: effectiveType === 'LOT' ? auctionRegion : undefined,
         minBidDecrement: Number(auctionSettings.minBidDecrement),
         extensionTriggerMinutes: Number(auctionSettings.extensionTriggerMinutes),
@@ -423,36 +408,12 @@ export default function AuctionCreatePage() {
                     <Input value={title} onChange={(event) => setTitle(event.target.value)} />
                   </div>
 
-                  {/* SPOT — booking selector */}
+                  {/* SPOT — lane-based, conducted in advance; no booking link.
+                      Whoever wins gets a one-time spot contract for the lane. */}
                   {effectiveType === 'SPOT' && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-[#334155]">Booking</label>
-                        <select
-                          value={selectedBookingId}
-                          onChange={(event) => {
-                            const booking = bookings.find((item) => item.id === event.target.value) ?? selectedBooking
-                            setSelectedBookingId(booking.id)
-                            setTitle(`Spot | ${booking.id} | ${booking.lane}`)
-                            setLanes((current) =>
-                              current.map((lane, index) =>
-                                index === 0 ? { ...lane, lane: booking.lane, vehicleType: booking.vehicleType } : lane
-                              )
-                            )
-                          }}
-                          className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                        >
-                          {[selectedBooking, ...bookings.filter((item) => item.id !== selectedBooking.id)].map((booking) => (
-                            <option key={booking.id} value={booking.id}>
-                              {booking.id} · {booking.lane}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-[#334155]">Vehicle Type</label>
-                        <Input value={lanes[0]?.vehicleType ?? '20 MT Open Body'} readOnly />
-                      </div>
+                    <div className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] p-4 text-xs text-[#1D4ED8]">
+                      Spot auctions run per lane, in advance of any booking. The winning vendor receives a
+                      one-time spot contract for the lane, which a spot booking on the same lane can consume.
                     </div>
                   )}
 
@@ -625,35 +586,54 @@ export default function AuctionCreatePage() {
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Lane</label>
-                              {effectiveType === 'SPOT' ? (
-                                <Input value={activeBooking.lane} readOnly />
-                              ) : (
+                              {effectiveType === 'LOT' ? (
                                 <select
                                   value={lane.lane}
                                   onChange={(event) => updateLane(index, 'lane', event.target.value)}
                                   className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                                 >
-                                  {(effectiveType === 'LOT' ? lotLaneOptions : LANE_OPTIONS).map((option) => (
+                                  {lotLaneOptions.map((option) => (
                                     <option key={option} value={option}>{option}</option>
                                   ))}
                                 </select>
+                              ) : (
+                                <>
+                                  {/* Free lane entry, restricted to AAA-BBB location codes.
+                                      The city mapping below shows exactly which lane the code
+                                      resolves to — same codes the booking side derives from
+                                      its origin/destination cities. */}
+                                  <Input
+                                    value={lane.lane}
+                                    list="lane-code-suggestions"
+                                    placeholder="AAA-BBB (e.g. MUM-DEL)"
+                                    onChange={(event) => updateLane(index, 'lane', normalizeLaneCode(event.target.value))}
+                                  />
+                                  <datalist id="lane-code-suggestions">
+                                    {LANE_OPTIONS.map((option) => (
+                                      <option key={option} value={option} />
+                                    ))}
+                                  </datalist>
+                                  {getLaneCodeError(lane.lane) ? (
+                                    <p className="mt-1 text-xs text-red-600">{getLaneCodeError(lane.lane)}</p>
+                                  ) : (
+                                    <p className="mt-1 text-xs text-[#64748B]">
+                                      {laneCodeToCityDisplay(lane.lane) || 'Unknown codes are accepted but won\'t auto-match bookings.'}
+                                    </p>
+                                  )}
+                                </>
                               )}
                             </div>
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Vehicle Type</label>
-                              {effectiveType === 'SPOT' ? (
-                                <Input value={activeBooking.vehicleType} readOnly />
-                              ) : (
-                                <select
-                                  value={lane.vehicleType}
-                                  onChange={(event) => updateLane(index, 'vehicleType', event.target.value)}
-                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                                >
-                                  {VEHICLE_TYPE_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
-                              )}
+                              <select
+                                value={lane.vehicleType}
+                                onChange={(event) => updateLane(index, 'vehicleType', event.target.value)}
+                                className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                              >
+                                {VEHICLE_TYPE_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
                             </div>
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Capacity (MT)</label>
