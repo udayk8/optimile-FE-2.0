@@ -9,7 +9,7 @@ import { Input } from '@vendor/components/ui/input'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
-import { formatDate } from '@vendor/lib/date-utils'
+import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
@@ -286,11 +286,13 @@ export default function InvoicesPage() {
               />
             </div>
           ) : (
-            <table className="w-full min-w-[1200px] text-left text-sm">
+            <table className="w-full min-w-[1450px] text-left text-sm">
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created On</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Due Date</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
@@ -307,6 +309,13 @@ export default function InvoicesPage() {
                     <tr key={invoice.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
                       <td className="p-4 font-mono font-semibold">{invoice.invoiceNumber || invoice.id}</td>
                       <td className="p-4">{formatDate(invoice.invoiceDate)}</td>
+                      <td className="p-4">{formatDateTime(invoice.createdAt)}</td>
+                      <td className="p-4">
+                        {formatDate(invoice.paymentDueDate)}
+                        {invoice.paymentDate ? (
+                          <div className="mt-1 text-xs text-emerald-600">Paid {formatDate(invoice.paymentDate)}</div>
+                        ) : null}
+                      </td>
                       <td className="p-4">
                         <StatusBadge status={invoice.status} />
                         {invoice.status === 'CLOSED' && invoice.closeReason ? (

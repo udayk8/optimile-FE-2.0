@@ -6,6 +6,7 @@ import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
 import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
+import { formatDateTime } from '@vendor/lib/date-utils'
 
 const PAGE_SIZE = 6
 
@@ -144,6 +145,7 @@ export default function SupportHubPage() {
                 <th className="px-5 py-3 font-bold">Status</th>
                 <th className="px-5 py-3 font-bold">SLA</th>
                 <th className="px-5 py-3 font-bold">Created</th>
+                <th className="px-5 py-3 font-bold">Last Update</th>
                 <th className="px-5 py-3 font-bold text-right">Actions</th>
               </tr>
             </thead>
@@ -164,6 +166,7 @@ export default function SupportHubPage() {
                   <td className="px-5 py-4 text-sm text-text">{statusLabel(item.status)}</td>
                   <td className="px-5 py-4 text-sm text-text">{new Date(item.slaDueAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
                   <td className="px-5 py-4 text-sm text-text">{new Date(item.createdAt).toLocaleDateString('en-IN')}</td>
+                  <td className="px-5 py-4 text-sm text-text">{formatDateTime(item.timeline[item.timeline.length - 1]?.timestamp ?? item.updatedAt ?? item.createdAt)}</td>
                   <td className="px-5 py-4 text-right">
                     <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/support/exception/${item.id}`)}>
                       View
