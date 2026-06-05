@@ -19,8 +19,9 @@ const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
 ]
 
 function laneLabel(contract: Contract): string {
-  if (contract.laneCode) return contract.laneCode
-  return formatLaneDisplay(contract.laneDetails.origin.city, contract.laneDetails.destination.city)
+  const { origin, destination } = contract.laneDetails
+  if (origin.city && destination.city) return formatLaneDisplay(origin.city, destination.city)
+  return contract.laneCode ?? formatLaneDisplay(origin.city, destination.city)
 }
 
 export default function ContractsPage() {
@@ -103,7 +104,7 @@ export default function ContractsPage() {
                   <td className="border-r border-gray-200 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-text">
                       <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                      <span className={contract.laneCode ? 'font-mono font-semibold' : ''}>{laneLabel(contract)}</span>
+                      <span>{laneLabel(contract)}</span>
                     </div>
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{contract.rateCard[0]?.vehicleType ?? '—'}</td>

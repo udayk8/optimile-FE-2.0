@@ -169,7 +169,7 @@ function writeStore(store: SourceStore) {
 function splitLane(lane: string): [string, string] {
   const codeParts = splitLaneCode(lane)
   if (codeParts) return codeParts
-  const parts = lane.split(/→|->/).map((p) => p.trim())
+  const parts = lane.split(/→|->| - /).map((p) => p.trim())
   return [parts[0] ?? lane, parts[1] ?? '']
 }
 

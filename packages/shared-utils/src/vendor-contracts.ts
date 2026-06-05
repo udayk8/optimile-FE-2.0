@@ -16,7 +16,7 @@
      GET  /admin/vendors/:vendorId/contracts
    ============================================================ */
 
-import { getLaneCodeError, legacyLaneToCityKey, normalizeLaneCode } from './lane'
+import { citiesToDisplayLane, laneCodeToCityDisplay } from './lane'
 import { isValidRateType, type RateType } from './rate-type'
 
 // ── Model ──
@@ -39,6 +39,10 @@ export interface VendorContract {
   /** Vendor display name — vendor-web also matches on this (same as auction bridge). */
   vendorName: string
   tenantId?: string
+  /** Lane identity — source/destination cities (address-book vocabulary). */
+  originCity?: string
+  destinationCity?: string
+  /** Legacy/internal lane code; display uses the cities. */
   laneCode: string
   vehicleType: string
   rate: number
@@ -55,10 +59,23 @@ export interface VendorContract {
   volumeAllocationPercent?: number
 }
 
+/** "Mumbai → Delhi" — from cities when present, else expanded legacy code. */
+export function vendorContractLaneLabel(contract: {
+  originCity?: string
+  destinationCity?: string
+  laneCode: string
+}): string {
+  if (contract.originCity && contract.destinationCity) {
+    return `${contract.originCity} → ${contract.destinationCity}`
+  }
+  return laneCodeToCityDisplay(contract.laneCode) || contract.laneCode
+}
+
 // ── CSV template + validation ──
 
 export const VENDOR_CONTRACT_CSV_HEADERS = [
-  'lane',
+  'originCity',
+  'destinationCity',
   'vehicleType',
   'rate',
   'rateType',
@@ -72,9 +89,9 @@ export function buildVendorContractCsvTemplate(): string {
   const endDate = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   return [
     VENDOR_CONTRACT_CSV_HEADERS.join(','),
-    `MUM-BLR,32FT,45000,PER_TRIP,${startDate},${endDate}`,
-    `DEL-LKO,20FT,1800,PER_MT,${startDate},${endDate}`,
-    `PNQ-JAI,32FT,52,PER_KM,${startDate},${endDate}`,
+    `Mumbai,Bengaluru,32FT,45000,PER_TRIP,${startDate},${endDate}`,
+    `Delhi,Lucknow,20FT,1800,PER_MT,${startDate},${endDate}`,
+    `Pune,Jaipur,32FT,52,PER_KM,${startDate},${endDate}`,
   ].join('\n')
 }
 
@@ -106,6 +123,8 @@ export function validateVendorContractCsvHeaders(headers: string[]): string[] {
 }
 
 export interface VendorContractCsvRow {
+  originCity: string
+  destinationCity: string
   laneCode: string
   vehicleType: string
   rate: number
@@ -145,14 +164,11 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
     const values = line.split(',').map((value) => value.trim())
     const errors: string[] = []
 
-    const laneCode = normalizeLaneCode(values[index('lane')] ?? '')
-    const laneError = getLaneCodeError(laneCode)
-    if (laneError) errors.push(laneError)
-    // Lane codes must resolve to known cities — bulk upload can't introduce
-    // a lane no booking can ever produce.
-    else if (!legacyLaneToCityKey(laneCode)) {
-      errors.push(`Lane ${laneCode} does not map to known cities — use codes for cities in the address book.`)
-    }
+    const originCity = (values[index('originCity')] ?? '').trim()
+    const destinationCity = (values[index('destinationCity')] ?? '').trim()
+    if (!originCity) errors.push('Origin city is required.')
+    if (!destinationCity) errors.push('Destination city is required.')
+    const laneCode = citiesToDisplayLane(originCity, destinationCity)
 
     const vehicleType = values[index('vehicleType')] ?? ''
     if (!vehicleType) errors.push('Vehicle type is required.')
@@ -175,7 +191,7 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
       invalidRows.push({ rowNumber, errors })
       return
     }
-    validRows.push({ laneCode, vehicleType, rate, rateType: rateType as RateType, startDate, endDate })
+    validRows.push({ originCity, destinationCity, laneCode, vehicleType, rate, rateType: rateType as RateType, startDate, endDate })
   })
 
   return { headerErrors: [], validRows, invalidRows }
@@ -229,6 +245,8 @@ export function createVendorContracts(
     vendorId: vendor.vendorId,
     vendorName: vendor.vendorName,
     tenantId: vendor.tenantId,
+    originCity: row.originCity,
+    destinationCity: row.destinationCity,
     laneCode: row.laneCode,
     vehicleType: row.vehicleType,
     rate: row.rate,

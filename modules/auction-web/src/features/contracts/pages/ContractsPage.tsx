@@ -138,7 +138,7 @@ export default function ContractsPage() {
         render: (contract) => (
           <span className="text-sm text-[#0F172A]">
             {contract.originCity && contract.destinationCity
-              ? `${contract.originCity} → ${contract.destinationCity}`
+              ? `${contract.originCity} - ${contract.destinationCity}`
               : contract.lane}
           </span>
         ),

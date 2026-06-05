@@ -24,10 +24,13 @@ function toLocation(code: string): Location {
 }
 
 function mapManualContract(source: VendorContract): Contract {
-  const [origin, destination] = splitLaneCode(source.laneCode) ?? [source.laneCode, '']
+  const [codeOrigin, codeDestination] = splitLaneCode(source.laneCode) ?? [source.laneCode, '']
+  const hasCities = Boolean(source.originCity && source.destinationCity)
+  const origin = source.originCity ?? codeOrigin
+  const destination = source.destinationCity ?? codeDestination
   return {
     id: source.contractId,
-    laneCode: source.laneCode,
+    laneCode: hasCities ? undefined : source.laneCode,
     laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
     source: 'MANUAL_UPLOAD',
     rateCard: [

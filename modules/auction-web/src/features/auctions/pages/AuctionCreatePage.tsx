@@ -630,7 +630,7 @@ export default function AuctionCreatePage() {
                               ) : (
                                 <p className="mt-1 text-xs text-[#64748B]">
                                   {lane.originCity && lane.destinationCity
-                                    ? `${lane.originCity} → ${lane.destinationCity}${lane.lane ? ` (${lane.lane})` : ''}`
+                                    ? `${lane.originCity} - ${lane.destinationCity}`
                                     : 'Cities come from your address book, so this lane is always bookable.'}
                                 </p>
                               )}

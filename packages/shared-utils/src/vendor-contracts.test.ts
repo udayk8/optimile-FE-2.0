@@ -73,12 +73,14 @@ describe('CSV row parsing', () => {
   const header = VENDOR_CONTRACT_CSV_HEADERS.join(',')
 
   it('parses valid rows', () => {
-    const result = parseVendorContractCsv(`${header}\nMUM-BLR,32FT,45000,PER_TRIP,2026-06-01,2026-12-31`)
+    const result = parseVendorContractCsv(`${header}\nMumbai,Bengaluru,32FT,45000,PER_TRIP,2026-06-01,2026-12-31`)
     expect(result.headerErrors).toEqual([])
     expect(result.invalidRows).toEqual([])
     expect(result.validRows).toEqual([
       {
-        laneCode: 'MUM-BLR',
+        originCity: 'Mumbai',
+        destinationCity: 'Bengaluru',
+        laneCode: 'Mumbai - Bengaluru',
         vehicleType: '32FT',
         rate: 45000,
         rateType: 'PER_TRIP',
@@ -88,21 +90,21 @@ describe('CSV row parsing', () => {
     ])
   })
 
-  it('flags invalid lane, rateType, rate, and dates per row', () => {
+  it('flags missing cities, rateType, rate, and dates per row', () => {
     const result = parseVendorContractCsv(
-      `${header}\nMumbai,32FT,-5,PER_TON,01-06-2026,2026-12-31`,
+      `${header}\nMumbai,,32FT,-5,PER_TON,01-06-2026,2026-12-31`,
     )
     expect(result.validRows).toEqual([])
     expect(result.invalidRows).toHaveLength(1)
     const errors = result.invalidRows[0].errors.join(' ')
-    expect(errors).toContain('AAA-BBB')
+    expect(errors).toContain('Destination city is required.')
     expect(errors).toContain('Rate must be a number greater than zero.')
     expect(errors).toContain('Rate type must be PER_TRIP, PER_MT, or PER_KM.')
     expect(errors).toContain('Start date must be YYYY-MM-DD.')
   })
 
   it('rejects a file whose headers contain a customer column', () => {
-    const result = parseVendorContractCsv(`customer,${header}\nAcme,MUM-BLR,32FT,45000,PER_TRIP,2026-06-01,2026-12-31`)
+    const result = parseVendorContractCsv(`customer,${header}\nAcme,Mumbai,Bengaluru,32FT,45000,PER_TRIP,2026-06-01,2026-12-31`)
     expect(result.headerErrors.join(' ')).toContain('Customer columns are not allowed')
     expect(result.validRows).toEqual([])
   })

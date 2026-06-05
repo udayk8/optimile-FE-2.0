@@ -258,12 +258,16 @@ export function cityToDisplayCode(city: string): string {
   return cityToLocationCode(city)
 }
 
-/** ("Mumbai","Delhi") → "MUM-DEL" display lane (never used for matching). */
+/**
+ * ("Mumbai","Delhi") → "Mumbai - Delhi" display lane (never used for
+ * matching — matching always goes through cityLaneKey). 3-letter codes are
+ * legacy-only; new lanes display the cities themselves.
+ */
 export function citiesToDisplayLane(originCity: string, destinationCity: string): string {
-  const origin = cityToDisplayCode(originCity)
-  const destination = cityToDisplayCode(destinationCity)
+  const origin = (originCity ?? '').trim()
+  const destination = (destinationCity ?? '').trim()
   if (!origin || !destination) return ''
-  return `${origin}-${destination}`
+  return `${origin} - ${destination}`
 }
 
 /* ============================================================

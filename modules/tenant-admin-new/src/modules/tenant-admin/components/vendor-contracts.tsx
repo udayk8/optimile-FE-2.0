@@ -10,12 +10,13 @@ import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
   buildVendorContractCsvTemplate,
-  getLaneCodeError,
+  citiesToDisplayLane,
   getRateTypeLabel,
   isValidRateType,
+  listTenantCities,
   listVendorContracts,
-  normalizeLaneCode,
   parseVendorContractCsv,
+  vendorContractLaneLabel,
   uploadVendorContractsCsv,
   type RateType,
   type VendorContract,
@@ -42,6 +43,8 @@ interface AuctionStoreContract {
   vendorId: string;
   vendorName: string;
   lane: string;
+  originCity?: string;
+  destinationCity?: string;
   vehicleType: string;
   contractedRate: number;
   rateUnit: VendorContract["rateType"];
@@ -68,6 +71,8 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
         contractId: contract.id,
         vendorId: contract.vendorId,
         vendorName: contract.vendorName,
+        originCity: contract.originCity,
+        destinationCity: contract.destinationCity,
         laneCode: contract.lane,
         vehicleType: contract.vehicleType,
         rate: contract.contractedRate,
@@ -216,7 +221,7 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
       headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
+        <span key={`${contract.contractId}-lane`} className="font-semibold">{vendorContractLaneLabel(contract)}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -240,6 +245,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
 }
 
 const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
+  originCity: "",
+  destinationCity: "",
   laneCode: "",
   vehicleType: "",
   rate: 0,
@@ -250,8 +257,11 @@ const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
 
 /** Validates a contract row; returns an error message or null when valid. */
 function validateContractRow(form: VendorContractCsvRow): string | null {
-  const laneError = getLaneCodeError(normalizeLaneCode(form.laneCode));
-  if (laneError) return laneError;
+  if (!form.originCity.trim()) return "Origin city is required.";
+  if (!form.destinationCity.trim()) return "Destination city is required.";
+  if (form.originCity.trim().toLowerCase() === form.destinationCity.trim().toLowerCase()) {
+    return "Origin and destination must be different cities.";
+  }
   if (!form.vehicleType.trim()) return "Vehicle type is required.";
   if (!Number.isFinite(form.rate) || form.rate <= 0) return "Rate must be greater than zero.";
   if (!isValidRateType(form.rateType)) return "Rate type must be PER_TRIP, PER_MT, or PER_KM.";
@@ -278,6 +288,8 @@ export function VendorContractFormDialog({
 }) {
   const [form, setForm] = useState<VendorContractCsvRow>(EMPTY_CONTRACT_ROW);
   const [error, setError] = useState("");
+  // Lane cities come from the tenant address book — same vocabulary bookings use.
+  const tenantCities = useMemo(() => listTenantCities(), []);
 
   useEffect(() => {
     if (!open) return;
@@ -288,7 +300,7 @@ export function VendorContractFormDialog({
   function save() {
     const validationError = validateContractRow(form);
     if (validationError) return setError(validationError);
-    onSave({ ...form, laneCode: normalizeLaneCode(form.laneCode) });
+    onSave({ ...form, laneCode: citiesToDisplayLane(form.originCity, form.destinationCity) });
     onOpenChange(false);
   }
 
@@ -297,7 +309,7 @@ export function VendorContractFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Lane must be AAA-BBB; rate type must be PER_TRIP, PER_MT, or PER_KM."
+      description="Pick the lane's source and destination cities from the address book."
       footer={
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -309,13 +321,27 @@ export function VendorContractFormDialog({
         {error ? (
           <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         ) : null}
-        <ContractField label="Lane">
-          <Input
-            value={form.laneCode}
-            onChange={(event) => setForm((current) => ({ ...current, laneCode: event.target.value.toUpperCase() }))}
-            placeholder="MUM-BLR"
-            className="font-mono"
-          />
+        <ContractField label="Source City">
+          <Select
+            value={form.originCity}
+            onChange={(event) => setForm((current) => ({ ...current, originCity: event.target.value }))}
+          >
+            <option value="">Select city</option>
+            {tenantCities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </Select>
+        </ContractField>
+        <ContractField label="Destination City">
+          <Select
+            value={form.destinationCity}
+            onChange={(event) => setForm((current) => ({ ...current, destinationCity: event.target.value }))}
+          >
+            <option value="">Select city</option>
+            {tenantCities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </Select>
         </ContractField>
         <ContractField label="Vehicle Type">
           <Input
@@ -373,7 +399,7 @@ export function EditableVendorContractRows({
         description="Each row can be edited or removed before the vendor is saved."
         headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Actions"]}
         rows={rows.map((row, index) => [
-          <span key={`pending-${index}-lane`} className="font-mono font-semibold">{row.laneCode}</span>,
+          <span key={`pending-${index}-lane`} className="font-semibold">{vendorContractLaneLabel(row)}</span>,
           row.vehicleType,
           row.rate.toLocaleString("en-IN"),
           <Badge key={`pending-${index}-rate-type`} variant="outline">{getRateTypeLabel(row.rateType)}</Badge>,
@@ -488,7 +514,7 @@ export function VendorContractCsvUpload({
         open={open}
         onOpenChange={setOpen}
         title="Upload Vendor Contracts"
-        description="CSV only. Headers must be exactly: lane,vehicleType,rate,rateType,startDate,endDate — no customer column."
+        description="CSV only. Headers must be exactly: originCity,destinationCity,vehicleType,rate,rateType,startDate,endDate — no customer column."
         footer={
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
@@ -510,7 +536,7 @@ export function VendorContractCsvUpload({
             />
           </label>
           <p className="text-xs text-muted-foreground">
-            Lane must be in AAA-BBB format (e.g. MUM-BLR). Rate type must be PER_TRIP, PER_MT, or PER_KM.
+            Lanes are source/destination city pairs (e.g. Mumbai,Bengaluru). Rate type must be PER_TRIP, PER_MT, or PER_KM.
           </p>
           {busy ? <p className="text-sm text-muted-foreground">Validating uploaded file...</p> : null}
           {fileName && !busy ? <p className="text-sm font-medium">{fileName}</p> : null}

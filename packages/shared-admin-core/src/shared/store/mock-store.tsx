@@ -683,6 +683,15 @@ const SEED_ADDRESS_BOOK = [
   { id: "addr-seed-hyd", name: "Hyderabad Hub", type: "BOTH", city: "Hyderabad", state: "Telangana", pincode: "500001", linkedCustomerId: "", status: "active" },
   { id: "addr-seed-nsk", name: "Nashik Consolidation Point", type: "BOTH", city: "Nashik", state: "Maharashtra", pincode: "422001", linkedCustomerId: "", status: "active" },
   { id: "addr-seed-jai", name: "Jaipur Gateway", type: "BOTH", city: "Jaipur", state: "Rajasthan", pincode: "302001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-lko", name: "Lucknow Depot", type: "BOTH", city: "Lucknow", state: "Uttar Pradesh", pincode: "226001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-amd", name: "Ahmedabad Logistics Park", type: "BOTH", city: "Ahmedabad", state: "Gujarat", pincode: "380001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-srt", name: "Surat Textile Hub", type: "BOTH", city: "Surat", state: "Gujarat", pincode: "395001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bdq", name: "Vadodara Industrial Estate", type: "BOTH", city: "Vadodara", state: "Gujarat", pincode: "390001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-udr", name: "Udaipur Trade Center", type: "BOTH", city: "Udaipur", state: "Rajasthan", pincode: "313001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-cjb", name: "Coimbatore Mills Yard", type: "BOTH", city: "Coimbatore", state: "Tamil Nadu", pincode: "641001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ixe", name: "Mangaluru Port Godown", type: "BOTH", city: "Mangaluru", state: "Karnataka", pincode: "575001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ccu", name: "Kolkata Freight Terminal", type: "BOTH", city: "Kolkata", state: "West Bengal", pincode: "700001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-nag", name: "Nagpur Central Yard", type: "BOTH", city: "Nagpur", state: "Maharashtra", pincode: "440001", linkedCustomerId: "", status: "active" },
 ];
 
 function seedAddressBookForDemoTenants(): void {
