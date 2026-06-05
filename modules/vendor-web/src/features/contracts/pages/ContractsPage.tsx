@@ -83,7 +83,7 @@ export default function ContractsPage() {
             <table className="w-full min-w-[1100px] text-left">
               <thead className="text-gray-500">
                 <tr>
-                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'End Date', 'Source', 'Status'].map((header) => (
+                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'Valid Till', 'Type', 'Status'].map((header) => (
                     <th
                       key={header}
                       className="border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] last:border-r-0"
@@ -119,18 +119,32 @@ export default function ContractsPage() {
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
                     {formatDateTime(contract.awardedOn ?? contract.createdAt)}
                   </td>
-                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityFrom)}</td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
+                    {contract.contractKind === 'SPOT' ? '—' : formatDate(contract.validityFrom)}
+                  </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityTo)}</td>
                   <td className="border-r border-gray-200 px-4 py-3">
-                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${contract.source === 'AUCTION_WIN' ? 'bg-violet-50 text-violet-700' : 'bg-sky-50 text-sky-700'}`}>
-                      {getContractSourceLabel(contract.source)}
+                    {/* Type tells the whole story (Manual / Bulk / Lot / Spot) —
+                        the old Source column was redundant with it. */}
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        contract.contractKind === 'SPOT'
+                          ? 'bg-amber-50 text-amber-700'
+                          : contract.source === 'AUCTION_WIN'
+                            ? 'bg-violet-50 text-violet-700'
+                            : 'bg-sky-50 text-sky-700'
+                      }`}
+                    >
+                      {contract.contractKind === 'SPOT'
+                        ? 'Spot · One-time'
+                        : contract.contractKind === 'LOT'
+                          ? 'Lot'
+                          : contract.contractKind === 'BULK'
+                            ? 'Bulk'
+                            : 'Manual'}
                     </span>
-                    {contract.contractKind === 'SPOT' && (
-                      <div className="mt-1">
-                        <span className="inline-block rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
-                          Spot · One-time{contract.consumedByBookingId ? ` · Used in ${contract.consumedByBookingId}` : ''}
-                        </span>
-                      </div>
+                    {contract.consumedByBookingId && (
+                      <div className="mt-1 text-[11px] text-gray-500">Used in {contract.consumedByBookingId}</div>
                     )}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={contract.status} /></td>

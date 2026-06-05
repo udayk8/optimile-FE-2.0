@@ -46,6 +46,8 @@ export interface VendorContract {
   startDate: string
   endDate: string
   createdFrom: ContractSource
+  /** Auction flavour for AUCTION_WIN contracts; manual uploads have none. */
+  contractKind?: 'BULK' | 'LOT' | 'SPOT'
   status: 'ACTIVE' | 'EXPIRED' | 'TERMINATED'
   /** L1/L2/L3 volume split from auction awards (e.g. 50/30/20 on one lane).
       Manual uploads default to the full lane volume (100%). */

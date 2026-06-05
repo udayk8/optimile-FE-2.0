@@ -338,7 +338,7 @@ export const MOCK_CONTRACTS: Contract[] = [
   // Permanent auction-win samples — always visible regardless of which vendor
   // is logged in or whether the cross-module auction store is populated.
   {
-    id: 'CNT-AW-101', status: 'ACTIVE', source: 'AUCTION_WIN', laneCode: 'PNQ-NAG',
+    id: 'CNT-AW-101', status: 'ACTIVE', source: 'AUCTION_WIN', contractKind: 'BULK', laneCode: 'PNQ-NAG',
     laneDetails: { origin: { name: 'Chakan Plant', city: 'PNQ', state: 'Maharashtra' }, destination: { name: 'Nagpur Hub', city: 'NAG', state: 'Maharashtra' }, distanceKm: 700 },
     rateCard: [{ vehicleType: '20ft Container', rateType: 'PER_KM', rate: 16500, surcharges: [] }],
     volumeAllocation: { volume: 60, unit: '%', frequency: 'Monthly' },
@@ -349,7 +349,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-04-28T11:00:00Z', awardedOn: '2026-04-27T16:30:00Z', pdfUrl: '/contracts/CNT-AW-101.pdf', createdAt: '2026-04-27T16:30:00Z',
   },
   {
-    id: 'CNT-AW-102', status: 'ACTIVE', source: 'AUCTION_WIN', laneCode: 'BRC-BLR',
+    id: 'CNT-AW-102', status: 'ACTIVE', source: 'AUCTION_WIN', contractKind: 'LOT', laneCode: 'BRC-BLR',
     laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'BLR', state: 'Karnataka' }, distanceKm: 1200 },
     rateCard: [{ vehicleType: '32ft Container', rateType: 'PER_MT', rate: 2450, surcharges: [{ name: 'Fuel Surcharge', amount: 150 }] }],
     volumeAllocation: { volume: 40, unit: '%', frequency: 'Monthly' },
@@ -360,7 +360,7 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-02-26T09:45:00Z', awardedOn: '2026-02-25T18:10:00Z', pdfUrl: '/contracts/CNT-AW-102.pdf', createdAt: '2026-02-25T18:10:00Z',
   },
   {
-    id: 'CNT-AW-103', status: 'EXPIRED', source: 'AUCTION_WIN', laneCode: 'DEL-LKO',
+    id: 'CNT-AW-103', status: 'EXPIRED', source: 'AUCTION_WIN', contractKind: 'BULK', laneCode: 'DEL-LKO',
     laneDetails: { origin: { name: 'Delhi NCR Hub', city: 'DEL', state: 'Delhi' }, destination: { name: 'Lucknow Depot', city: 'LKO', state: 'Uttar Pradesh' }, distanceKm: 550 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 19800, surcharges: [] }],
     volumeAllocation: { volume: 100, unit: '%', frequency: 'Monthly' },

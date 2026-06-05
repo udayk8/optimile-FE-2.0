@@ -10,7 +10,6 @@ import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
   buildVendorContractCsvTemplate,
-  getContractSourceLabel,
   getLaneCodeError,
   getRateTypeLabel,
   isValidRateType,
@@ -76,6 +75,7 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
         startDate: contract.startDate,
         endDate: contract.endDate,
         createdFrom: "AUCTION_WIN" as const,
+        contractKind: contract.contractType,
         status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
         allocationRank: contract.allocationRank,
         volumeAllocationPercent: contract.volumeAllocationPercent,
@@ -175,14 +175,13 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
     <DataTable
       title="Spot auction contracts"
       description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Spot Auction", "Status"]}
+      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
       rows={contracts.map((contract) => [
         <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
         <span key={`${contract.contractId}-volume`}>{contract.volumeAllocationPercent ?? 100}%</span>,
-        contract.startDate,
         contract.endDate,
         <span key={`${contract.contractId}-auction`} className="font-mono text-xs">
           {contract.sourceAuctionId || "—"}
@@ -215,7 +214,7 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
     <DataTable
       title="Vendor contracts"
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Source", "Status"]}
+      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
         <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
         contract.vehicleType,
@@ -227,8 +226,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
         </span>,
         contract.startDate,
         contract.endDate,
-        <Badge key={`${contract.contractId}-source`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
-          {getContractSourceLabel(contract.createdFrom)}
+        <Badge key={`${contract.contractId}-type`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
+          {contract.contractKind === "LOT" ? "Lot" : contract.contractKind === "BULK" ? "Bulk" : "Manual"}
         </Badge>,
         <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
           {contract.status}
