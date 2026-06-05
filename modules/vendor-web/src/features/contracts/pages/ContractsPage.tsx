@@ -84,7 +84,7 @@ export default function ContractsPage() {
             <table className="w-full min-w-[1100px] text-left">
               <thead className="text-gray-500">
                 <tr>
-                  {['Contract', 'Lane', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'Valid Till', 'Type', 'Status'].map((header) => (
+                  {['Contract', 'Source City', 'Destination City', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'Valid Till', 'Type', 'Status'].map((header) => (
                     <th
                       key={header}
                       className="border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] last:border-r-0"
@@ -104,8 +104,11 @@ export default function ContractsPage() {
                   <td className="border-r border-gray-200 px-4 py-3">
                     <div className="flex items-center gap-2 text-sm text-text">
                       <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                      <span>{laneLabel(contract)}</span>
+                      <span>{contract.laneDetails.origin.city || '—'}</span>
                     </div>
+                  </td>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
+                    {contract.laneDetails.destination.city || '—'}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{contract.rateCard[0]?.vehicleType ?? '—'}</td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">

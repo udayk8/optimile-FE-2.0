@@ -133,14 +133,17 @@ export default function ContractsPage() {
         ),
       },
       {
-        key: 'lane',
-        header: 'Lane',
+        key: 'origin',
+        header: 'Source',
         render: (contract) => (
-          <span className="text-sm text-[#0F172A]">
-            {contract.originCity && contract.destinationCity
-              ? `${contract.originCity} - ${contract.destinationCity}`
-              : contract.lane}
-          </span>
+          <span className="text-sm text-[#0F172A]">{contract.originCity ?? contract.lane}</span>
+        ),
+      },
+      {
+        key: 'destination',
+        header: 'Destination',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.destinationCity ?? '—'}</span>
         ),
       },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },

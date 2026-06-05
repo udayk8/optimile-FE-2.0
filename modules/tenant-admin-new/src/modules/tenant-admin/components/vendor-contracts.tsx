@@ -138,6 +138,8 @@ function readSpotContracts(vendor: { id: string; name: string }): VendorSpotCont
         consumedByBookingId: contract.consumedByBookingId,
         vendorId: contract.vendorId,
         vendorName: contract.vendorName,
+        originCity: contract.originCity,
+        destinationCity: contract.destinationCity,
         laneCode: contract.lane,
         vehicleType: contract.vehicleType,
         rate: contract.contractedRate,
@@ -180,9 +182,10 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
     <DataTable
       title="Spot auction contracts"
       description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
+      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity ?? vendorContractLaneLabel(contract)}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity ?? "—"}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -219,9 +222,10 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
     <DataTable
       title="Vendor contracts"
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
+      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-lane`} className="font-semibold">{vendorContractLaneLabel(contract)}</span>,
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity ?? vendorContractLaneLabel(contract)}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity ?? "—"}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -397,9 +401,10 @@ export function EditableVendorContractRows({
       <DataTable
         title="Contracts to import"
         description="Each row can be edited or removed before the vendor is saved."
-        headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Actions"]}
+        headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Actions"]}
         rows={rows.map((row, index) => [
-          <span key={`pending-${index}-lane`} className="font-semibold">{vendorContractLaneLabel(row)}</span>,
+          <span key={`pending-${index}-origin`} className="font-semibold">{row.originCity || "—"}</span>,
+          <span key={`pending-${index}-destination`} className="font-semibold">{row.destinationCity || "—"}</span>,
           row.vehicleType,
           row.rate.toLocaleString("en-IN"),
           <Badge key={`pending-${index}-rate-type`} variant="outline">{getRateTypeLabel(row.rateType)}</Badge>,

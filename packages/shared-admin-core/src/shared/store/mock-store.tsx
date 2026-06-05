@@ -639,12 +639,12 @@ const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-
 // Vendor Portal read. Idempotent by contractId; runs every boot.
 const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
 const SEED_VENDOR_CONTRACTS = [
-  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "MUM-DEL", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", laneCode: "BLR-MAA", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
-  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "DEL-LKO", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", laneCode: "MUM-BLR", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
-  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "PNQ-JAI", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", laneCode: "AMD-SRT", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", laneCode: "Mumbai - Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", laneCode: "Bengaluru - Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", laneCode: "Delhi - Lucknow", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", laneCode: "Mumbai - Bengaluru", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", laneCode: "Pune - Jaipur", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", laneCode: "Ahmedabad - Surat", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
 ];
 
 function seedVendorContracts(): void {
@@ -716,74 +716,11 @@ function seedAddressBookForDemoTenants(): void {
   }
 }
 
-// Manual vendor-contract seed (shared `optimile.vendor-contracts` store the
-// Tenant Admin vendor detail + Vendor Portal both read). City-pair lanes from
-// the seeded Address Book — cross-module consistent sample data.
-const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
-const VENDOR_CONTRACT_SEED_LANES: Array<{
-  suffix: string;
-  originCity: string;
-  destinationCity: string;
-  vehicleType: string;
-  rate: number;
-  rateType: "PER_TRIP" | "PER_MT" | "PER_KM";
-}> = [
-  { suffix: "a", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP" },
-  { suffix: "b", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT" },
-  { suffix: "c", originCity: "Pune", destinationCity: "Nagpur", vehicleType: "32FT", rate: 52, rateType: "PER_KM" },
-];
-
-function seedVendorContractsForDemoTenants(): void {
-  try {
-    const raw = window.localStorage.getItem(VENDOR_CONTRACTS_SEED_KEY);
-    const stored: Array<{ contractId: string }> = raw ? JSON.parse(raw) : [];
-    const existingIds = new Set(stored.map((contract) => contract.contractId));
-    const today = new Date();
-    const startDate = today.toISOString().slice(0, 10);
-    const endDate = new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const created: unknown[] = [];
-    for (const tenantId of DEMO_TENANT_IDS) {
-      const vendors = mockTenantVendors.filter((vendor) => vendor.tenantId === tenantId).slice(0, 3);
-      vendors.forEach((vendor, vendorIndex) => {
-        // Two lanes per vendor, rotated so vendors don't all share lanes.
-        [0, 1].forEach((laneIndex) => {
-          const pick = VENDOR_CONTRACT_SEED_LANES[(vendorIndex + laneIndex) % VENDOR_CONTRACT_SEED_LANES.length];
-          const contractId = `VC-SEED-${vendor.id}-${pick.suffix}`;
-          if (existingIds.has(contractId)) return;
-          existingIds.add(contractId);
-          created.push({
-            contractId,
-            vendorId: vendor.id,
-            vendorName: vendor.name,
-            tenantId,
-            originCity: pick.originCity,
-            destinationCity: pick.destinationCity,
-            laneCode: `${pick.originCity} - ${pick.destinationCity}`,
-            vehicleType: pick.vehicleType,
-            rate: pick.rate,
-            rateType: pick.rateType,
-            startDate,
-            endDate,
-            createdFrom: "MANUAL_UPLOAD",
-            status: "ACTIVE",
-          });
-        });
-      });
-    }
-    if (created.length > 0) {
-      window.localStorage.setItem(VENDOR_CONTRACTS_SEED_KEY, JSON.stringify([...stored, ...created]));
-    }
-  } catch {
-    /* best-effort — never break boot on seeding */
-  }
-}
-
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
     seedVendorContracts();
     seedAddressBookForDemoTenants();
-    seedVendorContractsForDemoTenants();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
