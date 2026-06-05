@@ -16,10 +16,8 @@ import {
   fetchBooking,
   launchAuction,
   cancelAuction,
-  completeAuction,
   awardAuction,
   finalizeAuction,
-  rejectAuction,
 } from '@auction/lib/mock-services'
 import { fetchContracts } from '@auction/lib/mock-services'
 import { AUCTION_STORE_KEY } from '@auction/lib/auction-store'
@@ -41,8 +39,6 @@ export default function AuctionDetailPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('overview')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('Configuration issue found after internal review.')
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [rejectReason, setRejectReason] = useState('No valid bids were received for this auction.')
   const [awardSelection, setAwardSelection] = useState<Record<string, { L1?: 'L1' | 'L2' | 'L3'; L2?: 'L1' | 'L2' | 'L3'; L3?: 'L1' | 'L2' | 'L3' }>>({})
   const [awardModal, setAwardModal] = useState<AwardModalState | null>(null)
   const [awardModalBidRank, setAwardModalBidRank] = useState<'L1' | 'L2' | 'L3'>('L1')
@@ -193,35 +189,6 @@ export default function AuctionDetailPage() {
     }
   }
 
-  const handleComplete = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await completeAuction(auction.id)
-      setAuction(updated)
-      toast.success('Auction completed.')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to complete auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReject = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await rejectAuction(auction.id, rejectReason)
-      setAuction(updated)
-      toast.success('Auction marked as no bids.')
-      setRejectOpen(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to reject auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const confirmAward = async () => {
     if (!awardModal || !auction) return
 
@@ -316,20 +283,20 @@ export default function AuctionDetailPage() {
         subtitle={`${auction.id} · ${auction.type} · ${auction.lanes.length} lane${auction.lanes.length > 1 ? 's' : ''}`}
         action={
           <div className="flex flex-wrap gap-2">
-            <StatusBadge status={auction.status} />
+            {/* Scheduled auctions read Upcoming until the start time passes.
+                Lifecycle is timer-driven — no manual Complete / No Bids: the
+                store sweep flips LIVE to Pending Award (or No Bids) when the
+                lane timers end. Cancel remains the only manual exit. */}
+            <StatusBadge
+              status={
+                auction.status === 'LIVE' && auction.startAt && new Date(auction.startAt).getTime() > Date.now()
+                  ? 'UPCOMING'
+                  : auction.status
+              }
+            />
             {auction.status === 'DRAFT' && (
               <Button disabled={saving} onClick={handleLaunch}>
                 {saving ? 'Launching…' : 'Launch'}
-              </Button>
-            )}
-            {auction.status === 'LIVE' && (
-              <Button disabled={saving} onClick={handleComplete}>
-                {saving ? 'Completing...' : 'Complete'}
-              </Button>
-            )}
-            {(auction.status === 'LIVE' || auction.status === 'COMPLETED') && !hasAnyBids && (
-              <Button variant="outline" disabled={saving} onClick={() => setRejectOpen(true)}>
-                No Bids
               </Button>
             )}
             {(auction.status === 'DRAFT' || auction.status === 'LIVE' || auction.status === 'COMPLETED') && (
@@ -644,22 +611,6 @@ export default function AuctionDetailPage() {
             <Button variant="outline" onClick={() => setCancelOpen(false)}>Back</Button>
             <Button variant="destructive" disabled={saving} onClick={handleCancel}>
               {saving ? 'Cancelling…' : 'Confirm Cancel'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark No Bids</DialogTitle>
-            <DialogDescription>This closes the auction without creating award decisions or contracts.</DialogDescription>
-          </DialogHeader>
-          <Input value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>Back</Button>
-            <Button variant="destructive" disabled={saving} onClick={handleReject}>
-              {saving ? 'Saving...' : 'Confirm No Bids'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -32,6 +32,14 @@ function normalizeTab(tab: string | null) {
   return AUCTION_TABS.includes(normalizedTab as (typeof AUCTION_TABS)[number]) ? (normalizedTab as (typeof AUCTION_TABS)[number]) : 'ALL'
 }
 
+// A scheduled auction is stored LIVE with a future start — display it as
+// Upcoming until the start time passes (then it is simply live).
+function displayStatus(auction: Auction): string {
+  return auction.status === 'LIVE' && auction.startAt && new Date(auction.startAt).getTime() > Date.now()
+    ? 'UPCOMING'
+    : auction.status
+}
+
 export default function AuctionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -46,8 +54,9 @@ export default function AuctionsPage() {
     let cancelled = false
     const load = (showSpinner: boolean) => {
       if (showSpinner) setLoading(true)
+      // Status filtering happens client-side via displayStatus so scheduled
+      // (LIVE + future start) auctions land on the Upcoming tab.
       fetchAuctions({
-        status: activeTab === 'ALL' ? undefined : activeTab === 'UPCOMING' ? 'DRAFT' : activeTab,
         search: search || undefined,
       })
         .then((data) => {
@@ -73,7 +82,10 @@ export default function AuctionsPage() {
   const filteredAuctions = useMemo(() => {
     const query = search.trim().toLowerCase()
     return auctions.filter((auction) => {
-      const matchesTab = activeTab === 'ALL' || auction.status === activeTab || (activeTab === 'UPCOMING' && auction.status === 'DRAFT')
+      const matchesTab =
+        activeTab === 'ALL' ||
+        displayStatus(auction) === activeTab ||
+        (activeTab === 'UPCOMING' && auction.status === 'DRAFT')
       const matchesSearch =
         query.length === 0 ||
         auction.id.toLowerCase().includes(query) ||
@@ -88,7 +100,7 @@ export default function AuctionsPage() {
     () => [
       { key: 'auction', header: 'Auction Name', render: (auction) => <span className="font-medium text-[#0F172A]">{auction.title}</span> },
       { key: 'type', header: 'Type', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.type}</span> },
-      { key: 'status', header: 'Status', render: (auction) => <StatusBadge status={auction.status} /> },
+      { key: 'status', header: 'Status', render: (auction) => <StatusBadge status={displayStatus(auction)} /> },
       { key: 'createdBy', header: 'Created By', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.createdBy}</span> },
       { key: 'createdAt', header: 'Created At', render: (auction) => <span className="text-sm text-[#0F172A]">{formatDateTime(auction.createdAt)}</span> },
       { key: 'start', header: 'Auction Start Time', render: (auction) => <span className="text-sm text-[#0F172A]">{auction.startAt ? formatDateTime(auction.startAt) : '-'}</span> },
@@ -109,7 +121,7 @@ export default function AuctionsPage() {
                 navigate(`/auction/auctions/${auction.id}`)
               }}
             >
-              {auction.status === 'LIVE' ? 'Enter' : auction.status === 'COMPLETED' ? 'Review & Award' : 'View'}
+              {displayStatus(auction) === 'LIVE' ? 'Enter' : auction.status === 'COMPLETED' ? 'Review & Award' : 'View'}
             </Button>
           </div>
         ),

@@ -40,6 +40,8 @@ type AuctionSettingsState = {
   biddingWindowMinutes: string
   contractStartDate: string
   contractEndDate: string
+  /** Optional future start — creates an Upcoming auction that goes live by itself. */
+  scheduledStartAt: string
 }
 
 type LaneImportMode = 'MANUAL' | 'EXCEL'
@@ -98,6 +100,7 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
     biddingWindowMinutes: type === 'SPOT' ? '20' : String(24 * 60),
     contractStartDate: defaultStartDate,
     contractEndDate: defaultEndDate,
+    scheduledStartAt: '',
   }
 }
 
@@ -274,6 +277,14 @@ export default function AuctionCreatePage() {
       return
     }
 
+    // A future schedule turns "launch now" into a scheduled (Upcoming)
+    // auction — it goes live automatically at the chosen time.
+    const scheduledStartAt =
+      auctionSettings.scheduledStartAt &&
+      new Date(auctionSettings.scheduledStartAt).getTime() > Date.now()
+        ? new Date(auctionSettings.scheduledStartAt).toISOString()
+        : undefined
+
     setSaving(true)
     try {
       const payload = {
@@ -291,7 +302,8 @@ export default function AuctionCreatePage() {
         invitedVendorIds: vendors.map((item) => item.id),
         createdBy: auctionUser?.name ?? 'Demo User',
         createdByRole: auctionUser?.role ?? 'OPS',
-        launchNow,
+        launchNow: launchNow && !scheduledStartAt,
+        startAt: launchNow ? scheduledStartAt : undefined,
         lanes: lanes.map((lane) => ({
           lane: lane.lane,
           region: effectiveType === 'LOT' ? auctionRegion : undefined,
@@ -310,7 +322,13 @@ export default function AuctionCreatePage() {
       }
 
       const created = await createAuction(payload)
-      toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
+      toast.success(
+        launchNow
+          ? scheduledStartAt
+            ? 'Auction scheduled — it goes live at the chosen start time.'
+            : 'Auction created and launched.'
+          : 'Auction draft created.',
+      )
       navigate(`/auction/auctions/${created.id}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create auction.')
@@ -475,6 +493,12 @@ export default function AuctionCreatePage() {
                         <label className="mb-1 block text-sm font-medium text-[#334155]">Bidding Window (min)</label>
                         <Input type="number" value={auctionSettings.biddingWindowMinutes}
                           onChange={(e) => setAuctionSettings((s) => ({ ...s, biddingWindowMinutes: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-[#334155]">Schedule Start (optional)</label>
+                        <Input type="datetime-local" value={auctionSettings.scheduledStartAt}
+                          onChange={(e) => setAuctionSettings((s) => ({ ...s, scheduledStartAt: e.target.value }))} />
+                        <p className="mt-1 text-xs text-[#64748B]">Leave empty to launch immediately. With a future time, the auction stays Upcoming and goes live by itself.</p>
                       </div>
                       {effectiveType !== 'SPOT' && (
                         <>
@@ -724,7 +748,11 @@ export default function AuctionCreatePage() {
                   {saving ? 'Saving…' : 'Save Draft'}
                 </Button>
                 <Button disabled={!effectiveType || saving} onClick={() => handleCreate(true)}>
-                  {saving ? 'Creating…' : 'Create and Launch'}
+                  {saving
+                    ? 'Creating…'
+                    : auctionSettings.scheduledStartAt && new Date(auctionSettings.scheduledStartAt).getTime() > Date.now()
+                      ? 'Schedule Auction'
+                      : 'Create and Launch'}
                 </Button>
               </div>
             </CardContent>

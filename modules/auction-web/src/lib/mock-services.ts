@@ -183,20 +183,27 @@ export async function createAuction(data: any): Promise<Auction> {
   const now = new Date()
   const principal = readSessionPrincipal()
   const launchNow = data.launchNow ?? data.status === 'LIVE'
+  // A future startAt creates a scheduled auction: stored LIVE so it goes live
+  // by itself at the start time, displayed as Upcoming until then.
+  const scheduledStart =
+    !launchNow && data.startAt && new Date(data.startAt).getTime() > now.getTime()
+      ? new Date(data.startAt).toISOString()
+      : undefined
   const windowMinutes = data.biddingWindowMinutes ?? 60
-  const timerEndsAt = new Date(now.getTime() + windowMinutes * 60 * 1000).toISOString()
+  const windowAnchor = scheduledStart ? new Date(scheduledStart).getTime() : now.getTime()
+  const timerEndsAt = new Date(windowAnchor + windowMinutes * 60 * 1000).toISOString()
   const id = `AUC-${data.type ?? 'SPOT'}-${Date.now().toString().slice(-6)}`
   const next: Auction = {
     id,
     title: data.title ?? 'New auction',
     type: data.type ?? 'SPOT',
-    status: launchNow ? 'LIVE' : 'DRAFT',
+    status: launchNow || scheduledStart ? 'LIVE' : 'DRAFT',
     tenantId: data.tenantId ?? principal.tenantId,
     createdBy: data.createdBy ?? 'u-ops-1',
     createdByUserId: data.createdByUserId ?? principal.userId,
     createdByRole: data.createdByRole ?? 'OPS',
     createdAt: now.toISOString(),
-    startAt: launchNow ? now.toISOString() : data.startAt,
+    startAt: launchNow ? now.toISOString() : scheduledStart ?? data.startAt,
     contractStartDate: data.contractStartDate,
     contractEndDate: data.contractEndDate,
     minBidDecrement: data.minBidDecrement ?? 500,
