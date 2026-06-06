@@ -144,8 +144,8 @@ export const mockPlatformTenants: TenantRecord[] = [
   // survive localStorage drift / cache clears.
   {
     id: "tenant-easylane",
-    name: "Easylane Logistics Pvt Ltd",
-    code: "ELLG01",
+    name: "Optimile Operations",
+    code: "OPTIOPS",
     region: "India",
     industry: "Logistics",
     planId: "plan-growth",

@@ -14,7 +14,9 @@ export interface UserProfile {
 
 export interface BookingReference {
   id: string
-  lane: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   commodity: string
   quantity: number
@@ -52,7 +54,9 @@ export interface AuctionEvent {
 
 export interface AuctionLane {
   id: string
-  lane: string
+  /** Lane = source/destination city pair (address-book vocabulary). */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   capacityMt: number
@@ -115,7 +119,7 @@ export interface Auction {
   auditTrail: AuctionEvent[]
 }
 
-export type ContractStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED'
+export type ContractStatus = 'ACTIVE' | 'EXPIRING_SOON' | 'EXPIRED' | 'TERMINATED' | 'USED'
 
 export interface PlacementFailure {
   failedVendor: string
@@ -133,21 +137,29 @@ export interface Contract {
   tenantId?: string
   /** Tenant user who finalized the award. */
   awardedByUserId?: string
-  contractType: 'BULK' | 'LOT'
+  contractType: 'BULK' | 'LOT' | 'SPOT'
   vendorId: string
   vendorName: string
-  lane: string
+  /** Lane = source/destination city pair copied from the auction lane at award. */
+  originCity: string
+  destinationCity: string
   region?: string
   vehicleType: string
   contractedRate: number
   rateUnit: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
   volumeAllocationPercent: number
   allocationRank: 'L1' | 'L2' | 'L3'
+  /** When the award that produced this contract was confirmed. */
+  awardedAt?: string
   startDate: string
   endDate: string
   estimatedTrips: number
   /** How the contract came to exist; auction awards stamp AUCTION_WIN. */
   createdFrom?: 'AUCTION_WIN' | 'MANUAL_UPLOAD'
+  /** SPOT awards produce a one-time contract consumed by a single booking. */
+  oneTime?: boolean
+  /** Booking that consumed this one-time contract (set when the spot booking assigns it). */
+  consumedByBookingId?: string
   status: ContractStatus
   l1OverrideReason?: string
   rateSyncedToTms: boolean
@@ -212,7 +224,9 @@ export interface RfqType {
 }
 
 export interface RfqResponseRow {
-  lane: string
+  /** Lane = source/destination city pair. */
+  originCity: string
+  destinationCity: string
   vehicleType: string
   price: number
 }

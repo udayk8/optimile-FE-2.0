@@ -43,6 +43,8 @@ interface AppState {
   createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[]) => void
   // Finance-side transitions (driven by the finance module / demo seed). Only finance changes status.
   financeApproveInvoice: (invoiceId: string) => void
+  /** Mirror a bridge-approved invoice into the store and open its receivable in the ledger (idempotent). */
+  ensureInvoiceLedgerOpened: (invoice: Invoice) => void
   financeRaiseDispute: (invoiceId: string, reason: string) => void
   financeRequestResubmission: (invoiceId: string, message?: string) => void
   financeRejectInvoice: (invoiceId: string, reason?: string) => void
@@ -1043,18 +1045,71 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   financeApproveInvoice: (invoiceId) =>
-    set((state) => ({
-      invoices: state.invoices.map((inv) =>
-        inv.id === invoiceId && (inv.status === 'PENDING' || inv.status === 'DISPUTED')
-          ? { ...inv, status: 'APPROVED' as const }
-          : inv
-      ),
-      disputes: state.disputes.map((d) =>
-        d.invoiceId === invoiceId && d.status === 'OPEN'
-          ? { ...d, status: 'CLOSED' as const, updatedAt: new Date().toISOString() }
-          : d
-      ),
-    })),
+    set((state) => {
+      const invoice = state.invoices.find((inv) => inv.id === invoiceId)
+      const approving = Boolean(invoice && (invoice.status === 'PENDING' || invoice.status === 'DISPUTED'))
+      // Approval opens the receivable: post the INVOICE_APPROVED ledger entry
+      // automatically (idempotent — one opening entry per invoice).
+      const hasOpeningEntry = state.ledger.some(
+        (entry) => entry.invoiceId === invoiceId && entry.entryType === 'INVOICE_APPROVED',
+      )
+      const openingEntry: LedgerEntry | null = approving && invoice && !hasOpeningEntry
+        ? {
+            id: `led-appr-${invoiceId}`,
+            invoiceId,
+            ledgerType: 'CUSTOMER',
+            date: new Date().toISOString().slice(0, 10),
+            entryType: 'INVOICE_APPROVED',
+            description: `Invoice ${invoice.invoiceNumber} approved — receivable opened`,
+            credit: 0,
+            debit: invoice.grandTotal,
+            runningBalance: invoice.grandTotal,
+            mode: 'ADJUSTMENT',
+          }
+        : null
+      return {
+        invoices: state.invoices.map((inv) =>
+          inv.id === invoiceId && (inv.status === 'PENDING' || inv.status === 'DISPUTED')
+            ? { ...inv, status: 'APPROVED' as const }
+            : inv
+        ),
+        disputes: state.disputes.map((d) =>
+          d.invoiceId === invoiceId && d.status === 'OPEN'
+            ? { ...d, status: 'CLOSED' as const, updatedAt: new Date().toISOString() }
+            : d
+        ),
+        ledger: openingEntry ? [openingEntry, ...state.ledger] : state.ledger,
+      }
+    }),
+
+  // Mirrors a finance-approved invoice (from the cross-module bridge) into the
+  // local store and opens its receivable in the ledger. Idempotent: existing
+  // invoice rows and opening entries are never duplicated. Lets Record
+  // Payments and the Ledger work for invoices approved in the finance module.
+  ensureInvoiceLedgerOpened: (invoice) =>
+    set((state) => {
+      const invoiceExists = state.invoices.some((item) => item.id === invoice.id)
+      const hasOpeningEntry = state.ledger.some(
+        (entry) => entry.invoiceId === invoice.id && entry.entryType === 'INVOICE_APPROVED',
+      )
+      if (invoiceExists && hasOpeningEntry) return state
+      const openingEntry: LedgerEntry = {
+        id: `led-appr-${invoice.id}`,
+        invoiceId: invoice.id,
+        ledgerType: 'CUSTOMER',
+        date: invoice.invoiceDate?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+        entryType: 'INVOICE_APPROVED',
+        description: `Invoice ${invoice.invoiceNumber} approved — receivable opened`,
+        credit: 0,
+        debit: invoice.grandTotal,
+        runningBalance: invoice.grandTotal,
+        mode: 'ADJUSTMENT',
+      }
+      return {
+        invoices: invoiceExists ? state.invoices : [invoice, ...state.invoices],
+        ledger: hasOpeningEntry ? state.ledger : [openingEntry, ...state.ledger],
+      }
+    }),
 
   financeRaiseDispute: (invoiceId, reason) =>
     set((state) => {

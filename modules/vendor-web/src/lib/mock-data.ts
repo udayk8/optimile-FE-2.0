@@ -29,9 +29,9 @@ export const MOCK_DASHBOARD: DashboardData = {
   pendingIndents: {
     count: 3,
     items: [
-      { id: 'BKG-2026-1001', contractId: 'CNT-001', lane: 'Bengaluru → Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1002', contractId: 'CNT-002', lane: 'Bengaluru → Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1003', contractId: 'CNT-001', lane: 'Bengaluru → Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1001', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1002', contractId: 'CNT-002', originCity: 'Bengaluru', destinationCity: 'Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1003', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
     ],
   },
   uninvoicedBookings: { count: 4, totalBillableAmount: 285000 },
@@ -47,7 +47,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
   { id: 'n7',  type: 'INVOICES',   title: 'Invoice Rejected',            message: 'Invoice INV-2026-026 was rejected. Raise a dispute if you disagree.',                deepLink: '/vendor/invoices/INV-2026-026',        isRead: false, createdAt: new Date(Date.now() - 5   * 3600 * 1000).toISOString() },
   { id: 'n8',  type: 'TRIPS',      title: 'POD Confirmed',               message: 'Proof of delivery confirmed for trip BKG-2026-1051 (Bengaluru → Hyderabad)',                       deepLink: '/vendor/bookings/completed/BKG-2026-1051',  isRead: true,  createdAt: new Date(Date.now() - 8   * 3600 * 1000).toISOString() },
   { id: 'n9',  type: 'SOURCING',   title: 'Auction Awarded',             message: 'You won R1 allocation on AUC-009 – Mumbai → Nashik lane',                           deepLink: '/vendor/sourcing',                    isRead: true,  createdAt: new Date(Date.now() - 12  * 3600 * 1000).toISOString() },
-  { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-007 for Delhi → Jaipur is ready for review',                     deepLink: '/vendor/contracts',                   isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
+  { id: 'n11', type: 'CONTRACTS',  title: 'New Contract Available',      message: 'A new contract CNT-005 for Jamshedpur → Haldia is ready for review',                deepLink: '/vendor/contracts/CNT-005',           isRead: true,  createdAt: new Date(Date.now() - 36  * 3600 * 1000).toISOString() },
   { id: 'n12', type: 'INVOICES',   title: 'Invoice Approved',            message: 'Invoice INV-2026-024 approved. Payment due in 15 days.',                            deepLink: '/vendor/invoices/INV-2026-024',        isRead: true,  createdAt: new Date(Date.now() - 48  * 3600 * 1000).toISOString() },
   { id: 'n13', type: 'TRIPS',      title: 'Indent Expiring Soon',        message: 'Indent BKG-2026-1008 expires in 2 hours. Accept or it will lapse.',                       deepLink: '/vendor/bookings?tab=new',             isRead: false, createdAt: new Date(Date.now() - 3   * 86400 * 1000).toISOString() },
   { id: 'n14', type: 'ONBOARDING', title: 'Document Verification Done',  message: 'Your GST and PAN documents have been verified successfully.',                       deepLink: '/vendor/profile/company',              isRead: true,  createdAt: new Date(Date.now() - 5   * 86400 * 1000).toISOString() },
@@ -163,7 +163,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'L1',
-        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'BLR', state: 'Karnataka' }, distanceKm: 1200 },
+        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Vadodara', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'Bengaluru', state: 'Karnataka' }, distanceKm: 1200 },
         volumeRequirement: { estimatedVolume: 50, unit: 'trucks/month', frequency: 'MONTHLY' },
         basePrice: 28000,
         currentBestBid: 25000,
@@ -171,7 +171,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'L2',
-        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Chennai Hub', city: 'MAA', state: 'Tamil Nadu' }, distanceKm: 1450 },
+        laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Vadodara', state: 'Gujarat' }, destination: { name: 'Chennai Hub', city: 'Chennai', state: 'Tamil Nadu' }, distanceKm: 1450 },
         volumeRequirement: { estimatedVolume: 20, unit: 'trucks/month', frequency: 'MONTHLY' },
         basePrice: 34000,
         currentBestBid: 31000,
@@ -185,7 +185,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-011', type: 'SPOT', customerName: 'ITC Limited', state: 'LIVE', pricingUnit: 'PER_TRIP',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Munger Factory', city: 'MGR', state: 'Bihar' }, destination: { name: 'Kolkata Depot', city: 'CCU', state: 'West Bengal' }, distanceKm: 320 },
+      laneDetails: { origin: { name: 'Munger Factory', city: 'Munger', state: 'Bihar' }, destination: { name: 'Kolkata Depot', city: 'Kolkata', state: 'West Bengal' }, distanceKm: 320 },
       basePrice: 21000,
       currentBestBid: 18500,
       minBidDecrement: 200
@@ -202,7 +202,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     lanes: [
       {
         id: 'L1',
-        laneDetails: { origin: { name: 'Bhiwandi', city: 'MUM', state: 'MH' }, destination: { name: 'Pune', city: 'PNQ', state: 'MH' }, distanceKm: 150 },
+        laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Pune', city: 'Pune', state: 'MH' }, distanceKm: 150 },
         volumeRequirement: { estimatedVolume: 100, unit: 'trucks', frequency: 'MONTHLY' },
         basePrice: 15000,
         currentBestBid: 12000,
@@ -210,7 +210,7 @@ export const MOCK_AUCTIONS: Auction[] = [
       },
       {
         id: 'L2',
-        laneDetails: { origin: { name: 'Bhiwandi', city: 'MUM', state: 'MH' }, destination: { name: 'Nashik', city: 'NSK', state: 'MH' }, distanceKm: 165 },
+        laneDetails: { origin: { name: 'Bhiwandi', city: 'Mumbai', state: 'MH' }, destination: { name: 'Nashik', city: 'Nashik', state: 'MH' }, distanceKm: 165 },
         volumeRequirement: { estimatedVolume: 80, unit: 'trucks', frequency: 'MONTHLY' },
         basePrice: 16500,
         currentBestBid: 13500,
@@ -228,7 +228,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-014', type: 'SPOT', customerName: 'Tata Motors', state: 'UPCOMING', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Pune Plant', city: 'PNQ', state: 'MH' }, destination: { name: 'Lucknow', city: 'LKO', state: 'UP' }, distanceKm: 1350 },
+      laneDetails: { origin: { name: 'Pune Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Lucknow', city: 'Lucknow', state: 'UP' }, distanceKm: 1350 },
       basePrice: 22000,
       minBidDecrement: 500
     }],
@@ -239,7 +239,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-015', type: 'BULK', customerName: 'Nestle India', state: 'PENDING_AWARD', pricingUnit: 'PER_MT',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Moga Factory', city: 'MOG', state: 'PB' }, destination: { name: 'Delhi', city: 'DEL', state: 'DL' }, distanceKm: 400 },
+      laneDetails: { origin: { name: 'Moga Factory', city: 'Moga', state: 'PB' }, destination: { name: 'Delhi', city: 'Delhi', state: 'DL' }, distanceKm: 400 },
       basePrice: 1800,
       currentBestBid: 1500,
       minBidDecrement: 50
@@ -252,14 +252,15 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-016', type: 'SPOT', customerName: 'Mahindra Logistics', state: 'AWARDED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Chakan Plant', city: 'PNQ', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'NAG', state: 'MH' }, distanceKm: 700 },
+      laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'MH' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'MH' }, distanceKm: 700 },
       basePrice: 18500,
       currentBestBid: 16500,
       minBidDecrement: 250
     }],
     vehicleTypeRequired: '20ft Container', startTime: new Date(Date.now() - 259200000).toISOString(), endTime: new Date(Date.now() - 172800000).toISOString(),
     awardDate: new Date(Date.now() - 86400000).toISOString(),
-    contractReference: 'CNT-008 / MAHINDRA',
+    // Matches the CNT-AW-101 auction-win contract sample (same lane/rate).
+    contractReference: 'CNT-AW-101',
     vendorBids: [{ id: 'b6', laneId: 'L1', amount: 16500, placedAt: new Date(Date.now() - 200000000).toISOString(), status: 'ACTIVE' }],
     createdAt: new Date(Date.now() - 345600000).toISOString(),
   },
@@ -267,7 +268,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-017', type: 'LOT', customerName: 'Adani Ports', state: 'NOT_AWARDED', pricingUnit: 'PER_TRIP',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Mundra Port', city: 'MUN', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'AMD', state: 'GJ' }, distanceKm: 320 },
+      laneDetails: { origin: { name: 'Mundra Port', city: 'Mundra', state: 'GJ' }, destination: { name: 'Ahmedabad DC', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 320 },
       basePrice: 11000,
       currentBestBid: 9800,
       minBidDecrement: 100
@@ -280,7 +281,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-019', type: 'SPOT', customerName: 'Bharat Petroleum', state: 'NOT_PARTICIPATED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Refinery', city: 'MUM', state: 'MH' }, destination: { name: 'Depot', city: 'AMD', state: 'GJ' }, distanceKm: 530 },
+      laneDetails: { origin: { name: 'Refinery', city: 'Mumbai', state: 'MH' }, destination: { name: 'Depot', city: 'Ahmedabad', state: 'GJ' }, distanceKm: 530 },
       basePrice: 12500,
       minBidDecrement: 100
     }],
@@ -292,7 +293,7 @@ export const MOCK_AUCTIONS: Auction[] = [
     id: 'AUC-018', type: 'SPOT', customerName: 'Blue Dart', state: 'CANCELLED', pricingUnit: 'PER_KM',
     lanes: [{
       id: 'L1',
-      laneDetails: { origin: { name: 'Mumbai Hub', city: 'MUM', state: 'MH' }, destination: { name: 'Surat DC', city: 'SRT', state: 'GJ' }, distanceKm: 280 },
+      laneDetails: { origin: { name: 'Mumbai Hub', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat DC', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
       basePrice: 14000,
       minBidDecrement: 100
     }],
@@ -304,8 +305,9 @@ export const MOCK_AUCTIONS: Auction[] = [
 
 export const MOCK_CONTRACTS: Contract[] = [
   {
-    id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD', laneCode: 'MUM-DEL',
-    laneDetails: { origin: { name: 'Mumbai Port', city: 'MUM', state: 'Maharashtra' }, destination: { name: 'Delhi NCR Hub', city: 'DEL', state: 'Delhi' }, distanceKm: 1420 },
+    // Kanodia Cements lane — the contract behind the BKG-2026-10xx indents/trips.
+    id: 'CNT-001', status: 'ACTIVE', source: 'MANUAL_UPLOAD',
+    laneDetails: { origin: { name: 'Bengaluru Depot', city: 'Bengaluru', state: 'Karnataka' }, destination: { name: 'Kanodia Cement Depot', city: 'Chandausi', state: 'Uttar Pradesh' }, distanceKm: 1980 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 45000, surcharges: [{ name: 'Fuel Surcharge', amount: 2000 }] }],
     volumeAllocation: { volume: 50, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
@@ -315,8 +317,20 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], signedAt: '2026-01-05T10:30:00Z', pdfUrl: '/contracts/CNT-001.pdf', createdAt: '2025-12-20T14:00:00Z',
   },
   {
-    id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD', laneCode: 'JSR-HLD',
-    laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'JSR', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'HLD', state: 'West Bengal' }, distanceKm: 280 },
+    // Shree Cements lane — the contract behind the CNT-002 indents/trips.
+    id: 'CNT-002', status: 'ACTIVE', source: 'MANUAL_UPLOAD',
+    laneDetails: { origin: { name: 'Bengaluru Depot', city: 'Bengaluru', state: 'Karnataka' }, destination: { name: 'Shree Cements Yard', city: 'Hyderabad', state: 'Telangana' }, distanceKm: 570 },
+    rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 42000, surcharges: [{ name: 'Fuel Surcharge', amount: 1500 }] }],
+    volumeAllocation: { volume: 40, unit: 'trucks', frequency: 'Monthly' },
+    paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
+    slaClauses: [{ name: 'Placement SLA', valueHours: 4, description: 'Vehicle must report within 4 hours of acceptance' }],
+    penaltyClauses: [{ breachType: 'Late Placement', penaltyType: 'FIXED', penaltyValue: 4000, description: 'Per late placement event' }],
+    validityFrom: '2026-02-01', validityTo: '2026-12-31', renewalTerms: 'Auto-renew unless 30-day notice',
+    amendments: [], signedAt: '2026-02-03T12:00:00Z', pdfUrl: '/contracts/CNT-002.pdf', createdAt: '2026-01-28T10:00:00Z',
+  },
+  {
+    id: 'CNT-005', status: 'DRAFT', source: 'MANUAL_UPLOAD',
+    laneDetails: { origin: { name: 'Jamshedpur Plant', city: 'Jamshedpur', state: 'Jharkhand' }, destination: { name: 'Haldia Port', city: 'Haldia', state: 'West Bengal' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_MT', rate: 1800, surcharges: [] }],
     volumeAllocation: { volume: 30, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 45, billingCycle: 'MONTHLY' },
@@ -326,8 +340,8 @@ export const MOCK_CONTRACTS: Contract[] = [
     amendments: [], pdfUrl: '/contracts/CNT-005.pdf', createdAt: '2026-04-20T09:00:00Z',
   },
   {
-    id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD', laneCode: 'MUM-SRT',
-    laneDetails: { origin: { name: 'Vikhroli', city: 'MUM', state: 'MH' }, destination: { name: 'Surat Hub', city: 'SRT', state: 'GJ' }, distanceKm: 280 },
+    id: 'CNT-003', status: 'EXPIRED', source: 'MANUAL_UPLOAD',
+    laneDetails: { origin: { name: 'Vikhroli', city: 'Mumbai', state: 'MH' }, destination: { name: 'Surat Hub', city: 'Surat', state: 'GJ' }, distanceKm: 280 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 12000, surcharges: [] }],
     volumeAllocation: { volume: 20, unit: 'trucks', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
@@ -338,36 +352,36 @@ export const MOCK_CONTRACTS: Contract[] = [
   // Permanent auction-win samples — always visible regardless of which vendor
   // is logged in or whether the cross-module auction store is populated.
   {
-    id: 'CNT-AW-101', status: 'ACTIVE', source: 'AUCTION_WIN', laneCode: 'PNQ-NAG',
-    laneDetails: { origin: { name: 'Chakan Plant', city: 'PNQ', state: 'Maharashtra' }, destination: { name: 'Nagpur Hub', city: 'NAG', state: 'Maharashtra' }, distanceKm: 700 },
+    id: 'CNT-AW-101', status: 'ACTIVE', source: 'AUCTION_WIN', contractKind: 'BULK',
+    laneDetails: { origin: { name: 'Chakan Plant', city: 'Pune', state: 'Maharashtra' }, destination: { name: 'Nagpur Hub', city: 'Nagpur', state: 'Maharashtra' }, distanceKm: 700 },
     rateCard: [{ vehicleType: '20ft Container', rateType: 'PER_KM', rate: 16500, surcharges: [] }],
     volumeAllocation: { volume: 60, unit: '%', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
     slaClauses: [{ name: 'Placement SLA', valueHours: 4, description: 'Vehicle must report within 4 hours of indent' }],
     penaltyClauses: [{ breachType: 'Late Placement', penaltyType: 'FIXED', penaltyValue: 5000, description: 'Per late placement event' }],
     validityFrom: '2026-05-01', validityTo: '2026-10-31', renewalTerms: 'Re-auction on expiry',
-    amendments: [], signedAt: '2026-04-28T11:00:00Z', pdfUrl: '/contracts/CNT-AW-101.pdf', createdAt: '2026-04-27T16:30:00Z',
+    amendments: [], signedAt: '2026-04-28T11:00:00Z', awardedOn: '2026-04-27T16:30:00Z', pdfUrl: '/contracts/CNT-AW-101.pdf', createdAt: '2026-04-27T16:30:00Z',
   },
   {
-    id: 'CNT-AW-102', status: 'ACTIVE', source: 'AUCTION_WIN', laneCode: 'BRC-BLR',
-    laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'BRC', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'BLR', state: 'Karnataka' }, distanceKm: 1200 },
+    id: 'CNT-AW-102', status: 'ACTIVE', source: 'AUCTION_WIN', contractKind: 'LOT',
+    laneDetails: { origin: { name: 'Ankleshwar Plant', city: 'Vadodara', state: 'Gujarat' }, destination: { name: 'Bangalore DC', city: 'Bengaluru', state: 'Karnataka' }, distanceKm: 1200 },
     rateCard: [{ vehicleType: '32ft Container', rateType: 'PER_MT', rate: 2450, surcharges: [{ name: 'Fuel Surcharge', amount: 150 }] }],
     volumeAllocation: { volume: 40, unit: '%', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 45, billingCycle: 'MONTHLY' },
     slaClauses: [{ name: 'Placement SLA', valueHours: 6, description: 'Vehicle must report within 6 hours of indent' }],
     penaltyClauses: [{ breachType: 'Missed Placement', penaltyType: 'PERCENTAGE', penaltyValue: 10, description: '10% of freight rate' }],
     validityFrom: '2026-03-01', validityTo: '2026-08-31', renewalTerms: 'Re-auction on expiry',
-    amendments: [], signedAt: '2026-02-26T09:45:00Z', pdfUrl: '/contracts/CNT-AW-102.pdf', createdAt: '2026-02-25T18:10:00Z',
+    amendments: [], signedAt: '2026-02-26T09:45:00Z', awardedOn: '2026-02-25T18:10:00Z', pdfUrl: '/contracts/CNT-AW-102.pdf', createdAt: '2026-02-25T18:10:00Z',
   },
   {
-    id: 'CNT-AW-103', status: 'EXPIRED', source: 'AUCTION_WIN', laneCode: 'DEL-LKO',
-    laneDetails: { origin: { name: 'Delhi NCR Hub', city: 'DEL', state: 'Delhi' }, destination: { name: 'Lucknow Depot', city: 'LKO', state: 'Uttar Pradesh' }, distanceKm: 550 },
+    id: 'CNT-AW-103', status: 'EXPIRED', source: 'AUCTION_WIN', contractKind: 'BULK',
+    laneDetails: { origin: { name: 'Delhi NCR Hub', city: 'Delhi', state: 'Delhi' }, destination: { name: 'Lucknow Depot', city: 'Lucknow', state: 'Uttar Pradesh' }, distanceKm: 550 },
     rateCard: [{ vehicleType: 'MGV', rateType: 'PER_TRIP', rate: 19800, surcharges: [] }],
     volumeAllocation: { volume: 100, unit: '%', frequency: 'Monthly' },
     paymentTerms: { creditPeriodDays: 30, billingCycle: 'MONTHLY' },
     slaClauses: [], penaltyClauses: [],
     validityFrom: '2025-07-01', validityTo: '2025-12-31', renewalTerms: 'None',
-    amendments: [], signedAt: '2025-06-27T10:00:00Z', pdfUrl: '/contracts/CNT-AW-103.pdf', createdAt: '2025-06-25T12:00:00Z',
+    amendments: [], signedAt: '2025-06-27T10:00:00Z', awardedOn: '2025-06-25T12:00:00Z', pdfUrl: '/contracts/CNT-AW-103.pdf', createdAt: '2025-06-25T12:00:00Z',
   },
 ]
 
@@ -677,6 +691,71 @@ export const MOCK_TRIPS: Trip[] = [
     ],
     freightRate: 28000, slaFlag: 'ON_TIME', isInvoiced: false,
     createdAt: '2026-04-24T08:00:00Z',
+  },
+  // Completed, POD-confirmed, not yet invoiced — feed the Create Invoice flow.
+  {
+    id: 'BKG-2026-1055', contractId: 'CNT-001', indentId: 'BKG-2026-1106', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Pune', city: 'Pune', state: '' }, distanceKm: 840 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-20T14:30:00Z', podStatus: 'CONFIRMED', podReference: 'POD-055',
+    documents: [
+      { id: 'td-101', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-055.pdf', fileUrl: '/docs/pod-trp-055.pdf', createdAt: '2026-05-20T15:00:00Z' },
+      { id: 'td-102', type: 'LR_COPY', title: 'LR copy', fileName: 'lr-trp-055.pdf', fileUrl: '/docs/lr-trp-055.pdf', createdAt: '2026-05-18T08:30:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-101', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-05-18T09:00:00Z', status: 'IN_TRANSIT' },
+      { id: 'tt-102', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-20T14:30:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 36500, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-05-18T07:30:00Z',
+  },
+  {
+    id: 'BKG-2026-1056', contractId: 'CNT-001', indentId: 'BKG-2026-1107', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Coimbatore', city: 'Coimbatore', state: '' }, distanceKm: 365 },
+    assignedVehicle: { id: 'VH-002', registrationNumber: 'KA05MN5678', type: 'LCV' },
+    assignedDriver: { id: 'DR-002', name: 'Suresh Kumar', mobile: '+91 9886011223' },
+    deliveredDate: '2026-05-24T11:15:00Z', podStatus: 'CONFIRMED', podReference: 'POD-056',
+    documents: [
+      { id: 'td-103', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-056.pdf', fileUrl: '/docs/pod-trp-056.pdf', createdAt: '2026-05-24T11:45:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-103', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-24T11:15:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 21500, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-05-23T06:45:00Z',
+  },
+  {
+    id: 'BKG-2026-1057', contractId: 'CNT-002', indentId: 'BKG-2026-1108', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Mumbai', city: 'Mumbai', state: '' }, distanceKm: 985 },
+    assignedVehicle: { id: 'VH-001', registrationNumber: 'KA01JK1234', type: 'MGV' },
+    assignedDriver: { id: 'DR-001', name: 'Kartik Pawar', mobile: '+91 9900154373' },
+    deliveredDate: '2026-05-28T18:00:00Z', podStatus: 'CONFIRMED', podReference: 'POD-057',
+    documents: [
+      { id: 'td-104', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-057.pdf', fileUrl: '/docs/pod-trp-057.pdf', createdAt: '2026-05-28T18:30:00Z' },
+      { id: 'td-105', type: 'EWAY_BILL', title: 'E-way bill', fileName: 'eway-trp-057.pdf', fileUrl: '/docs/eway-trp-057.pdf', createdAt: '2026-05-26T07:00:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-104', title: 'In Transit', description: 'Trip released from hub', timestamp: '2026-05-26T08:00:00Z', status: 'IN_TRANSIT' },
+      { id: 'tt-105', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-05-28T18:00:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 48500, slaFlag: 'DELAYED', isInvoiced: false,
+    createdAt: '2026-05-26T06:00:00Z',
+  },
+  {
+    id: 'BKG-2026-1058', contractId: 'CNT-002', indentId: 'BKG-2026-1109', status: 'COMPLETED',
+    laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
+    assignedVehicle: { id: 'VH-002', registrationNumber: 'KA05MN5678', type: 'LCV' },
+    assignedDriver: { id: 'DR-002', name: 'Suresh Kumar', mobile: '+91 9886011223' },
+    deliveredDate: '2026-06-02T09:40:00Z', podStatus: 'CONFIRMED', podReference: 'POD-058',
+    documents: [
+      { id: 'td-106', type: 'POD_COPY', title: 'POD copy', fileName: 'pod-trp-058.pdf', fileUrl: '/docs/pod-trp-058.pdf', createdAt: '2026-06-02T10:00:00Z' },
+    ],
+    timeline: [
+      { id: 'tt-106', title: 'Completed', description: 'Delivered, POD confirmed, booking ended', timestamp: '2026-06-02T09:40:00Z', status: 'COMPLETED' },
+    ],
+    freightRate: 23800, slaFlag: 'ON_TIME', isInvoiced: false,
+    createdAt: '2026-06-01T07:15:00Z',
   },
   {
     id: 'BKG-2026-1054', contractId: 'CNT-002', indentId: 'BKG-2026-1105', status: 'CANCELLED',

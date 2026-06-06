@@ -1,25 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
 import { CheckCircle2, Lock, Upload } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
+import { ExitConfirmDialog } from '@auction/components/shared/ExitConfirmDialog'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
 import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
-import { createAuction, fetchBookings, fetchVendors } from '@auction/lib/mock-services'
-import { getLaneCodeError, isValidLaneCode, normalizeLaneCode } from '@shared-utils'
-import type { AuctionType, BookingReference, VendorOption } from '@auction/types'
+import { createAuction, fetchVendors } from '@auction/lib/mock-services'
+import { readSessionTenantId } from '@auction/lib/auction-store'
+import { citiesToDisplayLane, isKnownTenantCity, listTenantCities, normalizeCity } from '@shared-utils'
+import type { AuctionType, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
 // BULK  — single lane (manually chosen), single winner, no L1/L2/L3
 // LOT   — multi-lane, L1/L2/L3 allocation, manual or Excel upload
 
 type DraftLane = {
-  lane: string
+  originCity: string
+  destinationCity: string
   vehicleType: string
   capacityMt: string
   commodity: string
@@ -40,6 +43,8 @@ type AuctionSettingsState = {
   biddingWindowMinutes: string
   contractStartDate: string
   contractEndDate: string
+  /** Optional future start — creates an Upcoming auction that goes live by itself. */
+  scheduledStartAt: string
 }
 
 type LaneImportMode = 'MANUAL' | 'EXCEL'
@@ -71,16 +76,6 @@ const COMMODITY_OPTIONS = [
   'Agriculture',
 ] as const
 
-const LANE_OPTIONS = [
-  'MUM-DEL',
-  'MUM-BLR',
-  'BLR-MAA',
-  'MAA-MUM',
-  'DEL-LKO',
-  'PNQ-JAI',
-  'AMD-SRT',
-] as const
-
 const REGION_OPTIONS = ['North India', 'South India', 'West India', 'East India', 'Central India'] as const
 
 function titleCase(value: string) {
@@ -98,14 +93,17 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
     biddingWindowMinutes: type === 'SPOT' ? '20' : String(24 * 60),
     contractStartDate: defaultStartDate,
     contractEndDate: defaultEndDate,
+    scheduledStartAt: '',
   }
 }
 
-function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
-  const lane = laneName ?? (type === 'SPOT' ? 'MUM-DEL' : 'MUM-BLR')
+function makeDefaultLane(type: AuctionType, cities?: { originCity: string; destinationCity: string }): DraftLane {
+  const originCity = cities?.originCity ?? 'Mumbai'
+  const destinationCity = cities?.destinationCity ?? (type === 'SPOT' ? 'Delhi' : 'Bengaluru')
   const isLot = type === 'LOT'
   return {
-    lane,
+    originCity,
+    destinationCity,
     vehicleType: '20 MT Open Body',
     capacityMt: '20',
     commodity: 'FMCG',
@@ -120,7 +118,7 @@ function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
 }
 
 function laneTemplateHeaders() {
-  return ['lane', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'l1', 'l2', 'l3']
+  return ['originCity', 'destinationCity', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'l1', 'l2', 'l3']
 }
 
 function normalizeText(value: unknown) { return String(value ?? '').trim() }
@@ -136,17 +134,6 @@ function parseLaneMode(value: unknown): DraftLane['allocationMode'] {
   return normalizeText(value).toUpperCase() === 'SINGLE' ? 'SINGLE' : 'SPLIT'
 }
 
-const FALLBACK_BOOKING: BookingReference = {
-  id: 'BK-DEMO-0001',
-  lane: 'MUM-DEL',
-  vehicleType: '20 MT Open Body',
-  commodity: 'FMCG',
-  quantity: 18,
-  uom: 'Metric Tonnes',
-  loadingDate: new Date().toISOString().slice(0, 10),
-  status: 'PENDING_AUCTION',
-}
-
 export default function AuctionCreatePage() {
   const { type } = useParams()
   const navigate = useNavigate()
@@ -155,57 +142,41 @@ export default function AuctionCreatePage() {
   const { auctionUser } = useAuctionAuth()
   const { canCreateAuction } = useAuctionPermissions()
 
-  const [bookings, setBookings] = useState<BookingReference[]>([])
   const [vendors, setVendors] = useState<VendorOption[]>([])
   const [saving, setSaving] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
 
   useEffect(() => {
-    fetchBookings()
-      .then(setBookings)
-      .catch(() => setBookings([]))
     fetchVendors()
       .then(setVendors)
       .catch(() => setVendors([]))
   }, [])
 
-  const selectedBooking = bookings[0] ?? FALLBACK_BOOKING
-
-  const [selectedBookingId, setSelectedBookingId] = useState(selectedBooking.id)
-  const [title, setTitle] = useState(`Spot | ${selectedBooking.id} | ${selectedBooking.lane}`)
+  const [title, setTitle] = useState('Spot | Lane Auction | Mumbai - Delhi')
   const [auctionRegion, setAuctionRegion] = useState('North India')
-  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', selectedBooking.lane)])
+  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT')])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
   const [importFileName, setImportFileName] = useState('')
 
-  const activeBooking = bookings.find((item) => item.id === selectedBookingId) ?? selectedBooking
-  const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
-    if (auctionRegion === 'North India') return lane === 'MUM-DEL' || lane === 'DEL-LKO'
-    if (auctionRegion === 'South India') return lane === 'MUM-BLR' || lane === 'BLR-MAA' || lane === 'MAA-MUM'
-    if (auctionRegion === 'West India') return lane === 'PNQ-JAI' || lane === 'AMD-SRT'
-    return true
-  })
 
   useEffect(() => {
     if (!effectiveType) return
-    const defaultBooking = bookings[0] ?? FALLBACK_BOOKING
-    const defaultLane = effectiveType === 'SPOT' ? defaultBooking.lane : 'MUM-BLR'
     setTitle(
       effectiveType === 'SPOT'
-        ? `Spot | ${defaultBooking.id} | ${defaultBooking.lane}`
+        ? 'Spot | Lane Auction'
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
-    setSelectedBookingId(defaultBooking.id)
     setAuctionRegion('North India')
-    setLanes([makeDefaultLane(effectiveType, defaultLane)])
+    setLanes([makeDefaultLane(effectiveType)])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
-  }, [effectiveType, bookings])
+  }, [effectiveType])
 
   const addLane = () => {
     if (effectiveType !== 'LOT') return
-    setLanes((current) => [...current, makeDefaultLane('LOT', lotLaneOptions[0] ?? 'MUM-BLR')])
+    setLanes((current) => [...current, makeDefaultLane('LOT')])
   }
 
   const updateLane = (index: number, field: keyof DraftLane, value: string) => {
@@ -222,6 +193,18 @@ export default function AuctionCreatePage() {
     )
   }
 
+  // Cities come from the tenant address book — a lane can only be auctioned
+  // between places bookings can actually use.
+  const tenantCities = useMemo(() => listTenantCities(readSessionTenantId()), [])
+
+  const updateLaneCity = (index: number, field: 'originCity' | 'destinationCity', value: string) => {
+    setLanes((current) =>
+      current.map((lane, laneIndex) =>
+        laneIndex !== index ? lane : { ...lane, [field]: value }
+      )
+    )
+  }
+
   const handleLaneFileImport = async (file: File) => {
     if (effectiveType !== 'LOT') return
     try {
@@ -234,28 +217,32 @@ export default function AuctionCreatePage() {
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return
         const values = row.values as unknown[]
-        const rawLane = normalizeText(values[1])
-        if (!rawLane) return
-        // Lane codes ("MUM-BLR") share validation with vendor-web; the legacy
-        // "City → City" format from existing templates stays accepted.
-        const isLegacyLane = /→|->/.test(rawLane)
-        const lane = isLegacyLane ? rawLane : normalizeLaneCode(rawLane)
-        if (!isLegacyLane && !isValidLaneCode(lane)) {
-          laneErrors.push(`Row ${rowNumber}: ${getLaneCodeError(lane) ?? 'Invalid lane.'}`)
+        const originCity = normalizeText(values[1])
+        const destinationCity = normalizeText(values[2])
+        if (!originCity && !destinationCity) return
+        // Cities must exist in the tenant address book — bulk upload enforces
+        // the same rule as the lane pickers, so no unbookable lane sneaks in.
+        if (!isKnownTenantCity(originCity, tenantCities)) {
+          laneErrors.push(`Row ${rowNumber}: '${originCity || '(empty)'}' is not a city in your address book.`)
+          return
+        }
+        if (!isKnownTenantCity(destinationCity, tenantCities)) {
+          laneErrors.push(`Row ${rowNumber}: '${destinationCity || '(empty)'}' is not a city in your address book.`)
           return
         }
         importedLanes.push({
-          lane,
-          vehicleType: normalizeText(values[2]) || '20 MT Open Body',
-          capacityMt: normalizeText(values[3]) || '20',
+          originCity,
+          destinationCity,
+          vehicleType: normalizeText(values[3]) || '20 MT Open Body',
+          capacityMt: normalizeText(values[4]) || '20',
           commodity: 'FMCG',
-          rateUnit: parseRateUnit(values[4]),
-          ceilingRate: normalizeText(values[5]) || '0',
-          estimatedTrips: normalizeText(values[6]) || '300',
-          allocationMode: parseLaneMode(values[7]),
-          l1: normalizeText(values[8]) || '0',
-          l2: normalizeText(values[9]) || '0',
-          l3: normalizeText(values[10]) || '0',
+          rateUnit: parseRateUnit(values[5]),
+          ceilingRate: normalizeText(values[6]) || '0',
+          estimatedTrips: normalizeText(values[7]) || '300',
+          allocationMode: parseLaneMode(values[8]),
+          l1: normalizeText(values[9]) || '0',
+          l2: normalizeText(values[10]) || '0',
+          l3: normalizeText(values[11]) || '0',
         })
       })
       if (laneErrors.length) throw new Error(laneErrors.join(' '))
@@ -273,13 +260,32 @@ export default function AuctionCreatePage() {
       toast.error('Select an auction type first.')
       return
     }
+    // Lanes are city pairs from the tenant address book — every auctioned
+    // lane stays bookable by construction.
+    const invalidLane = lanes.find(
+      (lane) =>
+        !isKnownTenantCity(lane.originCity, tenantCities) ||
+        !isKnownTenantCity(lane.destinationCity, tenantCities) ||
+        normalizeCity(lane.originCity) === normalizeCity(lane.destinationCity),
+    )
+    if (invalidLane) {
+      toast.error('Every lane needs two different cities from your address book.')
+      return
+    }
+
+    // A future schedule turns "launch now" into a scheduled (Upcoming)
+    // auction — it goes live automatically at the chosen time.
+    const scheduledStartAt =
+      auctionSettings.scheduledStartAt &&
+      new Date(auctionSettings.scheduledStartAt).getTime() > Date.now()
+        ? new Date(auctionSettings.scheduledStartAt).toISOString()
+        : undefined
 
     setSaving(true)
     try {
       const payload = {
         type: effectiveType,
         title,
-        bookingId: effectiveType === 'SPOT' ? activeBooking.id : undefined,
         region: effectiveType === 'LOT' ? auctionRegion : undefined,
         minBidDecrement: Number(auctionSettings.minBidDecrement),
         extensionTriggerMinutes: Number(auctionSettings.extensionTriggerMinutes),
@@ -291,9 +297,11 @@ export default function AuctionCreatePage() {
         invitedVendorIds: vendors.map((item) => item.id),
         createdBy: auctionUser?.name ?? 'Demo User',
         createdByRole: auctionUser?.role ?? 'OPS',
-        launchNow,
+        launchNow: launchNow && !scheduledStartAt,
+        startAt: launchNow ? scheduledStartAt : undefined,
         lanes: lanes.map((lane) => ({
-          lane: lane.lane,
+          originCity: lane.originCity,
+          destinationCity: lane.destinationCity,
           region: effectiveType === 'LOT' ? auctionRegion : undefined,
           vehicleType: lane.vehicleType,
           capacityMt: Number(lane.capacityMt),
@@ -310,7 +318,13 @@ export default function AuctionCreatePage() {
       }
 
       const created = await createAuction(payload)
-      toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
+      toast.success(
+        launchNow
+          ? scheduledStartAt
+            ? 'Auction scheduled — it goes live at the chosen start time.'
+            : 'Auction created and launched.'
+          : 'Auction draft created.',
+      )
       navigate(`/auction/auctions/${created.id}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create auction.')
@@ -350,6 +364,15 @@ export default function AuctionCreatePage() {
         eyebrow="Auction Builder"
         title={effectiveType ? `Create ${titleCase(effectiveType)} Auction` : 'Create Auction'}
         subtitle="Select the auction type, configure lanes, rate units, ceilings, and launch when ready."
+        onBack={() => setExitConfirmOpen(true)}
+      />
+
+      <ExitConfirmDialog
+        open={exitConfirmOpen}
+        onClose={() => setExitConfirmOpen(false)}
+        onConfirm={() => navigate('/auction/auctions')}
+        title="Exit auction builder?"
+        description="Your auction setup will be lost unless you save it as a draft."
       />
 
       <div>
@@ -394,36 +417,12 @@ export default function AuctionCreatePage() {
                     <Input value={title} onChange={(event) => setTitle(event.target.value)} />
                   </div>
 
-                  {/* SPOT — booking selector */}
+                  {/* SPOT — lane-based, conducted in advance; no booking link.
+                      Whoever wins gets a one-time spot contract for the lane. */}
                   {effectiveType === 'SPOT' && (
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-[#334155]">Booking</label>
-                        <select
-                          value={selectedBookingId}
-                          onChange={(event) => {
-                            const booking = bookings.find((item) => item.id === event.target.value) ?? selectedBooking
-                            setSelectedBookingId(booking.id)
-                            setTitle(`Spot | ${booking.id} | ${booking.lane}`)
-                            setLanes((current) =>
-                              current.map((lane, index) =>
-                                index === 0 ? { ...lane, lane: booking.lane, vehicleType: booking.vehicleType } : lane
-                              )
-                            )
-                          }}
-                          className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                        >
-                          {[selectedBooking, ...bookings.filter((item) => item.id !== selectedBooking.id)].map((booking) => (
-                            <option key={booking.id} value={booking.id}>
-                              {booking.id} · {booking.lane}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-[#334155]">Vehicle Type</label>
-                        <Input value={lanes[0]?.vehicleType ?? '20 MT Open Body'} readOnly />
-                      </div>
+                    <div className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] p-4 text-xs text-[#1D4ED8]">
+                      Spot auctions run per lane, in advance of any booking. The winning vendor receives a
+                      one-time spot contract for the lane, which a spot booking on the same lane can consume.
                     </div>
                   )}
 
@@ -475,6 +474,12 @@ export default function AuctionCreatePage() {
                         <label className="mb-1 block text-sm font-medium text-[#334155]">Bidding Window (min)</label>
                         <Input type="number" value={auctionSettings.biddingWindowMinutes}
                           onChange={(e) => setAuctionSettings((s) => ({ ...s, biddingWindowMinutes: e.target.value }))} />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-[#334155]">Schedule Start (optional)</label>
+                        <Input type="datetime-local" value={auctionSettings.scheduledStartAt}
+                          onChange={(e) => setAuctionSettings((s) => ({ ...s, scheduledStartAt: e.target.value }))} />
+                        <p className="mt-1 text-xs text-[#64748B]">Leave empty to launch immediately. With a future time, the auction stays Upcoming and goes live by itself.</p>
                       </div>
                       {effectiveType !== 'SPOT' && (
                         <>
@@ -556,7 +561,7 @@ export default function AuctionCreatePage() {
                           {lanes.map((lane, i) => (
                             <tr key={i} className="hover:bg-gray-50">
                               <td className="px-4 py-3 text-xs text-[#64748B]">{i + 1}</td>
-                              <td className="px-4 py-3 text-sm font-semibold text-[#0F172A]">{lane.lane}</td>
+                              <td className="px-4 py-3 text-sm font-semibold text-[#0F172A]">{citiesToDisplayLane(lane.originCity, lane.destinationCity)}</td>
                               <td className="px-4 py-3 text-sm text-[#334155]">{lane.vehicleType}</td>
                               <td className="px-4 py-3 font-mono text-sm text-[#334155]">{lane.capacityMt}</td>
                               <td className="px-4 py-3 text-sm text-[#334155]">{lane.rateUnit.replace('_', ' ')}</td>
@@ -590,35 +595,51 @@ export default function AuctionCreatePage() {
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Lane</label>
-                              {effectiveType === 'SPOT' ? (
-                                <Input value={activeBooking.lane} readOnly />
-                              ) : (
+<div className="grid gap-2 sm:grid-cols-2">
                                 <select
-                                  value={lane.lane}
-                                  onChange={(event) => updateLane(index, 'lane', event.target.value)}
+                                  value={lane.originCity}
+                                  onChange={(event) => updateLaneCity(index, 'originCity', event.target.value)}
                                   className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                                 >
-                                  {(effectiveType === 'LOT' ? lotLaneOptions : LANE_OPTIONS).map((option) => (
-                                    <option key={option} value={option}>{option}</option>
+                                  <option value="">Origin city</option>
+                                  {tenantCities.map((city) => (
+                                    <option key={city} value={city}>{city}</option>
                                   ))}
                                 </select>
+                                <select
+                                  value={lane.destinationCity}
+                                  onChange={(event) => updateLaneCity(index, 'destinationCity', event.target.value)}
+                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                >
+                                  <option value="">Destination city</option>
+                                  {tenantCities.map((city) => (
+                                    <option key={city} value={city}>{city}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              {tenantCities.length === 0 ? (
+                                <p className="mt-1 text-xs text-red-600">
+                                  No cities found — add addresses in Administration → Address Book first.
+                                </p>
+                              ) : (
+                                <p className="mt-1 text-xs text-[#64748B]">
+                                  {lane.originCity && lane.destinationCity
+                                    ? `${lane.originCity} - ${lane.destinationCity}`
+                                    : 'Cities come from your address book, so this lane is always bookable.'}
+                                </p>
                               )}
                             </div>
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Vehicle Type</label>
-                              {effectiveType === 'SPOT' ? (
-                                <Input value={activeBooking.vehicleType} readOnly />
-                              ) : (
-                                <select
-                                  value={lane.vehicleType}
-                                  onChange={(event) => updateLane(index, 'vehicleType', event.target.value)}
-                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                                >
-                                  {VEHICLE_TYPE_OPTIONS.map((option) => (
-                                    <option key={option} value={option}>{option}</option>
-                                  ))}
-                                </select>
-                              )}
+                              <select
+                                value={lane.vehicleType}
+                                onChange={(event) => updateLane(index, 'vehicleType', event.target.value)}
+                                className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                              >
+                                {VEHICLE_TYPE_OPTIONS.map((option) => (
+                                  <option key={option} value={option}>{option}</option>
+                                ))}
+                              </select>
                             </div>
                             <div>
                               <label className="mb-1 block text-sm font-medium text-[#334155]">Capacity (MT)</label>
@@ -724,7 +745,11 @@ export default function AuctionCreatePage() {
                   {saving ? 'Saving…' : 'Save Draft'}
                 </Button>
                 <Button disabled={!effectiveType || saving} onClick={() => handleCreate(true)}>
-                  {saving ? 'Creating…' : 'Create and Launch'}
+                  {saving
+                    ? 'Creating…'
+                    : auctionSettings.scheduledStartAt && new Date(auctionSettings.scheduledStartAt).getTime() > Date.now()
+                      ? 'Schedule Auction'
+                      : 'Create and Launch'}
                 </Button>
               </div>
             </CardContent>

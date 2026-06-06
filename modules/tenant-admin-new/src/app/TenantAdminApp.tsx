@@ -40,7 +40,8 @@ const TenantDocumentRulesPage = lazy(() => import('../modules/tenant-admin/pages
 const TenantPodRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantPodRulesPage })))
 import { PermissionGate } from '@/modules/tenant-admin/components/permission-gate'
 const ShipmentDocumentsListPage = lazy(() => import('../modules/tenant-admin/pages/booking-stubs/booking-stub-pages').then((m) => ({ default: m.ShipmentDocumentsListPage })))
-const BookingReportsPage = lazy(() => import('../modules/tenant-admin/pages/booking-stubs/booking-stub-pages').then((m) => ({ default: m.BookingReportsPage })))
+const BookingReportsPage = lazy(() => import('../modules/operations-dashboard/pages/operations-head-dashboard-page').then((m) => ({ default: m.BookingReportsPage })))
+const BookingReportDetailPage = lazy(() => import('../modules/operations-dashboard/pages/operations-head-dashboard-page').then((m) => ({ default: m.BookingReportDetailPage })))
 
 // Code-split the heavy booking pages (TMS booking engine) and the embedded
 // module apps (auction/vendor/fleet/track-trace/customer) so the tenant
@@ -182,6 +183,7 @@ function TenantAdminRoutes({
           <Route path="bookings/:bookingId" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingDetailsPage /></PermissionGate>} />
           <Route path="shipment-documents" element={<PermissionGate moduleCode="TMS" featureCode="SHIPMENT_DOCUMENTS"><ShipmentDocumentsListPage /></PermissionGate>} />
           <Route path="booking-reports" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_REPORTS"><BookingReportsPage /></PermissionGate>} />
+          <Route path="booking-reports/details/:detailKey" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_REPORTS"><BookingReportDetailPage /></PermissionGate>} />
           <Route path="vendor-portal/*" element={<PermissionGate moduleCode="VENDOR" featureCode="VENDOR_DASHBOARD"><VendorEmbeddedApp /></PermissionGate>} />
           <Route path="fleet-management/*" element={<PermissionGate moduleCode="FLEET" featureCode="FLEET_DASHBOARD"><FleetEmbeddedApp /></PermissionGate>} />
           <Route path="auction-ams/*" element={<PermissionGate moduleCode="AUCTION" featureCode="AUCTION_DASHBOARD"><AuctionEmbeddedApp /></PermissionGate>} />

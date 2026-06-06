@@ -52,7 +52,14 @@ export default function AuctionDetailPage() {
     const errors: Record<string, string> = {}
     auction.lanes.forEach(lane => {
       const amount = bids[lane.id] || 0
-      if (amount > 0 && lane.currentBestBid) {
+      if (amount <= 0) return
+      // First bid is capped by the lane ceiling (base price); later bids must
+      // beat the current best by at least the decrement.
+      if (lane.basePrice && amount > lane.basePrice) {
+        errors[lane.id] = `Above ceiling ₹${lane.basePrice.toLocaleString()}`
+        return
+      }
+      if (lane.currentBestBid) {
         const requiredMax = lane.currentBestBid - (lane.minBidDecrement || 0)
         if (amount > requiredMax) {
           errors[lane.id] = `Must be ≤ ₹${requiredMax.toLocaleString()}`
@@ -224,6 +231,19 @@ export default function AuctionDetailPage() {
                           </div>
                           {lane.minBidDecrement && (
                             <div className="text-xs text-gray-500">Dec: ₹{lane.minBidDecrement}</div>
+                          )}
+                          {/* Anonymized live leaderboard — top three amounts. */}
+                          {lane.topBids && lane.topBids.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {lane.topBids.map((amount, index) => (
+                                <span
+                                  key={index}
+                                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${index === 0 ? 'bg-success/10 text-success' : 'bg-gray-100 text-gray-600'}`}
+                                >
+                                  L{index + 1} ₹{amount.toLocaleString('en-IN')}
+                                </span>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ) : (

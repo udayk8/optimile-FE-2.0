@@ -3,6 +3,7 @@
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
+import { ExitConfirmDialog } from '@auction/components/shared/ExitConfirmDialog'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
@@ -21,6 +22,7 @@ export default function RfiCreatePage() {
   const [emailsRaw, setEmailsRaw] = useState('')
   const [fileName, setFileName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,6 +96,15 @@ export default function RfiCreatePage() {
         eyebrow="Sourcing"
         title="Create RFI Campaign"
         subtitle="Distribute RFI templates to external contacts to discover new vendors."
+        onBack={() => setExitConfirmOpen(true)}
+      />
+
+      <ExitConfirmDialog
+        open={exitConfirmOpen}
+        onClose={() => setExitConfirmOpen(false)}
+        onConfirm={() => navigate('/auction/sourcing')}
+        title="Exit RFI builder?"
+        description="Your RFI campaign setup will be lost."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">

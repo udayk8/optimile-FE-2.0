@@ -9,11 +9,13 @@ import type {
   VehicleFuelType,
 } from "@/types/fleet";
 import type { BookingRecord } from "@/modules/tms/booking/types";
-import type { TenantDataBridge } from "@vendor/integration/tenant-data-bridge";
+import type { TenantDataBridge, VendorInvoiceSubmitPayload } from "@vendor/integration/tenant-data-bridge";
 import type {
   ComplianceDocument as VendorComplianceDocument,
   Driver as VendorDriver,
   Indent as VendorIndent,
+  Invoice as VendorInvoice,
+  Dispute as VendorDispute,
   LaneDetails as VendorLaneDetails,
   Trip as VendorTrip,
   Vehicle as VendorVehicle,
@@ -126,6 +128,11 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     respondBookingVendorIndent,
     assignTenantBooking,
     getTenantById,
+    getTenantVendorById,
+    listTenantVendorInvoices,
+    vendorSubmitInvoice,
+    vendorRespondToInvoiceDispute,
+    vendorCreateInvoiceResubmission,
   } = useMockStore();
 
   const isVendorSession = session.loginType === "VENDOR" && Boolean(session.vendorId);
@@ -141,6 +148,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
   const tenantBookings = isVendorSession ? listTenantBookings(tenantId) : [];
   const tenantCustomers = isVendorSession ? listTenantCustomers(tenantId) : [];
   const vendorIndents = isVendorSession ? listBookingVendorIndents(tenantId) : [];
+  const allVendorInvoices = isVendorSession ? listTenantVendorInvoices(tenantId) : [];
 
   return useMemo<TenantDataBridge | null>(() => {
     if (!isVendorSession) return null;
@@ -380,6 +388,69 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       };
     };
 
+    // ── Vendor (AP) invoices — this vendor's slice of the shared collection ──
+    const myInvoiceRecords = allVendorInvoices.filter((r) => r.vendorId === vendorId);
+    const vendorInvoices: VendorInvoice[] = myInvoiceRecords.map((r) => ({
+      id: r.id,
+      invoiceNumber: r.invoiceNumber,
+      invoiceDate: r.invoiceDate,
+      vendorGstin: r.vendorGstin,
+      customerGstin: r.customerGstin,
+      billingPeriod: r.billingPeriod ?? { from: r.invoiceDate, to: r.invoiceDate },
+      paymentDueDate: r.paymentDueDate,
+      lineItems: r.lineItems,
+      subtotal: r.subtotal,
+      gstAmount: r.gstAmount,
+      grandTotal: r.grandTotal,
+      status: r.status,
+      closeReason: r.closeReason,
+      supersedesInvoiceId: r.supersedesInvoiceId,
+      supersededByInvoiceId: r.supersededByInvoiceId,
+      pdfUrl: r.pdfUrl,
+      tripReferences: r.tripReferences,
+      createdAt: r.createdAt,
+    }));
+    const vendorDisputes: VendorDispute[] = myInvoiceRecords
+      .filter((r) => r.dispute)
+      .map((r) => ({
+        id: `DSP-${r.id}`,
+        invoiceId: r.id,
+        invoiceNumber: r.invoiceNumber,
+        invoiceAmount: r.grandTotal,
+        reason: r.dispute!.reason,
+        status: r.dispute!.status,
+        raisedAt: r.dispute!.raisedAt,
+        updatedAt: r.dispute!.messages.at(-1)?.createdAt ?? r.dispute!.raisedAt,
+        responseDueAt: r.dispute!.responseDueAt,
+        messages: r.dispute!.messages,
+      }));
+
+    const vendorRec = vendorId ? getTenantVendorById(vendorId) : null;
+    const submitInvoice = (payload: VendorInvoiceSubmitPayload) => {
+      if (!vendorId) return;
+      const now = new Date().toISOString();
+      vendorSubmitInvoice({
+        id: payload.invoiceNumber,
+        tenantId,
+        vendorId,
+        vendorName: vendorName ?? "Vendor",
+        invoiceNumber: payload.invoiceNumber,
+        invoiceDate: payload.invoiceDate,
+        paymentDueDate: payload.paymentDueDate,
+        vendorGstin: vendorRec?.gstin ?? vendorRec?.gstNumber ?? "—",
+        customerGstin: "27AABCU9603R1ZM",
+        lineItems: payload.lineItems,
+        subtotal: payload.subtotal,
+        gstAmount: payload.gstAmount,
+        grandTotal: payload.grandTotal,
+        status: "PENDING",
+        pdfUrl: `/invoices/${payload.invoiceNumber}.pdf`,
+        tripReferences: payload.tripReferences,
+        billingPeriod: payload.billingPeriod,
+        createdAt: now,
+      });
+    };
+
     return {
       tenantId,
       tenantName,
@@ -399,6 +470,12 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       assignVehicle,
       assignVehicleResolved,
       getBookingDetail,
+      vendorInvoices,
+      vendorDisputes,
+      submitInvoice,
+      respondToInvoiceDispute: (invoiceId: string, message: string) => vendorRespondToInvoiceDispute(invoiceId, message),
+      createResubmissionInvoice: (oldInvoiceId: string, lineItems, invoiceNumber?: string) =>
+        vendorCreateInvoiceResubmission(oldInvoiceId, lineItems, invoiceNumber),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -413,6 +490,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     tenantCustomers,
     vehicleTypes,
     vendorIndents,
+    allVendorInvoices,
   ]);
 }
 

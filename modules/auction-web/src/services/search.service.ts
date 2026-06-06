@@ -4,7 +4,8 @@ export interface SearchResultItem {
   id: string
   title?: string
   vendorName?: string
-  lane?: string
+  originCity?: string
+  destinationCity?: string
   type?: string
   status?: string
 }

@@ -3,7 +3,6 @@ import {
   VENDOR_CONTRACTS_EVENT,
   VENDOR_CONTRACTS_STORE_KEY,
   listVendorContracts,
-  splitLaneCode,
   type VendorContract,
 } from '@shared-utils'
 import { readIdentity } from './auctionBridge'
@@ -24,11 +23,9 @@ function toLocation(code: string): Location {
 }
 
 function mapManualContract(source: VendorContract): Contract {
-  const [origin, destination] = splitLaneCode(source.laneCode) ?? [source.laneCode, '']
   return {
     id: source.contractId,
-    laneCode: source.laneCode,
-    laneDetails: { origin: toLocation(origin), destination: toLocation(destination) },
+    laneDetails: { origin: toLocation(source.originCity), destination: toLocation(source.destinationCity) },
     source: 'MANUAL_UPLOAD',
     rateCard: [
       {

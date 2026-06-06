@@ -15,7 +15,7 @@ export async function uploadRfqResponse(
   data: {
     fileName: string
     vendorName?: string
-    rows: { lane: string; vehicleType: string; price: number }[]
+    rows: { originCity: string; destinationCity: string; vehicleType: string; price: number }[]
   }
 ): Promise<RfqResponse> {
   const res = await apiClient.post(`/rfqs/${rfqId}/responses`, data)
@@ -35,6 +35,6 @@ function mapResponse(d: any): RfqResponse {
     rfqId: d.rfqId,
     uploadedAt: d.uploadedAt,
     uploadedBy: d.uploadedBy ?? '',
-    rows: (d.rows ?? []).map((r: any) => ({ lane: r.lane, vehicleType: r.vehicleType, price: r.price })),
+    rows: (d.rows ?? []).map((r: any) => ({ originCity: r.originCity ?? '', destinationCity: r.destinationCity ?? '', vehicleType: r.vehicleType, price: r.price })),
   }
 }

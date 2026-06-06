@@ -5,6 +5,7 @@ import type { BookingRecord, BookingExpenseRecord, BookingStatus } from "@/modul
 import { areAllDeliveryPodsCaptured } from "@/modules/tms/booking/services/booking-engine";
 import type { FinanceDataBridge } from "@finance/integration/finance-data-bridge";
 import type { ARInvoice, ARTrip, LedgerExpense, PodStage } from "@finance/lib/receivablesStore";
+import type { VendorBill } from "@finance/lib/payablesStore";
 
 // Project one booking expense into the finance LedgerExpense shape so the finance
 // team sees every charge line (not just rolled-up totals). Read-only in finance.
@@ -99,7 +100,9 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
     const allBookings = store.listTenantBookings(tenantId);
     const eligible = allBookings.filter((b) => POD_ELIGIBLE_STATUSES.has(b.status));
 
-    const trips: ARTrip[] = eligible.map((b) => {
+    // One booking → the receivables ARTrip shape. Reused for AR trips AND for the
+    // payables vendor bills' linkedBookings (full per-booking detail).
+    const bookingToTrip = (b: BookingRecord): ARTrip => {
       const approvedExpenses = approvedExpensesOf(b);
       const pendingExpenses = sumExpenses(b, "Pending");
       const d = b.deliveries?.[0];
@@ -136,7 +139,9 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         buyingFreight: b.assignment?.vendorFreight ?? undefined,
         margin: b.assignment?.marginAmount ?? undefined,
       };
-    });
+    };
+
+    const trips: ARTrip[] = eligible.map(bookingToTrip);
 
     const invoices: ARInvoice[] = store
       .listTenantInvoices(tenantId)
@@ -191,8 +196,59 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
     const findBookingByTripId = (tripId: string) =>
       allBookings.find((b) => b.bookingId === tripId) ?? store.getTenantBookingById(tripId);
 
+    /* ---------- Accounts payable: REAL vendor bills from shared invoices --------
+       Each vendor-submitted invoice (shared collection) becomes a VendorBill.
+       Linked bookings come from the invoice line items (→ full booking detail);
+       contract rate is the bookings' assigned vendor freight, so the 3-way match
+       shows real variance when the vendor billed off-contract. */
+    const podDoneOf = (b: BookingRecord) => podStageOf(b) !== "pending";
+    const bookingForTripRef = (ref: string) =>
+      allBookings.find((b) => b.bookingId === ref || b.id === ref);
+    // BillStage from invoice status: only PENDING/DISPUTED stay in the match queue.
+    const stageForStatus = (s: string): VendorBill["stage"] =>
+      s === "PENDING" ? "pending" : s === "DISPUTED" ? "disputed" : s === "APPROVED" ? "scheduled" : "paid";
+
+    const vendorBills: VendorBill[] = store.listTenantVendorInvoices(tenantId).map((inv) => {
+      const linkedRecords = inv.lineItems
+        .map((li) => bookingForTripRef(li.tripId))
+        .filter((b): b is BookingRecord => Boolean(b));
+      const contractRate = linkedRecords.length
+        ? linkedRecords.reduce((s, b) => s + (b.assignment?.vendorFreight ?? 0), 0)
+        : inv.subtotal;
+      return {
+        id: inv.id,
+        vendorId: inv.vendorId,
+        vendor: inv.vendorName,
+        trip: inv.lineItems[0]?.tripId ?? inv.invoiceNumber,
+        lane: linkedRecords[0] ? laneOf(linkedRecords[0]) : "—",
+        contractRate,
+        billed: inv.subtotal,                                   // freight billed (ex-GST) vs contract freight
+        pod: linkedRecords.length ? linkedRecords.every(podDoneOf) : true,
+        terms: "Net 30",
+        due: (inv.paymentDueDate ?? "").slice(0, 10),
+        stage: stageForStatus(inv.status),
+        linkedBookings: linkedRecords.map(bookingToTrip),
+        vendorGstin: inv.vendorGstin,
+        customerGstin: inv.customerGstin,
+        pdfUrl: inv.pdfUrl,
+        subtotal: inv.subtotal,
+        gst: inv.gstAmount,
+        total: inv.grandTotal,
+        billingPeriod: inv.billingPeriod,
+        dispute: inv.dispute,
+      };
+    });
+
     return {
       trips,
+      vendorBills,
+      // Finance-driven lifecycle — writes back to the shared collection so the
+      // vendor portal's tabs reflect the decision.
+      approveVendorBill: (id: string) => store.financeApproveVendorInvoice(id),
+      disputeVendorBill: (id: string, reason: string) => store.financeDisputeVendorInvoice(id, reason),
+      requestVendorResubmission: (id: string, message?: string) => store.financeRequestVendorResubmission(id, message),
+      rejectVendorBill: (id: string, reason?: string) => store.financeRejectVendorInvoice(id, reason),
+      replyToVendorDispute: (id: string, message: string) => store.financeReplyToInvoiceDispute(id, message),
       invoices,
 
       uploadPod: (tripId) => {

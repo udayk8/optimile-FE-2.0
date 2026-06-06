@@ -3,6 +3,7 @@
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
+import { ExitConfirmDialog } from '@auction/components/shared/ExitConfirmDialog'
 import { Button } from '@auction/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'
 import { Input } from '@auction/components/ui/input'
@@ -20,6 +21,7 @@ export default function RfqCreatePage() {
   const [emailsRaw, setEmailsRaw] = useState('')
   const [fileName, setFileName] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,6 +90,15 @@ export default function RfqCreatePage() {
         eyebrow="Sourcing"
         title="Create RFQ"
         subtitle="Request specific pricing from vendors who are already onboarded."
+        onBack={() => setExitConfirmOpen(true)}
+      />
+
+      <ExitConfirmDialog
+        open={exitConfirmOpen}
+        onClose={() => setExitConfirmOpen(false)}
+        onConfirm={() => navigate('/auction/sourcing')}
+        title="Exit RFQ builder?"
+        description="Your RFQ setup will be lost."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_340px]">

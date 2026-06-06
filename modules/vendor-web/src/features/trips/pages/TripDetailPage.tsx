@@ -210,6 +210,7 @@ export default function TripDetailPage() {
               <div><p className="text-gray-500">Route</p><p className="font-semibold text-text">{detail.origin} → {detail.destination}</p></div>
               <div><p className="text-gray-500">Qty / Weight</p><p className="font-semibold text-text">{detail.qty} · {detail.weight}</p></div>
               <div><p className="text-gray-500">Pickup</p><p className="font-semibold text-text">{detail.pickup || '—'}</p></div>
+              {trip && <div><p className="text-gray-500">Last Updated</p><p className="font-semibold text-text">{formatDateTime(trip.timeline?.length ? [...trip.timeline].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).at(-1)!.timestamp : trip.createdAt)}</p></div>}
               <div><p className="text-gray-500">Vehicle</p><p className="font-semibold text-text">{detail.vehicle}</p></div>
               <div><p className="text-gray-500">Driver</p><p className="font-semibold text-text">{detail.driver}</p></div>
               <div><p className="text-gray-500">LR</p><p className="font-semibold text-text">{detail.lrNumbers.join(', ') || '—'}</p></div>

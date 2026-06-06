@@ -26,8 +26,13 @@ function formatBalance(balance: number, tab: LedgerTab) {
 }
 
 export default function LedgerPage() {
-  const [fromDate, setFromDate] = useState('2026-04-01')
-  const [toDate, setToDate] = useState('2026-05-31')
+  // Default window: last two months up to today.
+  const [fromDate, setFromDate] = useState(() => {
+    const from = new Date()
+    from.setMonth(from.getMonth() - 2)
+    return from.toISOString().slice(0, 10)
+  })
+  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [invoiceFilter, setInvoiceFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const activeTab: LedgerTab = 'CUSTOMER'

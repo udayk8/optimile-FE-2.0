@@ -16,10 +16,8 @@ import {
   fetchBooking,
   launchAuction,
   cancelAuction,
-  completeAuction,
   awardAuction,
   finalizeAuction,
-  rejectAuction,
 } from '@auction/lib/mock-services'
 import { fetchContracts } from '@auction/lib/mock-services'
 import { AUCTION_STORE_KEY } from '@auction/lib/auction-store'
@@ -33,6 +31,7 @@ type AwardModalState =
 
 export default function AuctionDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [auction, setAuction] = useState<Auction | null>(null)
   const [booking, setBooking] = useState<BookingReference | null>(null)
   const [linkedContracts, setLinkedContracts] = useState<Contract[]>([])
@@ -41,8 +40,6 @@ export default function AuctionDetailPage() {
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]>('overview')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('Configuration issue found after internal review.')
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [rejectReason, setRejectReason] = useState('No valid bids were received for this auction.')
   const [awardSelection, setAwardSelection] = useState<Record<string, { L1?: 'L1' | 'L2' | 'L3'; L2?: 'L1' | 'L2' | 'L3'; L3?: 'L1' | 'L2' | 'L3' }>>({})
   const [awardModal, setAwardModal] = useState<AwardModalState | null>(null)
   const [awardModalBidRank, setAwardModalBidRank] = useState<'L1' | 'L2' | 'L3'>('L1')
@@ -109,6 +106,24 @@ export default function AuctionDetailPage() {
   const rankOrder = { L1: 0, L2: 1, L3: 2 } as const
   const hasAnyBids = auction?.lanes.some((lane) => lane.ranking.length > 0) ?? false
 
+  // Invited vendors with bid / no-bid status. Names resolve from the lane
+  // rankings (bidders); silent invitees fall back to their vendor id.
+  const participation = (() => {
+    if (!auction) return [] as Array<{ id: string; name: string; hasBid: boolean }>
+    const bidders = new Map<string, string>()
+    auction.lanes.forEach((lane) =>
+      lane.ranking.forEach((bid) => bidders.set(bid.vendorId, bid.vendorName)),
+    )
+    const invited = auction.invitedVendorIds.length
+      ? auction.invitedVendorIds
+      : Array.from(bidders.keys())
+    return invited.map((vendorId) => ({
+      id: vendorId,
+      name: bidders.get(vendorId) ?? vendorId,
+      hasBid: bidders.has(vendorId),
+    }))
+  })()
+
   const getDefaultSelection = (laneId: string, rank: 'L1' | 'L2' | 'L3') => {
     const selected = awardSelection[laneId]?.[rank]
     if (selected) return selected
@@ -170,35 +185,6 @@ export default function AuctionDetailPage() {
       setCancelOpen(false)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed to cancel auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleComplete = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await completeAuction(auction.id)
-      setAuction(updated)
-      toast.success('Auction completed.')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to complete auction.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReject = async () => {
-    if (!auction) return
-    setSaving(true)
-    try {
-      const updated = await rejectAuction(auction.id, rejectReason)
-      setAuction(updated)
-      toast.success('Auction marked as no bids.')
-      setRejectOpen(false)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to reject auction.')
     } finally {
       setSaving(false)
     }
@@ -296,22 +282,23 @@ export default function AuctionDetailPage() {
         eyebrow="Auction Detail"
         title={auction.title}
         subtitle={`${auction.id} · ${auction.type} · ${auction.lanes.length} lane${auction.lanes.length > 1 ? 's' : ''}`}
+        onBack={() => navigate('/auction/auctions')}
         action={
           <div className="flex flex-wrap gap-2">
-            <StatusBadge status={auction.status} />
+            {/* Scheduled auctions read Upcoming until the start time passes.
+                Lifecycle is timer-driven — no manual Complete / No Bids: the
+                store sweep flips LIVE to Pending Award (or No Bids) when the
+                lane timers end. Cancel remains the only manual exit. */}
+            <StatusBadge
+              status={
+                auction.status === 'LIVE' && auction.startAt && new Date(auction.startAt).getTime() > Date.now()
+                  ? 'UPCOMING'
+                  : auction.status
+              }
+            />
             {auction.status === 'DRAFT' && (
               <Button disabled={saving} onClick={handleLaunch}>
                 {saving ? 'Launching…' : 'Launch'}
-              </Button>
-            )}
-            {auction.status === 'LIVE' && (
-              <Button disabled={saving} onClick={handleComplete}>
-                {saving ? 'Completing...' : 'Complete'}
-              </Button>
-            )}
-            {(auction.status === 'LIVE' || auction.status === 'COMPLETED') && !hasAnyBids && (
-              <Button variant="outline" disabled={saving} onClick={() => setRejectOpen(true)}>
-                No Bids
               </Button>
             )}
             {(auction.status === 'DRAFT' || auction.status === 'LIVE' || auction.status === 'COMPLETED') && (
@@ -353,10 +340,6 @@ export default function AuctionDetailPage() {
                   <p className="mt-1 text-xs text-[#64748B]">{booking.commodity} - {booking.quantity} {booking.uom}</p>
                 </div>
               )}
-              <div className="rounded-xl border border-[#E5E7EB] p-4">
-                <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Award deadline</p>
-                <div className="mt-2">{(auction.status === 'LIVE' || auction.status === 'COMPLETED') ? <SLACountdown deadline={auction.awardDeadline} /> : <span className="text-sm text-[#64748B]">Not active</span>}</div>
-              </div>
               {auction.type !== 'SPOT' && (
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Contract Window</p>
@@ -394,9 +377,28 @@ export default function AuctionDetailPage() {
                     <StatusBadge status={contract.status} />
                   </div>
                   <p className="mt-2 text-sm text-[#0F172A]">{contract.vendorName}</p>
-                  <p className="mt-1 text-xs text-[#64748B]">{contract.lane} · {contract.allocationRank}</p>
+                  <p className="mt-1 text-xs text-[#64748B]">{contract.originCity} - {contract.destinationCity} · {contract.allocationRank}</p>
                 </Link>
               ))}
+              {participation.length > 0 && (
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Vendor Participation</p>
+                  <ul className="mt-3 space-y-2">
+                    {participation.map((vendor) => (
+                      <li key={vendor.id} className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm text-[#0F172A]">{vendor.name}</span>
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            vendor.hasBid ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {vendor.hasBid ? 'Bid placed' : 'No bid yet'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -407,7 +409,7 @@ export default function AuctionDetailPage() {
           {auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>{lane.lane}</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity}</CardTitle>
                 <StatusBadge status={auction.status} />
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-4">
@@ -453,7 +455,7 @@ export default function AuctionDetailPage() {
           {auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>{lane.lane} Ranking</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity} Ranking</CardTitle>
                 <span className="text-xs text-[#64748B]">{lane.ranking.length} bid{lane.ranking.length === 1 ? '' : 's'}</span>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -508,7 +510,7 @@ export default function AuctionDetailPage() {
           {auction.type !== 'SPOT' && auction.lanes.map((lane) => (
             <Card key={lane.id}>
               <CardHeader className="flex-row items-center justify-between space-y-0">
-                <CardTitle>{lane.lane}</CardTitle>
+                <CardTitle>{lane.originCity} - {lane.destinationCity}</CardTitle>
                 {lane.awardDecision ? <StatusBadge status="AWARDED" /> : <StatusBadge status={auction.status} />}
               </CardHeader>
               <CardContent className="space-y-4">
@@ -616,22 +618,6 @@ export default function AuctionDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mark No Bids</DialogTitle>
-            <DialogDescription>This closes the auction without creating award decisions or contracts.</DialogDescription>
-          </DialogHeader>
-          <Input value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>Back</Button>
-            <Button variant="destructive" disabled={saving} onClick={handleReject}>
-              {saving ? 'Saving...' : 'Confirm No Bids'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={Boolean(awardModal)} onOpenChange={(open) => !open && setAwardModal(null)}>
         <DialogContent>
           <DialogHeader>
@@ -646,7 +632,10 @@ export default function AuctionDetailPage() {
             <div className="space-y-4">
               <div className="rounded-xl border border-[#E5E7EB] p-4">
                 <p className="text-sm font-semibold text-[#0F172A]">
-                  {awardModal.scope === 'SPOT' ? spotLane?.lane : auction.lanes.find((lane) => lane.id === awardModal.laneId)?.lane}
+                  {(() => {
+                    const modalLane = awardModal.scope === 'SPOT' ? spotLane : auction.lanes.find((lane) => lane.id === awardModal.laneId)
+                    return modalLane ? `${modalLane.originCity} - ${modalLane.destinationCity}` : ''
+                  })()}
                 </p>
                 {awardModal.scope === 'SPOT' && spotLane && (
                   <p className="mt-1 text-xs text-[#64748B]">Spot ranks are shown in bid order. L1 is the current top bidder.</p>

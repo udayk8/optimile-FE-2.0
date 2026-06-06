@@ -12,6 +12,7 @@ interface AppShellProps {
   tenantName?: string
   footer?: ReactNode
   notificationCount?: number
+  onNotificationsClick?: () => void
 }
 
 export function AppShell({
@@ -22,6 +23,7 @@ export function AppShell({
   tenantName,
   footer,
   notificationCount,
+  onNotificationsClick,
 }: AppShellProps) {
   return (
     <div className="flex min-h-screen bg-background text-text">
@@ -32,6 +34,7 @@ export function AppShell({
           user={user}
           onLogout={onLogout}
           notificationCount={notificationCount}
+          onNotificationsClick={onNotificationsClick}
         />
         <main className="flex-1 overflow-x-hidden bg-[#F8FAFC]">
           <div className="page-enter mx-auto max-w-[1400px] px-8 py-8">

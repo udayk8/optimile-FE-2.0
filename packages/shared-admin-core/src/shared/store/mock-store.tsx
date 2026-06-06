@@ -105,6 +105,10 @@ import type {
   TenantVehicleInput,
 } from "@/types/fleet";
 import type {
+  TenantVendorInvoiceRecord,
+  TenantVendorInvoiceLineItem,
+} from "@/types/vendor-invoice";
+import type {
   LRAllocationApprovalFlow,
   LRAllocationFlowConfig,
   LRAllocationFlowLevel,
@@ -245,10 +249,12 @@ interface MockStoreValue {
     lrPlaceId?: string | null,
     lrPlaceName?: string | null,
     /** When set, the indent goes to ONLY this vendor (Contract Vendor flow).
-     *  Omitted ⇒ legacy broadcast to all active vendors. */
+     *  Omitted ⇒ spot-contract vendor (if any), else broadcast to all active. */
     vendorId?: string | null,
     /** Buying freight captured from the vendor's contract at send time. */
     buyingRate?: number | null,
+    /** Booking object when it may not be in the store yet (fresh spot booking). */
+    knownBooking?: BookingRecord,
   ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
@@ -262,6 +268,16 @@ interface MockStoreValue {
   actionTenantBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) => BookingRecord;
   listTenantInvoices: (tenantId: string) => TenantInvoiceRecord[];
   createTenantInvoice: (input: TenantInvoiceRecord) => TenantInvoiceRecord;
+  // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
+  listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
+  vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
+  financeApproveVendorInvoice: (invoiceId: string) => void;
+  financeDisputeVendorInvoice: (invoiceId: string, reason: string) => void;
+  financeRequestVendorResubmission: (invoiceId: string, message?: string) => void;
+  financeRejectVendorInvoice: (invoiceId: string, reason?: string) => void;
+  financeReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
+  vendorRespondToInvoiceDispute: (invoiceId: string, message: string) => void;
+  vendorCreateInvoiceResubmission: (oldInvoiceId: string, lineItems: TenantVendorInvoiceLineItem[], invoiceNumber?: string) => TenantVendorInvoiceRecord | null;
   listTenantVendorRateCards: (tenantVendorId: string) => TenantVendorRateCard[];
   createTenantVendorRateCard: (
     input: Omit<TenantVendorRateCard, "id" | "createdAt" | "updatedAt">,
@@ -623,12 +639,113 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // onboarded via the wizard. If the user's localStorage exists but doesn't
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v6";
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v7";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
+
+// Manual vendor-contract seed for the Bluedart vendors — the shared
+// `optimile.vendor-contracts` store both Tenant Admin vendor detail and the
+// Vendor Portal read. Idempotent by contractId; runs every boot.
+const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
+const SEED_VENDOR_CONTRACTS = [
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+];
+
+function seedVendorContracts(): void {
+  try {
+    const raw = window.localStorage.getItem(VENDOR_CONTRACTS_SEED_KEY);
+    const stored: Array<{ contractId: string }> = raw ? JSON.parse(raw) : [];
+    const existingIds = new Set(stored.map((contract) => contract.contractId));
+    const startDate = new Date().toISOString().slice(0, 10);
+    const created = SEED_VENDOR_CONTRACTS.filter((seed) => !existingIds.has(seed.contractId)).map(
+      ({ months, ...seed }) => ({
+        ...seed,
+        startDate,
+        endDate: new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        createdFrom: "MANUAL_UPLOAD",
+        status: "ACTIVE",
+      }),
+    );
+    if (created.length > 0) {
+      window.localStorage.setItem(VENDOR_CONTRACTS_SEED_KEY, JSON.stringify([...stored, ...created]));
+    }
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
+
+// Address Book seed (booking-setup blob) — gives every demo tenant a spread
+// of city pickup/drop points so auction lanes (which only allow address-book
+// cities) and spot bookings have data out of the box.
+const BOOKING_SETUP_KEY = "optimile.tenant.bookingSetup";
+const SEED_ADDRESS_BOOK = [
+  { id: "addr-seed-mum", name: "Mumbai Central Warehouse", type: "BOTH", city: "Mumbai", state: "Maharashtra", pincode: "400001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-del", name: "Delhi NCR Hub", type: "BOTH", city: "Delhi", state: "Delhi", pincode: "110001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-blr", name: "Bengaluru Depot", type: "BOTH", city: "Bengaluru", state: "Karnataka", pincode: "560001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-maa", name: "Chennai Dock Yard", type: "BOTH", city: "Chennai", state: "Tamil Nadu", pincode: "600001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-pnq", name: "Pune Distribution Center", type: "BOTH", city: "Pune", state: "Maharashtra", pincode: "411001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hyd", name: "Hyderabad Hub", type: "BOTH", city: "Hyderabad", state: "Telangana", pincode: "500001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-nsk", name: "Nashik Consolidation Point", type: "BOTH", city: "Nashik", state: "Maharashtra", pincode: "422001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-jai", name: "Jaipur Gateway", type: "BOTH", city: "Jaipur", state: "Rajasthan", pincode: "302001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-lko", name: "Lucknow Depot", type: "BOTH", city: "Lucknow", state: "Uttar Pradesh", pincode: "226001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-amd", name: "Ahmedabad Logistics Park", type: "BOTH", city: "Ahmedabad", state: "Gujarat", pincode: "380001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-srt", name: "Surat Textile Hub", type: "BOTH", city: "Surat", state: "Gujarat", pincode: "395001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bdq", name: "Vadodara Industrial Estate", type: "BOTH", city: "Vadodara", state: "Gujarat", pincode: "390001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-udr", name: "Udaipur Trade Center", type: "BOTH", city: "Udaipur", state: "Rajasthan", pincode: "313001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-cjb", name: "Coimbatore Mills Yard", type: "BOTH", city: "Coimbatore", state: "Tamil Nadu", pincode: "641001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ixe", name: "Mangaluru Port Godown", type: "BOTH", city: "Mangaluru", state: "Karnataka", pincode: "575001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ccu", name: "Kolkata Freight Terminal", type: "BOTH", city: "Kolkata", state: "West Bengal", pincode: "700001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-nag", name: "Nagpur Central Yard", type: "BOTH", city: "Nagpur", state: "Maharashtra", pincode: "440001", linkedCustomerId: "", status: "active" },
+  // Cities referenced by demo lanes/trips across modules — every mock
+  // source/destination city must exist here so the lane is bookable.
+  { id: "addr-seed-cnd", name: "Chandausi Cement Depot", type: "BOTH", city: "Chandausi", state: "Uttar Pradesh", pincode: "244412", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bhr", name: "Bharuch Chemical Park", type: "BOTH", city: "Bharuch", state: "Gujarat", pincode: "392001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-bwd", name: "Bhiwandi Warehouse Cluster", type: "BOTH", city: "Bhiwandi", state: "Maharashtra", pincode: "421302", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hld", name: "Haldia Port Yard", type: "BOTH", city: "Haldia", state: "West Bengal", pincode: "721602", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-hbx", name: "Hubballi Freight Point", type: "BOTH", city: "Hubballi", state: "Karnataka", pincode: "580020", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-idr", name: "Indore Logistics Hub", type: "BOTH", city: "Indore", state: "Madhya Pradesh", pincode: "452001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-ixw", name: "Jamshedpur Steel Yard", type: "BOTH", city: "Jamshedpur", state: "Jharkhand", pincode: "831001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-cok", name: "Kochi Harbour Godown", type: "BOTH", city: "Kochi", state: "Kerala", pincode: "682001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mog", name: "Moga Agro Depot", type: "BOTH", city: "Moga", state: "Punjab", pincode: "142001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mdr", name: "Mundra Port Terminal", type: "BOTH", city: "Mundra", state: "Gujarat", pincode: "370421", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mgr", name: "Munger Factory Gate", type: "BOTH", city: "Munger", state: "Bihar", pincode: "811201", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-mys", name: "Mysuru Distribution Center", type: "BOTH", city: "Mysuru", state: "Karnataka", pincode: "570001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-slm", name: "Salem Steel Yard", type: "BOTH", city: "Salem", state: "Tamil Nadu", pincode: "636001", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-tmk", name: "Tumakuru Industrial Park", type: "BOTH", city: "Tumakuru", state: "Karnataka", pincode: "572101", linkedCustomerId: "", status: "active" },
+  { id: "addr-seed-vga", name: "Vijayawada Trade Hub", type: "BOTH", city: "Vijayawada", state: "Andhra Pradesh", pincode: "520001", linkedCustomerId: "", status: "active" },
+];
+
+function seedAddressBookForDemoTenants(): void {
+  try {
+    const raw = window.localStorage.getItem(BOOKING_SETUP_KEY);
+    const all: Record<string, { addresses?: Array<{ id: string }> } & Record<string, unknown>> = raw ? JSON.parse(raw) : {};
+    let changed = false;
+    for (const tenantId of DEMO_TENANT_IDS) {
+      const entry = all[tenantId] ?? {};
+      const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
+      const existingIds = new Set(addresses.map((address) => address.id));
+      const missing = SEED_ADDRESS_BOOK.filter((address) => !existingIds.has(address.id));
+      if (missing.length > 0) {
+        all[tenantId] = { ...entry, addresses: [...addresses, ...missing] };
+        changed = true;
+      }
+    }
+    if (changed) window.localStorage.setItem(BOOKING_SETUP_KEY, JSON.stringify(all));
+
+  } catch {
+    /* best-effort — never break boot on seeding */
+  }
+}
 
 function ensureDemoTenantsRehydrated(): void {
   if (typeof window === "undefined") return;
   try {
+    seedVendorContracts();
+    seedAddressBookForDemoTenants();
     if (window.localStorage.getItem(DEMO_REHYDRATION_KEY) === "1") return;
     const demoTenantIds = new Set(DEMO_TENANT_IDS);
     const mergeDemoArray = <T extends { id: string; tenantId: string }>(key: string, seed: T[]) => {
@@ -3608,6 +3725,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   const [tenantInvoices, setTenantInvoices] = useState<TenantInvoiceRecord[]>(() =>
     loadSeededState(storageKeys.tenantInvoices, mockTenantInvoices),
   );
+  // Vendor (AP) invoices — single source of truth shared by the vendor portal
+  // and the finance module. Seeded empty; populated as vendors generate invoices.
+  const [tenantVendorInvoices, setTenantVendorInvoices] = useState<TenantVendorInvoiceRecord[]>(() =>
+    loadSeededState<TenantVendorInvoiceRecord[]>(storageKeys.tenantVendorInvoices, []),
+  );
   const [tenantLrs, setTenantLrs] = useState<TenantLrRecord[]>(() =>
     normalizeStoredTenantLrs(loadSeededState(storageKeys.tenantLrs, mockTenantLrs)),
   );
@@ -3751,6 +3873,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     writeStoredValue(storageKeys.tenantInvoices, tenantInvoices);
   }, [tenantInvoices]);
+
+  useEffect(() => {
+    writeStoredValue(storageKeys.tenantVendorInvoices, tenantVendorInvoices);
+  }, [tenantVendorInvoices]);
 
   useEffect(() => {
     writeStoredValue(storageKeys.tenantLrs, tenantLrs);
@@ -5137,8 +5263,8 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate) => {
-        const booking = tenantBookings.find((item) => item.id === bookingId);
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate, knownBooking) => {
+        const booking = knownBooking ?? tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
           throw new Error("Indents can only be sent for bookings pending assignment.");
@@ -5146,14 +5272,23 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         if (bookingVendorIndents.some((indent) => indent.bookingId === bookingId && indent.status === "PENDING")) {
           throw new Error("An active indent already exists for this booking.");
         }
-        // Contract Vendor flow targets ONE vendor; legacy broadcast targets all.
+        // Targeting precedence: an explicit vendorId (Contract Vendor "Send
+        // Indent") wins; else a spot-contract booking targets its winning vendor;
+        // else broadcast to all active vendors.
+        const spotVendorId = booking.spotContract?.vendorId ?? null;
         const eligibleVendors = tenantVendors.filter(
           (vendor) =>
             vendor.tenantId === booking.tenantId &&
             vendor.status === "active" &&
-            (vendorId ? vendor.id === vendorId : true),
+            (vendorId ? vendor.id === vendorId : !spotVendorId || vendor.id === spotVendorId),
         );
-        if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
+        if (eligibleVendors.length === 0) {
+          throw new Error(
+            spotVendorId
+              ? "The spot-contract vendor is not active for this tenant."
+              : "No active vendors to send the indent to.",
+          );
+        }
         const now = new Date().toISOString();
         // Vendor assignment always uses Auto LR generated from the booking owner's
         // place — captured here at send time so the vendor never picks LR.
@@ -5187,9 +5322,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       status: item.status,
                       timestamp: now,
                       actor,
-                      eventLabel: "INDENT_SENT_TO_VENDORS",
-                      note:
-                        created.length === 1
+                      eventLabel: spotVendorId ? "INDENT_SENT_SPOT_CONTRACT" : "INDENT_SENT_TO_VENDORS",
+                      note: spotVendorId
+                        ? `Indent sent to ${created[0]?.vendorName ?? "spot-contract vendor"} (spot contract ${booking.spotContract?.contractId ?? ""} @ ₹${booking.spotContract?.rate?.toLocaleString("en-IN") ?? ""})`
+                        : created.length === 1
                           ? `Indent sent to ${created[0].vendorName}`
                           : `Indent sent to ${created.length} vendor(s)`,
                     },
@@ -6034,6 +6170,117 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       createTenantInvoice: (input) => {
         setTenantInvoices((current) => [input, ...current]);
         return input;
+      },
+      // ---- Vendor (AP) invoice lifecycle ----------------------------------
+      listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),
+      vendorSubmitInvoice: (input) => {
+        setTenantVendorInvoices((current) => [input, ...current]);
+        return input;
+      },
+      financeApproveVendorInvoice: (invoiceId) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) =>
+            inv.id === invoiceId && (inv.status === "PENDING" || inv.status === "DISPUTED")
+              ? { ...inv, status: "APPROVED", dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
+              : inv,
+          ),
+        ),
+      financeDisputeVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "PENDING") return inv;
+            const now = new Date().toISOString();
+            return {
+              ...inv,
+              status: "DISPUTED",
+              dispute: {
+                reason,
+                status: "OPEN",
+                raisedAt: now,
+                responseDueAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                messages: [{ id: `dmsg-${invoiceId}-1`, sender: "FINANCE", message: reason, createdAt: now }],
+              },
+            };
+          }),
+        ),
+      financeRequestVendorResubmission: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || inv.status !== "DISPUTED") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "RESUBMISSION_REQUIRED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: message?.trim() || "Resubmission required. Please create a corrected invoice.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      financeRejectVendorInvoice: (invoiceId, reason) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || (inv.status !== "PENDING" && inv.status !== "DISPUTED")) return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              status: "CLOSED",
+              closeReason: "REJECTED",
+              dispute: inv.dispute
+                ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: reason?.trim() || "Invoice rejected by finance.", createdAt: now }] }
+                : inv.dispute,
+            };
+          }),
+        ),
+      vendorRespondToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "VENDOR", message, createdAt: now }] } };
+          }),
+        ),
+      financeReplyToInvoiceDispute: (invoiceId, message) =>
+        setTenantVendorInvoices((current) =>
+          current.map((inv) => {
+            if (inv.id !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message, createdAt: now }] } };
+          }),
+        ),
+      vendorCreateInvoiceResubmission: (oldInvoiceId, lineItems, invoiceNumber) => {
+        const old = tenantVendorInvoices.find((inv) => inv.id === oldInvoiceId);
+        if (!old) return null;
+        const now = new Date().toISOString();
+        const subtotal = lineItems.reduce((s, li) => s + (li.lineTotal || li.freightCharge || 0), 0);
+        const gstAmount = Math.round((old.grandTotal && old.subtotal ? old.gstAmount / old.subtotal : 0.12) * subtotal);
+        const newNumber = invoiceNumber ?? `${old.invoiceNumber}-R`;
+        const newInvoice: TenantVendorInvoiceRecord = {
+          ...old,
+          id: newNumber,
+          invoiceNumber: newNumber,
+          invoiceDate: now.slice(0, 10),
+          createdAt: now,
+          lineItems,
+          subtotal,
+          gstAmount,
+          grandTotal: subtotal + gstAmount,
+          status: "PENDING",
+          closeReason: undefined,
+          supersedesInvoiceId: old.id,
+          supersededByInvoiceId: undefined,
+          pdfUrl: `/invoices/${newNumber}.pdf`,
+          dispute: undefined,
+        };
+        setTenantVendorInvoices((current) => [
+          newInvoice,
+          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, supersededByInvoiceId: newNumber } : inv)),
+        ]);
+        return newInvoice;
       },
       listTenantLrPools: (tenantId) => tenantLrPools.filter((item) => item.tenantId === tenantId),
       listTenantLrs: (tenantId) => tenantLrs.filter((item) => item.tenantId === tenantId),
@@ -7146,6 +7393,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       tenantBookings,
       tenantCustomers,
       tenantDrivers,
+      tenantVendorInvoices,
       tenantLRConfigs,
       tenantLrs,
       tenantLrPools,

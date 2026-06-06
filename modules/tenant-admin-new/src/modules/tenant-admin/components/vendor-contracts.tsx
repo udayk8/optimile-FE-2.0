@@ -10,12 +10,10 @@ import {
   RATE_TYPE_OPTIONS,
   VENDOR_CONTRACTS_EVENT,
   buildVendorContractCsvTemplate,
-  getContractSourceLabel,
-  getLaneCodeError,
   getRateTypeLabel,
   isValidRateType,
+  listTenantCities,
   listVendorContracts,
-  normalizeLaneCode,
   parseVendorContractCsv,
   uploadVendorContractsCsv,
   type RateType,
@@ -38,9 +36,13 @@ const AUCTION_STORE_KEY = "optimile.auction-store";
 
 interface AuctionStoreContract {
   id: string;
+  sourceAuctionId?: string;
+  contractType?: "BULK" | "LOT" | "SPOT";
   vendorId: string;
   vendorName: string;
-  lane: string;
+  /** Lane = source/destination city pair. */
+  originCity: string;
+  destinationCity: string;
   vehicleType: string;
   contractedRate: number;
   rateUnit: VendorContract["rateType"];
@@ -59,18 +61,23 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
     const contracts = (JSON.parse(raw)?.contracts ?? []) as AuctionStoreContract[];
     const name = vendor.name.toLowerCase();
     return contracts
+      // SPOT one-time contracts render in their own table — keep the main
+      // vendor-contracts list to manual uploads + BULK/LOT auction wins.
+      .filter((contract) => contract.contractType !== "SPOT")
       .filter((contract) => contract.vendorId === vendor.id || contract.vendorName.toLowerCase() === name)
       .map((contract) => ({
         contractId: contract.id,
         vendorId: contract.vendorId,
         vendorName: contract.vendorName,
-        laneCode: contract.lane,
+        originCity: contract.originCity ?? "",
+        destinationCity: contract.destinationCity ?? "",
         vehicleType: contract.vehicleType,
         rate: contract.contractedRate,
         rateType: contract.rateUnit,
         startDate: contract.startDate,
         endDate: contract.endDate,
         createdFrom: "AUCTION_WIN" as const,
+        contractKind: contract.contractType,
         status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
         allocationRank: contract.allocationRank,
         volumeAllocationPercent: contract.volumeAllocationPercent,
@@ -104,6 +111,98 @@ export function useVendorContracts(vendor: { id: string; name: string }): Vendor
   );
 }
 
+/** Spot-auction one-time contract rows for the dedicated spot table. */
+export interface VendorSpotContract extends VendorContract {
+  sourceAuctionId: string;
+  consumedByBookingId?: string;
+}
+
+function readSpotContracts(vendor: { id: string; name: string }): VendorSpotContract[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(AUCTION_STORE_KEY);
+    if (!raw) return [];
+    const contracts = (JSON.parse(raw)?.contracts ?? []) as (AuctionStoreContract & {
+      consumedByBookingId?: string;
+    })[];
+    const name = vendor.name.toLowerCase();
+    return contracts
+      .filter((contract) => contract.contractType === "SPOT")
+      .filter((contract) => contract.vendorId === vendor.id || contract.vendorName.toLowerCase() === name)
+      .map((contract) => ({
+        contractId: contract.id,
+        sourceAuctionId: contract.sourceAuctionId ?? "",
+        consumedByBookingId: contract.consumedByBookingId,
+        vendorId: contract.vendorId,
+        vendorName: contract.vendorName,
+        originCity: contract.originCity ?? "",
+        destinationCity: contract.destinationCity ?? "",
+        vehicleType: contract.vehicleType,
+        rate: contract.contractedRate,
+        rateType: contract.rateUnit,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+        createdFrom: "AUCTION_WIN" as const,
+        status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
+        volumeAllocationPercent: contract.volumeAllocationPercent,
+        allocationRank: contract.allocationRank,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Spot contracts for a vendor, refreshed on shared-store changes. */
+export function useVendorSpotContracts(vendor: { id: string; name: string }): VendorSpotContract[] {
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setRevision((value) => value + 1);
+    window.addEventListener("optimile-auction-store", bump);
+    window.addEventListener("storage", bump);
+    return () => {
+      window.removeEventListener("optimile-auction-store", bump);
+      window.removeEventListener("storage", bump);
+    };
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => readSpotContracts(vendor), [vendor.id, vendor.name, revision]);
+}
+
+/**
+ * Spot-auction contracts table — same columns as the vendor contracts table
+ * plus the spot auction id. A spot contract is just a contract with that
+ * extra reference; no manual lifecycle marking here.
+ */
+export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotContract[] }) {
+  return (
+    <DataTable
+      title="Spot auction contracts"
+      description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
+      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
+      rows={contracts.map((contract) => [
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity || "—"}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity || "—"}</span>,
+        contract.vehicleType,
+        contract.rate.toLocaleString("en-IN"),
+        <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
+        <span key={`${contract.contractId}-volume`}>{contract.volumeAllocationPercent ?? 100}%</span>,
+        contract.endDate,
+        <span key={`${contract.contractId}-auction`} className="font-mono text-xs">
+          {contract.sourceAuctionId || "—"}
+          {contract.consumedByBookingId ? (
+            <span className="ml-1 text-muted-foreground">· used in {contract.consumedByBookingId}</span>
+          ) : null}
+        </span>,
+        <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
+          {contract.status}
+        </Badge>,
+      ])}
+      emptyMessage="No spot auction contracts yet — award a spot auction to this vendor."
+      pageSize={10}
+    />
+  );
+}
+
 export function downloadVendorContractCsvTemplate() {
   const blob = new Blob([buildVendorContractCsvTemplate()], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -119,9 +218,10 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
     <DataTable
       title="Vendor contracts"
       description="Manually uploaded contracts and auction-won contracts — the same list the vendor sees in their portal."
-      headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Source", "Status"]}
+      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "End Date", "Type", "Status"]}
       rows={contracts.map((contract) => [
-        <span key={`${contract.contractId}-lane`} className="font-mono font-semibold">{contract.laneCode}</span>,
+        <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity || "—"}</span>,
+        <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity || "—"}</span>,
         contract.vehicleType,
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
@@ -131,8 +231,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
         </span>,
         contract.startDate,
         contract.endDate,
-        <Badge key={`${contract.contractId}-source`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
-          {getContractSourceLabel(contract.createdFrom)}
+        <Badge key={`${contract.contractId}-type`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
+          {contract.contractKind === "LOT" ? "Lot" : contract.contractKind === "BULK" ? "Bulk" : "Manual"}
         </Badge>,
         <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
           {contract.status}
@@ -145,7 +245,8 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
 }
 
 const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
-  laneCode: "",
+  originCity: "",
+  destinationCity: "",
   vehicleType: "",
   rate: 0,
   rateType: "PER_TRIP",
@@ -155,8 +256,11 @@ const EMPTY_CONTRACT_ROW: VendorContractCsvRow = {
 
 /** Validates a contract row; returns an error message or null when valid. */
 function validateContractRow(form: VendorContractCsvRow): string | null {
-  const laneError = getLaneCodeError(normalizeLaneCode(form.laneCode));
-  if (laneError) return laneError;
+  if (!form.originCity.trim()) return "Origin city is required.";
+  if (!form.destinationCity.trim()) return "Destination city is required.";
+  if (form.originCity.trim().toLowerCase() === form.destinationCity.trim().toLowerCase()) {
+    return "Origin and destination must be different cities.";
+  }
   if (!form.vehicleType.trim()) return "Vehicle type is required.";
   if (!Number.isFinite(form.rate) || form.rate <= 0) return "Rate must be greater than zero.";
   if (!isValidRateType(form.rateType)) return "Rate type must be PER_TRIP, PER_MT, or PER_KM.";
@@ -183,6 +287,8 @@ export function VendorContractFormDialog({
 }) {
   const [form, setForm] = useState<VendorContractCsvRow>(EMPTY_CONTRACT_ROW);
   const [error, setError] = useState("");
+  // Lane cities come from the tenant address book — same vocabulary bookings use.
+  const tenantCities = useMemo(() => listTenantCities(), []);
 
   useEffect(() => {
     if (!open) return;
@@ -193,7 +299,7 @@ export function VendorContractFormDialog({
   function save() {
     const validationError = validateContractRow(form);
     if (validationError) return setError(validationError);
-    onSave({ ...form, laneCode: normalizeLaneCode(form.laneCode) });
+    onSave({ ...form });
     onOpenChange(false);
   }
 
@@ -202,7 +308,7 @@ export function VendorContractFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={title}
-      description="Lane must be AAA-BBB; rate type must be PER_TRIP, PER_MT, or PER_KM."
+      description="Pick the lane's source and destination cities from the address book."
       footer={
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -214,13 +320,27 @@ export function VendorContractFormDialog({
         {error ? (
           <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
         ) : null}
-        <ContractField label="Lane">
-          <Input
-            value={form.laneCode}
-            onChange={(event) => setForm((current) => ({ ...current, laneCode: event.target.value.toUpperCase() }))}
-            placeholder="MUM-BLR"
-            className="font-mono"
-          />
+        <ContractField label="Source City">
+          <Select
+            value={form.originCity}
+            onChange={(event) => setForm((current) => ({ ...current, originCity: event.target.value }))}
+          >
+            <option value="">Select city</option>
+            {tenantCities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </Select>
+        </ContractField>
+        <ContractField label="Destination City">
+          <Select
+            value={form.destinationCity}
+            onChange={(event) => setForm((current) => ({ ...current, destinationCity: event.target.value }))}
+          >
+            <option value="">Select city</option>
+            {tenantCities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </Select>
         </ContractField>
         <ContractField label="Vehicle Type">
           <Input
@@ -276,9 +396,10 @@ export function EditableVendorContractRows({
       <DataTable
         title="Contracts to import"
         description="Each row can be edited or removed before the vendor is saved."
-        headers={["Lane", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Actions"]}
+        headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Start Date", "End Date", "Actions"]}
         rows={rows.map((row, index) => [
-          <span key={`pending-${index}-lane`} className="font-mono font-semibold">{row.laneCode}</span>,
+          <span key={`pending-${index}-origin`} className="font-semibold">{row.originCity || "—"}</span>,
+          <span key={`pending-${index}-destination`} className="font-semibold">{row.destinationCity || "—"}</span>,
           row.vehicleType,
           row.rate.toLocaleString("en-IN"),
           <Badge key={`pending-${index}-rate-type`} variant="outline">{getRateTypeLabel(row.rateType)}</Badge>,
@@ -393,7 +514,7 @@ export function VendorContractCsvUpload({
         open={open}
         onOpenChange={setOpen}
         title="Upload Vendor Contracts"
-        description="CSV only. Headers must be exactly: lane,vehicleType,rate,rateType,startDate,endDate — no customer column."
+        description="CSV only. Headers must be exactly: originCity,destinationCity,vehicleType,rate,rateType,startDate,endDate — no customer column."
         footer={
           <div className="flex justify-end">
             <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
@@ -415,7 +536,7 @@ export function VendorContractCsvUpload({
             />
           </label>
           <p className="text-xs text-muted-foreground">
-            Lane must be in AAA-BBB format (e.g. MUM-BLR). Rate type must be PER_TRIP, PER_MT, or PER_KM.
+            Lanes are source/destination city pairs (e.g. Mumbai,Bengaluru). Rate type must be PER_TRIP, PER_MT, or PER_KM.
           </p>
           {busy ? <p className="text-sm text-muted-foreground">Validating uploaded file...</p> : null}
           {fileName && !busy ? <p className="text-sm font-medium">{fileName}</p> : null}

@@ -43,7 +43,8 @@ export interface PriorityAuction {
 export interface ExpiringContract {
   id: string
   vendorName: string
-  lane: string
+  originCity: string
+  destinationCity: string
   endDate: string
   status: string
 }
@@ -59,7 +60,8 @@ export interface SearchResultItem {
   id: string
   title?: string
   vendorName?: string
-  lane?: string
+  originCity?: string
+  destinationCity?: string
   type?: string
   status?: string
 }
@@ -183,20 +185,27 @@ export async function createAuction(data: any): Promise<Auction> {
   const now = new Date()
   const principal = readSessionPrincipal()
   const launchNow = data.launchNow ?? data.status === 'LIVE'
+  // A future startAt creates a scheduled auction: stored LIVE so it goes live
+  // by itself at the start time, displayed as Upcoming until then.
+  const scheduledStart =
+    !launchNow && data.startAt && new Date(data.startAt).getTime() > now.getTime()
+      ? new Date(data.startAt).toISOString()
+      : undefined
   const windowMinutes = data.biddingWindowMinutes ?? 60
-  const timerEndsAt = new Date(now.getTime() + windowMinutes * 60 * 1000).toISOString()
+  const windowAnchor = scheduledStart ? new Date(scheduledStart).getTime() : now.getTime()
+  const timerEndsAt = new Date(windowAnchor + windowMinutes * 60 * 1000).toISOString()
   const id = `AUC-${data.type ?? 'SPOT'}-${Date.now().toString().slice(-6)}`
   const next: Auction = {
     id,
     title: data.title ?? 'New auction',
     type: data.type ?? 'SPOT',
-    status: launchNow ? 'LIVE' : 'DRAFT',
+    status: launchNow || scheduledStart ? 'LIVE' : 'DRAFT',
     tenantId: data.tenantId ?? principal.tenantId,
     createdBy: data.createdBy ?? 'u-ops-1',
     createdByUserId: data.createdByUserId ?? principal.userId,
     createdByRole: data.createdByRole ?? 'OPS',
     createdAt: now.toISOString(),
-    startAt: launchNow ? now.toISOString() : data.startAt,
+    startAt: launchNow ? now.toISOString() : scheduledStart ?? data.startAt,
     contractStartDate: data.contractStartDate,
     contractEndDate: data.contractEndDate,
     minBidDecrement: data.minBidDecrement ?? 500,
@@ -293,35 +302,42 @@ export async function awardAuction(auctionId: string, decisions: any[]) {
   byLane.forEach((laneDecisions, laneId) => {
     const lane = auction.lanes.find((l) => l.id === laneId)
     if (!lane) return
-    const contracts: Contract[] =
-      auction.type === 'SPOT'
-        ? []
-        : laneDecisions.map((d) => ({
-            id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
-            sourceAuctionId: auction.id,
-            tenantId: auction.tenantId,
-            awardedByUserId: principal.userId,
-            contractType: auction.type as 'BULK' | 'LOT',
-            vendorId: d.vendorId,
-            vendorName: d.vendorName,
-            lane: lane.lane,
-            region: lane.region,
-            vehicleType: lane.vehicleType,
-            contractedRate: d.awardedAmount,
-            rateUnit: lane.rateUnit,
-            volumeAllocationPercent: d.allocationPercent,
-            allocationRank: d.allocationRank,
-            startDate: auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
-            endDate: auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-            estimatedTrips: lane.estimatedTrips ?? 0,
-            createdFrom: 'AUCTION_WIN' as const,
-            status: 'ACTIVE' as const,
-            l1OverrideReason: d.overrideReason,
-            rateSyncedToTms: true,
-            placementFailures: [],
-            rateDeviationOpen: false,
-          }))
-    if (contracts.length > 0) replaceLaneContracts(auction.id, lane.lane, contracts)
+    // SPOT awards produce a ONE-TIME lane contract: short validity, single
+    // trip, consumed by exactly one spot booking on the lane.
+    const isSpot = auction.type === 'SPOT'
+    const contracts: Contract[] = laneDecisions.map((d) => ({
+      id: `CNT-${Math.floor(1000 + Math.random() * 9000)}`,
+      sourceAuctionId: auction.id,
+      tenantId: auction.tenantId,
+      awardedByUserId: principal.userId,
+      contractType: auction.type as 'BULK' | 'LOT' | 'SPOT',
+      vendorId: d.vendorId,
+      vendorName: d.vendorName,
+      originCity: lane.originCity,
+      destinationCity: lane.destinationCity,
+      region: lane.region,
+      vehicleType: lane.vehicleType,
+      contractedRate: d.awardedAmount,
+      rateUnit: lane.rateUnit,
+      volumeAllocationPercent: d.allocationPercent,
+      allocationRank: d.allocationRank,
+      awardedAt: new Date().toISOString(),
+      startDate: isSpot
+        ? new Date().toISOString().slice(0, 10)
+        : auction.contractStartDate ?? new Date().toISOString().slice(0, 10),
+      endDate: isSpot
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+        : auction.contractEndDate ?? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+      estimatedTrips: isSpot ? 1 : lane.estimatedTrips ?? 0,
+      createdFrom: 'AUCTION_WIN' as const,
+      oneTime: isSpot || undefined,
+      status: 'ACTIVE' as const,
+      l1OverrideReason: d.overrideReason,
+      rateSyncedToTms: true,
+      placementFailures: [],
+      rateDeviationOpen: false,
+    }))
+    if (contracts.length > 0) replaceLaneContracts(auction.id, { originCity: lane.originCity, destinationCity: lane.destinationCity }, contracts)
   })
 
   updateAuction(auctionId, (a) => {
@@ -424,7 +440,8 @@ export async function fetchContracts(params?: { status?: string; search?: string
       (c) =>
         c.id.toLowerCase().includes(q) ||
         c.vendorName.toLowerCase().includes(q) ||
-        c.lane.toLowerCase().includes(q)
+        c.originCity.toLowerCase().includes(q) ||
+        c.destinationCity.toLowerCase().includes(q)
     )
   }
   return out
@@ -466,7 +483,7 @@ export async function fetchRfqResponses(rfqId: string): Promise<RfqResponse[]> {
 }
 export async function uploadRfqResponse(
   rfqId: string,
-  data: { fileName: string; vendorName?: string; rows: { lane: string; vehicleType: string; price: number }[] }
+  data: { fileName: string; vendorName?: string; rows: { originCity: string; destinationCity: string; vehicleType: string; price: number }[] }
 ): Promise<RfqResponse> {
   const next: RfqResponse = {
     id: `RFQR-LOCAL-${Date.now()}`,
@@ -492,7 +509,8 @@ export async function searchAuctionService(q: string): Promise<SearchResponse> {
       (c) =>
         c.id.toLowerCase().includes(lower) ||
         c.vendorName.toLowerCase().includes(lower) ||
-        c.lane.toLowerCase().includes(lower)
-    ).map((c) => ({ id: c.id, vendorName: c.vendorName, lane: c.lane, status: c.status })),
+        c.originCity.toLowerCase().includes(lower) ||
+        c.destinationCity.toLowerCase().includes(lower)
+    ).map((c) => ({ id: c.id, vendorName: c.vendorName, originCity: c.originCity, destinationCity: c.destinationCity, status: c.status })),
   }
 }

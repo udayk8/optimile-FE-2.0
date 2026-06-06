@@ -1155,12 +1155,12 @@ export function CreateBookingPage({
           <span className="text-base font-bold text-gray-900">{calculatedFreight ? formatCurrency(calculatedFreight) : "—"}</span>
         </div>
         <div className="flex gap-2">
-          {access.can("CREATE_BOOKING", "CREATE") ? (
+          {(canCreateBooking || access.can("CREATE_BOOKING", "CREATE")) ? (
             <Button variant="outline" onClick={() => persistBooking("DRAFT", false)}>
               Save Draft
             </Button>
           ) : null}
-          {access.can("CREATE_BOOKING", "SUBMIT_BOOKING") ? (
+          {(canCreateBooking || access.can("CREATE_BOOKING", "SUBMIT_BOOKING")) ? (
             <Button onClick={() => persistBooking(submitStatus, true)}>Submit Booking</Button>
           ) : null}
         </div>

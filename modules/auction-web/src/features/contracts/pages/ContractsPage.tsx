@@ -8,9 +8,9 @@ import { Button } from '@auction/components/ui/button'
 import { Input } from '@auction/components/ui/input'
 import { CurrencyDisplay } from '@auction/components/shared/CurrencyDisplay'
 import { StatusBadge } from '@auction/components/shared/StatusBadge'
-import { formatDate } from '@auction/lib/date-utils'
+import { formatDate, formatDateTime } from '@auction/lib/date-utils'
 import { fetchContract, fetchContracts, terminateContract } from '@auction/lib/mock-services'
-import { getContractSourceLabel, getRateTypeLabel } from '@shared-utils'
+import { getRateTypeLabel } from '@shared-utils'
 import type { Contract } from '@auction/types'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 
@@ -98,7 +98,8 @@ export default function ContractsPage() {
         query.length === 0 ||
         contract.id.toLowerCase().includes(query) ||
         contract.vendorName.toLowerCase().includes(query) ||
-        contract.lane.toLowerCase().includes(query) ||
+        contract.originCity.toLowerCase().includes(query) ||
+        contract.destinationCity.toLowerCase().includes(query) ||
         contract.vehicleType.toLowerCase().includes(query)
       return matchesTab && matchesSearch
     })
@@ -106,13 +107,63 @@ export default function ContractsPage() {
 
   const columns = useMemo<DataTableColumn<(typeof filteredContracts)[number]>[]>(
     () => [
-      { key: 'contract', header: 'Contract', render: (contract) => <span className="font-medium text-[#0F172A]">{contract.id}</span> },
+      {
+        key: 'contract',
+        header: 'Contract',
+        render: (contract) => (
+          <div>
+            <span className="font-medium text-[#0F172A]">{contract.id}</span>
+            {contract.consumedByBookingId && (
+              <div className="mt-0.5 text-[11px] text-[#64748B]">Used in {contract.consumedByBookingId}</div>
+            )}
+          </div>
+        ),
+      },
       { key: 'vendor', header: 'Vendor', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vendorName}</span> },
-      { key: 'lane', header: 'Lane', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.lane}</span> },
+      {
+        key: 'type',
+        header: 'Type',
+        render: (contract) => (
+          <span
+            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              contract.contractType === 'SPOT' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'
+            }`}
+          >
+            {contract.contractType === 'SPOT' ? 'Spot · One-time' : contract.contractType === 'LOT' ? 'Lot' : 'Bulk'}
+          </span>
+        ),
+      },
+      {
+        key: 'origin',
+        header: 'Source',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.originCity}</span>
+        ),
+      },
+      {
+        key: 'destination',
+        header: 'Destination',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.destinationCity}</span>
+        ),
+      },
       { key: 'vehicleType', header: 'Vehicle Type', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vehicleType}</span> },
       { key: 'status', header: 'Status', render: (contract) => <StatusBadge status={contract.status} /> },
-      { key: 'startDate', header: 'Start Date', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.startDate)}</span> },
-      { key: 'endDate', header: 'End Date', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.endDate)}</span> },
+      {
+        key: 'awardedAt',
+        header: 'Created On',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.awardedAt ? formatDateTime(contract.awardedAt) : '—'}</span>
+        ),
+      },
+      {
+        key: 'startDate',
+        header: 'Start Date',
+        render: (contract) => (
+          <span className="text-sm text-[#0F172A]">{contract.contractType === 'SPOT' ? '—' : formatDate(contract.startDate)}</span>
+        ),
+      },
+      { key: 'endDate', header: 'Valid Till', render: (contract) => <span className="text-sm text-[#0F172A]">{formatDate(contract.endDate)}</span> },
       {
         key: 'rate',
         header: 'Rate',
@@ -126,15 +177,6 @@ export default function ContractsPage() {
         key: 'rateType',
         header: 'Rate Type',
         render: (contract) => <span className="text-sm text-[#0F172A]">{getRateTypeLabel(contract.rateUnit)}</span>,
-      },
-      {
-        key: 'source',
-        header: 'Source',
-        render: (contract) => (
-          <span className="inline-block rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-700">
-            {getContractSourceLabel(contract.createdFrom ?? 'AUCTION_WIN')}
-          </span>
-        ),
       },
       {
         key: 'allocation',
@@ -188,7 +230,7 @@ export default function ContractsPage() {
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Lane</p>
-                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.lane}</p>
+                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.originCity} - {selectedContract.destinationCity}</p>
                   <p className="mt-1 text-xs text-[#64748B]">{selectedContract.vehicleType}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
@@ -196,6 +238,10 @@ export default function ContractsPage() {
                   <p className="mt-2 text-sm font-semibold text-[#0F172A]">
                     <CurrencyDisplay amount={selectedContract.contractedRate} /> · {getRateTypeLabel(selectedContract.rateUnit)}
                   </p>
+                </div>
+                <div className="rounded-xl border border-[#E5E7EB] p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Created On</p>
+                  <p className="mt-2 text-sm text-[#0F172A]">{selectedContract.awardedAt ? formatDateTime(selectedContract.awardedAt) : '—'}</p>
                 </div>
                 <div className="rounded-xl border border-[#E5E7EB] p-4">
                   <p className="text-xs uppercase tracking-wide text-[#94A3B8]">Validity</p>
@@ -267,7 +313,6 @@ export default function ContractsPage() {
               onPageChange={setPage}
               pageSize={PAGE_SIZE}
               className="w-full"
-              onRowClick={(contract) => navigate(`/auction/contracts/${contract.id}`)}
               emptyState={<div className="rounded-xl border border-dashed border-[#CBD5E1] px-4 py-10 text-center text-sm text-[#64748B]">No contracts match the current filters.</div>}
             />
           )}

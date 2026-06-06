@@ -88,8 +88,8 @@ const VEHICLE_CAPACITY: Record<(typeof VEHICLE_TYPE_OPTIONS)[number], string> = 
 
 const LANE_OPTIONS = [
   'Mumbai → Delhi',
-  'Mumbai → Bangalore',
-  'Bangalore → Chennai',
+  'Mumbai → Bengaluru',
+  'Bengaluru → Chennai',
   'Chennai → Mumbai',
   'Delhi → Lucknow',
   'Pune → Jaipur',
@@ -122,7 +122,7 @@ function makeAuctionSettings(type: AuctionType): AuctionSettingsState {
 }
 
 function makeDefaultLane(type: AuctionType, laneName?: string): DraftLane {
-  const lane = laneName ?? (type === 'SPOT' ? 'Mumbai → Delhi' : 'Mumbai → Bangalore')
+  const lane = laneName ?? (type === 'SPOT' ? 'Mumbai → Delhi' : 'Mumbai → Bengaluru')
   return {
     lane,
     vehicleType: '20 MT Open Body',
@@ -158,6 +158,17 @@ function laneTemplateHeaders() {
 
 function formatIndianCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)
+}
+
+/** Lane = source/destination cities; display joins them with an arrow. */
+function bookingLaneLabel(booking: { originCity: string; destinationCity: string }) {
+  return `${booking.originCity} → ${booking.destinationCity}`
+}
+
+/** "Mumbai → Delhi" → ["Mumbai", "Delhi"] (draft lanes keep the display string locally). */
+function splitDraftLane(lane: string): [string, string] {
+  const [origin = '', destination = ''] = lane.split('→').map((part) => part.trim())
+  return [origin, destination]
 }
 
 // ---------------------------------------------------------------------------
@@ -604,7 +615,8 @@ export default function AuctionCreatePage() {
 
   const selectedBooking = bookings[0] ?? {
     id: 'BK-DEMO-0001',
-    lane: 'Mumbai → Delhi',
+    originCity: 'Mumbai',
+    destinationCity: 'Delhi',
     vehicleType: '20 MT Open Body',
     commodity: 'FMCG',
     quantity: 18,
@@ -614,9 +626,9 @@ export default function AuctionCreatePage() {
   }
 
   const [selectedBookingId, setSelectedBookingId] = useState(selectedBooking.id)
-  const [title, setTitle] = useState(`Spot | ${selectedBooking.id} | ${selectedBooking.lane}`)
+  const [title, setTitle] = useState(`Spot | ${selectedBooking.id} | ${bookingLaneLabel(selectedBooking)}`)
   const [auctionRegion, setAuctionRegion] = useState('North India')
-  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', selectedBooking.lane)])
+  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT', bookingLaneLabel(selectedBooking))])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
   const [importFileName, setImportFileName] = useState('')
@@ -628,7 +640,7 @@ export default function AuctionCreatePage() {
   const lotLaneOptions = LANE_OPTIONS.filter((lane) => {
     if (auctionRegion === 'North India') return lane === 'Mumbai → Delhi' || lane === 'Delhi → Lucknow'
     if (auctionRegion === 'South India')
-      return lane === 'Mumbai → Bangalore' || lane === 'Bangalore → Chennai' || lane === 'Chennai → Mumbai'
+      return lane === 'Mumbai → Bengaluru' || lane === 'Bengaluru → Chennai' || lane === 'Chennai → Mumbai'
     if (auctionRegion === 'West India') return lane === 'Pune → Jaipur' || lane === 'Ahmedabad → Surat'
     return true
   })
@@ -636,10 +648,10 @@ export default function AuctionCreatePage() {
   useEffect(() => {
     if (!effectiveType) return
     const defaultBooking = bookings[0] ?? selectedBooking
-    const defaultLane = effectiveType === 'LOT' ? 'Mumbai → Bangalore' : 'Mumbai → Delhi'
+    const defaultLane = effectiveType === 'LOT' ? 'Mumbai → Bengaluru' : 'Mumbai → Delhi'
     setTitle(
       effectiveType === 'SPOT'
-        ? `Spot | ${defaultBooking.id} | ${defaultBooking.lane}`
+        ? `Spot | ${defaultBooking.id} | ${bookingLaneLabel(defaultBooking)}`
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
     setSelectedBookingId(defaultBooking.id)
@@ -649,11 +661,11 @@ export default function AuctionCreatePage() {
     setLaneImportMode('MANUAL')
     setImportFileName('')
     setActiveMode(effectiveType)
-  }, [effectiveType, bookings, selectedBooking.id, selectedBooking.lane])
+  }, [effectiveType, bookings, selectedBooking.id, selectedBooking.originCity, selectedBooking.destinationCity])
 
   const addLane = () => {
     if (!effectiveType || effectiveType === 'SPOT' || effectiveType === 'BULK') return
-    setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bangalore')])
+    setLanes((current) => [...current, makeDefaultLane(effectiveType, lotLaneOptions[0] ?? 'Mumbai → Bengaluru')])
   }
 
   const handleLaneFileImport = async (file: File) => {
@@ -741,8 +753,11 @@ export default function AuctionCreatePage() {
       createdBy: user?.name ?? 'Demo User',
       createdByRole: user?.role ?? 'OPS',
       launchNow,
-      lanes: lanes.map((lane) => ({
-        lane: lane.lane,
+      lanes: lanes.map((lane) => {
+        const [originCity, destinationCity] = splitDraftLane(lane.lane)
+        return {
+        originCity,
+        destinationCity,
         region: effectiveType === 'LOT' ? auctionRegion : undefined,
         vehicleType: lane.vehicleType,
         capacityMt: Number(lane.capacityMt),
@@ -757,7 +772,8 @@ export default function AuctionCreatePage() {
           l3: Number(lane.r3),
         },
         eligibleVendorIds: vendors.map((item) => item.id),
-      })),
+        }
+      }),
     })
 
     toast.success(launchNow ? 'Auction created and launched.' : 'Auction draft created.')
@@ -848,13 +864,13 @@ export default function AuctionCreatePage() {
                             const booking =
                               bookings.find((item) => item.id === event.target.value) ?? selectedBooking
                             setSelectedBookingId(booking.id)
-                            setTitle(`Spot | ${booking.id} | ${booking.lane}`)
+                            setTitle(`Spot | ${booking.id} | ${bookingLaneLabel(booking)}`)
                             setLanes((current) =>
                               current.map((lane, index) =>
                                 index === 0
                                   ? {
                                       ...lane,
-                                      lane: booking.lane,
+                                      lane: bookingLaneLabel(booking),
                                       vehicleType: booking.vehicleType,
                                     }
                                   : lane
@@ -865,7 +881,7 @@ export default function AuctionCreatePage() {
                           {[selectedBooking, ...bookings.filter((item) => item.id !== selectedBooking.id)].map(
                             (booking) => (
                               <option key={booking.id} value={booking.id}>
-                                {booking.id} · {booking.lane}
+                                {booking.id} · {bookingLaneLabel(booking)}
                               </option>
                             )
                           )}
@@ -1115,7 +1131,7 @@ export default function AuctionCreatePage() {
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <Field label="Lane">
                               {effectiveType === 'SPOT' ? (
-                                <Input value={activeBooking.lane} readOnly />
+                                <Input value={bookingLaneLabel(activeBooking)} readOnly />
                               ) : (
                                 <Select
                                   value={lane.lane}

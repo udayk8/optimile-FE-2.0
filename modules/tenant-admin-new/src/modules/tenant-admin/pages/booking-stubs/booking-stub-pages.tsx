@@ -44,20 +44,3 @@ export function ShipmentDocumentsListPage() {
     </div>
   );
 }
-
-export function BookingReportsPage() {
-  return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow="TMS"
-        title="Booking Reports"
-        description="Analytics and exports across the booking lifecycle."
-      />
-      <TenantPanel title="Reports — coming soon">
-        <p className="py-6 text-sm text-muted-foreground">
-          Reports are gated by the Booking Reports permission. The dashboards and exports will be wired up here.
-        </p>
-      </TenantPanel>
-    </div>
-  );
-}

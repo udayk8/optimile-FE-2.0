@@ -112,7 +112,7 @@ export interface BookingAssignment {
   vendorFreight?: number | null;
   vendorRateCardId?: string | null;
   vendorRateType?: "PER_TRIP" | "PER_KM" | "PER_MT" | null;
-  vendorContractSource?: "RATE_CARD" | "MANUAL" | null;
+  vendorContractSource?: "RATE_CARD" | "MANUAL" | "SPOT_AUCTION" | null;
   customerFreight?: number | null;
   sellingRateLabel?: string | null;
   buyingRateLabel?: string | null;
@@ -669,6 +669,19 @@ export interface BookingRecord {
   consigneeAddressId: string;
   laneKey?: string | null;
   laneFound: boolean;
+  /** One-time spot-auction contract attached at creation (lane match). */
+  spotContract?: {
+    contractId: string;
+    sourceAuctionId: string;
+    vendorId: string;
+    vendorName: string;
+    rate: number;
+    rateUnit: "PER_TRIP" | "PER_KM" | "PER_MT";
+    /** Lane = source/destination city pair. */
+    originCity: string;
+    destinationCity: string;
+  } | null;
+
   poNumber?: string | null;
   doNumber?: string | null;
   ewayBillNumber?: string | null;
@@ -721,6 +734,19 @@ export interface BookingInput {
   consigneeAddressId: string;
   laneKey?: string | null;
   laneFound: boolean;
+  /** One-time spot-auction contract attached at creation (lane match). */
+  spotContract?: {
+    contractId: string;
+    sourceAuctionId: string;
+    vendorId: string;
+    vendorName: string;
+    rate: number;
+    rateUnit: "PER_TRIP" | "PER_KM" | "PER_MT";
+    /** Lane = source/destination city pair. */
+    originCity: string;
+    destinationCity: string;
+  } | null;
+
   poNumber?: string | null;
   doNumber?: string | null;
   ewayBillNumber?: string | null;
@@ -775,7 +801,7 @@ export interface BookingAssignmentInput {
   vendorFreight: number;
   vendorRateCardId?: string | null;
   vendorRateType?: "PER_TRIP" | "PER_KM" | "PER_MT" | null;
-  vendorContractSource?: "RATE_CARD" | "MANUAL" | null;
+  vendorContractSource?: "RATE_CARD" | "MANUAL" | "SPOT_AUCTION" | null;
   customerFreight?: number | null;
   sellingRateLabel?: string | null;
   buyingRateLabel?: string | null;
