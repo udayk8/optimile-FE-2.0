@@ -244,12 +244,18 @@ interface MockStoreValue {
     actor: string,
     lrPlaceId?: string | null,
     lrPlaceName?: string | null,
+    /** When set, the indent goes to ONLY this vendor (Contract Vendor flow).
+     *  Omitted ⇒ legacy broadcast to all active vendors. */
+    vendorId?: string | null,
+    /** Buying freight captured from the vendor's contract at send time. */
+    buyingRate?: number | null,
   ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
     action: "ACCEPT" | "REJECT",
     reason?: string,
   ) => BookingVendorIndent;
+  cancelBookingVendorIndent: (indentId: string) => BookingVendorIndent;
   assignTenantBooking: (bookingId: string, input: BookingAssignmentInput) => BookingRecord;
   reassignTenantBooking: (bookingId: string, input: BookingReassignmentInput) => BookingRecord;
   replaceTenantBookingVehicle: (bookingId: string, input: BookingVehicleReplacementInput) => BookingRecord;
@@ -264,6 +270,7 @@ interface MockStoreValue {
     rateCardId: string,
     updates: Partial<TenantVendorRateCardInput>,
   ) => TenantVendorRateCard;
+  deleteTenantVendorRateCard: (rateCardId: string) => boolean;
   listTenantVehicles: (tenantId: string) => TenantVehicle[];
   getTenantVehicleById: (vehicleId: string) => TenantVehicle | null;
   createTenantVehicle: (
@@ -2602,7 +2609,7 @@ function normalizeStoredTenantCustomers(
         communicationChannel: customer.communicationChannel ?? "Email",
         defaultPaymentMode: customer.defaultPaymentMode ?? "Bank Transfer",
         allowAutoBooking: customer.allowAutoBooking ?? false,
-        rateMatchingBasis: customer.rateMatchingBasis ?? "LANE_TO_LANE",
+        rateMatchingBasis: customer.rateMatchingBasis ?? "CITY_TO_CITY",
         addresses: (customer.addresses ?? []).map((address) =>
           normalizeCustomerAddressMasterEntry(address),
         ),
@@ -2637,7 +2644,7 @@ function normalizeStoredTenantCustomers(
       communicationChannel: "Email",
       defaultPaymentMode: "Bank Transfer",
       allowAutoBooking: false,
-      rateMatchingBasis: "LANE_TO_LANE" as const,
+      rateMatchingBasis: "CITY_TO_CITY" as const,
       addresses: [],
       uomOverrides: [],
       setupStatus: "BASIC_COMPLETED" as CustomerSetupStatus,
@@ -2756,7 +2763,6 @@ function normalizeStoredTenantCustomerRateCard(rateCard: TenantCustomerRateCard)
 
   return {
     ...rateCard,
-    lanes: rateCard.lanes?.trim() || `${resolvedFromLocation} -> ${resolvedToLocation}`,
     fromCity: rateCard.fromCity?.trim() || resolvedFromLocation,
     toCity: rateCard.toCity?.trim() || resolvedToLocation,
     fromLocation: resolvedFromLocation,
@@ -3885,7 +3891,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           primaryContactName: input.primaryContactName.trim(),
           primaryContactEmail: input.primaryContactEmail.trim().toLowerCase(),
           allowAutoBooking: true,
-          rateMatchingBasis: "LANE_TO_LANE",
+          rateMatchingBasis: "CITY_TO_CITY",
           addresses: [],
           uomOverrides: [],
           setupStatus: "BASIC_COMPLETED",
@@ -4189,7 +4195,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           communicationChannel: input.communicationChannel?.trim() || "Email",
           defaultPaymentMode: input.defaultPaymentMode?.trim() || "Bank Transfer",
           allowAutoBooking: input.allowAutoBooking ?? false,
-          rateMatchingBasis: input.rateMatchingBasis ?? "LANE_TO_LANE",
+          rateMatchingBasis: input.rateMatchingBasis ?? "CITY_TO_CITY",
           addresses: (input.addresses ?? []).map((address) =>
             normalizeCustomerAddressMasterEntry(address),
           ),
@@ -4347,7 +4353,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           rateMatchingBasis:
             updates.rateMatchingBasis !== undefined
               ? updates.rateMatchingBasis
-              : existing.rateMatchingBasis ?? "LANE_TO_LANE",
+              : existing.rateMatchingBasis ?? "CITY_TO_CITY",
           addresses:
             updates.addresses !== undefined
               ? updates.addresses.map((address) => normalizeCustomerAddressMasterEntry(address))
@@ -4722,7 +4728,6 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         const now = new Date().toISOString();
         const created = normalizeStoredTenantCustomerRateCard({
           ...input,
-          lanes: input.lanes?.trim() || `${input.fromLocation?.trim() || input.sourcePincode} -> ${input.toLocation?.trim() || input.destinationPincode}`,
           fromCity: input.fromCity?.trim() || input.fromLocation?.trim() || input.sourcePincode,
           toCity: input.toCity?.trim() || input.toLocation?.trim() || input.destinationPincode,
           fromLocation: input.fromLocation?.trim() || input.sourcePincode,
@@ -4772,10 +4777,6 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         const updated = normalizeStoredTenantCustomerRateCard({
           ...existing,
           ...updates,
-          lanes:
-            updates.lanes !== undefined
-              ? updates.lanes.trim() || `${updates.fromLocation?.trim() || updates.sourcePincode || existing.fromLocation || existing.sourcePincode} -> ${updates.toLocation?.trim() || updates.destinationPincode || existing.toLocation || existing.destinationPincode}`
-              : existing.lanes,
           fromCity:
             updates.fromCity !== undefined
               ? updates.fromCity.trim() || updates.fromLocation?.trim() || updates.sourcePincode || existing.fromCity || existing.fromLocation || existing.sourcePincode
@@ -5136,7 +5137,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName) => {
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate) => {
         const booking = tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
@@ -5145,8 +5146,12 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         if (bookingVendorIndents.some((indent) => indent.bookingId === bookingId && indent.status === "PENDING")) {
           throw new Error("An active indent already exists for this booking.");
         }
+        // Contract Vendor flow targets ONE vendor; legacy broadcast targets all.
         const eligibleVendors = tenantVendors.filter(
-          (vendor) => vendor.tenantId === booking.tenantId && vendor.status === "active",
+          (vendor) =>
+            vendor.tenantId === booking.tenantId &&
+            vendor.status === "active" &&
+            (vendorId ? vendor.id === vendorId : true),
         );
         if (eligibleVendors.length === 0) throw new Error("No active vendors to send the indent to.");
         const now = new Date().toISOString();
@@ -5161,6 +5166,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           vendorName: vendor.name,
           status: "PENDING",
           isWinner: false,
+          buyingRate: buyingRate ?? null,
           sentAt: now,
           respondedAt: null,
           rejectedReason: null,
@@ -5182,7 +5188,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       timestamp: now,
                       actor,
                       eventLabel: "INDENT_SENT_TO_VENDORS",
-                      note: `Indent sent to ${created.length} vendor(s)`,
+                      note:
+                        created.length === 1
+                          ? `Indent sent to ${created[0].vendorName}`
+                          : `Indent sent to ${created.length} vendor(s)`,
                     },
                   ],
                   updatedAt: now,
@@ -5191,6 +5200,37 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           ),
         );
         return created;
+      },
+
+      cancelBookingVendorIndent: (indentId) => {
+        const indent = bookingVendorIndents.find((item) => item.id === indentId);
+        if (!indent) throw new Error("Indent not found.");
+        if (indent.status !== "PENDING") throw new Error("Only a pending indent can be cancelled.");
+        const now = new Date().toISOString();
+        const updated: BookingVendorIndent = { ...indent, status: "CANCELLED", respondedAt: now };
+        setBookingVendorIndents((current) => current.map((item) => (item.id === indentId ? updated : item)));
+        setTenantBookings((current) =>
+          current.map((item) =>
+            item.id === indent.bookingId
+              ? {
+                  ...item,
+                  statusTimeline: [
+                    ...item.statusTimeline,
+                    {
+                      id: `booking-status-${Date.now()}-indent-cancelled`,
+                      status: item.status,
+                      timestamp: now,
+                      actor: indent.vendorName,
+                      eventLabel: "INDENT_CANCELLED",
+                      note: `Indent to ${indent.vendorName} cancelled`,
+                    },
+                  ],
+                  updatedAt: now,
+                }
+              : item,
+          ),
+        );
+        return updated;
       },
 
       respondBookingVendorIndent: (indentId, action, reason) => {
@@ -6413,6 +6453,15 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           current.map((item) => (item.id === rateCardId ? updated : item)),
         );
         return updated;
+      },
+      deleteTenantVendorRateCard: (rateCardId) => {
+        let removed = false;
+        setTenantVendorRateCards((current) => {
+          const next = current.filter((item) => item.id !== rateCardId);
+          removed = next.length !== current.length;
+          return next;
+        });
+        return removed;
       },
       listTenantVehicles: (tenantId) => tenantVehicles.filter((item) => item.tenantId === tenantId),
       getTenantVehicleById: (vehicleId) =>

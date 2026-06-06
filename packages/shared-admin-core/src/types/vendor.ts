@@ -1,3 +1,5 @@
+import type { RateMatchingConfig } from "@/types/customer";
+
 export interface TenantVendor {
   id: string;
   tenantId: string;
@@ -20,6 +22,10 @@ export interface TenantVendor {
   accountNumber?: string;
   ifscCode?: string;
   accountType?: "SAVINGS" | "CURRENT";
+  /** Vendor contract rate-card STRUCTURE — which dimension columns this vendor's
+   *  rate card has AND what booking matches on (same engine as customers; there
+   *  is no separate strategy for vendors). See shared/lib/rate-matching-config.ts. */
+  rateMatchingConfig?: RateMatchingConfig;
   status: "active" | "inactive";
   createdAt: string;
   updatedAt: string;
@@ -44,6 +50,14 @@ export interface TenantVendorRateCard {
   destinationPincode: string;
   rateType: VendorRateType;
   vehicleType: string | null;
+  /** Configurable matching dimensions (populated only when the vendor's
+   *  rateMatchingConfig includes them) — same set as customer rate cards. */
+  material?: string;
+  serviceType?: string;
+  weightSlab?: string;
+  quantitySlab?: string;
+  customerGroup?: string;
+  uom?: string;
   buyingRate?: number;
   underloadRate?: number;
   overloadRate?: number | null;
@@ -75,6 +89,7 @@ export interface TenantVendorInput {
   accountNumber?: string;
   ifscCode?: string;
   accountType?: "SAVINGS" | "CURRENT";
+  rateMatchingConfig?: RateMatchingConfig;
   status: "active" | "inactive";
 }
 
@@ -92,6 +107,12 @@ export interface TenantVendorRateCardInput {
   destinationPincode: string;
   rateType: VendorRateType;
   vehicleType: string | null;
+  material?: string;
+  serviceType?: string;
+  weightSlab?: string;
+  quantitySlab?: string;
+  customerGroup?: string;
+  uom?: string;
   buyingRate?: number;
   underloadRate?: number;
   overloadRate?: number | null;

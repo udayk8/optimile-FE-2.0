@@ -1,5 +1,6 @@
 import type { TenantCustomer, TenantCustomerAddress, TenantCustomerRateCard } from "@/types/customer";
 import { validateRateCard, type RateValidationInput } from "@/modules/tms/booking/services/booking-selectors";
+import { resolveCustomerRateCalculationStrategy } from "@/shared/lib/rate-matching-config";
 import { perKM, perMT, perTrip } from "@/modules/tms/booking/services/booking-engine";
 import type {
   BookingDeliveryRecord,
@@ -51,8 +52,8 @@ function resolveRateCard(params: {
   const input: RateValidationInput = {
     bookingDate: booking.pickupDate,
     customerId: booking.customerId,
-    rateMatchingBasis: customer.rateMatchingBasis ?? "LANE_TO_LANE",
-    lane: `${sourceAddress.addressName} -> ${destinationAddress.addressName}`,
+    rateMatchingBasis: customer.rateMatchingBasis ?? "CITY_TO_CITY",
+    rateMatchingConfig: resolveCustomerRateCalculationStrategy(customer),
     fromCity: sourceAddress.city,
     toCity: destinationAddress.city,
     fromLocation: sourceAddress.addressName,

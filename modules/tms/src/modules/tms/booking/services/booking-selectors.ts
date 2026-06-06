@@ -1,10 +1,16 @@
 import type {
   CustomerRateMatchingBasis,
   CustomerRateType,
+  RateMatchingConfig,
   TenantCustomer,
   TenantCustomerAddress,
   TenantCustomerRateCard,
 } from "@/types/customer";
+import {
+  findBestRateCardMatch,
+  normalizeRateMatchingConfig,
+  type RateMatchInput,
+} from "@/shared/lib/rate-matching-config";
 import type { TenantDriver, TenantVehicle } from "@/types/fleet";
 import type {
   TenantLRConfig,
@@ -15,7 +21,13 @@ import type {
 } from "@/types/master-data";
 import type { TenantVendor } from "@/types/vendor";
 import type { TenantVendorRateCard } from "@/types/vendor";
-import { perKM, perMT, perTrip } from "@/modules/tms/booking/services/booking-engine";
+import {
+  calculateMarginAmount,
+  calculateMarginPercent,
+  perKM,
+  perMT,
+  perTrip,
+} from "@/modules/tms/booking/services/booking-engine";
 
 export function getCustomerMaterials(materials: TenantMaterial[], customerId: string) {
   return materials.filter(
@@ -92,7 +104,9 @@ export type RateValidationInput = {
   bookingDate?: string | null;
   customerId: string;
   rateMatchingBasis: CustomerRateMatchingBasis;
-  lane?: string | null;
+  /** When present, the configurable rate-matching engine is used (most
+   *  specific match wins) instead of the legacy single-basis switch. */
+  rateMatchingConfig?: RateMatchingConfig;
   fromCity?: string | null;
   toCity?: string | null;
   fromLocation?: string | null;
@@ -100,6 +114,12 @@ export type RateValidationInput = {
   fromPincode?: string | null;
   toPincode?: string | null;
   vehicleType?: string | null;
+  material?: string | null;
+  serviceType?: string | null;
+  weightSlab?: string | null;
+  quantitySlab?: string | null;
+  customerGroup?: string | null;
+  uom?: string | null;
   rateType: "PER_MT" | "PER_KM" | "PER_TRIP";
   weight?: number | null;
 };
@@ -112,7 +132,7 @@ export function getEffectiveRateMatchingBasis(
   preferredBasis: CustomerRateMatchingBasis,
   input: Pick<
     RateValidationInput,
-    "lane" | "fromCity" | "toCity" | "fromLocation" | "toLocation" | "fromPincode" | "toPincode"
+    "fromCity" | "toCity" | "fromLocation" | "toLocation" | "fromPincode" | "toPincode"
   >,
   options?: {
     allowDestinationFallback?: boolean;
@@ -122,16 +142,8 @@ export function getEffectiveRateMatchingBasis(
   const hasCities = hasMatchValue(input.fromCity) && hasMatchValue(input.toCity);
   const hasLocations = hasMatchValue(input.fromLocation) && hasMatchValue(input.toLocation);
   const hasPincodes = hasMatchValue(input.fromPincode) && hasMatchValue(input.toPincode);
-  const hasLane = hasMatchValue(input.lane);
 
   switch (preferredBasis) {
-    case "LANE_TO_LANE":
-      if (hasLane) {
-        return "LANE_TO_LANE";
-      }
-      return allowDestinationFallback && hasCities && hasMatchValue(input.fromLocation) && !hasMatchValue(input.toLocation)
-        ? "CITY_TO_CITY"
-        : "LANE_TO_LANE";
     case "PINCODE_TO_PINCODE":
       if (hasPincodes) {
         return "PINCODE_TO_PINCODE";
@@ -156,6 +168,32 @@ export function validateRateCard(
   input: RateValidationInput,
   rateCards: TenantCustomerRateCard[],
 ) {
+  // Config-driven path: filter to active rows of the right rate type, then let
+  // the engine pick the most specific match across all configured dimensions
+  // (vehicle type is itself a configurable dimension here).
+  if (input.rateMatchingConfig?.length) {
+    const eligible = rateCards.filter(
+      (rateCard) =>
+        rateCard.status === "active" && normalizeRateType(rateCard.rateType) === input.rateType,
+    );
+    const matchInput: RateMatchInput = {
+      fromCity: input.fromCity,
+      toCity: input.toCity,
+      fromLocation: input.fromLocation,
+      toLocation: input.toLocation,
+      fromPincode: input.fromPincode,
+      toPincode: input.toPincode,
+      vehicleType: input.vehicleType,
+      material: input.material,
+      serviceType: input.serviceType,
+      weightSlab: input.weightSlab,
+      quantitySlab: input.quantitySlab,
+      customerGroup: input.customerGroup,
+      uom: input.uom,
+    };
+    return findBestRateCardMatch(eligible, matchInput, input.rateMatchingConfig);
+  }
+
   const filteredRateCards = rateCards.filter((rateCard) => {
     if (rateCard.status !== "active") {
       return false;
@@ -187,9 +225,13 @@ export function validateRateCard(
           normalizeMatchValue(rateCard.fromLocation) === normalizeMatchValue(input.fromLocation) &&
           normalizeMatchValue(rateCard.toLocation) === normalizeMatchValue(input.toLocation)
         );
-      case "LANE_TO_LANE":
+      // City-to-city is the default origin→destination match (no lane concept).
       default:
-        return normalizeMatchValue(rateCard.lanes) === normalizeMatchValue(input.lane);
+        return (
+          normalizeCityValue(rateCard.fromCity ?? rateCard.fromLocation) ===
+            normalizeCityValue(input.fromCity) &&
+          normalizeCityValue(rateCard.toCity ?? rateCard.toLocation) === normalizeCityValue(input.toCity)
+        );
     }
   });
 
@@ -234,6 +276,9 @@ export function buildVendorLookup(vendors: TenantVendor[]) {
 
 export type VendorRateValidationInput = {
   bookingDate?: string | null;
+  /** When present, the configurable rate-matching engine (most specific match
+   *  wins) is used with the vendor's contract config — same engine as customers. */
+  rateMatchingConfig?: RateMatchingConfig;
   fromCity?: string | null;
   toCity?: string | null;
   fromLocation?: string | null;
@@ -241,6 +286,10 @@ export type VendorRateValidationInput = {
   fromPincode?: string | null;
   toPincode?: string | null;
   vehicleType?: string | null;
+  material?: string | null;
+  serviceType?: string | null;
+  weightSlab?: string | null;
+  quantitySlab?: string | null;
   rateType: "PER_MT" | "PER_KM" | "PER_TRIP";
 };
 
@@ -258,6 +307,30 @@ export function validateVendorRateCard(
   input: VendorRateValidationInput,
   rateCards: TenantVendorRateCard[],
 ) {
+  // Config-driven path: same engine as customer rate cards. Filter to active
+  // rows of the right rate type, then pick the most specific match across the
+  // vendor's configured dimensions.
+  if (input.rateMatchingConfig?.length) {
+    const eligible = rateCards.filter(
+      (rateCard) =>
+        rateCard.status === "active" && normalizeVendorRateType(rateCard.rateType) === input.rateType,
+    );
+    const matchInput: RateMatchInput = {
+      fromCity: input.fromCity,
+      toCity: input.toCity,
+      fromLocation: input.fromLocation,
+      toLocation: input.toLocation,
+      fromPincode: input.fromPincode,
+      toPincode: input.toPincode,
+      vehicleType: input.vehicleType,
+      material: input.material,
+      serviceType: input.serviceType,
+      weightSlab: input.weightSlab,
+      quantitySlab: input.quantitySlab,
+    };
+    return findBestRateCardMatch(eligible, matchInput, input.rateMatchingConfig);
+  }
+
   const filteredRateCards = rateCards.filter((rateCard) => {
     if (rateCard.status !== "active") {
       return false;
@@ -322,6 +395,105 @@ export function calculateVendorFreightFromRateCard(params: {
     return Number(perKM(unitRate, distanceKm).toFixed(2));
   }
   return Number(perTrip(unitRate).toFixed(2));
+}
+
+/** One recommended vendor in the Contract Vendor comparison. */
+export type VendorComparisonEntry = {
+  vendorId: string;
+  vendorName: string;
+  rateType: "PER_TRIP" | "PER_KM" | "PER_MT";
+  buyingRate: number;
+  vendorFreight: number;
+  customerFreight: number;
+  marginAmount: number;
+  marginPercent: number;
+  rateCardId: string;
+};
+
+/** Booking-side payload the vendor comparison matches on (resolved by callers). */
+export type VendorComparisonMatchInput = {
+  bookingDate?: string | null;
+  fromCity?: string | null;
+  toCity?: string | null;
+  fromLocation?: string | null;
+  toLocation?: string | null;
+  fromPincode?: string | null;
+  toPincode?: string | null;
+  vehicleType?: string | null;
+  material?: string | null;
+  weight: number;
+  distanceKm: number;
+  preferredRateType: "PER_MT" | "PER_KM" | "PER_TRIP";
+};
+
+/**
+ * Vendor Recommendation Engine — for every active vendor, match the booking
+ * against that vendor's contract using the SAME config-driven engine as
+ * customers, compute the buying freight (Per Trip / Per MT) and margin, and
+ * return the list sorted cheapest-buying-freight-first. Vendors without a
+ * matching contract are excluded.
+ */
+export function buildVendorComparison(params: {
+  vendors: TenantVendor[];
+  vendorRateCardMap: Map<string, TenantVendorRateCard[]>;
+  input: VendorComparisonMatchInput;
+  customerFreight: number;
+}): VendorComparisonEntry[] {
+  const { vendors, vendorRateCardMap, input, customerFreight } = params;
+  const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
+    input.preferredRateType,
+    "PER_MT",
+    "PER_TRIP",
+    "PER_KM",
+  ].filter((value, index, array) => array.indexOf(value) === index) as Array<"PER_MT" | "PER_KM" | "PER_TRIP">;
+
+  return vendors
+    .filter((vendor) => vendor.status === "active")
+    .map((vendor) => {
+      const vendorRateCards = vendorRateCardMap.get(vendor.id) ?? [];
+      if (!vendorRateCards.length) return null;
+      const config = normalizeRateMatchingConfig(vendor.rateMatchingConfig);
+      const matched =
+        candidateRateTypes
+          .map((rateType) =>
+            validateVendorRateCard(
+              {
+                bookingDate: input.bookingDate,
+                rateMatchingConfig: config,
+                fromCity: input.fromCity,
+                toCity: input.toCity,
+                fromLocation: input.fromLocation,
+                toLocation: input.toLocation,
+                fromPincode: input.fromPincode,
+                toPincode: input.toPincode,
+                vehicleType: input.vehicleType,
+                material: input.material,
+                rateType,
+              },
+              vendorRateCards,
+            ),
+          )
+          .find(Boolean) ?? null;
+      if (!matched) return null;
+      const vendorFreight = calculateVendorFreightFromRateCard({
+        rateCard: matched,
+        weight: input.weight,
+        distanceKm: input.distanceKm,
+      });
+      return {
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        rateType: normalizeVendorRateType(matched.rateType),
+        buyingRate: getVendorRateCardUnitRate(matched) ?? 0,
+        vendorFreight,
+        customerFreight,
+        marginAmount: calculateMarginAmount(customerFreight, vendorFreight),
+        marginPercent: calculateMarginPercent(customerFreight, vendorFreight),
+        rateCardId: matched.id,
+      } satisfies VendorComparisonEntry;
+    })
+    .filter((entry): entry is VendorComparisonEntry => Boolean(entry))
+    .sort((a, b) => a.vendorFreight - b.vendorFreight);
 }
 
 export function getQuantityUOMOptions(

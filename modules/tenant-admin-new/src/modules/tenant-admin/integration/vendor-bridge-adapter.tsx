@@ -220,7 +220,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     for (const indent of myAcceptedIndents) {
       const booking = bookingById.get(indent.bookingId);
       if (booking && !booking.assignment?.vehicleId) {
-        bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "ACCEPTED"));
+        bookingTrips.push(toVendorTrip(booking, vtLabel(booking), "ACCEPTED", false, indent.buyingRate ?? 0));
       }
     }
 
@@ -276,7 +276,9 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
           vehicleLabel: vehicle.registrationNumber,
           driverId: driver.id,
           driverName: driver.name,
-          vendorFreight: booking.assignment?.vendorFreight ?? booking.pricing?.calculatedFreight ?? 0,
+          // Buying rate from the won indent — never the customer/selling freight,
+          // so the tenant's margin (customerFreight − vendorFreight) stays correct.
+          vendorFreight: booking.assignment?.vendorFreight ?? wonIndent?.buyingRate ?? 0,
           customerFreight: booking.pricing?.calculatedFreight ?? null,
           actor: vendorName ?? "Vendor",
           lrType: "AUTO",
@@ -352,6 +354,13 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       ];
       const lane = laneOf(booking);
       const a = booking.assignment ?? null;
+      // 3PL rule: the vendor only ever sees their OWN buying rate — never the
+      // customer/selling freight or margin. Use the assigned vendor freight, or
+      // the buying rate captured on this vendor's indent; never calculatedFreight.
+      const myIndent = vendorIndents.find(
+        (indent) => indent.bookingId === booking.id && indent.vendorId === vendorId,
+      );
+      const vendorBuyingRate = a?.vendorFreight ?? myIndent?.buyingRate ?? 0;
       return {
         bookingRef: booking.bookingId,
         customerName: customerNameById.get(booking.customerId) ?? "Customer",
@@ -365,7 +374,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
         vehicle: a?.vehicleLabel ?? "—",
         driver: a?.driverName ?? "—",
         status: booking.status,
-        freight: a?.vendorFreight ?? booking.pricing?.calculatedFreight ?? 0,
+        freight: vendorBuyingRate,
         lrNumbers,
         documents,
       };
@@ -558,6 +567,10 @@ function toVendorTrip(
   vehicleTypeLabel: string,
   status: VendorTrip["status"],
   exceptionFlag = false,
+  // The vendor only ever sees their BUYING rate — never the customer/selling
+  // freight or margin (3PL keeps selling price private). Before a vehicle is
+  // assigned, fall back to the buying rate captured on the vendor's indent.
+  buyingRateFallback = 0,
 ): VendorTrip {
   const assignment = booking.assignment ?? null;
   return {
@@ -574,7 +587,7 @@ function toVendorTrip(
     status,
     slaFlag: status === "IN_TRANSIT" ? "ON_TIME" : undefined,
     exceptionFlag,
-    freightRate: assignment?.vendorFreight ?? 0,
+    freightRate: assignment?.vendorFreight ?? buyingRateFallback ?? 0,
     isInvoiced: booking.isInvoiced ?? false,
     createdAt: booking.createdAt,
   };

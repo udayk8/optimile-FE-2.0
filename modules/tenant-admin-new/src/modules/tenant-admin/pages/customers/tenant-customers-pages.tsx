@@ -26,18 +26,34 @@ import {
   downloadRateCardTemplateWorkbook,
   parseRateCardFile,
 } from "@/shared/lib/customer-rate-card-import";
+import {
+  RATE_MATCHING_FIELDS,
+  describeRateMatchingConfig,
+  getRateCardTemplateColumns,
+  getRateMatchingColumns,
+  normalizeRateMatchingConfig,
+  rateMatchingConfigToBasis,
+  resolveCustomerRateCalculationStrategy,
+  resolveCustomerRateMatchingConfig,
+  type RateCardDimensionField,
+} from "@/shared/lib/rate-matching-config";
 import { useTenantCustomers } from "@/modules/tenant-admin/hooks/useTenantCustomers";
-import { useTenantUOMConfigurations } from "@/modules/tenant-admin/hooks/useTenantMasterData";
+import {
+  useTenantMaterials,
+  useTenantUOMConfigurations,
+  useTenantVehicleTypes,
+} from "@/modules/tenant-admin/hooks/useTenantMasterData";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import type {
   AddressImportResult,
   CustomerAddressMasterEntry,
   CustomerAddressTag,
   CustomerOperationalAddressType,
-  CustomerRateMatchingBasis,
   CustomerSetupProgress,
   CustomerSetupStatus,
   CustomerUOMOverride,
+  RateMatchingConfig,
+  RateMatchingFieldKey,
   TenantCustomer,
   TenantCustomerAddress,
   TenantCustomerAddressInput,
@@ -118,7 +134,9 @@ const initialCustomerForm: TenantCustomerInput = {
   communicationChannel: "Email",
   defaultPaymentMode: "Bank Transfer",
   allowAutoBooking: false,
-  rateMatchingBasis: "LANE_TO_LANE",
+  rateMatchingBasis: "CITY_TO_CITY",
+  rateMatchingConfig: ["CITY_PAIR", "VEHICLE_TYPE"],
+  rateCalculationStrategy: [],
   addresses: [],
   uomOverrides: [],
   setupStatus: "BASIC_COMPLETED",
@@ -133,7 +151,6 @@ const initialCustomerForm: TenantCustomerInput = {
 };
 
 const initialRateCardForm = {
-  lanes: "",
   fromCity: "",
   toCity: "",
   fromLocation: "",
@@ -142,6 +159,13 @@ const initialRateCardForm = {
   destinationPincode: "",
   rateType: "PER_TRIP" as TenantCustomerRateCardInput["rateType"],
   vehicleType: "",
+  material: "",
+  serviceType: "",
+  weightSlab: "",
+  quantitySlab: "",
+  customerGroup: "",
+  uom: "",
+  rate: "",
   underloadRate: "",
   overloadRate: "",
   tat: "",
@@ -157,6 +181,15 @@ type EditableCustomerRateCard = TenantCustomerRateCardInput & {
   updatedAt?: string;
 };
 
+/** Read the display value for a rate-card dimension column. */
+function readRateCardColumnValue(
+  rateCard: EditableCustomerRateCard,
+  field: RateCardDimensionField,
+): string {
+  const value = (rateCard as unknown as Record<string, unknown>)[field];
+  return value != null && value !== "" ? String(value) : "-";
+}
+
 type CustomerFlowStep =
   | "Basic Details"
   | "Addresses"
@@ -168,14 +201,13 @@ type CustomerFlowStep =
 const customerFlowSteps: CustomerFlowStep[] = [
   "Basic Details",
   "Addresses",
-  "Contacts",
   "Credit & Billing",
   "Contracts",
   "Preferences",
 ];
 
 const customerFlowLabels: Record<CustomerFlowStep, string> = {
-  "Basic Details": "Basic Details",
+  "Basic Details": "Basic Details & Contact",
   Addresses: "Addresses",
   Contacts: "Customer Contact",
   "Credit & Billing": "Credit & Billing",
@@ -561,24 +593,20 @@ export function TenantCustomersPage() {
   ).length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Tenant Admin"
-        title="Customers"
-        description="Create and manage tenant-owned customers inside a guided enterprise workflow."
-        action={
-          <Button onClick={openCreate}>
-            <Plus className="size-4" />
-            Add Customer
-          </Button>
-        }
-      />
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <TenantSummaryCard label="Customers" value={String(rows.length)} helper="Tenant-level customer masters" />
-        <TenantSummaryCard label="Fully Configured" value={String(fullyConfiguredCount)} helper="All five pages completed" />
-        <TenantSummaryCard label="Incomplete Setup" value={String(rows.length - fullyConfiguredCount)} helper="Missing one or more guided pages" />
-        <TenantSummaryCard label="Active" value={String(rows.filter((customer) => customer.status === "active").length)} helper="Currently active customer records" />
+    <div className="space-y-4">
+      {!open ? (
+      <>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-border/70 bg-gradient-to-r from-slate-100 to-white px-4 py-2.5 shadow-sm">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="text-xl font-semibold tracking-tight">Customers</h1>
+          <span className="text-[12px] text-muted-foreground">
+            {rows.length} total · {fullyConfiguredCount} configured · {rows.length - fullyConfiguredCount} pending · {rows.filter((customer) => customer.status === "active").length} active
+          </span>
+        </div>
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="size-4" />
+          Add Customer
+        </Button>
       </div>
 
       {message ? (
@@ -597,7 +625,6 @@ export function TenantCustomersPage() {
       {rows.length ? (
         <DataTable
           title="Tenant customers"
-          description="Customer setup remains flexible, but missing pages stay clearly visible until completed."
           headers={["Customer", "Code", "GSTIN", "Setup", "Status", "Updated", "Actions"]}
           rows={rows.map((customer) => {
             const progress = normalizeSetupProgress(customer.setupProgress);
@@ -673,58 +700,142 @@ export function TenantCustomersPage() {
         />
       )}
 
-      <Dialog
-        open={open}
-        onOpenChange={setOpen}
-        title={editingCustomer ? "Edit Customer" : "Add Customer"}
-        description="Keep the five-page flow intact. Complete everything now, or save and finish the remaining pages later."
-        widthClassName="max-w-5xl"
-        footer={
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              {editingCustomer
-                ? "Update fields on the mapped page only."
-                : "You can skip later pages and complete them from the customer workspace."}
+      </>
+      ) : null}
+
+      {open ? (
+        <div className="space-y-4">
+          {/* Compact single-row header (operations screen, not a wizard essay). */}
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-gradient-to-r from-slate-100 to-white px-4 py-2.5 shadow-sm">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <button type="button" onClick={() => setOpen(false)} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition hover:text-primary">
+                ← Customers
+              </button>
+              <span className="text-slate-300">|</span>
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {editingCustomer ? form.name?.trim() || "Edit Customer" : form.name?.trim() || "New Customer"}
+              </h1>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {editingCustomer ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (
-                        currentDialogSectionDirty &&
-                        !window.confirm(
-                          `Discard changes in ${getCustomerFlowLabel(activeStep)} and exit edit mode?`,
-                        )
-                      ) {
-                        return;
-                      }
-                      setOpen(false);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button variant="outline" onClick={() => void saveEditSection(activeStep)}>
-                    Save
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      if (saveEditSection(activeStep) && activeStep !== "Preferences") {
-                        setActiveStep(nextFlowStep(activeStep));
-                      }
-                    }}
-                    disabled={activeStep === "Preferences"}
-                  >
-                    Save & Next
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={() => setOpen(false)}>
-                    Cancel
-                  </Button>
+            {!editingCustomer ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  submitCustomer({
+                    basicDetailsCompleted: true,
+                    contactsCompleted: false,
+                    creditBillingCompleted: false,
+                    contractsCompleted: false,
+                    preferencesCompleted: false,
+                  })
+                }
+              >
+                Save Draft
+              </Button>
+            ) : null}
+          </div>
+
+          {error ? (
+            <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+          ) : null}
+
+          <CustomerFlowStepper
+            activeStep={activeStep}
+            form={form}
+            rateCardCount={draftRateCards.length}
+            onStepChange={editingCustomer ? handleEditStepChange : moveToStep}
+          />
+
+          <div className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm sm:p-6">
+            {activeStep === "Basic Details" ? (
+              <div className="space-y-5">
+                <BasicDetailsStep form={form} setForm={setForm} />
+                <ContactsStep form={form} setForm={setForm} />
+              </div>
+            ) : null}
+            {activeStep === "Addresses" ? <AddressesStep form={form} setForm={setForm} /> : null}
+            {activeStep === "Credit & Billing" ? <CreditBillingStep form={form} setForm={setForm} /> : null}
+            {activeStep === "Contracts" ? (
+              <TenantCustomerContractsSection
+                tenantId={tenant.id}
+                rateMatchingConfig={resolveCustomerRateMatchingConfig(form)}
+                onConfigChange={(next) => setForm((current) => ({ ...current, rateMatchingConfig: next }))}
+                rateCards={draftRateCards}
+                onCreate={(input) =>
+                  setDraftRateCards((current) => [
+                    buildEditableRateCard({
+                      ...input,
+                      id: createDraftRateCardId(),
+                      tenantId: tenant.id,
+                      tenantCustomerId: editingCustomer?.id ?? "draft-customer",
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                    }),
+                    ...current,
+                  ])
+                }
+                onUpdate={(rateCardId, updates) =>
+                  setDraftRateCards((current) =>
+                    current.map((rateCard) =>
+                      rateCard.id === rateCardId ? { ...rateCard, ...updates } : rateCard,
+                    ),
+                  )
+                }
+                onReplaceAll={(rows) =>
+                  setDraftRateCards(
+                    rows.map((row) =>
+                      buildEditableRateCard({
+                        ...row,
+                        id: createDraftRateCardId(),
+                        tenantId: tenant.id,
+                        tenantCustomerId: editingCustomer?.id ?? "draft-customer",
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      }),
+                    ),
+                  )
+                }
+                onDelete={(rateCardId) =>
+                  setDraftRateCards((current) => current.filter((rateCard) => rateCard.id !== rateCardId))
+                }
+              />
+            ) : null}
+            {activeStep === "Preferences" ? (
+              <PreferencesStep
+                form={form}
+                setForm={setForm}
+                quantityUOMOptions={quantityUOMOptions}
+                weightUOMOptions={weightUOMOptions}
+              />
+            ) : null}
+          </div>
+
+          <div className="sticky bottom-0 z-20 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border/70 bg-card/95 px-4 py-2.5 shadow-sm backdrop-blur">
+            {activeStep !== "Basic Details" ? (
+              <Button size="sm" variant="outline" onClick={() => setActiveStep(previousFlowStep(activeStep))}>Back</Button>
+            ) : null}
+            {activeStep !== "Preferences" ? (
+              <Button size="sm" variant="outline" onClick={() => moveToStep(nextFlowStep(activeStep))}>Continue</Button>
+            ) : null}
+            {editingCustomer ? (
+              <Button
+                size="sm"
+                onClick={() =>
+                  submitCustomer({
+                    basicDetailsCompleted: true,
+                    contactsCompleted: Boolean(form.primaryContactName?.trim()),
+                    creditBillingCompleted: true,
+                    contractsCompleted: true,
+                    preferencesCompleted: true,
+                  })
+                }
+              >
+                Save Changes
+              </Button>
+            ) : (
+              <>
                 <Button
+                  size="sm"
                   variant="outline"
                   onClick={() =>
                     submitCustomer({
@@ -736,18 +847,10 @@ export function TenantCustomersPage() {
                     })
                   }
                 >
-                  Create And Finish Later
+                  Save Draft
                 </Button>
-                  {activeStep !== "Basic Details" ? (
-                    <Button variant="outline" onClick={() => setActiveStep(previousFlowStep(activeStep))}>
-                      Back
-                    </Button>
-                  ) : null}
-                  {activeStep !== "Preferences" ? (
-                    <Button onClick={() => moveToStep(nextFlowStep(activeStep))}>Continue</Button>
-                  ) : null}
-                  {activeStep === "Preferences" ? (
                 <Button
+                  size="sm"
                   onClick={() =>
                     submitCustomer({
                       basicDetailsCompleted: true,
@@ -760,96 +863,11 @@ export function TenantCustomersPage() {
                 >
                   Finish Setup
                 </Button>
-                  ) : null}
-                </>
-              )}
-            </div>
+              </>
+            )}
           </div>
-        }
-      >
-        <div className="grid gap-4">
-          {error ? (
-            <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : null}
-
-          <CustomerFlowStepper
-            activeStep={activeStep}
-            form={form}
-            onStepChange={editingCustomer ? handleEditStepChange : undefined}
-          />
-
-          {activeStep === "Basic Details" ? (
-            <BasicDetailsStep form={form} setForm={setForm} />
-          ) : null}
-
-          {activeStep === "Addresses" ? (
-            <AddressesStep form={form} setForm={setForm} />
-          ) : null}
-
-          {activeStep === "Contacts" ? (
-            <ContactsStep form={form} setForm={setForm} />
-          ) : null}
-
-          {activeStep === "Credit & Billing" ? (
-            <CreditBillingStep form={form} setForm={setForm} />
-          ) : null}
-
-          {activeStep === "Contracts" ? (
-            <TenantCustomerContractsSection
-              rateCards={draftRateCards}
-              onCreate={(input) =>
-                setDraftRateCards((current) => [
-                  buildEditableRateCard({
-                    ...input,
-                    id: createDraftRateCardId(),
-                    tenantId: tenant.id,
-                    tenantCustomerId: editingCustomer?.id ?? "draft-customer",
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                  }),
-                  ...current,
-                ])
-              }
-              onUpdate={(rateCardId, updates) =>
-                setDraftRateCards((current) =>
-                  current.map((rateCard) =>
-                    rateCard.id === rateCardId ? { ...rateCard, ...updates } : rateCard,
-                  ),
-                )
-              }
-              onReplaceAll={(rows) =>
-                setDraftRateCards(
-                  rows.map((row) =>
-                    buildEditableRateCard({
-                      ...row,
-                      id: createDraftRateCardId(),
-                      tenantId: tenant.id,
-                      tenantCustomerId: editingCustomer?.id ?? "draft-customer",
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                    }),
-                  ),
-                )
-              }
-              onDelete={(rateCardId) =>
-                setDraftRateCards((current) => current.filter((rateCard) => rateCard.id !== rateCardId))
-              }
-              helperNote="You can upload via Excel or add manually. This step can be completed later and does not block customer creation."
-            />
-          ) : null}
-
-          {activeStep === "Preferences" ? (
-            <PreferencesStep
-              form={form}
-              setForm={setForm}
-              quantityUOMOptions={quantityUOMOptions}
-              weightUOMOptions={weightUOMOptions}
-            />
-          ) : null}
         </div>
-      </Dialog>
+      ) : null}
     </div>
   );
 }
@@ -1101,78 +1119,40 @@ export function TenantCustomerDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Tenant Admin"
-        title={tenantCustomer.name}
-        description="Follow the mapped customer pages exactly and complete any missing sections here."
-        action={
-          <div className="flex flex-wrap gap-3">
-            {missingSteps.length ? (
-              <Button onClick={() => handleTabChange(getCustomerFlowLabel(missingSteps[0]))}>Complete Setup</Button>
-            ) : null}
-            <Button asChild variant="outline">
-              <Link to={`/tenant/${tenant.id}/customers`}>Back to customers</Link>
-            </Button>
-          </div>
-        }
-      />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-gradient-to-r from-slate-100 to-white px-4 py-2.5 shadow-sm">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link to={`/tenant/${tenant.id}/customers`} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition hover:text-primary">← Customers</Link>
+          <span className="text-slate-300">|</span>
+          <h1 className="truncate text-xl font-semibold tracking-tight">{tenantCustomer.name}</h1>
+          <Badge variant={tenantCustomer.status === "active" ? "success" : "warning"}>{tenantCustomer.status}</Badge>
+        </div>
+        {missingSteps.length ? (
+          <Button size="sm" onClick={() => handleTabChange(getCustomerFlowLabel(missingSteps[0]))}>Complete Setup</Button>
+        ) : null}
+      </div>
 
       {message ? (
-        <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {message}
-        </div>
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div>
       ) : null}
 
-      {missingSteps.length ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">Customer setup is incomplete</p>
-          <p className="mt-1 text-sm text-amber-800">
-            Complete the remaining mapped pages to finish setup for this customer.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {missingSteps.map((step) => (
-              <Badge key={step} variant="warning">Missing {getCustomerFlowLabel(step)}</Badge>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {!draftAddresses.length ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">Address Pending</p>
-          <p className="mt-1 text-sm text-amber-800">
-            This customer does not have any reusable address master entries yet. Add an address from the Addresses tab to use it later in booking, LR generation, and billing flows.
-          </p>
-          <div className="mt-3">
-            <Button onClick={() => handleTabChange(getCustomerFlowLabel("Addresses"))}>Add Address</Button>
-          </div>
-        </div>
-      ) : null}
-
-      {!detailRateCards.length ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-900">Rate Card Pending</p>
-          <p className="mt-1 text-sm text-amber-800">
-            No rate card has been configured for this customer yet. Add it from the Contracts (Rate Card) tab now or complete it later.
-          </p>
-          <div className="mt-3">
-            <Button onClick={() => handleTabChange(getCustomerFlowLabel("Contracts"))}>Add Rate Card</Button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-5">
-        <TenantSummaryCard label="Status" value={tenantCustomer.status} helper="Tenant-owned customer state" />
-        <TenantSummaryCard label="Setup" value={missingSteps.length ? "Incomplete" : "Complete"} helper="Guided page completion" />
-        <TenantSummaryCard label="Credit Limit" value={formatCurrency(detailForm.creditLimit ?? 0)} helper="Configured customer credit limit" />
-        <TenantSummaryCard label="Outstanding" value={formatCurrency(detailForm.currentOutstanding ?? 0)} helper="Current outstanding value" />
-        <TenantSummaryCard label="Contracts (Rate Card)" value={String(detailRateCards.length)} helper="Existing contract/rate-card records" />
+      {/* Compact stat strip — values only, no helper essays. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border/70 bg-card px-4 py-2.5 text-[12px] text-muted-foreground shadow-sm">
+        <span>Setup <span className="font-semibold text-foreground">{missingSteps.length ? "Incomplete" : "Complete"}</span></span>
+        <span>Credit Limit <span className="font-semibold text-foreground">{formatCurrency(detailForm.creditLimit ?? 0)}</span></span>
+        <span>Outstanding <span className="font-semibold text-foreground">{formatCurrency(detailForm.currentOutstanding ?? 0)}</span></span>
+        <span>Addresses <span className="font-semibold text-foreground">{draftAddresses.length}</span></span>
+        <span>Rate Cards <span className="font-semibold text-foreground">{detailRateCards.length}</span></span>
+        {!draftAddresses.length ? (
+          <Button size="sm" variant="outline" onClick={() => handleTabChange(getCustomerFlowLabel("Addresses"))}>+ Address</Button>
+        ) : null}
+        {!detailRateCards.length ? (
+          <Button size="sm" variant="outline" onClick={() => handleTabChange(getCustomerFlowLabel("Contracts"))}>+ Rate Card</Button>
+        ) : null}
       </div>
 
       <TenantPanel
-        title="Customer workspace"
-        description="Keep field placement fixed to the mapped customer pages."
+        title={getCustomerFlowLabel(activeTab)}
         action={
           <Tabs
             tabs={customerFlowSteps.map((step) => getCustomerFlowLabel(step))}
@@ -1181,17 +1161,11 @@ export function TenantCustomerDetailPage() {
           />
         }
       >
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-slate-50/70 px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold">{getCustomerFlowLabel(activeTab)}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Last Updated: {formatLastUpdated(lastUpdatedValue)}</p>
-          </div>
+        <div className="mb-3 flex items-center justify-end">
           <Badge variant={currentSectionDirty ? "warning" : "outline"}>
             {currentSectionDirty ? "Unsaved Changes" : "All Changes Saved"}
           </Badge>
         </div>
-
-        <CustomerFlowStepper activeStep={activeTab} form={detailForm} />
 
         {activeTab === "Basic Details" ? (
           <div className="grid gap-4">
@@ -1219,6 +1193,20 @@ export function TenantCustomerDetailPage() {
 
         {activeTab === "Contracts" ? (
           <TenantCustomerContractsSection
+            tenantId={tenant.id}
+            rateMatchingConfig={resolveCustomerRateMatchingConfig(detailForm)}
+            onConfigChange={(next) => {
+              setDetailForm((current) => ({ ...current, rateMatchingConfig: next }));
+              const payload = buildCustomerPayload(
+                { ...savedDetailForm, rateMatchingConfig: next },
+                normalizeSetupProgress(savedDetailForm.setupProgress),
+                savedAddressCount,
+                savedDetailRateCards.length,
+              );
+              updateTenantCustomer(customerId, payload);
+              commitSavedForm(payload);
+              setMessage("Rate card structure updated.");
+            }}
             rateCards={detailRateCards}
             onCreate={(input) =>
               setDetailRateCards((current) => [
@@ -1258,11 +1246,6 @@ export function TenantCustomerDetailPage() {
             }
             onDelete={(rateCardId) =>
               setDetailRateCards((current) => current.filter((rateCard) => rateCard.id !== rateCardId))
-            }
-            helperNote={
-              progress.contractsCompleted
-                ? undefined
-                : "You can upload via Excel or add manually. This step can be completed later."
             }
           />
         ) : null}
@@ -1325,7 +1308,9 @@ function buildCustomerForm(customer: TenantCustomer): TenantCustomerInput {
     communicationChannel: customer.communicationChannel ?? "Email",
     defaultPaymentMode: customer.defaultPaymentMode ?? "Bank Transfer",
     allowAutoBooking: customer.allowAutoBooking ?? false,
-    rateMatchingBasis: customer.rateMatchingBasis ?? "LANE_TO_LANE",
+    rateMatchingBasis: customer.rateMatchingBasis ?? "CITY_TO_CITY",
+    rateMatchingConfig: resolveCustomerRateMatchingConfig(customer),
+    rateCalculationStrategy: customer.rateCalculationStrategy ?? [],
     addresses: getResolvedCustomerAddresses(customer),
     uomOverrides: (customer.uomOverrides ?? []).map((override) =>
       normalizeCustomerUOMOverrideDraft(override),
@@ -1611,7 +1596,6 @@ function buildEditableRateCard(
 ): EditableCustomerRateCard {
   return {
     ...rateCard,
-    lanes: deriveRateCardLane(rateCard),
     fromCity: rateCard.fromCity ?? rateCard.fromLocation ?? "",
     toCity: rateCard.toCity ?? rateCard.toLocation ?? "",
     sourcePincode: rateCard.sourcePincode ?? "",
@@ -1642,7 +1626,6 @@ function persistCustomerRateCards(
 
   nextRateCards.forEach((rateCard) => {
     const payload: TenantCustomerRateCardInput = {
-      lanes: deriveRateCardLane(rateCard),
       fromCity: rateCard.fromCity,
       toCity: rateCard.toCity,
       fromLocation: rateCard.fromLocation,
@@ -1760,7 +1743,9 @@ function buildCustomerPayload(
     communicationChannel: form.communicationChannel || "Email",
     defaultPaymentMode: form.defaultPaymentMode || "Bank Transfer",
     allowAutoBooking: form.allowAutoBooking ?? false,
-    rateMatchingBasis: form.rateMatchingBasis ?? "LANE_TO_LANE",
+    rateMatchingConfig: normalizeRateMatchingConfig(form.rateMatchingConfig),
+    rateMatchingBasis: rateMatchingConfigToBasis(normalizeRateMatchingConfig(form.rateMatchingConfig)),
+    rateCalculationStrategy: resolveCustomerRateCalculationStrategy(form),
     addresses: nextAddresses,
     uomOverrides: (form.uomOverrides ?? [])
       .map((override) => normalizeCustomerUOMOverrideDraft(override))
@@ -1789,30 +1774,13 @@ function createDraftRateCardId() {
   return `draft-rate-card-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function deriveRateCardLane(input: {
-  lanes?: string;
-  fromLocation?: string;
-  toLocation?: string;
-}) {
-  const explicitLane = input.lanes?.trim();
-  if (explicitLane) {
-    return explicitLane;
-  }
-  const from = input.fromLocation?.trim();
-  const to = input.toLocation?.trim();
-  if (from && to) {
-    return `${from}-${to}`.toUpperCase().replace(/\s+/g, "");
-  }
-  return "";
-}
-
 function cloneCustomerForm(form: TenantCustomerInput): TenantCustomerInput {
   return {
     ...form,
     addresses: (form.addresses ?? []).map((address) => normalizeCustomerAddressDraft(address)),
     uomOverrides: (form.uomOverrides ?? []).map((override) => normalizeCustomerUOMOverrideDraft(override)),
     preferredVehicleTypes: [...(form.preferredVehicleTypes ?? [])],
-    rateMatchingBasis: form.rateMatchingBasis ?? "LANE_TO_LANE",
+    rateMatchingBasis: form.rateMatchingBasis ?? "CITY_TO_CITY",
     setupProgress: normalizeSetupProgress(form.setupProgress),
   };
 }
@@ -1873,7 +1841,6 @@ function getSectionSnapshot(
   if (step === "Contracts") {
     return rateCards.map((rateCard) => ({
       id: rateCard.id,
-      lanes: deriveRateCardLane(rateCard),
       fromCity: rateCard.fromCity ?? rateCard.fromLocation ?? "",
       toCity: rateCard.toCity ?? rateCard.toLocation ?? "",
       fromLocation: rateCard.fromLocation ?? "",
@@ -1896,7 +1863,8 @@ function getSectionSnapshot(
     communicationChannel: form.communicationChannel,
     defaultPaymentMode: form.defaultPaymentMode,
     allowAutoBooking: form.allowAutoBooking,
-    rateMatchingBasis: form.rateMatchingBasis ?? "LANE_TO_LANE",
+    rateMatchingConfig: normalizeRateMatchingConfig(form.rateMatchingConfig),
+    rateCalculationStrategy: resolveCustomerRateCalculationStrategy(form),
     uomOverrides: (form.uomOverrides ?? [])
       .map((override) => normalizeCustomerUOMOverrideDraft(override))
       .sort((left, right) => left.quantityUOM.localeCompare(right.quantityUOM)),
@@ -1965,7 +1933,9 @@ function mergeSectionState(
       communicationChannel: source.communicationChannel,
       defaultPaymentMode: source.defaultPaymentMode,
       allowAutoBooking: source.allowAutoBooking,
-      rateMatchingBasis: source.rateMatchingBasis ?? "LANE_TO_LANE",
+      rateMatchingBasis: source.rateMatchingBasis ?? "CITY_TO_CITY",
+      rateMatchingConfig: source.rateMatchingConfig,
+      rateCalculationStrategy: source.rateCalculationStrategy,
       uomOverrides: (source.uomOverrides ?? []).map((override) => normalizeCustomerUOMOverrideDraft(override)),
     };
   }
@@ -2026,69 +1996,71 @@ function CustomerFlowStepper({
   activeStep,
   form,
   onStepChange,
+  rateCardCount = 0,
 }: {
   activeStep: CustomerFlowStep;
   form: TenantCustomerInput;
   onStepChange?: (step: CustomerFlowStep) => void;
+  rateCardCount?: number;
 }) {
-  const progress = normalizeSetupProgress(form.setupProgress);
+  // Chips go green only when that step actually has data (not on saved
+  // progress flags), so nothing shows complete before data is entered.
   const items: Array<{ step: CustomerFlowStep; helper: string; complete: boolean }> = [
     {
       step: "Basic Details",
-      helper: "Identity, ownership, tax",
-      complete: Boolean(form.name.trim()),
+      helper: "Identity, tax, primary contact",
+      complete: Boolean(form.name?.trim()),
     },
     {
       step: "Addresses",
       helper: "Consignee, consignor, warehouse",
-      complete: Boolean(deriveCustomerMasterAddresses(form).length),
-    },
-    {
-      step: "Contacts",
-      helper: "Primary, accounts, logistics",
-      complete: Boolean(form.primaryContactName?.trim() || progress.contactsCompleted),
+      complete: (form.addresses?.length ?? 0) > 0,
     },
     {
       step: "Credit & Billing",
       helper: "Credit, tax, invoicing",
-      complete: Boolean(progress.creditBillingCompleted),
+      complete: Number(form.creditLimit ?? 0) > 0 || Number(form.creditDays ?? 0) > 0,
     },
     {
       step: "Contracts",
       helper: "Existing contract logic",
-      complete: Boolean(progress.contractsCompleted),
+      complete: rateCardCount > 0,
     },
     {
       step: "Preferences",
       helper: "Vehicles and booking",
-      complete: Boolean(progress.preferencesCompleted),
+      complete: (form.preferredVehicleTypes?.length ?? 0) > 0,
     },
   ];
 
   return (
-    <div className="grid gap-3 md:grid-cols-6">
-      {items.map((item) => (
-        <button
-          key={item.step}
-          type="button"
-          onClick={() => onStepChange?.(item.step)}
-          className={`rounded-2xl border px-4 py-3 ${
-            activeStep === item.step
-              ? "border-primary/40 bg-primary/5"
-              : item.complete
-                ? "border-emerald-300 bg-emerald-50"
-                : "border-slate-200 bg-slate-50"
-          } ${onStepChange ? "cursor-pointer text-left transition hover:border-primary/30 hover:bg-primary/5" : "cursor-default text-left"}`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold">{getCustomerFlowLabel(item.step)}</p>
-            <span className="text-xs text-muted-foreground">
-              {item.complete ? "Done" : activeStep === item.step ? "Current" : "Pending"}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {items.map((item, index) => {
+        const active = activeStep === item.step;
+        return (
+          <button
+            key={item.step}
+            type="button"
+            onClick={() => onStepChange?.(item.step)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+              active
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : item.complete
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+            } ${onStepChange ? "cursor-pointer" : "cursor-default"}`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                active ? "bg-white/25 text-white" : item.complete ? "bg-emerald-600 text-white" : "bg-slate-300 text-white"
+              }`}
+            >
+              {item.complete && !active ? "✓" : index + 1}
             </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{item.helper}</p>
-        </button>
-      ))}
+            {getCustomerFlowLabel(item.step)}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -2457,14 +2429,17 @@ function CustomerAddressManagementSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">Addresses</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Optional. Used by booking, LR generation, and billing. Can be added later.
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button size="sm" onClick={openCreate}>+ Add Address</Button>
+        <Button size="sm" variant="outline" onClick={downloadTemplate} title="Download Template">
+          <FileDown className="size-4" />
+          Template
+        </Button>
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[13px] font-medium transition hover:bg-muted" title="Bulk Upload (.xlsx / .csv)">
+          <FileDown className="size-4 -rotate-90" />
+          Bulk Upload
+          <input type="file" accept=".xlsx,.csv" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)} />
+        </label>
       </div>
 
       {/* Removed: redundant configured-summary block (X primary / additional /
@@ -2474,16 +2449,8 @@ function CustomerAddressManagementSection({
           live inside the address dialog footer instead of the top toolbar. */}
 
       {!addresses.length ? (
-        <div className="rounded-2xl border border-dashed bg-muted/10 px-4 py-6 text-center">
-          <p className="text-sm font-medium text-slate-700">No addresses yet</p>
-          <p className="mt-1 text-xs text-muted-foreground">Skip for now or add the first reusable address.</p>
-          <div className="mt-3 flex justify-center gap-2">
-            <Button size="sm" onClick={openCreate}>+ Add Address</Button>
-            <Button size="sm" variant="outline" onClick={downloadTemplate}>
-              <FileDown className="size-4" />
-              Download Template
-            </Button>
-          </div>
+        <div className="rounded-xl border border-dashed bg-muted/10 px-4 py-4 text-center text-xs text-muted-foreground">
+          No addresses yet — use “+ Add Address” or “Bulk Upload” above.
         </div>
       ) : (
         (() => {
@@ -2564,27 +2531,9 @@ function CustomerAddressManagementSection({
         })()
       )}
 
-      <div className="rounded-2xl border bg-muted/20 p-4">
-        <p className="text-sm font-semibold">Bulk Upload</p>
-        <div className="mt-4 grid gap-4">
-          <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={downloadTemplate}>
-              <FileDown className="size-4" />
-              Download Template
-            </Button>
-            <label className="inline-flex cursor-pointer items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-              Bulk Upload (Excel)
-              <input
-                type="file"
-                accept=".xlsx,.csv"
-                className="hidden"
-                onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)}
-              />
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Accepted formats: `.xlsx`, `.csv`. Mandatory fields, address types, and phone format are validated before import.
-          </p>
+      {importing || uploadedFileName || importError || importSummary ? (
+      <div className="rounded-xl border bg-muted/20 p-3">
+        <div className="grid gap-4">
           {importing ? <p className="text-sm text-muted-foreground">Validating uploaded file...</p> : null}
           {uploadedFileName ? <p className="text-sm font-medium">{uploadedFileName}</p> : null}
           {importError ? (
@@ -2649,6 +2598,7 @@ function CustomerAddressManagementSection({
           ) : null}
         </div>
       </div>
+      ) : null}
 
       <Dialog
         open={addressDialogOpen}
@@ -2759,7 +2709,7 @@ function CustomerAddressManagementSection({
               <Input value={draft.country ?? ""} onChange={(event) => setDraft((current) => ({ ...current, country: event.target.value }))} />
             </Field>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <Field label="GSTIN">
               <Input value={draft.gstin ?? ""} onChange={(event) => setDraft((current) => ({ ...current, gstin: event.target.value }))} placeholder="29AAAAA0000A1Z5" />
             </Field>
@@ -2767,17 +2717,13 @@ function CustomerAddressManagementSection({
               <Input value={draft.remarks ?? ""} onChange={(event) => setDraft((current) => ({ ...current, remarks: event.target.value }))} placeholder="Notes (optional)" />
             </Field>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <Button variant="ghost" size="sm" onClick={downloadTemplate}>
-              <FileDown className="size-4" />
-              Download Template
-            </Button>
-            {draft.type.includes("Consignee") && !draft.isTemporary ? (
+          {draft.type.includes("Consignee") && !draft.isTemporary ? (
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
               <Button variant="outline" size="sm" onClick={() => openCreateTemporaryForConsignee()}>
                 + Add Temporary Address
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </Dialog>
     </div>
@@ -2791,58 +2737,22 @@ function ContactsStep({
   setForm: React.Dispatch<React.SetStateAction<TenantCustomerInput>>;
 }) {
   return (
-    <div className="grid gap-6">
-      <SectionBlock title="Primary Contact (Mandatory)">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Name *">
-            <Input value={form.primaryContactName ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactName: event.target.value }))} />
-          </Field>
-          <Field label="Email">
-            <Input value={form.primaryContactEmail ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactEmail: event.target.value }))} />
-          </Field>
-          <Field label="Phone">
-            <Input value={form.primaryContactPhone ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactPhone: event.target.value }))} />
-          </Field>
-          <Field label="Designation">
-            <Input placeholder="e.g., Logistics Head" value={form.primaryContactDesignation ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactDesignation: event.target.value }))} />
-          </Field>
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Accounts Contact (Optional)">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Name">
-            <Input value={form.accountsContactName ?? ""} onChange={(event) => setForm((current) => ({ ...current, accountsContactName: event.target.value }))} />
-          </Field>
-          <Field label="Email">
-            <Input value={form.accountsContactEmail ?? ""} onChange={(event) => setForm((current) => ({ ...current, accountsContactEmail: event.target.value }))} />
-          </Field>
-          <Field label="Phone">
-            <Input value={form.accountsContactPhone ?? ""} onChange={(event) => setForm((current) => ({ ...current, accountsContactPhone: event.target.value }))} />
-          </Field>
-          <Field label="Designation">
-            <Input value={form.accountsContactDesignation ?? ""} onChange={(event) => setForm((current) => ({ ...current, accountsContactDesignation: event.target.value }))} />
-          </Field>
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Logistics Contact (Optional)">
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Name">
-            <Input value={form.logisticsContactName ?? ""} onChange={(event) => setForm((current) => ({ ...current, logisticsContactName: event.target.value }))} />
-          </Field>
-          <Field label="Email">
-            <Input value={form.logisticsContactEmail ?? ""} onChange={(event) => setForm((current) => ({ ...current, logisticsContactEmail: event.target.value }))} />
-          </Field>
-          <Field label="Phone">
-            <Input value={form.logisticsContactPhone ?? ""} onChange={(event) => setForm((current) => ({ ...current, logisticsContactPhone: event.target.value }))} />
-          </Field>
-          <Field label="Designation">
-            <Input value={form.logisticsContactDesignation ?? ""} onChange={(event) => setForm((current) => ({ ...current, logisticsContactDesignation: event.target.value }))} />
-          </Field>
-        </div>
-      </SectionBlock>
-    </div>
+    <SectionBlock title="Primary Contact">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Name *">
+          <Input value={form.primaryContactName ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactName: event.target.value }))} />
+        </Field>
+        <Field label="Phone">
+          <Input value={form.primaryContactPhone ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactPhone: event.target.value }))} />
+        </Field>
+        <Field label="Email">
+          <Input value={form.primaryContactEmail ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactEmail: event.target.value }))} />
+        </Field>
+        <Field label="Designation">
+          <Input placeholder="e.g., Logistics Head" value={form.primaryContactDesignation ?? ""} onChange={(event) => setForm((current) => ({ ...current, primaryContactDesignation: event.target.value }))} />
+        </Field>
+      </div>
+    </SectionBlock>
   );
 }
 
@@ -2862,33 +2772,29 @@ function CreditBillingStep({
   // mojibake'd ₹ in the labels. Now: one row of inputs + one row of utility
   // summaries + a compact GST/TDS strip.
   return (
-    <div className="grid gap-6">
+    <div className="space-y-4">
       <SectionBlock title="Credit">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid items-end gap-3 md:grid-cols-4">
           <Field label="Credit Limit (₹)">
             <Input type="number" value={String(form.creditLimit ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditLimit: Number(event.target.value || 0) }))} />
           </Field>
           <Field label="Credit Days">
             <Input type="number" value={String(form.creditDays ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditDays: Number(event.target.value || 0) }))} />
           </Field>
-          <Field label="Current Outstanding (₹)">
+          <Field label="Outstanding (₹)">
             <Input type="number" value={String(form.currentOutstanding ?? "")} onChange={(event) => setForm((current) => ({ ...current, currentOutstanding: Number(event.target.value || 0) }))} />
           </Field>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Outstanding / Limit</p>
-            <p className="mt-1 text-sm font-semibold">{formatCurrency(outstanding)} / {formatCurrency(creditLimit)}</p>
-          </div>
-          <div className="rounded-lg border bg-muted/20 px-4 py-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Utilization</p>
-            <p className="mt-1 text-sm font-semibold">{utilization.toFixed(1)}%</p>
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Utilization</label>
+            <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm font-semibold">
+              {utilization.toFixed(1)}% <span className="text-[11px] font-normal text-muted-foreground">({formatCurrency(outstanding)} / {formatCurrency(creditLimit)})</span>
+            </div>
           </div>
         </div>
       </SectionBlock>
 
       <SectionBlock title="Tax & Invoicing">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid items-end gap-3 md:grid-cols-3">
           <Field label="GST Charge Type">
             <Select value={form.gstChargeType ?? "Forward Charge (12% GST on Transport)"} onChange={(event) => setForm((current) => ({ ...current, gstChargeType: event.target.value }))}>
               <option value="Forward Charge (12% GST on Transport)">Forward Charge (12% GST on Transport)</option>
@@ -2898,11 +2804,11 @@ function CreditBillingStep({
           <Field label="Invoice Format">
             <Input value={form.invoiceFormat ?? ""} onChange={(event) => setForm((current) => ({ ...current, invoiceFormat: event.target.value }))} />
           </Field>
+          <label className="flex h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/10 px-3">
+            <span className="text-sm font-medium">TDS applicable</span>
+            <Switch checked={Boolean(form.tdsApplicable)} onCheckedChange={(checked) => setForm((current) => ({ ...current, tdsApplicable: checked }))} />
+          </label>
         </div>
-        <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-lg border bg-muted/10 px-4 py-3">
-          <span className="text-sm font-medium">TDS applicable</span>
-          <Switch checked={Boolean(form.tdsApplicable)} onCheckedChange={(checked) => setForm((current) => ({ ...current, tdsApplicable: checked }))} />
-        </label>
       </SectionBlock>
     </div>
   );
@@ -2980,16 +2886,79 @@ function PreferencesStep({
     }));
   }
 
+  // RATE CALCULATION STRATEGY: booking searches on this subset of the rate card
+  // structure. The available checkboxes come from the structure (Contracts →
+  // Configure Rate Card); selecting nothing means "match on all columns".
+  const rateStructure = resolveCustomerRateMatchingConfig(form);
+  const rateStrategy = resolveCustomerRateCalculationStrategy(form);
+  function toggleStrategyDimension(key: RateMatchingFieldKey) {
+    const selected = new Set(rateStrategy);
+    if (selected.has(key)) {
+      selected.delete(key);
+    } else {
+      selected.add(key);
+    }
+    // Keep at least one dimension and preserve the structure's canonical order.
+    const next = rateStructure.filter((item) => selected.has(item));
+    if (!next.length) {
+      return;
+    }
+    setForm((current) => ({ ...current, rateCalculationStrategy: next }));
+  }
+
   return (
-    <div className="grid gap-6">
-      <SectionBlock title="Preferred Vehicle Types (Multi-select)">
-        <div className="grid gap-3 md:grid-cols-4">
+    <div className="space-y-4">
+      <SectionBlock title="Rate Calculation Strategy">
+        <p className="text-sm text-muted-foreground">
+          Choose which of this customer&apos;s rate card columns booking should search on to
+          auto-calculate freight. Only columns defined in the rate card structure
+          (Contracts → Configure Rate Card) are available here.
+        </p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {rateStructure.map((key) => {
+            const field = RATE_MATCHING_FIELDS.find((item) => item.key === key);
+            const checked = rateStrategy.includes(key);
+            return (
+              <label
+                key={key}
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                  checked
+                    ? "border-primary/40 bg-primary/5 font-medium"
+                    : "bg-background/80 hover:border-primary/20"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={checked}
+                  onChange={() => toggleStrategyDimension(key)}
+                />
+                <span>
+                  {field?.label ?? key}
+                  {field?.description ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {field.description}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-3 rounded-lg bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+          Booking will search the rate card using:{" "}
+          <span className="font-medium text-foreground">{describeRateMatchingConfig(rateStrategy)}</span>
+        </p>
+      </SectionBlock>
+
+      <SectionBlock title="Vehicle Preferences">
+        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {vehicleTypeOptions.map((vehicleType) => (
             <label
               key={vehicleType}
-              className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
                 form.preferredVehicleTypes?.includes(vehicleType)
-                  ? "border-primary/40 bg-primary/5"
+                  ? "border-primary/40 bg-primary/5 font-medium"
                   : "bg-background/80 hover:border-primary/20"
               }`}
             >
@@ -2997,16 +2966,15 @@ function PreferencesStep({
                 type="checkbox"
                 checked={form.preferredVehicleTypes?.includes(vehicleType) ?? false}
                 onChange={() => toggleVehicle(vehicleType)}
-                className="mt-1"
               />
-              <span className="text-sm font-medium">{vehicleType}</span>
+              {vehicleType}
             </label>
           ))}
         </div>
       </SectionBlock>
 
-      <SectionBlock title="Other Preferences">
-        <div className="grid gap-4 md:grid-cols-2">
+      <SectionBlock title="Communication & Payment">
+        <div className="grid gap-3 md:grid-cols-2">
           <Field label="Communication Channel">
             <Select value={form.communicationChannel ?? "Email"} onChange={(event) => setForm((current) => ({ ...current, communicationChannel: event.target.value }))}>
               <option value="Email">Email</option>
@@ -3021,43 +2989,17 @@ function PreferencesStep({
               <option value="UPI">UPI</option>
             </Select>
           </Field>
-          <Field label="Rate Matching Basis">
-            <Select
-              value={form.rateMatchingBasis ?? "LANE_TO_LANE"}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  rateMatchingBasis: event.target.value as CustomerRateMatchingBasis,
-                }))
-              }
-            >
-              <option value="LANE_TO_LANE">Lane to Lane</option>
-              <option value="CITY_TO_CITY">City to City</option>
-              <option value="PINCODE_TO_PINCODE">Pincode to Pincode</option>
-              <option value="ADDRESS_TO_ADDRESS">Address to Address</option>
-            </Select>
-          </Field>
         </div>
-        <div className="rounded-2xl border bg-muted/20 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Allow Auto-Booking (API)</p>
-              <p className="mt-1 text-xs text-muted-foreground">Toggle API-driven booking enablement for this customer.</p>
-            </div>
-            <Switch checked={Boolean(form.allowAutoBooking)} onCheckedChange={(checked) => setForm((current) => ({ ...current, allowAutoBooking: checked }))} />
-          </div>
-        </div>
+        <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/10 px-3 py-2">
+          <span className="text-sm font-medium">Allow Auto-Booking (API)</span>
+          <Switch checked={Boolean(form.allowAutoBooking)} onCheckedChange={(checked) => setForm((current) => ({ ...current, allowAutoBooking: checked }))} />
+        </label>
       </SectionBlock>
 
-      <SectionBlock title="Customer-wise UOM Mapping">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-muted/20 p-4">
-            <div>
-              <p className="text-sm font-medium">Customer-specific conversion overrides</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Use this only when the customer conversion differs from the tenant default. Booking will prefer these overrides first.
-              </p>
-            </div>
+      <details className="rounded-2xl border border-border/70 bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Customer UOM Overrides</summary>
+        <div className="space-y-3 border-t px-4 py-3">
+          <div className="flex justify-end">
             <Button size="sm" variant="outline" onClick={addOverride} disabled={!quantityUOMOptions.length || !weightUOMOptions.length}>
               + Add UOM Override
             </Button>
@@ -3124,31 +3066,60 @@ function PreferencesStep({
               </table>
             </div>
           ) : (
-            <div className="rounded-2xl border bg-background/80 px-4 py-4 text-sm text-muted-foreground">
-              No customer-specific overrides configured. Booking will use the global tenant UOM mapping by default.
-            </div>
+            <p className="text-xs text-muted-foreground">No overrides — booking uses the tenant default UOM mapping.</p>
           )}
         </div>
-      </SectionBlock>
+      </details>
     </div>
   );
 }
 
 function TenantCustomerContractsSection({
+  tenantId,
   rateCards,
   onCreate,
   onUpdate,
   onDelete,
   onReplaceAll,
   helperNote,
+  rateMatchingConfig,
+  onConfigChange,
 }: {
+  tenantId: string;
   rateCards: EditableCustomerRateCard[];
   onCreate: (input: TenantCustomerRateCardInput) => void;
   onUpdate: (rateCardId: string, updates: Partial<TenantCustomerRateCardInput>) => void;
   onDelete: (rateCardId: string) => void;
   onReplaceAll?: (rows: TenantCustomerRateCardInput[]) => void;
   helperNote?: string;
+  rateMatchingConfig?: RateMatchingConfig;
+  onConfigChange?: (config: RateMatchingConfig) => void;
 }) {
+  // The customer's rate card STRUCTURE drives the grid, add-rate form, template
+  // and upload validation — which columns exist. How booking SEARCHES these
+  // columns is a separate choice (Preferences → Rate Calculation Strategy).
+  const config = normalizeRateMatchingConfig(rateMatchingConfig);
+  const columns = getRateMatchingColumns(config);
+
+  // Dimension dropdowns reuse existing tenant master data where it exists.
+  const { data: vehicleTypeData } = useTenantVehicleTypes(tenantId);
+  const { data: materialData } = useTenantMaterials(tenantId);
+  const { definitions: uomDefinitions } = useTenantUOMConfigurations(tenantId);
+  const vehicleSelectOptions = vehicleTypeData.length
+    ? vehicleTypeData.map((vehicleType) => vehicleType.typeCode)
+    : [...vehicleTypeOptions];
+  const materialSelectOptions = materialData
+    .filter((material) => material.status === "active")
+    .map((material) => material.materialCode);
+  const uomSelectOptions = uomDefinitions
+    .filter((definition) => definition.status === "active")
+    .map((definition) => definition.code);
+  const selectOptionsByField: Partial<Record<RateCardDimensionField, string[]>> = {
+    vehicleType: vehicleSelectOptions,
+    ...(materialSelectOptions.length ? { material: materialSelectOptions } : {}),
+    ...(uomSelectOptions.length ? { uom: uomSelectOptions } : {}),
+  };
+
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [open, setOpen] = useState(false);
@@ -3160,11 +3131,32 @@ function TenantCustomerContractsSection({
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [form, setForm] = useState(initialRateCardForm);
 
+  // "Configure Rate Card" modal — selecting dimensions regenerates the grid,
+  // add-rate form, template and upload validation for this customer.
+  const [configOpen, setConfigOpen] = useState(false);
+  const [draftConfig, setDraftConfig] = useState<RateMatchingConfig>(config);
+  function toggleDraftConfig(key: RateMatchingFieldKey) {
+    setDraftConfig((current) =>
+      current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
+    );
+  }
+  function openConfig() {
+    setDraftConfig(config);
+    setConfigOpen(true);
+  }
+  function saveConfig() {
+    if (!draftConfig.length) {
+      return;
+    }
+    onConfigChange?.(normalizeRateMatchingConfig(draftConfig));
+    setConfigOpen(false);
+  }
+
   const filteredRateCards = rateCards.filter((rateCard) => {
     const normalizedSearch = search.trim().toLowerCase();
     if (
       normalizedSearch &&
-      !`${deriveRateCardLane(rateCard)} ${rateCard.fromLocation ?? ""} ${rateCard.toLocation ?? ""} ${rateCard.sourcePincode ?? ""} ${rateCard.destinationPincode ?? ""} ${rateCard.vehicleType ?? ""} ${rateCard.remarks ?? ""}`
+      !`${rateCard.fromCity ?? ""} ${rateCard.toCity ?? ""} ${rateCard.fromLocation ?? ""} ${rateCard.toLocation ?? ""} ${rateCard.sourcePincode ?? ""} ${rateCard.destinationPincode ?? ""} ${rateCard.vehicleType ?? ""} ${rateCard.remarks ?? ""}`
         .toLowerCase()
         .includes(normalizedSearch)
     ) {
@@ -3186,16 +3178,22 @@ function TenantCustomerContractsSection({
   function openEdit(rateCard: EditableCustomerRateCard) {
     setEditingRateCard(rateCard);
     setForm({
-      lanes: deriveRateCardLane(rateCard),
-      fromCity: rateCard.fromCity ?? rateCard.fromLocation ?? "",
-      toCity: rateCard.toCity ?? rateCard.toLocation ?? "",
+      fromCity: rateCard.fromCity ?? "",
+      toCity: rateCard.toCity ?? "",
       fromLocation: rateCard.fromLocation ?? "",
       toLocation: rateCard.toLocation ?? "",
-      sourcePincode: rateCard.sourcePincode,
-      destinationPincode: rateCard.destinationPincode,
+      sourcePincode: rateCard.sourcePincode ?? "",
+      destinationPincode: rateCard.destinationPincode ?? "",
       rateType: rateCard.rateType,
       vehicleType: rateCard.vehicleType ?? "",
-      underloadRate: String(rateCard.underloadRate ?? rateCard.baseRate ?? rateCard.rate),
+      material: rateCard.material ?? "",
+      serviceType: rateCard.serviceType ?? "",
+      weightSlab: rateCard.weightSlab ?? "",
+      quantitySlab: rateCard.quantitySlab ?? "",
+      customerGroup: rateCard.customerGroup ?? "",
+      uom: rateCard.uom ?? "",
+      rate: String(rateCard.rate ?? rateCard.underloadRate ?? rateCard.baseRate ?? ""),
+      underloadRate: String(rateCard.underloadRate ?? rateCard.baseRate ?? rateCard.rate ?? ""),
       overloadRate: rateCard.overloadRate != null ? String(rateCard.overloadRate) : "",
       tat: rateCard.tat ?? rateCard.transitTime ?? "",
       effectiveFromDate: rateCard.effectiveFromDate ?? "",
@@ -3208,96 +3206,61 @@ function TenantCustomerContractsSection({
   }
 
   function submit() {
-    const parsed = z
-      .object({
-        lanes: z.string().trim().min(2, "Lane is required."),
-        fromCity: z.string().trim().min(2, "From City is required."),
-        toCity: z.string().trim().min(2, "To City is required."),
-        fromLocation: z.string().trim().min(2, "From Location is required."),
-        toLocation: z.string().trim().min(2, "To Location is required."),
-        sourcePincode: z.string().trim().refine((value) => !value || /^\d{6}$/.test(value), {
-          message: "From Pincode must be a 6-digit number.",
-        }),
-        destinationPincode: z.string().trim().refine((value) => !value || /^\d{6}$/.test(value), {
-          message: "To Pincode must be a 6-digit number.",
-        }),
-        rateType: z.enum(["PER_KM", "PER_MT", "PER_TRIP"]),
-        vehicleType: z.string().trim().min(1, "Vehicle Type is required."),
-        underloadRate: z.number().positive("Underload Rate must be greater than zero."),
-        overloadRate: z.number().nullable(),
-        tat: z.string().optional(),
-        effectiveFromDate: z.string().trim().min(1, "Effective From Date is required."),
-        effectiveToDate: z.string().trim().min(1, "Effective To Date is required."),
-        remarks: z.string().optional(),
-        status: z.enum(["active", "inactive"]),
-      })
-      .superRefine((value, context) => {
-        if (value.overloadRate !== null && value.overloadRate <= 0) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Overload Rate must be greater than zero.",
-            path: ["overloadRate"],
-          });
-        }
-        const fromDate = new Date(value.effectiveFromDate);
-        const toDate = new Date(value.effectiveToDate);
-        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Effective dates must be valid.",
-            path: ["effectiveFromDate"],
-          });
-        } else if (toDate < fromDate) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Effective To Date must be on or after Effective From Date.",
-            path: ["effectiveToDate"],
-          });
-        }
-      })
-      .safeParse({
-        lanes: form.lanes,
-        fromCity: form.fromCity,
-        toCity: form.toCity,
-        fromLocation: form.fromLocation,
-        toLocation: form.toLocation,
-        sourcePincode: form.sourcePincode,
-        destinationPincode: form.destinationPincode,
-        rateType: form.rateType,
-        vehicleType: form.vehicleType.trim(),
-        underloadRate: Number(form.underloadRate),
-        overloadRate: form.overloadRate ? Number(form.overloadRate) : null,
-        tat: form.tat.trim() || undefined,
-        effectiveFromDate: form.effectiveFromDate,
-        effectiveToDate: form.effectiveToDate,
-        remarks: form.remarks.trim() || undefined,
-        status: form.status,
-      });
+    setError("");
+    const readField = (field: RateCardDimensionField) =>
+      ((form as Record<string, string>)[field] ?? "").trim();
 
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Fix the rate card form errors.");
+    // Validate only the configured dimension columns.
+    for (const column of columns) {
+      const value = readField(column.field);
+      // Vehicle Type is mandatory only for Per Trip; optional for other rate types.
+      if (column.field === "vehicleType" && form.rateType !== "PER_TRIP") {
+        continue;
+      }
+      if (column.field === "sourcePincode" || column.field === "destinationPincode") {
+        if (!/^\d{6}$/.test(value)) {
+          setError(`${column.label} must be a 6-digit number.`);
+          return;
+        }
+      } else if (!value) {
+        setError(`${column.label} is required.`);
+        return;
+      }
+    }
+
+    const rate = Number(form.rate);
+    if (!form.rate || Number.isNaN(rate) || rate <= 0) {
+      setError("Rate must be greater than zero.");
       return;
     }
 
+    // Persist only the configured dimensions; unconfigured ones stay empty.
+    const configuredFields = new Set(columns.map((column) => column.field));
+    const dim = (field: RateCardDimensionField) =>
+      configuredFields.has(field) ? readField(field) || undefined : undefined;
+
     const payload: TenantCustomerRateCardInput = {
-      lanes: parsed.data.lanes,
-      fromCity: parsed.data.fromCity,
-      toCity: parsed.data.toCity,
-      fromLocation: parsed.data.fromLocation,
-      toLocation: parsed.data.toLocation,
-      sourcePincode: parsed.data.sourcePincode,
-      destinationPincode: parsed.data.destinationPincode,
-      rateType: parsed.data.rateType,
-      vehicleType: parsed.data.vehicleType,
-      underloadRate: parsed.data.underloadRate,
-      overloadRate: parsed.data.overloadRate,
-      tat: parsed.data.tat,
-      baseRate: parsed.data.underloadRate,
-      rate: parsed.data.underloadRate,
-      effectiveFromDate: parsed.data.effectiveFromDate,
-      effectiveToDate: parsed.data.effectiveToDate,
-      remarks: parsed.data.remarks,
-      status: parsed.data.status,
+      fromCity: dim("fromCity"),
+      toCity: dim("toCity"),
+      fromLocation: dim("fromLocation"),
+      toLocation: dim("toLocation"),
+      sourcePincode: dim("sourcePincode") ?? "",
+      destinationPincode: dim("destinationPincode") ?? "",
+      rateType: form.rateType,
+      vehicleType: dim("vehicleType") ?? null,
+      material: dim("material"),
+      serviceType: dim("serviceType"),
+      weightSlab: dim("weightSlab"),
+      quantitySlab: dim("quantitySlab"),
+      customerGroup: dim("customerGroup"),
+      uom: dim("uom"),
+      // A single Rate drives the value side; mirror it to the legacy rate
+      // fields the booking engine reads.
+      underloadRate: rate,
+      overloadRate: null,
+      baseRate: rate,
+      rate,
+      status: editingRateCard?.status ?? "active",
     };
 
     if (editingRateCard) {
@@ -3309,7 +3272,7 @@ function TenantCustomerContractsSection({
   }
 
   function downloadTemplate() {
-    downloadRateCardTemplateWorkbook();
+    downloadRateCardTemplateWorkbook(getRateCardTemplateColumns(config));
   }
 
   async function handleUpload(file: File | null) {
@@ -3319,7 +3282,7 @@ function TenantCustomerContractsSection({
     setImporting(true);
     setImportError("");
     try {
-      const summary = await parseRateCardFile(file);
+      const summary = await parseRateCardFile(file, config);
       setImportSummary(summary);
       setUploadedFileName(file.name);
     } catch (uploadError) {
@@ -3357,9 +3320,20 @@ function TenantCustomerContractsSection({
           {helperNote}
         </div>
       ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+        <div>
+          <p className="text-sm font-semibold">Rate Card Structure</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Choose which columns this customer's rate card has. This regenerates the grid,
+            add-rate form, template and upload validation. How booking searches these columns
+            is set in Preferences → Rate Calculation Strategy.
+          </p>
+        </div>
+        <Button onClick={openConfig}>Configure Rate Card</Button>
+      </div>
       <TenantFilterBar
         searchValue={search}
-        searchPlaceholder="Search by lane, location, vehicle type, or remarks"
+        searchPlaceholder="Search by city, location, vehicle type, or remarks"
         onSearchChange={setSearch}
         filters={
           <Select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
@@ -3370,146 +3344,80 @@ function TenantCustomerContractsSection({
           </Select>
         }
         trailing={
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={openCreate}>Add Rate Manually</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="hidden text-[12px] text-muted-foreground sm:inline">{rateCards.length} row{rateCards.length === 1 ? "" : "s"} configured</span>
+            <Button size="sm" onClick={openCreate}>Add Rate</Button>
+            <label className="inline-flex cursor-pointer items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
+              Upload Rate Card
+              <input type="file" accept=".xlsx,.csv" className="hidden" onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)} />
+            </label>
+            <Button size="sm" variant="outline" onClick={downloadTemplate}>
+              <FileDown className="size-4" />
+              Download Template
+            </Button>
           </div>
         }
       />
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <SectionBlock title="Rate Card Upload">
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              You can upload via Excel or add manually. This step can be completed later.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Button variant="outline" onClick={downloadTemplate}>
-                <FileDown className="size-4" />
-                Download Template
-              </Button>
-              <label className="inline-flex cursor-pointer items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
-                Upload Rate Card
-                <input
-                  type="file"
-                  accept=".xlsx,.csv"
-                  className="hidden"
-                  onChange={(event) => void handleUpload(event.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Accepted formats: `.xlsx`, `.csv`. Template columns are validated strictly before rows are saved.
-            </p>
-            {importing ? <p className="text-sm text-muted-foreground">Validating uploaded file...</p> : null}
-            {uploadedFileName ? <p className="text-sm font-medium">{uploadedFileName}</p> : null}
-            {importError ? (
-              <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {importError}
+      {importing || uploadedFileName || importError || importSummary ? (
+        <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+          {importing ? <p className="text-sm text-muted-foreground">Validating uploaded file...</p> : null}
+          {uploadedFileName ? <p className="text-sm font-medium">{uploadedFileName}</p> : null}
+          {importError ? (
+            <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-700">{importError}</div>
+          ) : null}
+          {importSummary ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3">
+                <p className="font-medium text-emerald-900">Valid rows</p>
+                <p className="mt-1 text-sm text-emerald-800">{importSummary.validRows.length} rows ready to import.</p>
               </div>
-            ) : null}
-            {importSummary ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4">
-                  <p className="font-medium text-emerald-900">Valid rows</p>
-                  <p className="mt-1 text-sm text-emerald-800">{importSummary.validRows.length} rows ready to import.</p>
-                </div>
-                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                  <p className="font-medium text-amber-900">Invalid rows</p>
-                  <p className="mt-1 text-sm text-amber-800">{importSummary.invalidRows.length} rows need correction.</p>
-                </div>
-                {importSummary.invalidRows.length ? (
-                  <div className="md:col-span-2 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-                    <p className="font-medium text-amber-900">Validation errors</p>
-                    <div className="mt-3 space-y-3">
-                      {importSummary.invalidRows.slice(0, 5).map((row) => (
-                        <div key={`invalid-${row.rowNumber}`} className="rounded-xl border border-amber-200 bg-white/70 px-3 py-3 text-sm text-amber-900">
-                          <p className="font-medium">Row {row.rowNumber}</p>
-                          <p className="mt-1">{row.errors.join(" ")}</p>
-                        </div>
-                      ))}
-                    </div>
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+                <p className="font-medium text-amber-900">Invalid rows</p>
+                <p className="mt-1 text-sm text-amber-800">{importSummary.invalidRows.length} rows need correction.</p>
+              </div>
+              {importSummary.invalidRows.length ? (
+                <div className="md:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                  <p className="font-medium text-amber-900">Validation errors</p>
+                  <div className="mt-2 space-y-2">
+                    {importSummary.invalidRows.slice(0, 5).map((row) => (
+                      <div key={`invalid-${row.rowNumber}`} className="rounded-lg border border-amber-200 bg-white/70 px-3 py-2 text-sm text-amber-900">
+                        <p className="font-medium">Row {row.rowNumber}</p>
+                        <p className="mt-1">{row.errors.join(" ")}</p>
+                      </div>
+                    ))}
                   </div>
-                ) : null}
-                <div className="md:col-span-2 flex justify-end">
-                  <Button onClick={applyValidRows} disabled={!importSummary.validRows.length}>
-                    Import Valid Rows
-                  </Button>
                 </div>
+              ) : null}
+              <div className="md:col-span-2 flex justify-end">
+                <Button onClick={applyValidRows} disabled={!importSummary.validRows.length}>Import Valid Rows</Button>
               </div>
-            ) : null}
-          </div>
-        </SectionBlock>
-        <SectionBlock title="Rate Card Status">
-          <div className="space-y-4">
-            <SummaryCard title={`${rateCards.length} row${rateCards.length === 1 ? "" : "s"} configured`} helper="Uploaded and manually added rate card rows" />
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm font-medium">Optional step</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Customer creation is not blocked if you skip rate cards now. You can return later from the customer workspace and add them.
-              </p>
             </div>
-          </div>
-        </SectionBlock>
-      </div>
+          ) : null}
+        </div>
+      ) : null}
       <DataTable
         title="Rate Card Preview"
-        description="Uploaded rows and manual rows are previewed here before downstream booking and billing use them."
+        description="Rate rows for this customer."
         headers={[
-          "Lane",
-          "From City",
-          "To City",
-          "From Location",
-          "To Location",
-          "From Pincode",
-          "To Pincode",
-          "Vehicle Type",
+          ...columns.map((column) => column.label),
           "Rate Type",
-          "Underload Rate",
-          "Overload Rate",
-          "TAT",
-          "Effective From",
-          "Effective To",
-          "Remarks",
-          "Status",
-          "Updated",
+          "Rate",
           "Actions",
         ]}
         rows={filteredRateCards.map((rateCard) => [
-          <div key={`${rateCard.id}-lane`} className="min-w-[180px]">
-            <p className="font-medium">{deriveRateCardLane(rateCard) || `${rateCard.fromLocation} -> ${rateCard.toLocation}`}</p>
-          </div>,
-          rateCard.fromCity || "-",
-          rateCard.toCity || "-",
-          rateCard.fromLocation || "-",
-          rateCard.toLocation || "-",
-          rateCard.sourcePincode || "-",
-          rateCard.destinationPincode || "-",
-          rateCard.vehicleType || "-",
+          ...columns.map((column, columnIndex) => (
+            <span key={`${rateCard.id}-dim-${columnIndex}`} className="font-medium">
+              {readRateCardColumnValue(rateCard, column.field)}
+            </span>
+          )),
           <Badge key={`${rateCard.id}-type`} variant="outline">{formatRateType(rateCard.rateType)}</Badge>,
-          `${(rateCard.underloadRate ?? rateCard.baseRate ?? rateCard.rate).toLocaleString()}`,
-          rateCard.overloadRate != null ? String(rateCard.overloadRate) : "-",
-          rateCard.tat || rateCard.transitTime || "-",
-          rateCard.effectiveFromDate ?? "-",
-          rateCard.effectiveToDate ?? "-",
-          rateCard.remarks || "-",
-          <Badge key={`${rateCard.id}-status`} variant={rateCard.status === "active" ? "success" : "warning"}>{rateCard.status}</Badge>,
-          rateCard.updatedAt ? new Date(rateCard.updatedAt).toLocaleDateString() : "-",
+          `${(rateCard.rate ?? rateCard.underloadRate ?? rateCard.baseRate ?? 0).toLocaleString()}`,
           <div key={`${rateCard.id}-actions`} className="flex flex-wrap gap-2">
             <Button size="sm" variant="ghost" onClick={() => openEdit(rateCard)}>Edit</Button>
             <Button size="sm" variant="outline" onClick={() => onDelete(rateCard.id)}>Delete</Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() =>
-                onUpdate(rateCard.id, {
-                  status: rateCard.status === "active" ? "inactive" : "active",
-                })
-              }
-            >
-              {rateCard.status === "active" ? "Deactivate" : "Activate"}
-            </Button>
           </div>,
         ])}
-        emptyMessage="No rate cards added yet. Upload a template or add rows manually."
+        emptyMessage="No rate cards yet. Configure the structure, then add rows or upload a template."
       />
 
       <Dialog
@@ -3530,65 +3438,137 @@ function TenantCustomerContractsSection({
               {error}
             </div>
           ) : null}
-          <Field label="Lane">
-            <Input value={form.lanes} onChange={(event) => setForm((current) => ({ ...current, lanes: event.target.value }))} placeholder="BLR-CHE" />
-          </Field>
-          <Field label="From City">
-            <Input value={form.fromCity} onChange={(event) => setForm((current) => ({ ...current, fromCity: event.target.value }))} />
-          </Field>
-          <Field label="To City">
-            <Input value={form.toCity} onChange={(event) => setForm((current) => ({ ...current, toCity: event.target.value }))} />
-          </Field>
-          <Field label="From Location">
-            <Input value={form.fromLocation} onChange={(event) => setForm((current) => ({ ...current, fromLocation: event.target.value }))} />
-          </Field>
-          <Field label="To Location">
-            <Input value={form.toLocation} onChange={(event) => setForm((current) => ({ ...current, toLocation: event.target.value }))} />
-          </Field>
-          <Field label="From Pincode">
-            <Input value={form.sourcePincode} onChange={(event) => setForm((current) => ({ ...current, sourcePincode: event.target.value }))} placeholder="560037" />
-          </Field>
-          <Field label="To Pincode">
-            <Input value={form.destinationPincode} onChange={(event) => setForm((current) => ({ ...current, destinationPincode: event.target.value }))} placeholder="600001" />
-          </Field>
-          <Field label="Vehicle Type">
-            <Input value={form.vehicleType} onChange={(event) => setForm((current) => ({ ...current, vehicleType: event.target.value }))} />
-          </Field>
-          <Field label="Rate Type">
+          {/* Rate Type comes first — it drives whether Vehicle Type is required
+              (mandatory for Per Trip, optional for Per MT / Per KM). */}
+          <Field label="Rate Type *">
             <Select value={form.rateType} onChange={(event) => setForm((current) => ({ ...current, rateType: event.target.value as TenantCustomerRateCardInput["rateType"] }))}>
               <option value="PER_KM">Per KM</option>
               <option value="PER_MT">Per MT</option>
               <option value="PER_TRIP">Per Trip</option>
             </Select>
           </Field>
-          <Field label="Underload Rate">
-            <Input value={form.underloadRate} onChange={(event) => setForm((current) => ({ ...current, underloadRate: event.target.value }))} />
-          </Field>
-          <Field label="Overload Rate (Optional)">
-            <Input value={form.overloadRate} onChange={(event) => setForm((current) => ({ ...current, overloadRate: event.target.value }))} />
-          </Field>
-          <Field label="TAT (Optional)">
-            <Input value={form.tat} onChange={(event) => setForm((current) => ({ ...current, tat: event.target.value }))} />
-          </Field>
-          <Field label="Effective From Date">
-            <Input type="date" value={form.effectiveFromDate} onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))} />
-          </Field>
-          <Field label="Effective To Date">
-            <Input type="date" value={form.effectiveToDate} onChange={(event) => setForm((current) => ({ ...current, effectiveToDate: event.target.value }))} />
-          </Field>
-          <div className="md:col-span-2">
-            <Field label="Remarks (Optional)">
-              <Textarea value={form.remarks} onChange={(event) => setForm((current) => ({ ...current, remarks: event.target.value }))} className="min-h-[96px]" />
-            </Field>
-          </div>
-          <Field label="Status">
-            <Select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as TenantCustomerRateCardInput["status"] }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Select>
+          {/* Dimension fields are driven by the customer's rate matching configuration. */}
+          {columns.map((column) => {
+            const value = (form as Record<string, string>)[column.field] ?? "";
+            const options = selectOptionsByField[column.field];
+            const setValue = (next: string) =>
+              setForm((current) => ({ ...current, [column.field]: next }));
+            // Vehicle Type is only mandatory for Per Trip; optional otherwise.
+            const vehicleOptional = column.field === "vehicleType" && form.rateType !== "PER_TRIP";
+            const labelText = vehicleOptional ? `${column.label} (optional)` : `${column.label} *`;
+            return (
+              <Field key={column.field} label={labelText}>
+                {options ? (
+                  <Select value={value} onChange={(event) => setValue(event.target.value)}>
+                    <option value="">Select {column.label}</option>
+                    {value && !options.includes(value) ? <option value={value}>{value}</option> : null}
+                    {options.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <Input
+                    value={value}
+                    onChange={(event) => setValue(event.target.value)}
+                    placeholder={column.placeholder}
+                  />
+                )}
+              </Field>
+            );
+          })}
+          <Field label="Rate *">
+            <Input
+              type="number"
+              value={form.rate}
+              onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))}
+              placeholder="18000"
+            />
           </Field>
         </div>
       </Dialog>
+
+      <Dialog
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        title="Configure Rate Card"
+        description="Select which columns this customer's rate card has. Columns regenerate immediately. Booking's search columns are chosen separately in Preferences."
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfigOpen(false)}>Cancel</Button>
+            <Button onClick={saveConfig} disabled={!draftConfig.length}>Save Configuration</Button>
+          </div>
+        }
+      >
+        <div className="space-y-5">
+          <RateCardConfigGroup
+            title="Origin → Destination columns"
+            hint="Pick at least one origin → destination basis."
+            keys={["CITY_PAIR", "LOCATION_PAIR", "PINCODE_PAIR"]}
+            labels={{ CITY_PAIR: "City Pair", LOCATION_PAIR: "Location Pair", PINCODE_PAIR: "Pincode Pair" }}
+            selected={draftConfig}
+            onToggle={toggleDraftConfig}
+          />
+          <RateCardConfigGroup
+            title="Additional parameters"
+            hint="Optional dimensions that further narrow the rate."
+            keys={["VEHICLE_TYPE", "MATERIAL", "SERVICE_TYPE", "WEIGHT_SLAB", "QUANTITY_SLAB"]}
+            selected={draftConfig}
+            onToggle={toggleDraftConfig}
+          />
+          {!draftConfig.length ? (
+            <p className="text-sm text-rose-600">Select at least one parameter.</p>
+          ) : null}
+        </div>
+      </Dialog>
+    </div>
+  );
+}
+
+/** A labelled group of rate-card dimension checkboxes inside the config modal. */
+function RateCardConfigGroup({
+  title,
+  hint,
+  keys,
+  labels,
+  selected,
+  onToggle,
+}: {
+  title: string;
+  hint?: string;
+  keys: RateMatchingFieldKey[];
+  labels?: Partial<Record<RateMatchingFieldKey, string>>;
+  selected: RateMatchingConfig;
+  onToggle: (key: RateMatchingFieldKey) => void;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-semibold">{title}</p>
+      {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {keys.map((key) => {
+          const field = RATE_MATCHING_FIELDS.find((item) => item.key === key);
+          const label = labels?.[key] ?? field?.label ?? key;
+          const checked = selected.includes(key);
+          return (
+            <label
+              key={key}
+              className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                checked ? "border-primary/40 bg-primary/5 font-medium" : "bg-background/80 hover:border-primary/20"
+              }`}
+            >
+              <input type="checkbox" className="mt-0.5" checked={checked} onChange={() => onToggle(key)} />
+              <span>
+                {label}
+                {field?.description ? (
+                  <span className="block text-xs font-normal text-muted-foreground">{field.description}</span>
+                ) : null}
+              </span>
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 }

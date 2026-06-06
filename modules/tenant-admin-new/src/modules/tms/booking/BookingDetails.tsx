@@ -31,10 +31,13 @@ import {
   buildVehicleLookup,
   buildVehicleTypeLookup,
   buildVendorLookup,
+  buildVendorComparison,
   calculateVendorFreightFromRateCard,
   getVendorRateCardUnitRate,
   validateVendorRateCard,
 } from "@/modules/tms/booking/services/booking-selectors";
+import { VendorContractComparison } from "@/modules/tms/booking/components/VendorContractComparison";
+import { normalizeRateMatchingConfig } from "@/shared/lib/rate-matching-config";
 import {
   buildDeliveryRevisionRecord,
   previewDestinationChange,
@@ -190,13 +193,15 @@ export function BookingDetailsPage() {
     actionBookingVehicleReplacement,
   } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
-  const { sendBookingVendorIndent, listBookingVendorIndents } = useMockStore();
+  const { sendBookingVendorIndent, listBookingVendorIndents, cancelBookingVendorIndent } = useMockStore();
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [reassignmentOpen, setReassignmentOpen] = useState(false);
   const [breakdownActionOpen, setBreakdownActionOpen] = useState(false);
   const [vehicleReplacementOpen, setVehicleReplacementOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancellationReason, setCancellationReason] = useState("");
+  // Contract Vendor (auto-match + comparison) vs Manual Assignment. Default Contract.
+  const [assignMethod, setAssignMethod] = useState<"CONTRACT" | "MANUAL">("CONTRACT");
   const [vendorId, setVendorId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -395,6 +400,97 @@ export function BookingDetailsPage() {
   const customerFreight = bookingRecord.pricing.calculatedFreight;
   const marginAmount = calculateMarginAmount(customerFreight, Number(vendorFreight || 0));
   const marginPercent = calculateMarginPercent(customerFreight, Number(vendorFreight || 0));
+
+  // Vendor Recommendation Engine — booking payload + per-vendor contract match.
+  const assignSourceAddress = addressMap.get(bookingRecord.sourceAddressId) ?? null;
+  const assignDestinationAddress = addressMap.get(bookingRecord.destinationAddressId) ?? null;
+  const assignVehicleTypeCode = bookingRecord.vehicleTypeId
+    ? adminSources.vehicleTypes.find((vehicleType) => vehicleType.id === bookingRecord.vehicleTypeId)?.typeCode ?? null
+    : null;
+  const assignMaterialCode =
+    (bookingRecord.materialIds ?? [])
+      .map((id) => adminSources.materials.find((material) => material.id === id)?.materialCode)
+      .find(Boolean) ?? null;
+  const assignDistanceKm =
+    bookingRecord.deliveries?.reduce((max, delivery) => Math.max(max, Number(delivery.distanceKm || 0)), 0) ??
+    Number(bookingRecord.pricing.distanceKm || 0);
+  const assignWeight = Number(bookingRecord.weight || 0);
+  const vendorComparison = useMemo(
+    () =>
+      buildVendorComparison({
+        vendors: adminSources.vendors,
+        vendorRateCardMap: adminSources.vendorRateCardMap,
+        customerFreight,
+        input: {
+          bookingDate: bookingRecord.pickupDate ?? null,
+          fromCity: assignSourceAddress?.city ?? null,
+          toCity: assignDestinationAddress?.city ?? null,
+          fromLocation: assignSourceAddress?.addressName ?? null,
+          toLocation: assignDestinationAddress?.addressName ?? null,
+          fromPincode: assignSourceAddress?.pincode ?? null,
+          toPincode: assignDestinationAddress?.pincode ?? null,
+          vehicleType: assignVehicleTypeCode,
+          material: assignMaterialCode,
+          weight: assignWeight,
+          distanceKm: assignDistanceKm,
+          preferredRateType: bookingRecord.pricing.rateType,
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode],
+  );
+
+  // Contract Vendor indent stage. The booking stays PENDING_ASSIGNMENT throughout;
+  // the stage is derived from the vendor indents (send → pending → accepted/rejected).
+  const isSpotBooking = bookingRecord.commercialType === "SPOT";
+  const myBookingIndents = listBookingVendorIndents(tenant.id).filter((indent) => indent.bookingId === bookingRecord.id);
+  const winnerIndent = myBookingIndents.find((indent) => indent.isWinner && indent.status === "ACCEPTED") ?? null;
+  const pendingIndent = myBookingIndents.find((indent) => indent.status === "PENDING") ?? null;
+  const rejectedIndentVendorIds = Array.from(
+    new Set(myBookingIndents.filter((indent) => indent.status === "REJECTED").map((indent) => indent.vendorId)),
+  );
+  const pendingIndentBuyingRate =
+    pendingIndent?.buyingRate ?? vendorComparison.find((entry) => entry.vendorId === pendingIndent?.vendorId)?.vendorFreight ?? null;
+  const winnerIndentBuyingRate =
+    winnerIndent?.buyingRate ?? vendorComparison.find((entry) => entry.vendorId === winnerIndent?.vendorId)?.vendorFreight ?? null;
+
+  function sendIndentToVendor(targetVendorId: string) {
+    const entry = vendorComparison.find((item) => item.vendorId === targetVendorId);
+    try {
+      sendBookingVendorIndent(
+        bookingRecord.id,
+        session.actorName || "Dispatcher",
+        session.activeTenantOrgUnitId ?? null,
+        orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
+        targetVendorId,
+        entry?.vendorFreight ?? null,
+      );
+    } catch (error) {
+      window.alert((error as Error).message);
+    }
+  }
+  function cancelPendingIndent() {
+    if (!pendingIndent) return;
+    try {
+      cancelBookingVendorIndent(pendingIndent.id);
+    } catch (error) {
+      window.alert((error as Error).message);
+    }
+  }
+  // Once a vendor accepts, prefill them as the assigned vendor so the buying
+  // freight + assignment fields populate for the ops team.
+  useEffect(() => {
+    if (winnerIndent && vendorId !== winnerIndent.vendorId) {
+      setVendorId(winnerIndent.vendorId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winnerIndent?.vendorId]);
+
+  // SPOT and Manual modes use a vendor dropdown + direct freight entry. Contract
+  // mode only reveals the vehicle/driver/LR fields AFTER a vendor accepts the indent.
+  const manualVendorSelection = isSpotBooking || assignMethod === "MANUAL";
+  const showAssignmentFields = manualVendorSelection || (assignMethod === "CONTRACT" && Boolean(winnerIndent));
+
   const selectedDeliveryId = typeof (location.state as { deliveryId?: string } | null)?.deliveryId === "string" ? (location.state as { deliveryId?: string }).deliveryId : null;
   const selectedDelivery = (bookingRecord.deliveries ?? []).find((delivery) => delivery.id === selectedDeliveryId) ?? null;
   const normalizedVendorId = vendorId === OWN_FLEET_VENDOR ? null : vendorId || null;
@@ -1035,7 +1131,7 @@ export function BookingDetailsPage() {
   }, [assignmentOpen, bookingRecord.lrType, bookingRecord.manualLrPoolPreference]);
 
   useEffect(() => {
-    if (!assignmentOpen || !vendorId || vendorId === OWN_FLEET_VENDOR) {
+    if (!vendorId || vendorId === OWN_FLEET_VENDOR) {
       setVendorFreightSource("MANUAL");
       setVendorRateWarning("");
       setMatchedVendorRateCardId(null);
@@ -1044,17 +1140,10 @@ export function BookingDetailsPage() {
       return;
     }
 
+    // Search the selected vendor's contract using its OWN config (same engine
+    // as customers) and auto-fill the buying freight + margin.
     const vendorRateCards = adminSources.vendorRateCardMap.get(vendorId) ?? [];
-    const sourceAddress = addressMap.get(bookingRecord.sourceAddressId) ?? null;
-    const destinationAddress = addressMap.get(bookingRecord.destinationAddressId) ?? null;
-    const vehicleTypeCode =
-      bookingRecord.vehicleTypeId
-        ? adminSources.vehicleTypes.find((vehicleType) => vehicleType.id === bookingRecord.vehicleTypeId)?.typeCode ?? null
-        : null;
-    const bookingDistance =
-      bookingRecord.deliveries?.reduce((max, delivery) => Math.max(max, Number(delivery.distanceKm || 0)), 0) ??
-      Number(bookingRecord.pricing.distanceKm || 0);
-    const bookingWeight = Number(bookingRecord.weight || 0);
+    const config = normalizeRateMatchingConfig(vendorMap.get(vendorId)?.rateMatchingConfig);
     const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
       bookingRecord.pricing.rateType,
       "PER_MT",
@@ -1068,13 +1157,15 @@ export function BookingDetailsPage() {
           validateVendorRateCard(
             {
               bookingDate: bookingRecord.pickupDate ?? null,
-              fromCity: sourceAddress?.city ?? null,
-              toCity: destinationAddress?.city ?? null,
-              fromLocation: sourceAddress?.addressName ?? null,
-              toLocation: destinationAddress?.addressName ?? null,
-              fromPincode: sourceAddress?.pincode ?? null,
-              toPincode: destinationAddress?.pincode ?? null,
-              vehicleType: vehicleTypeCode,
+              rateMatchingConfig: config,
+              fromCity: assignSourceAddress?.city ?? null,
+              toCity: assignDestinationAddress?.city ?? null,
+              fromLocation: assignSourceAddress?.addressName ?? null,
+              toLocation: assignDestinationAddress?.addressName ?? null,
+              fromPincode: assignSourceAddress?.pincode ?? null,
+              toPincode: assignDestinationAddress?.pincode ?? null,
+              vehicleType: assignVehicleTypeCode,
+              material: assignMaterialCode,
               rateType,
             },
             vendorRateCards,
@@ -1084,7 +1175,7 @@ export function BookingDetailsPage() {
 
     if (!matchedRateCard) {
       setVendorFreightSource("MANUAL");
-      setVendorRateWarning("No vendor contract found. Manual buying rate entered.");
+      setVendorRateWarning("No matching vendor contract found. Enter the buying rate manually.");
       setMatchedVendorRateCardId(null);
       setMatchedVendorRateType(null);
       setBuyingRateLabel(null);
@@ -1093,8 +1184,8 @@ export function BookingDetailsPage() {
 
     const calculatedVendorFreight = calculateVendorFreightFromRateCard({
       rateCard: matchedRateCard,
-      weight: bookingWeight,
-      distanceKm: bookingDistance,
+      weight: assignWeight,
+      distanceKm: assignDistanceKm,
     });
 
     setVendorFreight(String(calculatedVendorFreight));
@@ -1105,7 +1196,8 @@ export function BookingDetailsPage() {
     setBuyingRateLabel(
       `${matchedRateCard.rateType} @ ${(getVendorRateCardUnitRate(matchedRateCard) ?? 0).toLocaleString()}`,
     );
-  }, [addressMap, adminSources.vendorRateCardMap, adminSources.vehicleTypes, assignmentOpen, bookingRecord, vendorId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminSources.vendorRateCardMap, assignmentOpen, bookingRecord, vendorId]);
 
   function resetRemarkDialog() {
     setRemarkDeliveryId(null);
@@ -1920,26 +2012,9 @@ export function BookingDetailsPage() {
                     if (pendingCount > 0) {
                       return <Badge variant="accent">Indent sent · {pendingCount} notified</Badge>;
                     }
-                    return (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          try {
-                            sendBookingVendorIndent(
-                              bookingRecord.id,
-                              session.actorName || "Dispatcher",
-                              session.activeTenantOrgUnitId ?? null,
-                              orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
-                            );
-                          } catch (error) {
-                            window.alert((error as Error).message);
-                          }
-                        }}
-                      >
-                        Send Indent to Vendors
-                      </Button>
-                    );
+                    // Indents are sent per-vendor from the Contract Vendor recommendation
+                    // table in the Assign Vehicle section — no broadcast button in the header.
+                    return null;
                   })() : null}
                   {!loadingStarted && ["VEHICLE_ASSIGNED", "ASSIGNED"].includes(bookingRecord.status) && access.can("BOOKING_DETAIL", "START_LOADING") ? <Button size="sm" onClick={startLoading}>Start Loading</Button> : null}
                     {loadingStarted && !loadingCompleted && access.can("BOOKING_DETAIL", "COMPLETE_LOADING") ? <Button size="sm" onClick={endLoading}>Complete Loading</Button> : null}
@@ -3476,36 +3551,111 @@ export function BookingDetailsPage() {
             <span className="text-[15px] font-semibold text-slate-900">Assign Vehicle</span>
             <span className="text-[11px] text-slate-500">{getAssignmentModeLabel(tenant.assignmentMode)} · {getCommercialModeLabel(tenant.commercialMode)}</span>
           </div>
-          <Button
-            size="sm"
-            onClick={submitAssignment}
-            disabled={
-              !vendorId ||
-              !vehicleId ||
-              !driverId ||
-              Number(vendorFreight) <= 0 ||
-                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
-                !activeLrOrgUnitId
-              }
-          >
-            Assign Vehicle
-          </Button>
+          {showAssignmentFields ? (
+            <Button
+              size="sm"
+              onClick={submitAssignment}
+              disabled={
+                !vendorId ||
+                !vehicleId ||
+                !driverId ||
+                Number(vendorFreight) <= 0 ||
+                  (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  !activeLrOrgUnitId
+                }
+            >
+              Assign Vehicle
+            </Button>
+          ) : null}
         </div>
         <div className="px-4 py-3.5">
         <div className="space-y-3">
+          {/* Assignment method — Contract Vendor (recommendation engine) is default; SPOT is manual-only. */}
+          {!isSpotBooking ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assignment Method</p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="assignMethodDetail" checked={assignMethod === "CONTRACT"} onChange={() => { setAssignMethod("CONTRACT"); setVendorId(""); setVehicleId(""); setDriverId(""); setVendorFreight(""); }} />
+                  Contract Vendor
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="assignMethodDetail" checked={assignMethod === "MANUAL"} onChange={() => { setAssignMethod("MANUAL"); setVendorId(""); setVehicleId(""); setDriverId(""); setVendorFreight(""); }} />
+                  Manual Assignment
+                </label>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Spot booking — enter the spot vendor rate and assign manually below.
+            </div>
+          )}
+
+          {/* CONTRACT mode is staged by indent: recommend → send → pending → accepted. */}
+          {assignMethod === "CONTRACT" && !isSpotBooking ? (
+            winnerIndent ? (
+              <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                <span className="font-semibold">{winnerIndent.vendorName}</span> accepted the indent
+                {winnerIndentBuyingRate != null ? <> · Buying Rate Rs {Math.round(winnerIndentBuyingRate).toLocaleString()}</> : null}. Assign vehicle &amp; driver below.
+              </div>
+            ) : pendingIndent ? (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-amber-800">Selected Vendor</p>
+                    <p className="mt-0.5 text-sm font-semibold text-amber-950">{pendingIndent.vendorName}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-amber-800">Buying Rate</p>
+                    <p className="mt-0.5 text-sm font-semibold text-amber-950">{pendingIndentBuyingRate != null ? `Rs ${Math.round(pendingIndentBuyingRate).toLocaleString()}` : "-"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-[11px] uppercase tracking-wide text-amber-800">Status</p>
+                    <p className="mt-0.5 text-sm font-semibold text-amber-950">Indent Sent · Waiting for Vendor Response</p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Button size="sm" variant="outline" onClick={cancelPendingIndent}>Cancel Indent</Button>
+                </div>
+              </div>
+            ) : (
+              <VendorContractComparison
+                entries={vendorComparison}
+                selectedVendorId=""
+                onSelect={sendIndentToVendor}
+                actionLabel="Send Indent"
+                mutedVendorIds={rejectedIndentVendorIds}
+                showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
+                showCustomerFreight={false}
+                header={{
+                  route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
+                  customerFreight,
+                  vehicleType: assignVehicleTypeCode ?? "-",
+                  material: assignMaterialCode ?? "-",
+                }}
+              />
+            )
+          ) : null}
+
+          {showAssignmentFields ? (
+          <>
           {/* Two-column: Assignment Details (left) | Commercial & LR (right) */}
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
               <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Assignment Details</p>
               <div className="space-y-2.5">
                 <CompactField label="Vendor">
-                  <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
-                    <option value="">Select vendor</option>
-                    <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
-                    {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
-                      <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
-                    ))}
-                  </Select>
+                  {manualVendorSelection ? (
+                    <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
+                      <option value="">Select vendor</option>
+                      <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
+                      {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
+                        <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Input value={vendorMap.get(vendorId)?.name ?? "Contract vendor"} disabled />
+                  )}
                 </CompactField>
                 <CompactField label="Vehicle">
                   <Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setDriverId(""); }} disabled={!vendorId}>
@@ -3633,6 +3783,8 @@ export function BookingDetailsPage() {
               </div>
             </div>
           </div>
+          </>
+          ) : null}
         </div>
         </div>
       </section>

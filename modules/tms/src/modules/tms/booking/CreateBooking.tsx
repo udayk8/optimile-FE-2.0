@@ -35,6 +35,10 @@ import {
   getWeightUOMOptions,
   validateRateCard,
 } from "@/modules/tms/booking/services/booking-selectors";
+import {
+  rateMatchingConfigToBasis,
+  resolveCustomerRateCalculationStrategy,
+} from "@/shared/lib/rate-matching-config";
 import type {
   BookingCommercialType,
   BookingInput,
@@ -302,7 +306,11 @@ export function CreateBookingPage({
       return;
     }
 
-    const preferredRateBasis = selectedCustomer.rateMatchingBasis ?? "LANE_TO_LANE";
+    // Booking searches the rate card using the customer's RATE CALCULATION
+    // STRATEGY (a subset of the rate card structure, configured in Preferences),
+    // NOT the full structure. The basis gating is derived from that strategy.
+    const rateCalculationStrategy = resolveCustomerRateCalculationStrategy(selectedCustomer);
+    const preferredRateBasis = rateMatchingConfigToBasis(rateCalculationStrategy);
     const hasMinimumRateInputs = deliveries.some((delivery) => {
       if (!delivery.originCity || !delivery.destinationCity) {
         return false;
@@ -331,11 +339,13 @@ export function CreateBookingPage({
         const source = customerAddresses.find((address) => address.id === delivery.originAddressId) ?? null;
         const destination =
           customerAddresses.find((address) => address.id === delivery.destinationAddressId) ?? null;
+        const deliveryMaterial =
+          customerMaterials.find((material) => material.id === delivery.materialId) ?? null;
         const validationInput = {
           bookingDate: draft.pickupDateTime ? draft.pickupDateTime.slice(0, 10) : null,
           customerId: draft.customerId,
           rateMatchingBasis: "CITY_TO_CITY" as const,
-          lane: source && destination ? buildRateValidationLane(source.addressName, destination.addressName) : null,
+          rateMatchingConfig: rateCalculationStrategy,
           fromCity: source?.city ?? delivery.originCity,
           toCity: destination?.city ?? delivery.destinationCity,
           fromLocation: source?.addressName ?? null,
@@ -343,6 +353,8 @@ export function CreateBookingPage({
           fromPincode: source?.pincode ?? null,
           toPincode: destination?.pincode ?? null,
           vehicleType: selectedVehicleTypeCode,
+          material: deliveryMaterial?.materialCode ?? null,
+          uom: deliveryMaterial?.uom ?? delivery.uom ?? null,
           rateType: draft.contractRateType,
           weight: draft.contractRateType === "PER_MT" ? cumulativeWeight : null,
         };
@@ -612,7 +624,7 @@ export function CreateBookingPage({
       destinationAddressId: lastDelivery?.destinationAddressId || draft.destinationAddressId,
       consignorAddressId: firstDelivery?.originAddressId || draft.sourceAddressId,
       consigneeAddressId: lastDelivery?.destinationAddressId || draft.destinationAddressId,
-      laneKey: matchedRateCard?.lanes ?? null,
+      laneKey: null,
       laneFound,
       poNumber: null,
       doNumber: null,
@@ -1414,17 +1426,8 @@ function createEmptyDeliveryDraft(index: number): DeliveryDraft {
   };
 }
 
-function buildRateValidationLane(fromLabel?: string | null, toLabel?: string | null) {
-  const from = fromLabel?.trim();
-  const to = toLabel?.trim();
-  if (!from || !to) {
-    return "";
-  }
-  return `${from}-${to}`.toUpperCase().replace(/\s+/g, "");
-}
-
 function formatRateMatchingBasisLabel(
-  value: "LANE_TO_LANE" | "CITY_TO_CITY" | "PINCODE_TO_PINCODE" | "ADDRESS_TO_ADDRESS",
+  value: "CITY_TO_CITY" | "PINCODE_TO_PINCODE" | "ADDRESS_TO_ADDRESS" | "HYBRID",
 ) {
   return value
     .split("_TO_")
@@ -1433,7 +1436,7 @@ function formatRateMatchingBasisLabel(
 }
 
 function effectiveRateBasisLabel(
-  preferredBasis: "LANE_TO_LANE" | "CITY_TO_CITY" | "PINCODE_TO_PINCODE" | "ADDRESS_TO_ADDRESS",
+  preferredBasis: "CITY_TO_CITY" | "PINCODE_TO_PINCODE" | "ADDRESS_TO_ADDRESS" | "HYBRID",
   delivery: DeliveryDraft | undefined,
   customerAddresses: TenantCustomerAddress[],
 ) {
@@ -1445,7 +1448,6 @@ function effectiveRateBasisLabel(
   const effectiveBasis =
     origin && delivery.destinationCity
       ? getEffectiveRateMatchingBasis(preferredBasis, {
-          lane: destination ? buildRateValidationLane(origin.addressName, destination.addressName) : null,
           fromCity: origin.city,
           toCity: destination?.city ?? delivery.destinationCity,
           fromLocation: origin.addressName,

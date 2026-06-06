@@ -39,6 +39,7 @@ export interface CustomerAddressMasterEntry {
   contactPerson?: string;
   contactNumber?: string;
   emailId?: string;
+  lane?: string;
   isActive?: boolean;
   isTemporary?: boolean;
   remarks?: string;
@@ -56,7 +57,8 @@ export type CustomerRateMatchingBasis =
   | "LANE_TO_LANE"
   | "CITY_TO_CITY"
   | "PINCODE_TO_PINCODE"
-  | "ADDRESS_TO_ADDRESS";
+  | "ADDRESS_TO_ADDRESS"
+  | "HYBRID";
 
 export interface TenantCustomer {
   id: string;
@@ -139,6 +141,7 @@ export interface TenantCustomerAddress {
   status: "active" | "inactive";
   isTemporary?: boolean;
   remarks?: string;
+  lane?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -248,6 +251,7 @@ export interface TenantCustomerAddressInput {
   status: "active" | "inactive";
   isTemporary?: boolean;
   remarks?: string;
+  lane?: string;
 }
 
 export interface TenantCustomerRateCardInput {

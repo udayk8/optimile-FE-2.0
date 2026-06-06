@@ -11,6 +11,9 @@ export interface BookingVendorIndent {
   vendorName: string;
   status: BookingVendorIndentStatus;
   isWinner: boolean;
+  /** Buying freight the indent was sent at (from the vendor's contract), so the
+   *  Indent-Sent / Accepted panels show the committed rate without recompute. */
+  buyingRate?: number | null;
   sentAt: string;
   respondedAt?: string | null;
   rejectedReason?: string | null;

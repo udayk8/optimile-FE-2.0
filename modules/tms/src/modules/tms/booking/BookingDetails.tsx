@@ -30,10 +30,13 @@ import {
   buildVehicleLookup,
   buildVehicleTypeLookup,
   buildVendorLookup,
+  buildVendorComparison,
   calculateVendorFreightFromRateCard,
   getVendorRateCardUnitRate,
   validateVendorRateCard,
 } from "@/modules/tms/booking/services/booking-selectors";
+import { VendorContractComparison } from "@/modules/tms/booking/components/VendorContractComparison";
+import { normalizeRateMatchingConfig } from "@/shared/lib/rate-matching-config";
 import {
   buildDeliveryRevisionRecord,
   previewDestinationChange,
@@ -182,6 +185,8 @@ export function BookingDetailsPage() {
   const [vehicleReplacementOpen, setVehicleReplacementOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancellationReason, setCancellationReason] = useState("");
+  // Contract Vendor (auto-match + comparison) vs Manual Assignment. Default Contract.
+  const [assignMethod, setAssignMethod] = useState<"CONTRACT" | "MANUAL">("CONTRACT");
   const [vendorId, setVendorId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -372,6 +377,46 @@ export function BookingDetailsPage() {
   const customerFreight = bookingRecord.pricing.calculatedFreight;
   const marginAmount = calculateMarginAmount(customerFreight, Number(vendorFreight || 0));
   const marginPercent = calculateMarginPercent(customerFreight, Number(vendorFreight || 0));
+
+  // Vendor Recommendation Engine — booking payload + per-vendor contract match.
+  const assignSourceAddress = addressMap.get(bookingRecord.sourceAddressId) ?? null;
+  const assignDestinationAddress = addressMap.get(bookingRecord.destinationAddressId) ?? null;
+  const assignVehicleTypeCode = bookingRecord.vehicleTypeId
+    ? adminSources.vehicleTypes.find((vehicleType) => vehicleType.id === bookingRecord.vehicleTypeId)?.typeCode ?? null
+    : null;
+  const assignMaterialCode =
+    (bookingRecord.materialIds ?? [])
+      .map((id) => adminSources.materials.find((material) => material.id === id)?.materialCode)
+      .find(Boolean) ?? null;
+  const assignDistanceKm =
+    bookingRecord.deliveries?.reduce((max, delivery) => Math.max(max, Number(delivery.distanceKm || 0)), 0) ??
+    Number(bookingRecord.pricing.distanceKm || 0);
+  const assignWeight = Number(bookingRecord.weight || 0);
+  const vendorComparison = useMemo(
+    () =>
+      buildVendorComparison({
+        vendors: adminSources.vendors,
+        vendorRateCardMap: adminSources.vendorRateCardMap,
+        customerFreight,
+        input: {
+          bookingDate: bookingRecord.pickupDate ?? null,
+          fromCity: assignSourceAddress?.city ?? null,
+          toCity: assignDestinationAddress?.city ?? null,
+          fromLocation: assignSourceAddress?.addressName ?? null,
+          toLocation: assignDestinationAddress?.addressName ?? null,
+          fromPincode: assignSourceAddress?.pincode ?? null,
+          toPincode: assignDestinationAddress?.pincode ?? null,
+          vehicleType: assignVehicleTypeCode,
+          material: assignMaterialCode,
+          weight: assignWeight,
+          distanceKm: assignDistanceKm,
+          preferredRateType: bookingRecord.pricing.rateType,
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode],
+  );
+
   const selectedDeliveryId = typeof (location.state as { deliveryId?: string } | null)?.deliveryId === "string" ? (location.state as { deliveryId?: string }).deliveryId : null;
   const selectedDelivery = (bookingRecord.deliveries ?? []).find((delivery) => delivery.id === selectedDeliveryId) ?? null;
   const normalizedVendorId = vendorId === OWN_FLEET_VENDOR ? null : vendorId || null;
@@ -1012,7 +1057,7 @@ export function BookingDetailsPage() {
   }, [assignmentOpen, bookingRecord.lrType, bookingRecord.manualLrPoolPreference]);
 
   useEffect(() => {
-    if (!assignmentOpen || !vendorId || vendorId === OWN_FLEET_VENDOR) {
+    if (!vendorId || vendorId === OWN_FLEET_VENDOR) {
       setVendorFreightSource("MANUAL");
       setVendorRateWarning("");
       setMatchedVendorRateCardId(null);
@@ -1021,17 +1066,10 @@ export function BookingDetailsPage() {
       return;
     }
 
+    // Search the selected vendor's contract using its OWN config (same engine
+    // as customers) and auto-fill the buying freight + margin.
     const vendorRateCards = adminSources.vendorRateCardMap.get(vendorId) ?? [];
-    const sourceAddress = addressMap.get(bookingRecord.sourceAddressId) ?? null;
-    const destinationAddress = addressMap.get(bookingRecord.destinationAddressId) ?? null;
-    const vehicleTypeCode =
-      bookingRecord.vehicleTypeId
-        ? adminSources.vehicleTypes.find((vehicleType) => vehicleType.id === bookingRecord.vehicleTypeId)?.typeCode ?? null
-        : null;
-    const bookingDistance =
-      bookingRecord.deliveries?.reduce((max, delivery) => Math.max(max, Number(delivery.distanceKm || 0)), 0) ??
-      Number(bookingRecord.pricing.distanceKm || 0);
-    const bookingWeight = Number(bookingRecord.weight || 0);
+    const config = normalizeRateMatchingConfig(vendorMap.get(vendorId)?.rateMatchingConfig);
     const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
       bookingRecord.pricing.rateType,
       "PER_MT",
@@ -1045,13 +1083,15 @@ export function BookingDetailsPage() {
           validateVendorRateCard(
             {
               bookingDate: bookingRecord.pickupDate ?? null,
-              fromCity: sourceAddress?.city ?? null,
-              toCity: destinationAddress?.city ?? null,
-              fromLocation: sourceAddress?.addressName ?? null,
-              toLocation: destinationAddress?.addressName ?? null,
-              fromPincode: sourceAddress?.pincode ?? null,
-              toPincode: destinationAddress?.pincode ?? null,
-              vehicleType: vehicleTypeCode,
+              rateMatchingConfig: config,
+              fromCity: assignSourceAddress?.city ?? null,
+              toCity: assignDestinationAddress?.city ?? null,
+              fromLocation: assignSourceAddress?.addressName ?? null,
+              toLocation: assignDestinationAddress?.addressName ?? null,
+              fromPincode: assignSourceAddress?.pincode ?? null,
+              toPincode: assignDestinationAddress?.pincode ?? null,
+              vehicleType: assignVehicleTypeCode,
+              material: assignMaterialCode,
               rateType,
             },
             vendorRateCards,
@@ -1061,7 +1101,7 @@ export function BookingDetailsPage() {
 
     if (!matchedRateCard) {
       setVendorFreightSource("MANUAL");
-      setVendorRateWarning("No vendor contract found. Manual buying rate entered.");
+      setVendorRateWarning("No matching vendor contract found. Enter the buying rate manually.");
       setMatchedVendorRateCardId(null);
       setMatchedVendorRateType(null);
       setBuyingRateLabel(null);
@@ -1070,8 +1110,8 @@ export function BookingDetailsPage() {
 
     const calculatedVendorFreight = calculateVendorFreightFromRateCard({
       rateCard: matchedRateCard,
-      weight: bookingWeight,
-      distanceKm: bookingDistance,
+      weight: assignWeight,
+      distanceKm: assignDistanceKm,
     });
 
     setVendorFreight(String(calculatedVendorFreight));
@@ -1082,7 +1122,8 @@ export function BookingDetailsPage() {
     setBuyingRateLabel(
       `${matchedRateCard.rateType} @ ${(getVendorRateCardUnitRate(matchedRateCard) ?? 0).toLocaleString()}`,
     );
-  }, [addressMap, adminSources.vendorRateCardMap, adminSources.vehicleTypes, assignmentOpen, bookingRecord, vendorId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminSources.vendorRateCardMap, bookingRecord, vendorId]);
 
   function resetRemarkDialog() {
     setRemarkDeliveryId(null);
@@ -1821,7 +1862,7 @@ export function BookingDetailsPage() {
                 ) : null}
               </div>
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-                <MiniInfoPill strong label="Lane" value={`${sourceAddress?.addressName ?? "-"} to ${destinationAddress?.addressName ?? "-"}`} />
+                <MiniInfoPill strong label="Route" value={`${sourceAddress?.addressName ?? "-"} to ${destinationAddress?.addressName ?? "-"}`} />
                 <MiniInfoPill label="Qty / Weight" value={`${bookingRecord.quantity} ${bookingRecord.uom} / ${bookingRecord.weight} ${bookingRecord.weightUom ?? bookingRecord.uom}`} />
                 <MiniInfoPill label="Status / Stage" value={`${visibleBookingStatus.replace(/_/g, " ")} / ${currentExecutionStage.label}`} />
               </div>
@@ -3206,15 +3247,45 @@ export function BookingDetailsPage() {
         }
       >
         <div className="grid gap-3 md:grid-cols-2">
-          <CompactField label="Vendor">
-            <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
-              <option value="">Select vendor</option>
-              <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
-              {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
-                <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
-              ))}
-            </Select>
-          </CompactField>
+          <div className="md:col-span-2">
+            <CompactField label="Assignment Method">
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="assignMethodDetail" checked={assignMethod === "CONTRACT"} onChange={() => { setAssignMethod("CONTRACT"); setVendorId(""); setVehicleId(""); setDriverId(""); setVendorFreight(""); }} />
+                  Contract Vendor
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="assignMethodDetail" checked={assignMethod === "MANUAL"} onChange={() => { setAssignMethod("MANUAL"); setVendorId(""); setVehicleId(""); setDriverId(""); setVendorFreight(""); }} />
+                  Manual Assignment
+                </label>
+              </div>
+            </CompactField>
+          </div>
+          {assignMethod === "CONTRACT" ? (
+            <div className="md:col-span-2">
+              <VendorContractComparison
+                entries={vendorComparison}
+                selectedVendorId={vendorId}
+                onSelect={(id) => { setVendorId(id); setVehicleId(""); setDriverId(""); }}
+                header={{
+                  route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
+                  customerFreight,
+                  vehicleType: assignVehicleTypeCode ?? "-",
+                  material: assignMaterialCode ?? "-",
+                }}
+              />
+            </div>
+          ) : (
+            <CompactField label="Vendor">
+              <Select value={vendorId} onChange={(event) => { setVendorId(event.target.value); setVehicleId(""); setDriverId(""); }}>
+                <option value="">Select vendor</option>
+                <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
+                {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
+                  <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
+                ))}
+              </Select>
+            </CompactField>
+          )}
           <CompactField label="Customer Freight / Selling Rate">
             <Input value={customerFreight.toLocaleString()} disabled />
           </CompactField>

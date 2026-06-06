@@ -4,6 +4,15 @@ import type {
   VendorRateCardImportResult,
   VendorRateCardImportRow,
 } from "@/types/vendor";
+import type { RateMatchingConfig } from "@/types/customer";
+import {
+  getRateCardTemplateColumns,
+  getRateMatchingColumns,
+  getRequiredUploadColumns,
+  normalizeRateMatchingConfig,
+  RATE_VALUE_TEMPLATE_COLUMNS,
+  type RateCardDimensionField,
+} from "@/shared/lib/rate-matching-config";
 
 export const vendorRateCardTemplateColumns = [
   "Lane",
@@ -391,6 +400,195 @@ export function downloadVendorRateCardTemplateWorkbook() {
   const worksheet = XLSX.utils.json_to_sheet(vendorRateCardTemplateRows, {
     header: [...vendorRateCardTemplateColumns],
   });
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Vendor Rate Card Template");
+  XLSX.writeFile(workbook, "vendor-rate-card-template.xlsx");
+}
+
+// ---------------------------------------------------------------------------
+// CONFIG-DRIVEN vendor rate-card import / export — reuses the SAME engine
+// (shared/lib/rate-matching-config) as customer rate cards. The vendor's
+// `rateMatchingConfig` drives the template, required columns and validation.
+// ---------------------------------------------------------------------------
+
+const PINCODE_FIELDS = new Set<RateCardDimensionField>(["sourcePincode", "destinationPincode"]);
+
+/** Maps an engine dimension field to the vendor rate-card input property. */
+const dimensionFieldToVendorInput: Record<RateCardDimensionField, keyof TenantVendorRateCardInput> = {
+  fromCity: "fromCity",
+  toCity: "toCity",
+  fromLocation: "fromLocation",
+  toLocation: "toLocation",
+  sourcePincode: "sourcePincode",
+  destinationPincode: "destinationPincode",
+  vehicleType: "vehicleType",
+  material: "material",
+  serviceType: "serviceType",
+  weightSlab: "weightSlab",
+  quantitySlab: "quantitySlab",
+  customerGroup: "customerGroup",
+  uom: "uom",
+};
+
+function parseStructuredVendorRows(
+  rows: Record<string, string>[],
+  config: RateMatchingConfig,
+): VendorRateCardImportResult {
+  const result: VendorRateCardImportResult = { validRows: [], invalidRows: [] };
+  const dimensionColumns = getRateMatchingColumns(config);
+
+  rows.forEach((row, index) => {
+    const dimensionValues: Partial<Record<RateCardDimensionField, string>> = {};
+    const errors: string[] = [];
+
+    dimensionColumns.forEach((column) => {
+      const value = normalizeString(row[column.label]);
+      dimensionValues[column.field] = value;
+      if (PINCODE_FIELDS.has(column.field)) {
+        if (!/^\d{6}$/.test(value)) errors.push(`${column.label} must be a 6-digit number.`);
+      } else if (!value) {
+        errors.push(`${column.label} is required.`);
+      }
+    });
+
+    const rateTypeRaw = normalizeString(row["Rate Type"]);
+    const rateRaw = normalizeString(row["Rate"]);
+    const normalizedRateType = vendorRateTypeAliasMap[rateTypeRaw.toUpperCase()];
+    if (!normalizedRateType || !["PER_KM", "PER_MT", "PER_TRIP"].includes(normalizedRateType)) {
+      errors.push("Rate Type must be Per KM, Per MT, or Per Trip.");
+    }
+    const numericRate = Number(rateRaw);
+    if (!rateRaw || Number.isNaN(numericRate) || numericRate <= 0) {
+      errors.push("Rate must be a positive number.");
+    }
+
+    if (errors.length) {
+      result.invalidRows.push({
+        rowNumber: index + 2,
+        row: { ...row, rateType: rateTypeRaw, rate: rateRaw } as unknown as VendorRateCardImportRow,
+        errors,
+      });
+      return;
+    }
+
+    const input: TenantVendorRateCardInput = {
+      sourcePincode: dimensionValues.sourcePincode ?? "",
+      destinationPincode: dimensionValues.destinationPincode ?? "",
+      rateType: normalizedRateType,
+      vehicleType: dimensionValues.vehicleType || null,
+      buyingRate: numericRate,
+      underloadRate: numericRate,
+      overloadRate: null,
+      rate: numericRate,
+      status: "active",
+    };
+    // Apply only the configured dimension values.
+    Object.entries(dimensionValues).forEach(([field, value]) => {
+      if (!value) return;
+      const key = dimensionFieldToVendorInput[field as RateCardDimensionField];
+      (input as Record<string, unknown>)[key] = value;
+    });
+    result.validRows.push(input);
+  });
+
+  return result;
+}
+
+function parseVendorRateCardWorksheetConfig(
+  worksheet: XLSX.WorkSheet,
+  config: RateMatchingConfig,
+): VendorRateCardImportResult {
+  const rows = XLSX.utils.sheet_to_json<(string | number | Date)[]>(worksheet, {
+    header: 1,
+    blankrows: false,
+    defval: "",
+    raw: false,
+  });
+  if (!rows.length) return { validRows: [], invalidRows: [] };
+
+  const headerRow = rows[0].map((cell) => normalizeString(cell));
+  const headerIndex = new Map(headerRow.map((header, index) => [header.trim().toLowerCase(), index]));
+  const requiredColumns = getRequiredUploadColumns(config);
+  const missing = requiredColumns.filter((column) => !headerIndex.has(column.toLowerCase()));
+  if (missing.length) {
+    return {
+      validRows: [],
+      invalidRows: [
+        {
+          rowNumber: 1,
+          row: {} as VendorRateCardImportRow,
+          errors: [
+            `File does not match this vendor's template. Expected columns: ${requiredColumns.join(
+              ", ",
+            )}. Missing: ${missing.join(", ")}.`,
+          ],
+        },
+      ],
+    };
+  }
+
+  const knownColumns = [
+    ...getRateMatchingColumns(config).map((column) => column.label),
+    ...RATE_VALUE_TEMPLATE_COLUMNS,
+  ];
+  const structuredRows = rows.slice(1).map((row) => {
+    const cellMap: Record<string, string> = {};
+    knownColumns.forEach((label) => {
+      const index = headerIndex.get(label.toLowerCase());
+      cellMap[label] = index != null ? normalizeString(row[index] ?? "") : "";
+    });
+    return cellMap;
+  });
+
+  return parseStructuredVendorRows(structuredRows, config);
+}
+
+/** Config-driven vendor rate-card file parse (mirrors `parseRateCardFile`). */
+export async function parseVendorRateCardFileConfig(
+  file: File,
+  config?: RateMatchingConfig,
+): Promise<VendorRateCardImportResult> {
+  const resolvedConfig = normalizeRateMatchingConfig(config);
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (extension !== "csv" && extension !== "xlsx") {
+    return {
+      validRows: [],
+      invalidRows: [
+        { rowNumber: 0, row: {} as VendorRateCardImportRow, errors: ["Only .xlsx and .csv files are supported."] },
+      ],
+    };
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
+  if (!workbook.SheetNames.length) return { validRows: [], invalidRows: [] };
+  return parseVendorRateCardWorksheetConfig(workbook.Sheets[workbook.SheetNames[0]], resolvedConfig);
+}
+
+/** Config-driven vendor template download (mirrors `downloadRateCardTemplateWorkbook`). */
+export function downloadVendorRateCardTemplateWorkbookConfig(config?: RateMatchingConfig) {
+  const header = getRateCardTemplateColumns(normalizeRateMatchingConfig(config));
+  const sampleValues: Record<string, string> = {
+    "From City": "Bengaluru",
+    "To City": "Chennai",
+    "From Location": "BLR Plant",
+    "To Location": "CHN Depot",
+    "From Pincode": "560001",
+    "To Pincode": "600001",
+    "Vehicle Type": "32FT",
+    Material: "Cement",
+    "Service Type": "FTL",
+    "Weight Slab": "0-9 MT",
+    "Quantity Slab": "0-100",
+    "Customer Group": "Group A",
+    UOM: "MT",
+    "Rate Type": "Per Trip",
+    Rate: "16000",
+  };
+  const exampleRow: Record<string, string> = {};
+  header.forEach((column) => {
+    exampleRow[column] = sampleValues[column] ?? "";
+  });
+  const worksheet = XLSX.utils.json_to_sheet([exampleRow], { header });
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Vendor Rate Card Template");
   XLSX.writeFile(workbook, "vendor-rate-card-template.xlsx");

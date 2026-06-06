@@ -864,13 +864,6 @@ export function getDeliveryActualQuantity(deliveryDocuments: BookingDeliveryShip
   return sumDeliveryInvoiceTotals(deliveryDocuments).quantity;
 }
 
-export function deriveShipmentLane(fromLocation?: string | null, toLocation?: string | null) {
-  if (!fromLocation?.trim() || !toLocation?.trim()) {
-    return "";
-  }
-  return `${fromLocation.trim()}-${toLocation.trim()}`.toUpperCase().replace(/\s+/g, "");
-}
-
 type ShipmentFreightCalculationInput = {
   booking: BookingRecord;
   customer: TenantCustomer | null;
@@ -917,7 +910,7 @@ export function calculateShipmentDocumentFreight({
   }
 
   const deliveryRates = new Map<string, number>();
-  const matchingBasis = customer.rateMatchingBasis ?? "LANE_TO_LANE";
+  const matchingBasis = customer.rateMatchingBasis ?? "CITY_TO_CITY";
   const buildValidationInput = (
     delivery: BookingDeliveryRecord,
     deliveryDocuments: BookingDeliveryShipmentDocuments | null | undefined,
@@ -936,10 +929,6 @@ export function calculateShipmentDocumentFreight({
       bookingDate: booking.pickupDate ?? booking.createdAt.slice(0, 10),
       customerId: booking.customerId,
       rateMatchingBasis: "CITY_TO_CITY",
-      lane:
-        origin && selectedDestination
-          ? deriveShipmentLane(origin.addressName, selectedDestination.addressName)
-          : null,
       fromCity: origin?.city ?? delivery.originCity ?? null,
       toCity:
         "city" in (primaryDestination ?? {})

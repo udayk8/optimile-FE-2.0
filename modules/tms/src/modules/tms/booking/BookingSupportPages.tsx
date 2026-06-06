@@ -68,7 +68,7 @@ export function LiveTrackingPlaceholderPage() {
       <DataTable
         title="Control Tower Board"
         description="Minimal high-signal table. Click row to open booking workspace."
-        headers={["Booking", "Customer", "Lane", "Status", "Vehicle", "Driver", "Signals", "Action"]}
+        headers={["Booking", "Customer", "Route", "Status", "Vehicle", "Driver", "Signals", "Action"]}
         rows={controlTowerBookings.map((booking) => {
           const customer = customerMap.get(booking.customerId);
           const source = addressMap.get(booking.sourceAddressId);

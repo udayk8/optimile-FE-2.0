@@ -718,7 +718,7 @@ export const bl001Customers = [
     "communicationChannel": "Email",
     "defaultPaymentMode": "Bank Transfer",
     "allowAutoBooking": false,
-    "rateMatchingBasis": "LANE_TO_LANE",
+    "rateMatchingBasis": "CITY_TO_CITY",
     "addresses": [
       {
         "id": "customer-address-qfnxvlr",

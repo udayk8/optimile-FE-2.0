@@ -10,6 +10,7 @@ export function useTenantVendors(tenantId: string) {
     listTenantVendorRateCards,
     createTenantVendorRateCard,
     updateTenantVendorRateCard,
+    deleteTenantVendorRateCard,
   } = useMockStore();
 
   return {
@@ -33,5 +34,6 @@ export function useTenantVendors(tenantId: string) {
       }),
     updateRateCard: (rateCardId: string, updates: Partial<TenantVendorRateCardInput>) =>
       updateTenantVendorRateCard(rateCardId, updates),
+    deleteRateCard: (rateCardId: string) => deleteTenantVendorRateCard(rateCardId),
   };
 }
