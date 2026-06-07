@@ -53,6 +53,12 @@ interface AuctionStoreContract {
   volumeAllocationPercent?: number;
 }
 
+/** Auction store statuses → VendorContract statuses (EXPIRING_SOON renders as ACTIVE). */
+function mapContractStatus(status: string): VendorContract["status"] {
+  if (status === "TERMINATED" || status === "EXPIRED" || status === "USED") return status;
+  return "ACTIVE";
+}
+
 function readAuctionWonContracts(vendor: { id: string; name: string }): VendorContract[] {
   if (typeof window === "undefined") return [];
   try {
@@ -78,7 +84,7 @@ function readAuctionWonContracts(vendor: { id: string; name: string }): VendorCo
         endDate: contract.endDate,
         createdFrom: "AUCTION_WIN" as const,
         contractKind: contract.contractType,
-        status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
+        status: mapContractStatus(contract.status),
         allocationRank: contract.allocationRank,
         volumeAllocationPercent: contract.volumeAllocationPercent,
       }));
@@ -143,7 +149,7 @@ function readSpotContracts(vendor: { id: string; name: string }): VendorSpotCont
         startDate: contract.startDate,
         endDate: contract.endDate,
         createdFrom: "AUCTION_WIN" as const,
-        status: contract.status === "TERMINATED" ? "TERMINATED" : contract.status === "EXPIRED" ? "EXPIRED" : "ACTIVE",
+        status: mapContractStatus(contract.status),
         volumeAllocationPercent: contract.volumeAllocationPercent,
         allocationRank: contract.allocationRank,
       }));
@@ -178,7 +184,7 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
     <DataTable
       title="Spot auction contracts"
       description="One-time contracts won in spot auctions — consumed by a single spot booking on the lane."
-      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Valid Till", "Spot Auction", "Status"]}
+      headers={["Source City", "Destination City", "Vehicle Type", "Rate", "Rate Type", "Volume", "Start Date", "Valid Till", "Spot Auction", "Status"]}
       rows={contracts.map((contract) => [
         <span key={`${contract.contractId}-origin`} className="font-semibold">{contract.originCity || "—"}</span>,
         <span key={`${contract.contractId}-destination`} className="font-semibold">{contract.destinationCity || "—"}</span>,
@@ -186,6 +192,7 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
         contract.rate.toLocaleString("en-IN"),
         <Badge key={`${contract.contractId}-rate-type`} variant="outline">{getRateTypeLabel(contract.rateType)}</Badge>,
         <span key={`${contract.contractId}-volume`}>{contract.volumeAllocationPercent ?? 100}%</span>,
+        contract.startDate,
         contract.endDate,
         <span key={`${contract.contractId}-auction`} className="font-mono text-xs">
           {contract.sourceAuctionId || "—"}
@@ -193,7 +200,10 @@ export function VendorSpotContractsTable({ contracts }: { contracts: VendorSpotC
             <span className="ml-1 text-muted-foreground">· used in {contract.consumedByBookingId}</span>
           ) : null}
         </span>,
-        <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
+        <Badge
+          key={`${contract.contractId}-status`}
+          variant={contract.status === "ACTIVE" ? "success" : contract.status === "USED" ? "secondary" : "warning"}
+        >
           {contract.status}
         </Badge>,
       ])}
@@ -234,7 +244,10 @@ export function VendorContractsTable({ contracts }: { contracts: VendorContract[
         <Badge key={`${contract.contractId}-type`} variant={contract.createdFrom === "AUCTION_WIN" ? "outline" : "secondary"}>
           {contract.contractKind === "LOT" ? "Lot" : contract.contractKind === "BULK" ? "Bulk" : "Manual"}
         </Badge>,
-        <Badge key={`${contract.contractId}-status`} variant={contract.status === "ACTIVE" ? "success" : "warning"}>
+        <Badge
+          key={`${contract.contractId}-status`}
+          variant={contract.status === "ACTIVE" ? "success" : contract.status === "USED" ? "secondary" : "warning"}
+        >
           {contract.status}
         </Badge>,
       ])}

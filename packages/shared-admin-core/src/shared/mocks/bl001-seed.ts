@@ -1017,7 +1017,119 @@ export const bl001Vendors = [
     "updatedAt": "2026-05-31T13:35:36.619Z"
   }
 ] as unknown as TenantVendor[];
-export const bl001VendorRateCards = [] as unknown as TenantVendorRateCard[];
+// Manual buying-rate rows for the three Bluedart vendors — what the
+// vendor detail "Vendor Rate Card" grid shows next to BULK/LOT auction wins.
+// Default rate-matching config = City Pair + Vehicle Type.
+export const bl001VendorRateCards = [
+  {
+    "id": "vendor-rate-card-bl001-mahesh-1",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-hh8uo8c",
+    "fromCity": "Mumbai",
+    "toCity": "Delhi",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_TRIP",
+    "vehicleType": "MGV",
+    "buyingRate": 48000,
+    "rate": 48000,
+    "effectiveFromDate": "2026-05-01",
+    "effectiveToDate": "2026-10-31",
+    "status": "active",
+    "createdAt": "2026-05-01T09:00:00.000Z",
+    "updatedAt": "2026-05-01T09:00:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-mahesh-2",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-hh8uo8c",
+    "fromCity": "Bengaluru",
+    "toCity": "Chennai",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": "MGV",
+    "buyingRate": 1650,
+    "rate": 1650,
+    "effectiveFromDate": "2026-05-01",
+    "effectiveToDate": "2026-10-31",
+    "status": "active",
+    "createdAt": "2026-05-01T09:05:00.000Z",
+    "updatedAt": "2026-05-01T09:05:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-abc-1",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-nqup09r",
+    "fromCity": "Delhi",
+    "toCity": "Lucknow",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_TRIP",
+    "vehicleType": "MGV",
+    "buyingRate": 21500,
+    "rate": 21500,
+    "effectiveFromDate": "2026-05-01",
+    "effectiveToDate": "2026-10-31",
+    "status": "active",
+    "createdAt": "2026-05-01T09:10:00.000Z",
+    "updatedAt": "2026-05-01T09:10:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-abc-2",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-nqup09r",
+    "fromCity": "Mumbai",
+    "toCity": "Bengaluru",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_KM",
+    "vehicleType": "MGV",
+    "buyingRate": 54,
+    "rate": 54,
+    "effectiveFromDate": "2026-06-01",
+    "effectiveToDate": "2027-05-31",
+    "status": "active",
+    "createdAt": "2026-06-01T09:15:00.000Z",
+    "updatedAt": "2026-06-01T09:15:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-vrl-1",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-af8xr8p",
+    "fromCity": "Pune",
+    "toCity": "Jaipur",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_TRIP",
+    "vehicleType": "MGV",
+    "buyingRate": 47500,
+    "rate": 47500,
+    "effectiveFromDate": "2026-05-01",
+    "effectiveToDate": "2026-10-31",
+    "status": "active",
+    "createdAt": "2026-05-01T09:20:00.000Z",
+    "updatedAt": "2026-05-01T09:20:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-vrl-2",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-af8xr8p",
+    "fromCity": "Ahmedabad",
+    "toCity": "Surat",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": "MGV",
+    "buyingRate": 1450,
+    "rate": 1450,
+    "effectiveFromDate": "2026-06-01",
+    "effectiveToDate": "2027-05-31",
+    "status": "active",
+    "createdAt": "2026-06-01T09:25:00.000Z",
+    "updatedAt": "2026-06-01T09:25:00.000Z"
+  }
+] as unknown as TenantVendorRateCard[];
 export const bl001VehicleTypes = [
   {
     "tenantId": "tenant-bl001",

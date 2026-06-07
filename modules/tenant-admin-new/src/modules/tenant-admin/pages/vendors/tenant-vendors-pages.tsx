@@ -40,7 +40,6 @@ import {
   EditableVendorContractRows,
   VendorContractCsvUpload,
   VendorContractFormDialog,
-  VendorContractsTable,
   VendorSpotContractsTable,
   useVendorContracts,
   useVendorSpotContracts,
@@ -479,6 +478,8 @@ const VENDOR_RATE_CARD_FORM_INIT: Record<string, string> & { rateType: TenantVen
   customerGroup: "",
   uom: "",
   rate: "",
+  effectiveFromDate: "",
+  effectiveToDate: "",
   rateType: "PER_TRIP",
 };
 
@@ -558,6 +559,14 @@ function TenantVendorRateCardSection({
   const columns = getRateMatchingColumns(config);
   const rateCards = listRateCards(vendor.id);
 
+  // BULK/LOT auction wins surface here as read-only rate card rows — winning a
+  // term auction effectively adds a buying rate on the lane. SPOT wins render
+  // in their own table below the page.
+  const vendorContracts = useVendorContracts(vendor);
+  const auctionContracts = vendorContracts.filter(
+    (contract) => contract.createdFrom === "AUCTION_WIN",
+  );
+
   const { data: vehicleTypeData } = useTenantVehicleTypes(vendor.tenantId);
   const { data: materialData } = useTenantMaterials(vendor.tenantId);
   const { definitions: uomDefinitions } = useTenantUOMConfigurations(vendor.tenantId);
@@ -612,6 +621,22 @@ function TenantVendorRateCardSection({
       .includes(normalizedSearch);
   });
 
+  const filteredAuctionContracts = auctionContracts.filter((contract) => {
+    const normalizedSearch = search.trim().toLowerCase();
+    if (!normalizedSearch) return true;
+    return `${contract.originCity} ${contract.destinationCity} ${contract.vehicleType}`
+      .toLowerCase()
+      .includes(normalizedSearch);
+  });
+
+  /** Auction contracts only carry the lane + vehicle dimensions. */
+  function auctionDimensionValue(field: RateCardDimensionField, contract: (typeof auctionContracts)[number]) {
+    if (field === "fromCity") return contract.originCity;
+    if (field === "toCity") return contract.destinationCity;
+    if (field === "vehicleType") return contract.vehicleType;
+    return "";
+  }
+
   function openCreate() {
     setEditingId(null);
     setForm(VENDOR_RATE_CARD_FORM_INIT);
@@ -636,6 +661,8 @@ function TenantVendorRateCardSection({
       customerGroup: rateCard.customerGroup ?? "",
       uom: rateCard.uom ?? "",
       rate: String(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? ""),
+      effectiveFromDate: rateCard.effectiveFromDate ?? "",
+      effectiveToDate: rateCard.effectiveToDate ?? "",
       rateType: rateCard.rateType,
     });
     setError("");
@@ -664,6 +691,10 @@ function TenantVendorRateCardSection({
       setError("Rate must be greater than zero.");
       return;
     }
+    if (form.effectiveFromDate && form.effectiveToDate && form.effectiveToDate < form.effectiveFromDate) {
+      setError("Effective To must not be before Effective From.");
+      return;
+    }
     const configuredFields = new Set(columns.map((column) => column.field));
     const dim = (field: RateCardDimensionField) =>
       configuredFields.has(field) ? readField(field) || undefined : undefined;
@@ -674,6 +705,8 @@ function TenantVendorRateCardSection({
       toLocation: dim("toLocation"),
       sourcePincode: dim("sourcePincode") ?? "",
       destinationPincode: dim("destinationPincode") ?? "",
+      effectiveFromDate: form.effectiveFromDate || undefined,
+      effectiveToDate: form.effectiveToDate || undefined,
       rateType: form.rateType,
       vehicleType: dim("vehicleType") ?? null,
       material: dim("material"),
@@ -744,6 +777,7 @@ function TenantVendorRateCardSection({
           <div className="flex flex-wrap items-center gap-2">
             <span className="hidden text-[12px] text-muted-foreground sm:inline">
               {rateCards.length} row{rateCards.length === 1 ? "" : "s"} configured
+              {auctionContracts.length ? ` · ${auctionContracts.length} auction-won` : ""}
             </span>
             <Button size="sm" onClick={openCreate}>Add Rate</Button>
             <label className="inline-flex cursor-pointer items-center rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
@@ -798,25 +832,55 @@ function TenantVendorRateCardSection({
 
       <DataTable
         title="Vendor Rate Card"
-        description="Buying-rate rows for this vendor."
-        headers={[...columns.map((column) => column.label), "Rate Type", "Rate", "Actions"]}
-        rows={filteredRateCards.map((rateCard) => [
-          ...columns.map((column, columnIndex) => (
-            <span key={`${rateCard.id}-dim-${columnIndex}`} className="font-medium">
-              {(() => {
-                const value = (rateCard as unknown as Record<string, unknown>)[column.field];
-                return value != null && value !== "" ? String(value) : "-";
-              })()}
-            </span>
-          )),
-          <Badge key={`${rateCard.id}-type`} variant="outline">{formatVendorRateType(rateCard.rateType)}</Badge>,
-          `${(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0).toLocaleString()}`,
-          <div key={`${rateCard.id}-actions`} className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" onClick={() => openEdit(rateCard)}>Edit</Button>
-            <Button size="sm" variant="outline" onClick={() => { deleteRateCard(rateCard.id); onMessage("Vendor rate removed."); }}>Delete</Button>
-          </div>,
-        ])}
-        emptyMessage="No vendor rates yet. Configure the structure, then add rows or upload a template."
+        description="Buying-rate rows for this vendor — manually configured rates plus BULK/LOT auction wins."
+        headers={[...columns.map((column) => column.label), "Rate Type", "Rate", "Volume", "Start Date", "End Date", "Type", "Actions"]}
+        rows={[
+          ...filteredRateCards.map((rateCard) => [
+            ...columns.map((column, columnIndex) => (
+              <span key={`${rateCard.id}-dim-${columnIndex}`} className="font-medium">
+                {(() => {
+                  const value = (rateCard as unknown as Record<string, unknown>)[column.field];
+                  return value != null && value !== "" ? String(value) : "-";
+                })()}
+              </span>
+            )),
+            <Badge key={`${rateCard.id}-type`} variant="outline">{formatVendorRateType(rateCard.rateType)}</Badge>,
+            `${(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0).toLocaleString()}`,
+            "100%",
+            rateCard.effectiveFromDate || "—",
+            rateCard.effectiveToDate || "—",
+            <Badge key={`${rateCard.id}-kind`} variant="secondary">Manual</Badge>,
+            <div key={`${rateCard.id}-actions`} className="flex flex-wrap gap-2">
+              <Button size="sm" variant="ghost" onClick={() => openEdit(rateCard)}>Edit</Button>
+              <Button size="sm" variant="outline" onClick={() => { deleteRateCard(rateCard.id); onMessage("Vendor rate removed."); }}>Delete</Button>
+            </div>,
+          ]),
+          // Auction-won BULK/LOT contract rows — read only; the auction award
+          // owns the rate, validity window, and L1/L2/L3 volume split.
+          ...filteredAuctionContracts.map((contract) => [
+            ...columns.map((column, columnIndex) => (
+              <span key={`${contract.contractId}-dim-${columnIndex}`} className="font-medium">
+                {auctionDimensionValue(column.field, contract) || "-"}
+              </span>
+            )),
+            <Badge key={`${contract.contractId}-rate-type`} variant="outline">{formatVendorRateType(contract.rateType)}</Badge>,
+            contract.rate.toLocaleString(),
+            <span key={`${contract.contractId}-volume`}>
+              {contract.volumeAllocationPercent ?? 100}%
+              {contract.allocationRank ? <span className="ml-1 text-xs text-muted-foreground">({contract.allocationRank})</span> : null}
+            </span>,
+            contract.startDate,
+            contract.endDate,
+            <Badge key={`${contract.contractId}-kind`} variant="outline">
+              {contract.contractKind === "LOT" ? "Lot" : "Bulk"}
+            </Badge>,
+            <div key={`${contract.contractId}-actions`} className="flex items-center gap-2">
+              <Badge variant={contract.status === "ACTIVE" ? "success" : "warning"}>{contract.status}</Badge>
+              <span className="text-xs text-muted-foreground">Auction-won</span>
+            </div>,
+          ]),
+        ]}
+        emptyMessage="No vendor rates yet. Configure the structure, then add rows or upload a template — or award this vendor an auction."
       />
 
       <Dialog
@@ -867,6 +931,20 @@ function TenantVendorRateCardSection({
           <VendorField label="Rate *">
             <Input type="number" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} placeholder="16000" />
           </VendorField>
+          <VendorField label="Effective From (optional)">
+            <Input
+              type="date"
+              value={form.effectiveFromDate}
+              onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))}
+            />
+          </VendorField>
+          <VendorField label="Effective To (optional)">
+            <Input
+              type="date"
+              value={form.effectiveToDate}
+              onChange={(event) => setForm((current) => ({ ...current, effectiveToDate: event.target.value }))}
+            />
+          </VendorField>
         </div>
       </Dialog>
 
@@ -916,47 +994,5 @@ function TenantVendorRateCardSection({
 function VendorSpotContractsSection({ vendor }: { vendor: { id: string; name: string } }) {
   const spotContracts = useVendorSpotContracts(vendor);
   return <VendorSpotContractsTable contracts={spotContracts} />;
-}
-
-function TenantVendorContractsSection({
-  vendor,
-  onUploaded,
-}: {
-  vendor: { id: string; name: string; tenantId?: string };
-  onUploaded: (count: number) => void;
-}) {
-  const contracts = useVendorContracts(vendor);
-  const [addOpen, setAddOpen] = useState(false);
-  return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {contracts.length} contract{contracts.length === 1 ? "" : "s"} — manual uploads and auction wins.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <VendorContractCsvUpload vendor={vendor} onUploaded={(created) => onUploaded(created.length)} />
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="size-4" />
-            Add Contract
-          </Button>
-        </div>
-      </div>
-      <VendorContractsTable contracts={contracts} />
-
-      <VendorContractFormDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        title="Add Contract"
-        saveLabel="Add Contract"
-        onSave={(row) => {
-          createVendorContracts(
-            { vendorId: vendor.id, vendorName: vendor.name, tenantId: vendor.tenantId },
-            [row],
-          );
-          onUploaded(1);
-        }}
-      />
-    </div>
-  );
 }
 
