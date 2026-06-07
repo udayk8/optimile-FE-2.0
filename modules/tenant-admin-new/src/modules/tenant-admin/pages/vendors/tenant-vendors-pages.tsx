@@ -37,14 +37,10 @@ import type {
 } from "@/types/customer";
 import type { TenantVendorRateCard, TenantVendorRateCardInput } from "@/types/vendor";
 import {
-  EditableVendorContractRows,
-  VendorContractCsvUpload,
-  VendorContractFormDialog,
   VendorSpotContractsTable,
   useVendorContracts,
   useVendorSpotContracts,
 } from "@/modules/tenant-admin/components/vendor-contracts";
-import { createVendorContracts, type VendorContractCsvRow } from "@shared-utils";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useTenantVendors } from "@/modules/tenant-admin/hooks/useTenantVendors";
 import { mockTenantVendors } from "@shared-admin-core/mocks/data";
@@ -261,7 +257,7 @@ export function TenantVendorOnboardingPage() {
   const { tenant } = useTenantRouteContext();
   const navigate = useNavigate();
   const { tenantVendorId } = useParams();
-  const { getTenantVendorById, createVendor, updateTenantVendor } = useTenantVendors(tenant.id);
+  const { getTenantVendorById, createVendor, updateTenantVendor, createRateCard } = useTenantVendors(tenant.id);
   const editingVendor = tenantVendorId ? getTenantVendorById(tenantVendorId) : null;
   const isEdit = Boolean(tenantVendorId);
 
@@ -299,10 +295,38 @@ export function TenantVendorOnboardingPage() {
     status: initialForm.status,
   };
   const [error, setError] = useState("");
-  // Contract rows parsed from uploaded CSVs or added manually — editable per
-  // row and persisted once the vendor record is saved.
-  const [pendingContractRows, setPendingContractRows] = useState<VendorContractCsvRow[]>([]);
-  const [addContractOpen, setAddContractOpen] = useState(false);
+  // Pending rate card rows (create flow) — persisted once the vendor record is
+  // saved. The edit flow manages the live rate card directly in the wizard
+  // step, exactly like the vendor detail page.
+  const [pendingRateRows, setPendingRateRows] = useState<TenantVendorRateCardInput[]>([]);
+  const [rateDialogOpen, setRateDialogOpen] = useState(false);
+  const [editRateIndex, setEditRateIndex] = useState<number | null>(null);
+  const [rateUploadError, setRateUploadError] = useState("");
+  const [rateUploadInfo, setRateUploadInfo] = useState("");
+  const [rateMessage, setRateMessage] = useState("");
+  // New vendors start on the default structure (City Pair + Vehicle Type);
+  // it can be reconfigured from the detail page once the vendor exists.
+  const onboardingRateConfig = normalizeRateMatchingConfig(undefined);
+  const onboardingRateColumns = getRateMatchingColumns(onboardingRateConfig);
+  const rateSelectOptionsByField = useVendorRateCardSelectOptions(tenant.id);
+
+  async function handleRateFile(file: File | null) {
+    if (!file) return;
+    setRateUploadError("");
+    setRateUploadInfo("");
+    try {
+      const summary = await parseVendorRateCardFileConfig(file, onboardingRateConfig);
+      if (summary.validRows.length) {
+        setPendingRateRows((current) => [...current, ...summary.validRows]);
+      }
+      setRateUploadInfo(
+        `${summary.validRows.length} valid row${summary.validRows.length === 1 ? "" : "s"} added` +
+          (summary.invalidRows.length ? `, ${summary.invalidRows.length} skipped.` : "."),
+      );
+    } catch {
+      setRateUploadError("Could not read the file. Check the format and try again.");
+    }
+  }
 
   if (isEdit && !editingVendor) {
     return (
@@ -336,11 +360,8 @@ export function TenantVendorOnboardingPage() {
       const saved = editingVendor
         ? updateTenantVendor(editingVendor.id, parsed.data)
         : createVendor(parsed.data);
-      if (pendingContractRows.length > 0) {
-        createVendorContracts(
-          { vendorId: saved.id, vendorName: saved.name, tenantId: tenant.id },
-          pendingContractRows,
-        );
+      if (!editingVendor && pendingRateRows.length > 0) {
+        pendingRateRows.forEach((row) => createRateCard(saved.id, row));
       }
       navigate(`/tenant/${tenant.id}/vendors`);
     } catch (submissionError) {
@@ -374,31 +395,100 @@ export function TenantVendorOnboardingPage() {
         lockPrimaryContactPhone={Boolean(editingVendor)}
         extraSteps={[
           {
-            label: "Contracts",
-            content: (
+            label: "Rate Card",
+            content: isEdit && editingVendor ? (
+              // Edit flow: the SAME live rate card section as the vendor detail
+              // page — structure config, add/edit/delete rates, template upload.
+              <div className="space-y-4">
+                {rateMessage ? (
+                  <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{rateMessage}</div>
+                ) : null}
+                <TenantVendorRateCardSection
+                  vendor={{ id: editingVendor.id, name: editingVendor.name, tenantId: tenant.id }}
+                  onMessage={setRateMessage}
+                />
+              </div>
+            ) : (
+              // Create flow: vendor doesn't exist yet, so rows are collected
+              // here and persisted right after the vendor record is created.
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Bulk upload the vendor's contract CSVs or add contracts manually (optional). Rows can be edited
-                  or removed below and are saved together with the vendor on submit.
+                  Define the vendor's buying rates (optional). Rows are saved together with the vendor on
+                  submit; the rate card structure can be reconfigured later from the vendor detail page.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <VendorContractCsvUpload
-                    onRowsParsed={(_file, result) =>
-                      setPendingContractRows((current) => [...current, ...result.validRows])
-                    }
-                  />
-                  <Button onClick={() => setAddContractOpen(true)}>
+                  <Button variant="outline" onClick={() => downloadVendorRateCardTemplateWorkbookConfig(onboardingRateConfig)}>
+                    <FileDown className="size-4" />
+                    Download Template
+                  </Button>
+                  <label className="inline-flex cursor-pointer items-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+                    Upload Rate Card
+                    <input
+                      type="file"
+                      accept=".xlsx,.csv"
+                      className="hidden"
+                      onChange={(event) => {
+                        void handleRateFile(event.target.files?.[0] ?? null);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <Button onClick={() => { setEditRateIndex(null); setRateDialogOpen(true); }}>
                     <Plus className="size-4" />
-                    Add Contract
+                    Add Rate
                   </Button>
                 </div>
-                <EditableVendorContractRows rows={pendingContractRows} onChange={setPendingContractRows} />
-                <VendorContractFormDialog
-                  open={addContractOpen}
-                  onOpenChange={setAddContractOpen}
-                  title="Add Contract"
-                  saveLabel="Add Contract"
-                  onSave={(row) => setPendingContractRows((current) => [...current, row])}
+                {rateUploadError ? (
+                  <div className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{rateUploadError}</div>
+                ) : null}
+                {rateUploadInfo ? (
+                  <div className="rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{rateUploadInfo}</div>
+                ) : null}
+                <DataTable
+                  title="Rates to import"
+                  description="Each row can be edited or removed before the vendor is saved."
+                  headers={[...onboardingRateColumns.map((column) => column.label), "Rate Type", "Rate", "Effective From", "Effective To", "Actions"]}
+                  rows={pendingRateRows.map((row, index) => [
+                    ...onboardingRateColumns.map((column, columnIndex) => (
+                      <span key={`pending-rate-${index}-dim-${columnIndex}`} className="font-medium">
+                        {(() => {
+                          const value = (row as unknown as Record<string, unknown>)[column.field];
+                          return value != null && value !== "" ? String(value) : "-";
+                        })()}
+                      </span>
+                    )),
+                    <Badge key={`pending-rate-${index}-type`} variant="outline">{formatVendorRateType(row.rateType)}</Badge>,
+                    `${(row.buyingRate ?? row.rate ?? 0).toLocaleString()}`,
+                    row.effectiveFromDate || "—",
+                    row.effectiveToDate || "—",
+                    <div key={`pending-rate-${index}-actions`} className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => { setEditRateIndex(index); setRateDialogOpen(true); }}>
+                        <PencilLine className="size-4" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setPendingRateRows((current) => current.filter((_, i) => i !== index))}>
+                        Delete
+                      </Button>
+                    </div>,
+                  ])}
+                  emptyMessage="No rate rows yet — upload the template or add rates manually."
+                  pageSize={10}
+                />
+                <VendorRateFormDialog
+                  open={rateDialogOpen}
+                  onOpenChange={setRateDialogOpen}
+                  title={editRateIndex !== null ? "Edit Vendor Rate" : "Add Vendor Rate"}
+                  saveLabel={editRateIndex !== null ? "Save Row" : "Add Rate"}
+                  columns={onboardingRateColumns}
+                  selectOptionsByField={rateSelectOptionsByField}
+                  initial={editRateIndex !== null ? pendingRateRows[editRateIndex] : null}
+                  onSave={(payload) => {
+                    if (editRateIndex !== null) {
+                      setPendingRateRows((current) => current.map((row, i) => (i === editRateIndex ? payload : row)));
+                    } else {
+                      setPendingRateRows((current) => [...current, payload]);
+                    }
+                  }}
                 />
               </div>
             ),
@@ -406,11 +496,13 @@ export function TenantVendorOnboardingPage() {
         ]}
         extraReviewContent={
           <div className="rounded-xl border bg-muted/30 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contracts</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rate Card</div>
             <div className="mt-1 text-sm font-bold">
-              {pendingContractRows.length
-                ? `${pendingContractRows.length} contract row${pendingContractRows.length === 1 ? "" : "s"} ready to import`
-                : "No contracts uploaded"}
+              {isEdit
+                ? "Managed live in the Rate Card step."
+                : pendingRateRows.length
+                  ? `${pendingRateRows.length} rate row${pendingRateRows.length === 1 ? "" : "s"} ready to import`
+                  : "No rates added"}
             </div>
           </div>
         }
@@ -545,6 +637,202 @@ function VendorRateCardConfigGroup({
   );
 }
 
+/** Select options per rate-card dimension, sourced from tenant master data. */
+function useVendorRateCardSelectOptions(tenantId: string): Partial<Record<RateCardDimensionField, string[]>> {
+  const { data: vehicleTypeData } = useTenantVehicleTypes(tenantId);
+  const { data: materialData } = useTenantMaterials(tenantId);
+  const { definitions: uomDefinitions } = useTenantUOMConfigurations(tenantId);
+  const vehicleSelectOptions = vehicleTypeData.length
+    ? vehicleTypeData.map((vehicleType) => vehicleType.typeCode)
+    : ["20FT", "32FT", "Trailer", "Container", "LCV", "Tanker", "Open Body", "Other"];
+  const materialSelectOptions = materialData
+    .filter((material) => material.status === "active")
+    .map((material) => material.materialCode);
+  const uomSelectOptions = uomDefinitions
+    .filter((definition) => definition.status === "active")
+    .map((definition) => definition.code);
+  return {
+    vehicleType: vehicleSelectOptions,
+    ...(materialSelectOptions.length ? { material: materialSelectOptions } : {}),
+    ...(uomSelectOptions.length ? { uom: uomSelectOptions } : {}),
+  };
+}
+
+/**
+ * Shared add/edit dialog for one vendor buying-rate row. Used by the vendor
+ * detail rate card section AND the onboarding/edit wizard so both entry
+ * points run the exact same form, validation and payload shape.
+ */
+function VendorRateFormDialog({
+  open,
+  onOpenChange,
+  title,
+  saveLabel,
+  columns,
+  selectOptionsByField,
+  initial,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  saveLabel: string;
+  columns: ReturnType<typeof getRateMatchingColumns>;
+  selectOptionsByField: Partial<Record<RateCardDimensionField, string[]>>;
+  initial?: Partial<TenantVendorRateCard> | null;
+  onSave: (payload: TenantVendorRateCardInput) => void;
+}) {
+  const [form, setForm] = useState(VENDOR_RATE_CARD_FORM_INIT);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({
+      ...VENDOR_RATE_CARD_FORM_INIT,
+      fromCity: initial?.fromCity ?? "",
+      toCity: initial?.toCity ?? "",
+      fromLocation: initial?.fromLocation ?? "",
+      toLocation: initial?.toLocation ?? "",
+      sourcePincode: initial?.sourcePincode ?? "",
+      destinationPincode: initial?.destinationPincode ?? "",
+      vehicleType: initial?.vehicleType ?? "",
+      material: initial?.material ?? "",
+      serviceType: initial?.serviceType ?? "",
+      weightSlab: initial?.weightSlab ?? "",
+      quantitySlab: initial?.quantitySlab ?? "",
+      customerGroup: initial?.customerGroup ?? "",
+      uom: initial?.uom ?? "",
+      rate: initial ? String(initial.buyingRate ?? initial.underloadRate ?? initial.rate ?? "") : "",
+      effectiveFromDate: initial?.effectiveFromDate ?? "",
+      effectiveToDate: initial?.effectiveToDate ?? "",
+      rateType: initial?.rateType ?? "PER_TRIP",
+    });
+    setError("");
+  }, [open, initial]);
+
+  function submit() {
+    setError("");
+    const readField = (field: RateCardDimensionField) => (form[field] ?? "").trim();
+    for (const column of columns) {
+      const value = readField(column.field);
+      // Vehicle Type is mandatory only for Per Trip; optional otherwise.
+      if (column.field === "vehicleType" && form.rateType !== "PER_TRIP") continue;
+      if (column.field === "sourcePincode" || column.field === "destinationPincode") {
+        if (!/^\d{6}$/.test(value)) {
+          setError(`${column.label} must be a 6-digit number.`);
+          return;
+        }
+      } else if (!value) {
+        setError(`${column.label} is required.`);
+        return;
+      }
+    }
+    const rate = Number(form.rate);
+    if (!form.rate || Number.isNaN(rate) || rate <= 0) {
+      setError("Rate must be greater than zero.");
+      return;
+    }
+    if (form.effectiveFromDate && form.effectiveToDate && form.effectiveToDate < form.effectiveFromDate) {
+      setError("Effective To must not be before Effective From.");
+      return;
+    }
+    const configuredFields = new Set(columns.map((column) => column.field));
+    const dim = (field: RateCardDimensionField) =>
+      configuredFields.has(field) ? readField(field) || undefined : undefined;
+    onSave({
+      fromCity: dim("fromCity"),
+      toCity: dim("toCity"),
+      fromLocation: dim("fromLocation"),
+      toLocation: dim("toLocation"),
+      sourcePincode: dim("sourcePincode") ?? "",
+      destinationPincode: dim("destinationPincode") ?? "",
+      effectiveFromDate: form.effectiveFromDate || undefined,
+      effectiveToDate: form.effectiveToDate || undefined,
+      rateType: form.rateType,
+      vehicleType: dim("vehicleType") ?? null,
+      material: dim("material"),
+      serviceType: dim("serviceType"),
+      weightSlab: dim("weightSlab"),
+      quantitySlab: dim("quantitySlab"),
+      customerGroup: dim("customerGroup"),
+      uom: dim("uom"),
+      buyingRate: rate,
+      underloadRate: rate,
+      overloadRate: null,
+      rate,
+      status: "active",
+    });
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description="Buying rate for this vendor. Booking auto-fills vendor freight from these rows."
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={submit}>{saveLabel}</Button>
+        </div>
+      }
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        {error ? (
+          <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+        ) : null}
+        <VendorField label="Rate Type *">
+          <Select value={form.rateType} onChange={(event) => setForm((current) => ({ ...current, rateType: event.target.value as TenantVendorRateCardInput["rateType"] }))}>
+            <option value="PER_KM">Per KM</option>
+            <option value="PER_MT">Per MT</option>
+            <option value="PER_TRIP">Per Trip</option>
+          </Select>
+        </VendorField>
+        {columns.map((column) => {
+          const value = form[column.field] ?? "";
+          const options = selectOptionsByField[column.field];
+          const setValue = (next: string) => setForm((current) => ({ ...current, [column.field]: next }));
+          const vehicleOptional = column.field === "vehicleType" && form.rateType !== "PER_TRIP";
+          const labelText = vehicleOptional ? `${column.label} (optional)` : `${column.label} *`;
+          return (
+            <VendorField key={column.field} label={labelText}>
+              {options ? (
+                <Select value={value} onChange={(event) => setValue(event.target.value)}>
+                  <option value="">Select {column.label}</option>
+                  {value && !options.includes(value) ? <option value={value}>{value}</option> : null}
+                  {options.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </Select>
+              ) : (
+                <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder={column.placeholder} />
+              )}
+            </VendorField>
+          );
+        })}
+        <VendorField label="Rate *">
+          <Input type="number" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} placeholder="16000" />
+        </VendorField>
+        <VendorField label="Effective From (optional)">
+          <Input
+            type="date"
+            value={form.effectiveFromDate}
+            onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))}
+          />
+        </VendorField>
+        <VendorField label="Effective To (optional)">
+          <Input
+            type="date"
+            value={form.effectiveToDate}
+            onChange={(event) => setForm((current) => ({ ...current, effectiveToDate: event.target.value }))}
+          />
+        </VendorField>
+      </div>
+    </Dialog>
+  );
+}
+
 function TenantVendorRateCardSection({
   vendor,
   onMessage,
@@ -567,29 +855,11 @@ function TenantVendorRateCardSection({
     (contract) => contract.createdFrom === "AUCTION_WIN",
   );
 
-  const { data: vehicleTypeData } = useTenantVehicleTypes(vendor.tenantId);
-  const { data: materialData } = useTenantMaterials(vendor.tenantId);
-  const { definitions: uomDefinitions } = useTenantUOMConfigurations(vendor.tenantId);
-  const vehicleSelectOptions = vehicleTypeData.length
-    ? vehicleTypeData.map((vehicleType) => vehicleType.typeCode)
-    : ["20FT", "32FT", "Trailer", "Container", "LCV", "Tanker", "Open Body", "Other"];
-  const materialSelectOptions = materialData
-    .filter((material) => material.status === "active")
-    .map((material) => material.materialCode);
-  const uomSelectOptions = uomDefinitions
-    .filter((definition) => definition.status === "active")
-    .map((definition) => definition.code);
-  const selectOptionsByField: Partial<Record<RateCardDimensionField, string[]>> = {
-    vehicleType: vehicleSelectOptions,
-    ...(materialSelectOptions.length ? { material: materialSelectOptions } : {}),
-    ...(uomSelectOptions.length ? { uom: uomSelectOptions } : {}),
-  };
+  const selectOptionsByField = useVendorRateCardSelectOptions(vendor.tenantId);
 
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState(VENDOR_RATE_CARD_FORM_INIT);
   const [importSummary, setImportSummary] = useState<Awaited<ReturnType<typeof parseVendorRateCardFileConfig>> | null>(null);
   const [importError, setImportError] = useState("");
   const [importing, setImporting] = useState(false);
@@ -637,90 +907,19 @@ function TenantVendorRateCardSection({
     return "";
   }
 
+  const editingRateCard = editingId ? rateCards.find((rateCard) => rateCard.id === editingId) ?? null : null;
+
   function openCreate() {
     setEditingId(null);
-    setForm(VENDOR_RATE_CARD_FORM_INIT);
-    setError("");
     setOpen(true);
   }
 
   function openEdit(rateCard: TenantVendorRateCard) {
     setEditingId(rateCard.id);
-    setForm({
-      fromCity: rateCard.fromCity ?? "",
-      toCity: rateCard.toCity ?? "",
-      fromLocation: rateCard.fromLocation ?? "",
-      toLocation: rateCard.toLocation ?? "",
-      sourcePincode: rateCard.sourcePincode ?? "",
-      destinationPincode: rateCard.destinationPincode ?? "",
-      vehicleType: rateCard.vehicleType ?? "",
-      material: rateCard.material ?? "",
-      serviceType: rateCard.serviceType ?? "",
-      weightSlab: rateCard.weightSlab ?? "",
-      quantitySlab: rateCard.quantitySlab ?? "",
-      customerGroup: rateCard.customerGroup ?? "",
-      uom: rateCard.uom ?? "",
-      rate: String(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? ""),
-      effectiveFromDate: rateCard.effectiveFromDate ?? "",
-      effectiveToDate: rateCard.effectiveToDate ?? "",
-      rateType: rateCard.rateType,
-    });
-    setError("");
     setOpen(true);
   }
 
-  function submit() {
-    setError("");
-    const readField = (field: RateCardDimensionField) => (form[field] ?? "").trim();
-    for (const column of columns) {
-      const value = readField(column.field);
-      // Vehicle Type is mandatory only for Per Trip; optional otherwise.
-      if (column.field === "vehicleType" && form.rateType !== "PER_TRIP") continue;
-      if (column.field === "sourcePincode" || column.field === "destinationPincode") {
-        if (!/^\d{6}$/.test(value)) {
-          setError(`${column.label} must be a 6-digit number.`);
-          return;
-        }
-      } else if (!value) {
-        setError(`${column.label} is required.`);
-        return;
-      }
-    }
-    const rate = Number(form.rate);
-    if (!form.rate || Number.isNaN(rate) || rate <= 0) {
-      setError("Rate must be greater than zero.");
-      return;
-    }
-    if (form.effectiveFromDate && form.effectiveToDate && form.effectiveToDate < form.effectiveFromDate) {
-      setError("Effective To must not be before Effective From.");
-      return;
-    }
-    const configuredFields = new Set(columns.map((column) => column.field));
-    const dim = (field: RateCardDimensionField) =>
-      configuredFields.has(field) ? readField(field) || undefined : undefined;
-    const payload: TenantVendorRateCardInput = {
-      fromCity: dim("fromCity"),
-      toCity: dim("toCity"),
-      fromLocation: dim("fromLocation"),
-      toLocation: dim("toLocation"),
-      sourcePincode: dim("sourcePincode") ?? "",
-      destinationPincode: dim("destinationPincode") ?? "",
-      effectiveFromDate: form.effectiveFromDate || undefined,
-      effectiveToDate: form.effectiveToDate || undefined,
-      rateType: form.rateType,
-      vehicleType: dim("vehicleType") ?? null,
-      material: dim("material"),
-      serviceType: dim("serviceType"),
-      weightSlab: dim("weightSlab"),
-      quantitySlab: dim("quantitySlab"),
-      customerGroup: dim("customerGroup"),
-      uom: dim("uom"),
-      buyingRate: rate,
-      underloadRate: rate,
-      overloadRate: null,
-      rate,
-      status: "active",
-    };
+  function handleSave(payload: TenantVendorRateCardInput) {
     if (editingId) {
       updateRateCard(editingId, payload);
       onMessage("Vendor rate updated.");
@@ -728,7 +927,6 @@ function TenantVendorRateCardSection({
       createRateCard(vendor.id, payload);
       onMessage("Vendor rate added.");
     }
-    setOpen(false);
   }
 
   async function handleUpload(file: File | null) {
@@ -883,70 +1081,16 @@ function TenantVendorRateCardSection({
         emptyMessage="No vendor rates yet. Configure the structure, then add rows or upload a template — or award this vendor an auction."
       />
 
-      <Dialog
+      <VendorRateFormDialog
         open={open}
         onOpenChange={setOpen}
         title={editingId ? "Edit Vendor Rate" : "Add Vendor Rate"}
-        description="Buying rate for this vendor. Booking auto-fills vendor freight from these rows."
-        footer={
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submit}>{editingId ? "Save Changes" : "Save Rate"}</Button>
-          </div>
-        }
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          {error ? (
-            <div className="md:col-span-2 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-          ) : null}
-          <VendorField label="Rate Type *">
-            <Select value={form.rateType} onChange={(event) => setForm((current) => ({ ...current, rateType: event.target.value as TenantVendorRateCardInput["rateType"] }))}>
-              <option value="PER_KM">Per KM</option>
-              <option value="PER_MT">Per MT</option>
-              <option value="PER_TRIP">Per Trip</option>
-            </Select>
-          </VendorField>
-          {columns.map((column) => {
-            const value = form[column.field] ?? "";
-            const options = selectOptionsByField[column.field];
-            const setValue = (next: string) => setForm((current) => ({ ...current, [column.field]: next }));
-            const vehicleOptional = column.field === "vehicleType" && form.rateType !== "PER_TRIP";
-            const labelText = vehicleOptional ? `${column.label} (optional)` : `${column.label} *`;
-            return (
-              <VendorField key={column.field} label={labelText}>
-                {options ? (
-                  <Select value={value} onChange={(event) => setValue(event.target.value)}>
-                    <option value="">Select {column.label}</option>
-                    {value && !options.includes(value) ? <option value={value}>{value}</option> : null}
-                    {options.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </Select>
-                ) : (
-                  <Input value={value} onChange={(event) => setValue(event.target.value)} placeholder={column.placeholder} />
-                )}
-              </VendorField>
-            );
-          })}
-          <VendorField label="Rate *">
-            <Input type="number" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} placeholder="16000" />
-          </VendorField>
-          <VendorField label="Effective From (optional)">
-            <Input
-              type="date"
-              value={form.effectiveFromDate}
-              onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))}
-            />
-          </VendorField>
-          <VendorField label="Effective To (optional)">
-            <Input
-              type="date"
-              value={form.effectiveToDate}
-              onChange={(event) => setForm((current) => ({ ...current, effectiveToDate: event.target.value }))}
-            />
-          </VendorField>
-        </div>
-      </Dialog>
+        saveLabel={editingId ? "Save Changes" : "Save Rate"}
+        columns={columns}
+        selectOptionsByField={selectOptionsByField}
+        initial={editingRateCard}
+        onSave={handleSave}
+      />
 
       <Dialog
         open={configOpen}

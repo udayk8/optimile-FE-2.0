@@ -21,6 +21,7 @@ import {
   type VendorContractCsvResult,
   type VendorContractCsvRow,
 } from "@shared-utils";
+import { loadStore as loadAuctionStore } from "@auction/lib/auction-store";
 
 /* ============================================================
    Tenant Admin → vendor contracts.
@@ -31,8 +32,6 @@ import {
    shared auction store the moment a winner is finalized. Together
    this mirrors GET /admin/vendors/:vendorId/contracts.
    ============================================================ */
-
-const AUCTION_STORE_KEY = "optimile.auction-store";
 
 interface AuctionStoreContract {
   id: string;
@@ -62,9 +61,9 @@ function mapContractStatus(status: string): VendorContract["status"] {
 function readAuctionWonContracts(vendor: { id: string; name: string }): VendorContract[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(AUCTION_STORE_KEY);
-    if (!raw) return [];
-    const contracts = (JSON.parse(raw)?.contracts ?? []) as AuctionStoreContract[];
+    // loadStore (not a raw localStorage read) so the auction mock data is
+    // seeded/merged even when the Auction module was never opened.
+    const contracts = loadAuctionStore().contracts as unknown as AuctionStoreContract[];
     const name = vendor.name.toLowerCase();
     return contracts
       // SPOT one-time contracts render in their own table — keep the main
@@ -126,9 +125,7 @@ export interface VendorSpotContract extends VendorContract {
 function readSpotContracts(vendor: { id: string; name: string }): VendorSpotContract[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(AUCTION_STORE_KEY);
-    if (!raw) return [];
-    const contracts = (JSON.parse(raw)?.contracts ?? []) as (AuctionStoreContract & {
+    const contracts = loadAuctionStore().contracts as unknown as (AuctionStoreContract & {
       consumedByBookingId?: string;
     })[];
     const name = vendor.name.toLowerCase();
