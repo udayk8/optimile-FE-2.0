@@ -219,10 +219,6 @@ export function TenantLayout() {
         children: Array<{ label: string; featureCode: string; to: string; icon: typeof Truck; isActiveOverride?: boolean }>;
       };
 
-      // Active Customer Dashboard section (driven by ?section= on the embedded
-      // customer-portal route) so the sidebar submenu highlights correctly.
-      const customerSection = new URLSearchParams(location.search).get("section") ?? "overview";
-
       const portals: ModulePortal[] = [
         {
           moduleCode: "AUCTION",
@@ -257,20 +253,10 @@ export function TenantLayout() {
             { label: "Route Performance", featureCode: "TRACKING_ANALYTICS", to: `${paths.trackAndTrace}/route-performance`, icon: ShieldCheck },
           ],
         },
-        {
-          moduleCode: "VENDOR",
-          label: "Vendor Portal",
-          icon: Users,
-          to: `${paths.vendorPortal}/dashboard`,
-          children: manifestSidebarToTenantChildren(vendorManifest, paths.vendorPortal).map(
-            (item) => ({
-              label: item.label,
-              featureCode: "VENDOR_DASHBOARD",
-              to: item.to,
-              icon: (item.icon ?? Users) as typeof Truck,
-            }),
-          ),
-        },
+        // Vendor Portal is intentionally NOT surfaced to internal tenant users.
+        // Vendors sign in with their own credentials (external portal session)
+        // and land directly on their portal via `portalNav` above. Internal
+        // users manage vendors through Administration → Vendors (onboarding).
         {
           moduleCode: "FLEET",
           label: "Fleet Management",
@@ -293,20 +279,10 @@ export function TenantLayout() {
             { label: "Fleet Settings", featureCode: "FLEET_SETTINGS", to: `${paths.fleetManagement}/settings`, icon: ShieldCheck },
           ],
         },
-        {
-          moduleCode: "CUSTOMER",
-          label: "Customer Portal",
-          icon: UserCog,
-          to: paths.customerPortal,
-          children: [
-            { label: "Overview", featureCode: "CUSTOMER_DASHBOARD", to: paths.customerPortal, icon: LayoutDashboard, isActiveOverride: customerSection === "overview" },
-            { label: "Bookings", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=bookings`, icon: Boxes, isActiveOverride: customerSection === "bookings" },
-            { label: "Create Booking", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=create`, icon: Plus, isActiveOverride: customerSection === "create" },
-            { label: "Track & ePOD", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=tracking`, icon: MapPin, isActiveOverride: customerSection === "tracking" },
-            { label: "Finance", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=finance`, icon: Landmark, isActiveOverride: customerSection === "finance" },
-            { label: "Reports", featureCode: "CUSTOMER_DASHBOARD", to: `${paths.customerPortal}?section=reports`, icon: Building2, isActiveOverride: customerSection === "reports" },
-          ],
-        },
+        // Customer Portal is intentionally NOT surfaced to internal tenant
+        // users either. Customers sign in with their own credentials and land
+        // on their dashboard via `portalNav` above; internal users manage
+        // customers through Administration → Customers (onboarding).
         // Finance is intentionally NOT listed here — it renders as a flat
         // top-level leaf (no nested children) so the tenant sidebar shows a
         // single "Finance" entry that opens the variant-resolved finance

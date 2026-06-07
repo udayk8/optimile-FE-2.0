@@ -217,6 +217,9 @@ export function SidebarExplorer({
   const pathname = location.pathname;
   const storageKey = `sidebar-explorer:${actorLabel}:${title}`;
   const [search, setSearch] = useState("");
+  // `collapsed` is the PINNED state, toggled by the button and persisted.
+  // `hoverExpanded` is a transient peek when the mouse is over a pinned-collapsed
+  // sidebar. The effective (visible) state is `isCollapsed`.
   const [collapsed, setCollapsed] = useState(true);
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -255,19 +258,28 @@ export function SidebarExplorer({
     }
   }, [autoCollapse]);
 
+  // The ids of the branch leading to the active route, as a stable string.
+  // Content-based (not array identity) so it only changes when the active
+  // branch actually changes — NOT on every parent re-render, which is what
+  // re-expanded sections the moment the user collapsed them (the "stuck open"
+  // bug). Recomputed inline; the nav tree is tiny.
+  const activeBranchKey = collectExpandedIds(items, pathname).join("|");
+
+  // When the active branch changes (route change, or items finishing loading),
+  // open exactly that branch and close everything else. REPLACE (not merge) so
+  // nothing stays stuck open after navigating away; manual expand/collapse made
+  // between navigations is preserved because this key doesn't change then.
   useEffect(() => {
-    const autoExpanded = collectExpandedIds(items, pathname);
-    if (!autoExpanded.length) {
-      return;
-    }
-    setExpandedNodes((current) => {
-      const next = { ...current };
-      autoExpanded.forEach((id) => {
-        next[id] = true;
-      });
+    setExpandedNodes(() => {
+      const next: Record<string, boolean> = {};
+      if (activeBranchKey) {
+        activeBranchKey.split("|").forEach((id) => {
+          next[id] = true;
+        });
+      }
       return next;
     });
-  }, [items, pathname]);
+  }, [activeBranchKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -283,19 +295,41 @@ export function SidebarExplorer({
   }, [collapsed, expandedNodes, storageKey]);
 
   function toggleNode(nodeId: string) {
-    if (collapsed) {
+    // In the icon rail (collapsed and not hover-peeking), the first click just
+    // opens the sidebar — submenus aren't visible to toggle yet.
+    if (isCollapsed) {
       setCollapsed(false);
       return;
     }
-    setExpandedNodes((current) => ({
-      ...current,
-      [nodeId]: !current[nodeId],
-    }));
+    setExpandedNodes((current) => {
+      // Already open → collapse this node and everything beneath it.
+      if (current[nodeId]) {
+        const next: Record<string, boolean> = {};
+        Object.keys(current).forEach((id) => {
+          if (current[id] && id !== nodeId && !id.startsWith(`${nodeId}:`)) {
+            next[id] = true;
+          }
+        });
+        return next;
+      }
+      // Closed → open exactly the path to this node. Node ids are built as
+      // `parent:child:…`, so each `:`-prefix is an ancestor. Opening only the
+      // ancestor path closes sibling and unrelated branches at every level —
+      // i.e. one expanded section at a time, no duplicates.
+      const next: Record<string, boolean> = {};
+      const segments = nodeId.split(":");
+      for (let depth = 2; depth <= segments.length; depth += 1) {
+        next[segments.slice(0, depth).join(":")] = true;
+      }
+      return next;
+    });
   }
 
   return (
     <aside
       onMouseEnter={() => {
+        // Peek-expand only while pinned-collapsed; never overrides a pinned-open
+        // sidebar.
         if (collapsed) {
           setHoverExpanded(true);
         }
@@ -323,11 +357,17 @@ export function SidebarExplorer({
           )}
           <button
             type="button"
-            onClick={() => setCollapsed((current) => !current)}
+            onClick={() => {
+              // Toggle the PINNED state and drop any transient hover-peek so the
+              // explicit click always wins: peek + click pins open; clicking
+              // collapse stays collapsed even while the cursor is over it.
+              setHoverExpanded(false);
+              setCollapsed((current) => !current);
+            }}
             className="rounded-2xl border border-border/80 bg-card/90 p-2 text-slate-600 transition hover:border-primary/25 hover:bg-primary/[0.045] hover:text-slate-950"
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
           </button>
         </div>
 
