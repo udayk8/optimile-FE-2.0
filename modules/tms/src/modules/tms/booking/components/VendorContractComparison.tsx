@@ -9,6 +9,7 @@ import type { VendorComparisonEntry } from "@/modules/tms/booking/services/booki
 export function VendorContractComparison({
   entries,
   selectedRateCardId,
+  recommendedRateCardIds = [],
   onSelect,
   showMargin = true,
   showCustomerFreight = true,
@@ -18,6 +19,10 @@ export function VendorContractComparison({
 }: {
   entries: VendorComparisonEntry[];
   selectedRateCardId: string | null;
+  /** Lowest-rate (L1) contract(s) — highlighted + badged as the default pick.
+   *  More than one when vendors tie at the best rate. Action stays enabled
+   *  (unlike selectedRateCardId's no-op). */
+  recommendedRateCardIds?: string[];
   onSelect: (vendorId: string, rateCardId: string) => void;
   showMargin?: boolean;
   showCustomerFreight?: boolean;
@@ -28,6 +33,7 @@ export function VendorContractComparison({
   header: { route: string; customerFreight: number; vehicleType: string; material: string };
 }) {
   const muted = new Set(mutedVendorIds);
+  const recommended = new Set(recommendedRateCardIds);
   const money = (value: number) => `Rs ${Math.round(value).toLocaleString()}`;
   return (
     <div className="space-y-3">
@@ -59,13 +65,15 @@ export function VendorContractComparison({
             <tbody className="divide-y divide-border/70">
               {entries.map((entry) => {
                 const isMuted = muted.has(entry.vendorId);
+                const isRecommended = recommended.has(entry.rateCardId);
                 return (
                   <tr
                     key={entry.rateCardId}
-                    className={`${entry.rateCardId === selectedRateCardId ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
+                    className={`${entry.rateCardId === selectedRateCardId || isRecommended ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
                   >
                     <td className="px-3 py-2 font-medium">
                       {entry.vendorName}
+                      {isRecommended ? <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">L1 · Lowest</span> : null}
                       {isMuted ? <span className="ml-2 text-[11px] font-normal text-rose-600">Rejected</span> : null}
                     </td>
                     <td className="px-3 py-2">

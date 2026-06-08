@@ -35,6 +35,7 @@ import {
   calculateVendorFreightFromRateCard,
   getVendorRateCardUnitRate,
   validateVendorRateCard,
+  type VendorComparisonEntry,
 } from "@/modules/tms/booking/services/booking-selectors";
 import { VendorContractComparison } from "@/modules/tms/booking/components/VendorContractComparison";
 import { cityLaneKey, contractCityLaneKey } from "@shared-utils";
@@ -207,6 +208,10 @@ export function BookingDetailsPage() {
   const [assignMethod, setAssignMethod] = useState<"CONTRACT" | "MANUAL">("CONTRACT");
   // Reason required when bypassing the default L1/lowest contract (manual assign).
   const [manualReason, setManualReason] = useState("");
+  // Sending the indent to a higher-rate (non-L1) contract vendor opens a modal
+  // that captures a mandatory remark before the indent goes out.
+  const [indentRemark, setIndentRemark] = useState("");
+  const [indentModalEntry, setIndentModalEntry] = useState<VendorComparisonEntry | null>(null);
   const [vendorId, setVendorId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -456,6 +461,14 @@ export function BookingDetailsPage() {
     [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode, allBookings, addressMap],
   );
 
+  // L1 / lowest-rate contract(s). vendorComparison is sorted cheapest-first, so
+  // the first entry's freight is the best rate; ties (multiple vendors at that
+  // exact rate) are ALL treated as L1 — any of them is a no-remark default pick.
+  const lowestVendorFreight = vendorComparison[0]?.vendorFreight ?? null;
+  const l1Entries = vendorComparison.filter((entry) => entry.vendorFreight === lowestVendorFreight);
+  const l1RateCardIds = l1Entries.map((entry) => entry.rateCardId);
+  const l1VendorIds = new Set(l1Entries.map((entry) => entry.vendorId));
+
   // Contract Vendor indent stage. The booking stays PENDING_ASSIGNMENT throughout;
   // the stage is derived from the vendor indents (send → pending → accepted/rejected).
   const isSpotBooking = bookingRecord.commercialType === "SPOT";
@@ -497,7 +510,7 @@ export function BookingDetailsPage() {
   const winnerIndentBuyingRate =
     winnerIndent?.buyingRate ?? vendorComparison.find((entry) => entry.vendorId === winnerIndent?.vendorId)?.vendorFreight ?? null;
 
-  function sendIndentToVendor(targetVendorId: string) {
+  function sendIndentToVendor(targetVendorId: string, reason?: string) {
     const entry = vendorComparison.find((item) => item.vendorId === targetVendorId);
     try {
       sendBookingVendorIndent(
@@ -507,7 +520,11 @@ export function BookingDetailsPage() {
         orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
         targetVendorId,
         entry?.vendorFreight ?? null,
+        undefined,
+        reason ?? null,
       );
+      setIndentRemark("");
+      setIndentModalEntry(null);
     } catch (error) {
       window.alert((error as Error).message);
     }
@@ -3728,12 +3745,24 @@ export function BookingDetailsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {/* Only the L1 / lowest-rate contract is offered. To use a
-                    different vendor, switch to Manual Assignment (reason required). */}
+                {/* All matching contracts on the lane are shown, cheapest-first.
+                    L1 = lowest-rate contract(s) (ties included) — sent with one
+                    click. A higher-rate vendor opens a remark modal first. */}
                 <VendorContractComparison
-                  entries={vendorComparison.filter((entry) => entry.vendorFreight === vendorComparison[0]?.vendorFreight)}
+                  entries={vendorComparison}
                   selectedRateCardId={null}
-                  onSelect={(targetVendorId) => sendIndentToVendor(targetVendorId)}
+                  recommendedRateCardIds={l1RateCardIds}
+                  onSelect={(targetVendorId) => {
+                    if (l1VendorIds.has(targetVendorId)) {
+                      // L1 (or tied-L1) vendor → send straight away, no remark.
+                      sendIndentToVendor(targetVendorId);
+                      return;
+                    }
+                    // Higher-rate vendor → open the remark modal.
+                    const entry = vendorComparison.find((item) => item.vendorId === targetVendorId) ?? null;
+                    setIndentRemark("");
+                    setIndentModalEntry(entry);
+                  }}
                   actionLabel="Send Indent"
                   mutedVendorIds={rejectedIndentVendorIds}
                   showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
@@ -3747,12 +3776,88 @@ export function BookingDetailsPage() {
                 />
                 {vendorComparison.length ? (
                   <p className="text-[11px] text-muted-foreground">
-                    Showing the lowest-rate (L1) contract(s) — all vendors tied at the best rate (auction & manual). To pick another vendor, switch to Manual Assignment — a reason is required.
+                    {l1Entries.length > 1
+                      ? `${l1Entries.length} vendors tie at the lowest rate (L1) — send the indent to any of them with one click. `
+                      : "The lowest-rate (L1) contract is the default — one click to send. "}
+                    Choosing a higher-rate vendor needs a remark.
                   </p>
                 ) : null}
               </div>
             )
           ) : null}
+
+          {/* Remark modal — required before the indent goes to a higher-rate
+              (non-L1) contract vendor. */}
+          <Dialog
+            open={Boolean(indentModalEntry)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setIndentModalEntry(null);
+                setIndentRemark("");
+              }
+            }}
+            title="Send indent to a higher-rate vendor"
+            description={
+              indentModalEntry
+                ? `${indentModalEntry.vendorName} is not the lowest-rate (L1) contract on this lane. Add a remark to justify sending the indent here.`
+                : undefined
+            }
+            widthClassName="max-w-lg"
+            footer={
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIndentModalEntry(null);
+                    setIndentRemark("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!indentRemark.trim()}
+                  onClick={() => {
+                    if (indentModalEntry && indentRemark.trim()) {
+                      sendIndentToVendor(indentModalEntry.vendorId, indentRemark.trim());
+                    }
+                  }}
+                >
+                  Send Indent
+                </Button>
+              </div>
+            }
+          >
+            {indentModalEntry ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-muted/10 p-3 text-sm">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Selected vendor</p>
+                    <p className="mt-0.5 font-semibold">{indentModalEntry.vendorName}</p>
+                    <p className="text-xs text-muted-foreground">Rs {Math.round(indentModalEntry.vendorFreight).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Lowest (L1) rate</p>
+                    <p className="mt-0.5 font-semibold">Rs {Math.round(lowestVendorFreight ?? 0).toLocaleString()}</p>
+                    <p className="text-xs text-rose-600">
+                      +Rs {Math.round(indentModalEntry.vendorFreight - (lowestVendorFreight ?? 0)).toLocaleString()} over L1
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Remark *
+                  </label>
+                  <Textarea
+                    value={indentRemark}
+                    onChange={(event) => setIndentRemark(event.target.value)}
+                    rows={3}
+                    autoFocus
+                    placeholder="Why send the indent to this vendor instead of the lowest-rate (L1) contract?"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </Dialog>
 
           {showAssignmentFields ? (
           <>

@@ -17,6 +17,9 @@ export interface BookingVendorIndent {
   sentAt: string;
   respondedAt?: string | null;
   rejectedReason?: string | null;
+  /** Dispatcher's remark, required when the indent goes to a higher-rate
+   *  (non-L1 / non-lowest) contract vendor instead of the recommended one. */
+  indentReason?: string | null;
   // Vendor-indent assignment ALWAYS uses Auto LR, generated from the booking
   // owner's place (captured when the indent is sent). The vendor never picks
   // an LR mode or number.

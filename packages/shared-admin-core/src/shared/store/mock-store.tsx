@@ -255,6 +255,8 @@ interface MockStoreValue {
     buyingRate?: number | null,
     /** Booking object when it may not be in the store yet (fresh spot booking). */
     knownBooking?: BookingRecord,
+    /** Dispatcher's remark — required when targeting a higher-rate (non-L1) vendor. */
+    reason?: string | null,
   ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
@@ -5278,7 +5280,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate, knownBooking) => {
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate, knownBooking, reason) => {
         const booking = knownBooking ?? tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
@@ -5320,6 +5322,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           sentAt: now,
           respondedAt: null,
           rejectedReason: null,
+          indentReason: reason?.trim() ? reason.trim() : null,
           lrModeForVendorAssignment: "AUTO",
           lrPlaceId: lrPlaceId ?? null,
           lrPlaceName: lrPlaceName ?? null,
@@ -5341,7 +5344,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       note: spotVendorId
                         ? `Indent sent to ${created[0]?.vendorName ?? "spot-contract vendor"} (spot contract ${booking.spotContract?.contractId ?? ""} @ ₹${booking.spotContract?.rate?.toLocaleString("en-IN") ?? ""})`
                         : created.length === 1
-                          ? `Indent sent to ${created[0].vendorName}`
+                          ? `Indent sent to ${created[0].vendorName}${reason?.trim() ? ` — Reason: ${reason.trim()}` : ""}`
                           : `Indent sent to ${created.length} vendor(s)`,
                     },
                   ],
