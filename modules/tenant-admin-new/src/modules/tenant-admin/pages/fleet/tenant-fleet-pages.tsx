@@ -50,7 +50,6 @@ const OPERATIONAL_STATUSES: Array<{ value: VehicleOperationalStatus; label: stri
   { value: "UNDER_MAINTENANCE", label: "Under Maintenance" },
   { value: "INACTIVE", label: "Inactive" },
 ];
-const LICENSE_CLASSES = ["HMV", "HMV Hazmat", "LMV Transport", "LMV", "HCV", "LCV"];
 
 const STATUS_STYLES: Record<ComplianceStatus, string> = {
   COMPLIANT: "bg-emerald-100 text-emerald-700",
@@ -945,13 +944,9 @@ function DriverModal({
     name: "",
     dob: "",
     mobile: "",
-    email: "",
     gender: "" as "MALE" | "FEMALE" | "OTHER" | "",
     baseLocation: "",
     aadhaarMasked: "",
-    licenseNumber: "",
-    licenseClasses: "" as string,
-    licenseExpiry: "",
     assignedVehicleId: "" as string,
     vendorId: "" as string,
   });
@@ -966,13 +961,9 @@ function DriverModal({
         name: initialDriver.name,
         dob: initialDriver.dob ?? "",
         mobile: initialDriver.mobile ?? initialDriver.phone ?? "",
-        email: initialDriver.email ?? "",
         gender: (initialDriver.gender ?? "") as "MALE" | "FEMALE" | "OTHER" | "",
         baseLocation: initialDriver.baseLocation ?? "",
         aadhaarMasked: initialDriver.aadhaarMasked ?? "",
-        licenseNumber: initialDriver.licenseNumber ?? "",
-        licenseClasses: (initialDriver.licenseClasses ?? []).join(", "),
-        licenseExpiry: initialDriver.licenseExpiry ?? "",
         assignedVehicleId: initialDriver.assignedVehicleId ?? "",
         vendorId: initialDriver.vendorId ?? "",
       });
@@ -982,13 +973,9 @@ function DriverModal({
         name: "",
         dob: "",
         mobile: "",
-        email: "",
         gender: "",
         baseLocation: "",
         aadhaarMasked: "",
-        licenseNumber: "",
-        licenseClasses: "",
-        licenseExpiry: "",
         assignedVehicleId: "",
         vendorId: "",
       });
@@ -1001,14 +988,13 @@ function DriverModal({
   const setDoc = (key: DriverDocKey, patch: Partial<{ fileName: string; referenceNo: string; expiryDate: string }>) =>
     setDocs((c) => ({ ...c, [key]: { ...c[key], ...patch } }));
   const compliance = computeComplianceFromDocs(docs);
-  const parsedClasses = form.licenseClasses
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   function handleSubmit() {
     if (!form.name.trim()) return;
-    if (!form.licenseNumber.trim()) return;
+    // DL number/expiry come from the DL compliance document now that the
+    // standalone License section is gone. DL number stays mandatory.
+    const licenseNumber = docs.DL.referenceNo.trim();
+    if (!licenseNumber) return;
     const input: TenantDriverInput = {
       name: form.name,
       dob: form.dob,
@@ -1016,19 +1002,18 @@ function DriverModal({
       phone: form.mobile,
       address: form.baseLocation,
       bloodGroup: "",
-      licenseNumber: form.licenseNumber,
-      licenseType: parsedClasses[0] ?? "",
-      licenseExpiry: form.licenseExpiry,
+      licenseNumber,
+      licenseType: "",
+      licenseExpiry: docs.DL.expiryDate,
       medicalExpiry: docs.MedicalCertificate.expiryDate,
       drugTestStatus: "CLEAR",
       endorsements: [],
       assignedVehicleId: form.assignedVehicleId || null,
       vendorId: form.vendorId || null,
-      email: form.email,
       gender: form.gender,
       baseLocation: form.baseLocation,
       aadhaarMasked: form.aadhaarMasked,
-      licenseClasses: parsedClasses,
+      licenseClasses: [],
       mobile: form.mobile,
       complianceStatus: compliance,
       complianceDocuments: docsToComplianceDocs(docs),
@@ -1043,7 +1028,7 @@ function DriverModal({
       open={isOpen}
       onOpenChange={(open) => (!open ? onClose() : undefined)}
       title={isEdit ? `Edit ${initialDriver?.name}` : "Add Driver"}
-      description="Capture driver personal info, license, and compliance documents."
+      description="Capture driver personal info and compliance documents (DL number is taken from the Driving License document)."
       widthClassName="max-w-3xl"
       footer={
         <div className="flex justify-end gap-3">
@@ -1083,9 +1068,6 @@ function DriverModal({
                 readOnly={isEdit}
               />
             </Field>
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
-            </Field>
             <Field label="Gender">
               <Select value={form.gender} onChange={(e) => setField("gender", e.target.value as "MALE" | "FEMALE" | "OTHER" | "")}>
                 <option value="">Select</option>
@@ -1099,20 +1081,6 @@ function DriverModal({
             </Field>
             <Field label="Aadhaar (masked)">
               <Input value={form.aadhaarMasked} onChange={(e) => setField("aadhaarMasked", e.target.value)} placeholder="XXXX-XXXX-1234" />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="License">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="DL Number*">
-              <Input value={form.licenseNumber} onChange={(e) => setField("licenseNumber", e.target.value)} />
-            </Field>
-            <Field label={`License Classes (comma-separated: ${LICENSE_CLASSES.join(", ")})`}>
-              <Input value={form.licenseClasses} onChange={(e) => setField("licenseClasses", e.target.value)} placeholder="HMV, HMV Hazmat" />
-            </Field>
-            <Field label="DL Valid Till">
-              <Input type="date" value={form.licenseExpiry} onChange={(e) => setField("licenseExpiry", e.target.value)} />
             </Field>
           </div>
         </Section>
