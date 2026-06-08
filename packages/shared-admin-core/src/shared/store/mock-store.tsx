@@ -640,7 +640,8 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
 // v8: bl001 vendor rate card seed rows added (vendor detail rate card grid).
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v8";
+// v9: bl001 Bengaluru→Coimbatore customer + vendor rate cards (all PER_MT) added.
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v9";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
 // Manual vendor-contract seed for the Bluedart vendors — the shared
@@ -897,7 +898,8 @@ function ensureDemoTenantsRehydrated(): void {
 // plain add-missing merge would leave duplicates. This pass REPLACES every
 // bl001-tenant row in each seed-managed collection with the seed snapshot.
 // Gated by its own version key so it runs once and never clobbers later edits.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v1";
+// v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v2";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {

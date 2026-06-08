@@ -805,6 +805,35 @@ export const bl001Customers = [
         "isActive": true,
         "isTemporary": false,
         "remarks": "wew"
+      },
+      {
+        "id": "customer-address-cbe001",
+        "addressCode": "CUSTADDR-0004",
+        "type": [
+          "Consignee"
+        ],
+        "consigneeId": "consignee-cbe",
+        "consigneeName": "Coimbatore Mills",
+        "operationalAddressType": "PRIMARY",
+        "addressUsage": "BOTH",
+        "contactCode": "ADDR-0004",
+        "name": "Coimbatore Mills Yard",
+        "addressLabel": "Coimbatore Mills Yard",
+        "fullAddress": "Coimbatore Mills Yard, Coimbatore, Tamil Nadu, 641001",
+        "line1": "Coimbatore Mills Yard",
+        "city": "Coimbatore",
+        "state": "Tamil Nadu",
+        "country": "India",
+        "pincode": "641001",
+        "latitude": null,
+        "longitude": null,
+        "gstin": "TN33ACC0001",
+        "contactPerson": "Kartik Pawar",
+        "contactNumber": "9900154373",
+        "emailId": "kartik.p@optimile.co",
+        "isActive": true,
+        "isTemporary": false,
+        "remarks": ""
       }
     ],
     "uomOverrides": [],
@@ -940,9 +969,69 @@ export const bl001CustomerAddresses = [
     "email": "kartikpawar391@gmail.com",
     "createdAt": "2026-05-30T19:35:35.511Z",
     "updatedAt": "2026-05-30T19:49:44.065Z"
+  },
+  {
+    "tenantId": "tenant-bl001",
+    "tenantCustomerId": "tenant-customer-o8kyr7u",
+    "addressCode": "CUSTADDR-0004",
+    "addressType": "consignee",
+    "addressTypes": [
+      "Consignee"
+    ],
+    "consigneeId": "consignee-cbe",
+    "consigneeName": "Coimbatore Mills",
+    "operationalAddressType": "PRIMARY",
+    "addressUsage": "BOTH",
+    "addressName": "Coimbatore Mills Yard",
+    "addressLabel": "Coimbatore Mills Yard",
+    "fullAddress": "Coimbatore Mills Yard, Coimbatore, Tamil Nadu, 641001",
+    "contactCode": "ADDR-0004",
+    "gstin": "TN33ACC0001",
+    "contactPerson": "Kartik Pawar",
+    "contactNumber": "9900154373",
+    "emailId": "kartik.p@optimile.co",
+    "addressLine1": "Coimbatore Mills Yard",
+    "landmark": "",
+    "city": "Coimbatore",
+    "state": "Tamil Nadu",
+    "country": "India",
+    "pincode": "641001",
+    "latitude": null,
+    "longitude": null,
+    "isDefault": false,
+    "status": "active",
+    "isTemporary": false,
+    "remarks": "",
+    "customerId": "tenant-customer-o8kyr7u",
+    "contactPersonName": "Kartik Pawar",
+    "phone": "9900154373",
+    "id": "customer-address-cbe001",
+    "email": "kartik.p@optimile.co",
+    "createdAt": "2026-06-01T09:40:00.000Z",
+    "updatedAt": "2026-06-01T09:40:00.000Z"
   }
 ] as unknown as TenantCustomerAddress[];
-export const bl001CustomerRateCards = [] as unknown as TenantCustomerRateCard[];
+export const bl001CustomerRateCards = [
+  {
+    "id": "rate-card-bl001-blr-cbe-1",
+    "tenantId": "tenant-bl001",
+    "tenantCustomerId": "tenant-customer-o8kyr7u",
+    "fromCity": "Bengaluru",
+    "toCity": "Coimbatore",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": null,
+    "underloadRate": 2100,
+    "overloadRate": 2100,
+    "tat": "1 day",
+    "baseRate": 2100,
+    "rate": 2100,
+    "status": "active",
+    "createdAt": "2026-06-01T09:30:00.000Z",
+    "updatedAt": "2026-06-01T09:30:00.000Z"
+  }
+] as unknown as TenantCustomerRateCard[];
 export const bl001Vendors = [
   {
     "id": "tenant-vendor-hh8uo8c",
@@ -1128,6 +1217,60 @@ export const bl001VendorRateCards = [
     "status": "active",
     "createdAt": "2026-06-01T09:25:00.000Z",
     "updatedAt": "2026-06-01T09:25:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-mahesh-blr-cbe",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-hh8uo8c",
+    "fromCity": "Bengaluru",
+    "toCity": "Coimbatore",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": "MGV",
+    "buyingRate": 1780,
+    "rate": 1780,
+    "effectiveFromDate": "2026-06-01",
+    "effectiveToDate": "2027-05-31",
+    "status": "active",
+    "createdAt": "2026-06-01T09:35:00.000Z",
+    "updatedAt": "2026-06-01T09:35:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-abc-blr-cbe",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-nqup09r",
+    "fromCity": "Bengaluru",
+    "toCity": "Coimbatore",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": "MGV",
+    "buyingRate": 1720,
+    "rate": 1720,
+    "effectiveFromDate": "2026-06-01",
+    "effectiveToDate": "2027-05-31",
+    "status": "active",
+    "createdAt": "2026-06-01T09:36:00.000Z",
+    "updatedAt": "2026-06-01T09:36:00.000Z"
+  },
+  {
+    "id": "vendor-rate-card-bl001-vrl-blr-cbe",
+    "tenantId": "tenant-bl001",
+    "tenantVendorId": "tenant-vendor-af8xr8p",
+    "fromCity": "Bengaluru",
+    "toCity": "Coimbatore",
+    "sourcePincode": "",
+    "destinationPincode": "",
+    "rateType": "PER_MT",
+    "vehicleType": "MGV",
+    "buyingRate": 1850,
+    "rate": 1850,
+    "effectiveFromDate": "2026-06-01",
+    "effectiveToDate": "2027-05-31",
+    "status": "active",
+    "createdAt": "2026-06-01T09:37:00.000Z",
+    "updatedAt": "2026-06-01T09:37:00.000Z"
   }
 ] as unknown as TenantVendorRateCard[];
 export const bl001VehicleTypes = [
