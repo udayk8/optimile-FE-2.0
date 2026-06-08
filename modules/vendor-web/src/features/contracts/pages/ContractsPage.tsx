@@ -8,8 +8,8 @@ import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
 import { useAuctionContractsBridge } from '@vendor/integration/auctionBridge'
 import { useManualContractsBridge } from '@vendor/integration/manualContractsBridge'
-import { formatLaneDisplay, getContractSourceLabel, getRateTypeLabel } from '@shared-utils'
-import { FileText, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
+import { formatLaneDisplay, getRateTypeLabel } from '@shared-utils'
+import { FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Contract, ContractStatus } from '@vendor/types'
 
 const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
@@ -111,7 +111,7 @@ export default function ContractsPage() {
             <table className="w-full min-w-[1100px] text-left">
               <thead className="text-gray-500">
                 <tr>
-                  {['Contract', 'Source City', 'Destination City', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'Valid Till', 'Type', 'Status'].map((header) => (
+                  {['Contract', 'Source City', 'Destination City', 'Vehicle Type', 'Rate', 'Rate Type', 'Volume', 'Created On', 'Start Date', 'Valid Till', 'Status'].map((header) => (
                     <th
                       key={header}
                       className="border-b border-r border-gray-200 bg-gray-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] last:border-r-0"
@@ -128,11 +128,8 @@ export default function ContractsPage() {
                   className={`border-t border-gray-200 transition-colors hover:bg-blue-50/50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}
                 >
                   <td className="border-r border-gray-200 px-4 py-3 font-mono text-sm font-semibold text-text">{contract.id}</td>
-                  <td className="border-r border-gray-200 px-4 py-3">
-                    <div className="flex items-center gap-2 text-sm text-text">
-                      <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                      <span>{contract.laneDetails.origin.city || '—'}</span>
-                    </div>
+                  <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
+                    {contract.laneDetails.origin.city || '—'}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
                     {contract.laneDetails.destination.city || '—'}
@@ -143,9 +140,11 @@ export default function ContractsPage() {
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{getRateTypeLabel(contract.rateCard[0]?.rateType ?? '')}</td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
-                    {contract.volumeAllocation.unit === '%'
-                      ? `${contract.volumeAllocation.volume}%`
-                      : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
+                    {contract.contractKind === 'SPOT'
+                      ? '—'
+                      : contract.volumeAllocation.unit === '%'
+                        ? `${contract.volumeAllocation.volume}%`
+                        : `${contract.volumeAllocation.volume} ${contract.volumeAllocation.unit}`}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">
                     {formatDateTime(contract.awardedOn ?? contract.createdAt)}
@@ -154,30 +153,6 @@ export default function ContractsPage() {
                     {contract.contractKind === 'SPOT' ? '—' : formatDate(contract.validityFrom)}
                   </td>
                   <td className="border-r border-gray-200 px-4 py-3 text-sm text-text">{formatDate(contract.validityTo)}</td>
-                  <td className="border-r border-gray-200 px-4 py-3">
-                    {/* Type tells the whole story (Manual / Bulk / Lot / Spot) —
-                        the old Source column was redundant with it. */}
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                        contract.contractKind === 'SPOT'
-                          ? 'bg-amber-50 text-amber-700'
-                          : contract.source === 'AUCTION_WIN'
-                            ? 'bg-violet-50 text-violet-700'
-                            : 'bg-sky-50 text-sky-700'
-                      }`}
-                    >
-                      {contract.contractKind === 'SPOT'
-                        ? 'Spot · One-time'
-                        : contract.contractKind === 'LOT'
-                          ? 'Lot'
-                          : contract.contractKind === 'BULK'
-                            ? 'Bulk'
-                            : 'Manual'}
-                    </span>
-                    {contract.consumedByBookingId && (
-                      <div className="mt-1 text-[11px] text-gray-500">Used in {contract.consumedByBookingId}</div>
-                    )}
-                  </td>
                   <td className="px-4 py-3"><StatusBadge status={contract.status} /></td>
                   </tr>
                 ))}

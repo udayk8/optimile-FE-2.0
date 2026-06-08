@@ -158,6 +158,14 @@ export default function InvoicesPage() {
       totalGstApproved,
     }
   }, [approvedInvoices])
+  // Totals across ALL invoices (not just approved) for the summary cards.
+  const invoiceSummary = useMemo(
+    () => ({
+      totalInvoiced: invoices.reduce((sum, invoice) => sum + invoice.grandTotal, 0),
+      totalGst: invoices.reduce((sum, invoice) => sum + invoice.gstAmount, 0),
+    }),
+    [invoices],
+  )
 
   const invoicePageSize = 5
   const invoiceTotalPages = Math.max(1, Math.ceil(invoicesForTab.length / invoicePageSize))
@@ -222,12 +230,6 @@ export default function InvoicesPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Approved Invoices</div>
-            <div className="mt-2 text-2xl font-bold text-text">{approvedSummary.approvedCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Invoice Approved</div>
             <div className="mt-2 text-2xl font-bold text-text">
               <CurrencyDisplay amount={approvedSummary.totalInvoiceApproved} />
@@ -236,9 +238,17 @@ export default function InvoicesPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total GST Approved</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Invoiced</div>
+            <div className="mt-2 text-2xl font-bold text-text">
+              <CurrencyDisplay amount={invoiceSummary.totalInvoiced} />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total GST</div>
             <div className="mt-2 text-2xl font-bold text-amber-700">
-              <CurrencyDisplay amount={approvedSummary.totalGstApproved} />
+              <CurrencyDisplay amount={invoiceSummary.totalGst} />
             </div>
           </CardContent>
         </Card>
