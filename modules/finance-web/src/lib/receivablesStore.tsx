@@ -5,7 +5,7 @@ import {
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
 import { logAudit } from '@finance/lib/auditStore'
-import { useFinanceBridge } from '@finance/integration/finance-data-bridge'
+import { useFinanceBridge, type RateCardDescriptor } from '@finance/integration/finance-data-bridge'
 
 /* ============================================================
    Shared receivables store — PER-MODE MODULE SINGLETONS.
@@ -112,6 +112,11 @@ export interface ARInvoice {
   // Approved booking expenses billed on this invoice, itemised for the finance
   // team (embedded mode only; optional so existing/standalone invoices are fine).
   expenseItems?: LedgerExpense[]
+  // Spot vs standing-contract booking, and the contracted rate-card behind the
+  // `contracted` baseline — shown on the invoice for transparency (optional;
+  // present only for bridged invoices whose booking has a contract/spot source).
+  commercialType?: 'SPOT' | 'CONTRACT'
+  rateCard?: RateCardDescriptor
 }
 
 export interface LedgerEntry {

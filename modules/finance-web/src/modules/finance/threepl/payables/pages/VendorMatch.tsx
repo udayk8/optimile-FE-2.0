@@ -9,6 +9,7 @@ import { VENDOR_BILL_DETAILS, OPTIMILE_BILL_TO, vendorMeta, VENDOR_DISPUTE_RESPO
 import { useDisputes } from "@finance/lib/disputesStore";
 import { usePayables, computeMatch } from "@finance/lib/payablesStore";
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
+import RateCardPanel from "@finance/components/RateCardPanel";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -145,6 +146,9 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
             <Pill tone={bill.status === "matched" ? "green" : bill.status === "variance" ? "red" : "amber"}>
               {bill.status === "matched" ? "Matched" : bill.status === "variance" ? `Variance +${bill.variance}%` : "POD pending"}
             </Pill>
+            {bill.commercialType && (
+              <Pill tone={bill.commercialType === "SPOT" ? "amber" : "blue"}>{bill.commercialType === "SPOT" ? "Spot" : "Contract"}</Pill>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500">{bill.vendor} · {bill.trip} · {bill.lane} · {bill.terms} (due {bill.due})</p>
         </div>
@@ -172,6 +176,10 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
         <Match label="POD" v={bill.pod ? "Verified" : "Missing"} ok={bill.pod} />
         <Match label="Billed" v={fmtINR(bill.billed)} ok={bill.status !== "variance"} />
       </Card>
+
+      {/* Contract rate card — transparency on what the `Contract` baseline is built
+          from (the awarded spot rate or the standing vendor rate card). */}
+      {bill.rateCard && <RateCardPanel rateCard={bill.rateCard} commercialType={bill.commercialType} />}
 
       {bridged ? (
         <>

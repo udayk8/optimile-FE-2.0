@@ -4,7 +4,7 @@ import {
 } from '@finance/data/mock'
 import type { FinanceMode } from '@finance/modules/finance/nav'
 import { logAudit } from '@finance/lib/auditStore'
-import { useFinanceBridge } from '@finance/integration/finance-data-bridge'
+import { useFinanceBridge, type RateCardDescriptor } from '@finance/integration/finance-data-bridge'
 import type { ARTrip } from '@finance/lib/receivablesStore'
 
 /* ============================================================
@@ -42,6 +42,11 @@ export interface VendorBill {
   category?: string
   commodity?: string
   stage: BillStage
+  // Spot vs standing-contract booking, and the contracted/awarded rate behind the
+  // `contractRate` baseline — shown on the match view for transparency (optional;
+  // present only for bridged bills whose booking has a contract/spot source).
+  commercialType?: 'SPOT' | 'CONTRACT'
+  rateCard?: RateCardDescriptor
   // Real bridged bills (embedded mode) — synthesized from bookings. All optional
   // so mock bills + the standalone build render unchanged.
   linkedBookings?: ARTrip[]                       // full per-booking detail

@@ -2,10 +2,37 @@ import { useMemo } from "react";
 import { useMockStore } from "@/shared/store/mock-store";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import type { BookingRecord, BookingExpenseRecord, BookingStatus } from "@/modules/tms/booking/types";
-import { areAllDeliveryPodsCaptured } from "@/modules/tms/booking/services/booking-engine";
-import type { FinanceDataBridge } from "@finance/integration/finance-data-bridge";
+import { areAllDeliveryPodsCaptured, perTrip, perMT, perKM } from "@/modules/tms/booking/services/booking-engine";
+import { calculateVendorFreightFromRateCard, getVendorRateCardUnitRate } from "@/modules/tms/booking/services/booking-selectors";
+import { readVendorContracts, type VendorContract } from "@shared-utils";
+import { AR_TOLERANCE_PCT } from "@finance/data/mock";
+import type { FinanceDataBridge, RateCardDescriptor } from "@finance/integration/finance-data-bridge";
 import type { ARInvoice, ARTrip, LedgerExpense, PodStage } from "@finance/lib/receivablesStore";
 import type { VendorBill } from "@finance/lib/payablesStore";
+
+// Coerce any rate-type spelling to the three the finance descriptor uses.
+function normRateType(v?: string | null): "PER_TRIP" | "PER_KM" | "PER_MT" {
+  const s = (v ?? "").toUpperCase();
+  if (s.includes("KM")) return "PER_KM";
+  if (s.includes("MT") || s.includes("TON")) return "PER_MT";
+  return "PER_TRIP";
+}
+
+// Freight from a unit rate by rate-type, reusing the booking module's own maths.
+function freightFor(
+  rate: number,
+  rateType: "PER_TRIP" | "PER_KM" | "PER_MT",
+  weight: number,
+  distanceKm: number,
+): number {
+  if (rateType === "PER_MT") return Number(perMT(rate, weight).toFixed(2));
+  if (rateType === "PER_KM") return Number(perKM(rate, distanceKm).toFixed(2));
+  return Number(perTrip(rate).toFixed(2));
+}
+
+// Single source for 18% GST (CGST 9% + SGST 9%) so every invoice builder here
+// rounds identically. Returns the combined tax on a subtotal.
+const gst18 = (subtotal: number) => 2 * Math.round(subtotal * 0.09);
 
 // Project one booking expense into the finance LedgerExpense shape so the finance
 // team sees every charge line (not just rolled-up totals). Read-only in finance.
@@ -97,6 +124,151 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
       return a?.consigneeName ?? a?.contactPerson ?? undefined;
     };
 
+    const weightOf = (b: BookingRecord) => b.weight ?? b.deliveries?.[0]?.weight ?? 0;
+    const distanceOf = (b: BookingRecord) =>
+      b.pricing?.distanceKm ?? b.deliveries?.[0]?.distanceKm ?? 0;
+
+    // Vendor-won (auction) contracts — read once. A vendor "wins" a lane via an
+    // auction; that award becomes a VendorContract with createdFrom AUCTION_WIN
+    // carrying the allocation rank (L1/L2/L3) + volume split. Used to surface the
+    // won contract behind the AP 3-way-match baseline.
+    const wonContracts: VendorContract[] = (() => {
+      try {
+        return readVendorContracts().filter((c) => c.tenantId === tenantId || !c.tenantId);
+      } catch {
+        return [];
+      }
+    })();
+    const cityEq = (x?: string | null, y?: string | null) =>
+      (x ?? "").trim().toLowerCase() === (y ?? "").trim().toLowerCase();
+    const wonById = (contractId?: string | null) =>
+      contractId ? wonContracts.find((c) => c.contractId === contractId) : undefined;
+    const wonByVendorLane = (vendorId?: string | null, vendorName?: string | null, from?: string, to?: string, vehicleType?: string | null) =>
+      wonContracts.find(
+        (c) =>
+          c.createdFrom === "AUCTION_WIN" &&
+          (cityEq(c.vendorId, vendorId) || cityEq(c.vendorName, vendorName)) &&
+          cityEq(c.originCity, from) &&
+          cityEq(c.destinationCity, to) &&
+          (!vehicleType || !c.vehicleType || cityEq(c.vehicleType, vehicleType)),
+      );
+    // Award provenance fields from a won contract (only when it's an auction win).
+    const awardFields = (won?: VendorContract): Partial<RateCardDescriptor> =>
+      won && won.createdFrom === "AUCTION_WIN"
+        ? {
+            awarded: true,
+            allocationRank: won.allocationRank,
+            volumeAllocationPercent: won.volumeAllocationPercent,
+            validFrom: won.startDate,
+            validTo: won.endDate,
+          }
+        : {};
+
+    // AP baseline: the INDEPENDENT contracted/awarded vendor freight behind a
+    // booking (never the negotiated `vendorFreight`) so the 3-way match can show
+    // real variance. Spot → the auction-won rate; contract → the matched vendor
+    // rate card; manual/own-fleet → null (no contract to compare against).
+    const resolveVendorContract = (
+      b: BookingRecord,
+    ): { contracted: number | null; rateCard?: RateCardDescriptor } => {
+      if (b.spotContract) {
+        const rt = normRateType(b.spotContract.rateUnit);
+        const won = wonById(b.spotContract.contractId);
+        return {
+          contracted: freightFor(b.spotContract.rate, rt, weightOf(b), distanceOf(b)),
+          rateCard: {
+            source: "SPOT",
+            rateCardId: b.spotContract.contractId,
+            lane: `${b.spotContract.originCity} → ${b.spotContract.destinationCity}`,
+            rate: b.spotContract.rate,
+            rateType: rt,
+            sourceAuctionId: b.spotContract.sourceAuctionId,
+            awarded: true,
+            ...awardFields(won),
+          },
+        };
+      }
+      const a = b.assignment;
+      if (a?.vendorRateCardId && a.vendorId) {
+        const card = store
+          .listTenantVendorRateCards(a.vendorId)
+          .find((c) => c.id === a.vendorRateCardId);
+        if (card) {
+          const rt = normRateType(card.rateType);
+          // Best-effort: was this lane won by the vendor at auction? If so, surface
+          // the win (rank/volume/validity) alongside the rate-card baseline.
+          const won = wonByVendorLane(a.vendorId, a.vendorName, card.fromCity ?? undefined, card.toCity ?? undefined, card.vehicleType);
+          return {
+            contracted: calculateVendorFreightFromRateCard({
+              rateCard: card,
+              weight: weightOf(b),
+              distanceKm: distanceOf(b),
+            }),
+            rateCard: {
+              source: "CONTRACT",
+              rateCardId: card.id,
+              lane: `${card.fromCity ?? laneOf(b).split(" → ")[0]} → ${card.toCity ?? laneOf(b).split(" → ")[1]}`,
+              vehicleType: card.vehicleType ?? undefined,
+              rate: getVendorRateCardUnitRate(card) ?? 0,
+              rateType: rt,
+              validFrom: card.effectiveFromDate,
+              validTo: card.effectiveToDate,
+              ...awardFields(won),
+            },
+          };
+        }
+      }
+      return { contracted: null };
+    };
+
+    // AR baseline: the customer rate card behind a booking, so a customer invoice
+    // deviating from contract (or carrying accessorials) shows a real variance.
+    // Prefer the REAL stored TenantCustomerRateCard (its own from/to city, vehicle
+    // type, rate, validity) — the same card the tenant configures — so finance
+    // shows the rate card exactly as stored. Fall back to the booking's L1 rate
+    // only when no card is linked; null when there's no contracted rate at all.
+    const resolveCustomerContract = (
+      b: BookingRecord,
+    ): { contracted: number | null; rateCard?: RateCardDescriptor } => {
+      const p = b.pricing;
+      const source: RateCardDescriptor["source"] = b.commercialType === "SPOT" ? "SPOT" : "CONTRACT";
+      if (p?.contractRateCardId) {
+        const card = store
+          .listTenantCustomerRateCards(b.customerId)
+          .find((c) => c.id === p.contractRateCardId);
+        if (card) {
+          const rt = normRateType(card.rateType);
+          return {
+            contracted: freightFor(card.rate, rt, weightOf(b), distanceOf(b)),
+            rateCard: {
+              source,
+              rateCardId: card.id,
+              lane: `${card.fromCity ?? laneOf(b).split(" → ")[0]} → ${card.toCity ?? laneOf(b).split(" → ")[1]}`,
+              vehicleType: card.vehicleType ?? undefined,
+              rate: card.rate,
+              rateType: rt,
+              validFrom: card.effectiveFromDate,
+              validTo: card.effectiveToDate,
+            },
+          };
+        }
+      }
+      if (p?.l1Rate && p.l1Rate > 0) {
+        const rt = normRateType(p.rateType);
+        return {
+          contracted: freightFor(p.l1Rate, rt, weightOf(b), distanceOf(b)),
+          rateCard: {
+            source,
+            rateCardId: p.contractRateCardId ?? undefined,
+            lane: laneOf(b),
+            rate: p.l1Rate,
+            rateType: rt,
+          },
+        };
+      }
+      return { contracted: null };
+    };
+
     const allBookings = store.listTenantBookings(tenantId);
     const eligible = allBookings.filter((b) => POD_ELIGIBLE_STATUSES.has(b.status));
 
@@ -167,7 +339,19 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           0,
         );
         const subtotalLive = base + approvedExpenseTotal;          // freight + approved expenses
-        const totalLive = subtotalLive + 2 * Math.round(subtotalLive * 0.09); // + 18% GST (CGST+SGST)
+        const totalLive = subtotalLive + gst18(subtotalLive);      // + 18% GST (CGST+SGST)
+        // Independent contracted total = Σ customer rate-card L1 freight (fallback
+        // to the booking's own freight when there's no L1 rate). Real variance vs
+        // the live invoiced amount surfaces deviation + accessorials.
+        const arContracts = invBookings.map(resolveCustomerContract);
+        const contractedTotal =
+          invBookings.reduce(
+            (s, b, i) => s + (arContracts[i].contracted ?? (b.pricing?.calculatedFreight ?? 0)),
+            0,
+          ) || base;
+        const variancePct = contractedTotal
+          ? Number((((subtotalLive - contractedTotal) / contractedTotal) * 100).toFixed(2))
+          : 0;
         return {
           id: inv.invoiceId,
           tripId: inv.bookingIds?.[0],
@@ -178,14 +362,16 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           terms: "Net 30",
           base,
           accessorials: [],
-          contracted: base,
+          contracted: contractedTotal,
           invoiced: subtotalLive,
           amount: totalLive,
-          variancePct: 0,
-          flagged: false,
+          variancePct,
+          flagged: Math.abs(variancePct) > AR_TOLERANCE_PCT,
           stage: "submitted",
           bookingIds: inv.bookingIds,
           expenseItems,
+          commercialType: firstBooking?.commercialType ?? undefined,
+          rateCard: arContracts.find((c) => c.rateCard)?.rateCard,
           // One drop per booking so multi-booking invoices resolve every trip.
           drops: invBookings.length > 1
             ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))
@@ -198,10 +384,15 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
 
     /* ---------- Accounts payable: REAL vendor bills from shared invoices --------
        Each vendor-submitted invoice (shared collection) becomes a VendorBill.
-       Linked bookings come from the invoice line items (→ full booking detail);
-       contract rate is the bookings' assigned vendor freight, so the 3-way match
-       shows real variance when the vendor billed off-contract. */
-    const podDoneOf = (b: BookingRecord) => podStageOf(b) !== "pending";
+       Linked bookings come from the invoice line items (→ full booking detail).
+       The 3-way-match baseline is the INDEPENDENT contracted/awarded rate
+       (spot win or vendor rate card via resolveVendorContract) — never the
+       negotiated vendorFreight — so a bill off-contract shows real variance. */
+    // POD for AP must be a genuine POD signal (delivery-level capture or the
+    // booking's own POD flag), NOT merely status === COMPLETED.
+    const podConfirmedForAp = (b: BookingRecord) =>
+      Boolean(b.invoiceId || b.isInvoiced || b.pod?.podUploaded) ||
+      areAllDeliveryPodsCaptured(b.deliveries);
     const bookingForTripRef = (ref: string) =>
       allBookings.find((b) => b.bookingId === ref || b.id === ref);
     // BillStage from invoice status: only PENDING/DISPUTED stay in the match queue.
@@ -212,8 +403,12 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
       const linkedRecords = inv.lineItems
         .map((li) => bookingForTripRef(li.tripId))
         .filter((b): b is BookingRecord => Boolean(b));
+      const apContracts = linkedRecords.map(resolveVendorContract);
       const contractRate = linkedRecords.length
-        ? linkedRecords.reduce((s, b) => s + (b.assignment?.vendorFreight ?? 0), 0)
+        ? linkedRecords.reduce(
+            (s, b, i) => s + (apContracts[i].contracted ?? (b.assignment?.vendorFreight ?? 0)),
+            0,
+          )
         : inv.subtotal;
       return {
         id: inv.id,
@@ -223,10 +418,12 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         lane: linkedRecords[0] ? laneOf(linkedRecords[0]) : "—",
         contractRate,
         billed: inv.subtotal,                                   // freight billed (ex-GST) vs contract freight
-        pod: linkedRecords.length ? linkedRecords.every(podDoneOf) : true,
+        pod: linkedRecords.length ? linkedRecords.every(podConfirmedForAp) : true,
         terms: "Net 30",
         due: (inv.paymentDueDate ?? "").slice(0, 10),
         stage: stageForStatus(inv.status),
+        commercialType: linkedRecords[0]?.commercialType ?? undefined,
+        rateCard: apContracts.find((c) => c.rateCard)?.rateCard,
         linkedBookings: linkedRecords.map(bookingToTrip),
         vendorGstin: inv.vendorGstin,
         customerGstin: inv.customerGstin,

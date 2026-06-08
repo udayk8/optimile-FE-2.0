@@ -11,6 +11,7 @@ import { useDisputes } from "@finance/lib/disputesStore";
 import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
+import RateCardPanel from "@finance/components/RateCardPanel";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -292,6 +293,12 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Fraunces', Georgia, serif" }}>{inv.id}</h1>
             <Pill tone={STAGE_TONE[inv.stage]}>{STAGE_LABEL[inv.stage]}</Pill>
+            {inv.commercialType && (
+              <Pill tone={inv.commercialType === "SPOT" ? "amber" : "blue"}>{inv.commercialType === "SPOT" ? "Spot" : "Contract"}</Pill>
+            )}
+            {inv.flagged && (
+              <Pill tone="red">Variance {inv.variancePct > 0 ? "+" : ""}{inv.variancePct.toFixed(1)}% vs contract</Pill>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500">{inv.client} · {inv.lane} · {inv.truck} {inv.tripId && <>· trip {inv.tripId}</>}</p>
         </div>
@@ -311,6 +318,10 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
       <Card className="mb-6 p-5">
         <Stepper steps={WORKFLOW_STEPS} current={stepIndex(inv.stage)} />
       </Card>
+
+      {/* Contract rate card behind this invoice's `contracted` baseline — shown for
+          contract / spot bookings so the client sees what the rate was matched on. */}
+      {inv.rateCard && <RateCardPanel rateCard={inv.rateCard} commercialType={inv.commercialType} />}
 
       {podTrips.length > 1 ? (
         /* Consolidated invoice — show expenses grouped per booking. */

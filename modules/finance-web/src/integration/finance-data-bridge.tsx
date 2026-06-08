@@ -3,6 +3,32 @@ import type { ARInvoice, ARTrip } from '@finance/lib/receivablesStore'
 import type { VendorBill } from '@finance/lib/payablesStore'
 
 /**
+ * The contracted/awarded rate behind a booking, surfaced to Finance for
+ * transparency on the invoice / 3-way-match views. `source` distinguishes a
+ * spot-auction win from a standing rate-card contract. All fields are best-effort
+ * (the embedded adapter fills them from the booking's assignment / spot contract);
+ * absent for manual/own-fleet bookings that have no underlying contract.
+ */
+export interface RateCardDescriptor {
+  source: 'SPOT' | 'CONTRACT'
+  rateCardId?: string
+  lane: string
+  vehicleType?: string
+  rate: number
+  rateType: 'PER_TRIP' | 'PER_KM' | 'PER_MT'
+  validFrom?: string
+  validTo?: string
+  // Auction-win provenance (AP/vendor side only). Present when the vendor was
+  // awarded this lane via an auction — the contract the vendor "won". Lets Finance
+  // show the win behind the 3-way-match baseline (source auction, L1/L2/L3 rank,
+  // volume split). Absent for manually-uploaded vendor contracts / customer cards.
+  awarded?: boolean
+  sourceAuctionId?: string
+  allocationRank?: 'L1' | 'L2' | 'L3'
+  volumeAllocationPercent?: number
+}
+
+/**
  * Cross-module integration PORT for the Finance module.
  *
  * Finance runs in two modes:

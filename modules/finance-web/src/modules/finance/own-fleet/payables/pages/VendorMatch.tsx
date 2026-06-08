@@ -7,6 +7,7 @@ import { Card, Pill, SectionTitle, Modal, ModalHeader } from "@finance/component
 import { fmtINR } from "@finance/lib/format";
 import { VENDOR_BILLS, VENDOR_BILL_DETAILS, OPTIMILE_BILL_TO, vendorMeta, VENDOR_DISPUTE_RESPONSES, DEFAULT_VENDOR_DISPUTE_RESPONSE } from "@finance/data/mock";
 import { useDisputes } from "@finance/lib/disputesStore";
+import RateCardPanel from "@finance/components/RateCardPanel";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -122,6 +123,9 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
             <Pill tone={bill.status === "matched" ? "green" : bill.status === "variance" ? "red" : "amber"}>
               {bill.status === "matched" ? "Matched" : bill.status === "variance" ? `Variance +${bill.variance}%` : "POD pending"}
             </Pill>
+            {bill.commercialType && (
+              <Pill tone={bill.commercialType === "SPOT" ? "amber" : "blue"}>{bill.commercialType === "SPOT" ? "Spot" : "Contract"}</Pill>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500">{bill.vendor} · {bill.trip} · {bill.lane} · {bill.terms} (due {bill.due})</p>
         </div>
@@ -149,6 +153,8 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
         <Match label="POD" v={bill.pod ? "Verified" : "Missing"} ok={bill.pod} />
         <Match label="Billed" v={fmtINR(bill.billed)} ok={bill.status !== "variance"} />
       </Card>
+
+      {bill.rateCard && <RateCardPanel rateCard={bill.rateCard} commercialType={bill.commercialType} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Validation: contract vs invoice */}
