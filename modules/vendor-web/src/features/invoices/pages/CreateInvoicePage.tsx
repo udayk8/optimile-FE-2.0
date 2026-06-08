@@ -14,12 +14,12 @@ import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
+import { useVendorGstRate } from '@vendor/integration/useVendorGstRate'
 import type { Invoice } from '@vendor/types'
 
 type Step = 'select' | 'review'
 
 const PAGE_SIZE = 5
-const GST_RATE = 12
 const CUSTOMER_ADDRESS =
   '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
@@ -27,6 +27,8 @@ export default function CreateInvoicePage() {
   const navigate = useNavigate()
   const { trips } = useVendorBookings()
   const { generateInvoice } = useVendorInvoices()
+  // Vendor's GST rate, configured by the tenant admin at onboarding (cross-module).
+  const GST_RATE = useVendorGstRate()
   const [step, setStep] = useState<Step>('select')
   const [page, setPage] = useState(1)
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
@@ -52,7 +54,7 @@ export default function CreateInvoicePage() {
       grandTotal: subtotal + gstAmount,
       bookingCount: selectedTrips.length,
     }
-  }, [selectedTrips])
+  }, [selectedTrips, GST_RATE])
 
   const bridge = useTenantBridge()
   const { getBookingDetail } = useVendorBookings()

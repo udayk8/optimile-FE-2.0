@@ -8,6 +8,8 @@ export interface TenantVendor {
   code?: string;
   gstin?: string;
   gstNumber?: string;
+  /** GST rate (%) applied to this vendor's invoices, e.g. 12 or 18. */
+  gstRate?: number;
   pan?: string;
   address?: string;
   vendorType?: string;
@@ -79,6 +81,7 @@ export interface TenantVendorInput {
   code?: string;
   gstin?: string;
   gstNumber?: string;
+  gstRate?: number;
   pan?: string;
   address?: string;
   vendorType?: string;

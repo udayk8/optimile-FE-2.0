@@ -899,7 +899,8 @@ function ensureDemoTenantsRehydrated(): void {
 // bl001-tenant row in each seed-managed collection with the seed snapshot.
 // Gated by its own version key so it runs once and never clobbers later edits.
 // v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v2";
+// v3: 3 vendors get configured GST rates (Mahesh 10 / ABC 12 / VRL 18).
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v3";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
@@ -4530,6 +4531,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           code: normalizedCode || undefined,
           gstin: input.gstin?.trim().toUpperCase() || input.gstNumber?.trim().toUpperCase() || undefined,
           gstNumber: input.gstNumber?.trim() || undefined,
+          gstRate: input.gstRate,
           pan: input.pan?.trim().toUpperCase() || undefined,
           address: input.address?.trim() || undefined,
           vendorType: input.vendorType?.trim() || undefined,
