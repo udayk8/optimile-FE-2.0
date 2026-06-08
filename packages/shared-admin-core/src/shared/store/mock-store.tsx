@@ -649,12 +649,12 @@ const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-
 // Vendor Portal read. Idempotent by contractId; runs every boot.
 const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
 const SEED_VENDOR_CONTRACTS = [
-  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
-  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
-  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "MGV", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "MGV", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "MGV", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "MGV", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "MGV", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "MGV", rate: 1450, rateType: "PER_MT", months: 12 },
 ];
 
 function seedVendorContracts(): void {
