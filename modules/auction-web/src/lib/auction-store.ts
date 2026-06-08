@@ -16,6 +16,8 @@ import { MOCK_AUCTIONS, MOCK_CONTRACTS } from '@auction/lib/mock-data'
  * data when the key is absent (standalone vendor build).
  */
 export const AUCTION_STORE_KEY = 'optimile.auction-store'
+// One-time refresh of seeded demo contracts' vehicle type (v1 = all MGV).
+const AUCTION_SEED_REFRESH_KEY = 'optimile.auction-seed-refresh.v1'
 const SESSION_CONTEXT_KEY = 'optimile.session.context'
 
 /**
@@ -165,6 +167,25 @@ export function loadStore(): AuctionStoreSnapshot {
       snapshot.auctions = [...snapshot.auctions, ...missingAuctions]
       snapshot.contracts = [...snapshot.contracts, ...missingContracts]
       window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+    }
+    // One-time: refresh the VEHICLE TYPE of seeded demo contracts to the latest
+    // seed value (the merge-missing above only adds new ids, never updates
+    // existing rows). Touches only seed ids and only the vehicleType field, so
+    // user-created contracts and other fields (status, consumedByBookingId…) are
+    // left intact. Bump the version key to push further field refreshes.
+    if (window.localStorage.getItem(AUCTION_SEED_REFRESH_KEY) !== '1') {
+      const seedVehicleById = new Map(MOCK_CONTRACTS.map((c) => [c.id, c.vehicleType]))
+      let refreshed = false
+      snapshot.contracts = snapshot.contracts.map((c) => {
+        const seedVehicle = seedVehicleById.get(c.id)
+        if (seedVehicle != null && seedVehicle !== c.vehicleType) {
+          refreshed = true
+          return { ...c, vehicleType: seedVehicle }
+        }
+        return c
+      })
+      if (refreshed) window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+      window.localStorage.setItem(AUCTION_SEED_REFRESH_KEY, '1')
     }
     return sweepExpiredAuctions(snapshot)
   } catch {

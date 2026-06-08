@@ -24,17 +24,20 @@ type AuctionStoreContract = {
   destinationCity?: string;
   contractedRate: number;
   rateUnit: TenantVendorRateCard["rateType"];
+  vehicleType?: string;
   startDate: string;
   endDate: string;
   status: string;
+  allocationRank?: "L1" | "L2" | "L3";
+  volumeAllocationPercent?: number;
 };
 
 /**
  * Auction-won LOT/BULK contracts for one vendor, shaped as vendor rate cards.
  * SPOT contracts are one-time (consumed by a single spot booking) so they are
- * excluded from contract-based assignment. Matched on lane (city pair) only —
- * vehicle type is left open because auction vehicle labels (e.g. "32 FT Closed
- * Body") don't map 1:1 to tenant vehicle-type codes (e.g. "32FT").
+ * excluded from contract-based assignment. The contract's own vehicle type is
+ * carried through (auction contracts use the tenant vehicle-type vocabulary,
+ * e.g. "MGV"), so booking matches on lane + vehicle like manual rate cards.
  */
 function auctionContractsAsRateCards(vendor: {
   id: string;
@@ -63,7 +66,7 @@ function auctionContractsAsRateCards(vendor: {
         sourcePincode: "",
         destinationPincode: "",
         rateType: contract.rateUnit,
-        vehicleType: null,
+        vehicleType: contract.vehicleType ?? null,
         buyingRate: contract.contractedRate,
         underloadRate: contract.contractedRate,
         overloadRate: null,
@@ -71,6 +74,8 @@ function auctionContractsAsRateCards(vendor: {
         effectiveFromDate: contract.startDate,
         effectiveToDate: contract.endDate,
         status: "active",
+        allocationRank: contract.allocationRank,
+        volumeAllocationPercent: contract.volumeAllocationPercent,
         createdAt: contract.startDate,
         updatedAt: contract.startDate,
       } satisfies TenantVendorRateCard));

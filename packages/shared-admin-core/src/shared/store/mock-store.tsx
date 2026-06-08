@@ -659,12 +659,12 @@ const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-
 // Vendor Portal read. Idempotent by contractId; runs every boot.
 const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
 const SEED_VENDOR_CONTRACTS = [
-  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
-  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
-  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "MGV", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "MGV", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "MGV", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "MGV", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "MGV", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "MGV", rate: 1450, rateType: "PER_MT", months: 12 },
 ];
 
 function seedVendorContracts(): void {
@@ -909,7 +909,8 @@ function ensureDemoTenantsRehydrated(): void {
 // bl001-tenant row in each seed-managed collection with the seed snapshot.
 // Gated by its own version key so it runs once and never clobbers later edits.
 // v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v2";
+// v3: 3 vendors get configured GST rates (Mahesh 10 / ABC 12 / VRL 18).
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v3";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
@@ -4540,6 +4541,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           code: normalizedCode || undefined,
           gstin: input.gstin?.trim().toUpperCase() || input.gstNumber?.trim().toUpperCase() || undefined,
           gstNumber: input.gstNumber?.trim() || undefined,
+          gstRate: input.gstRate,
           pan: input.pan?.trim().toUpperCase() || undefined,
           address: input.address?.trim() || undefined,
           vendorType: input.vendorType?.trim() || undefined,

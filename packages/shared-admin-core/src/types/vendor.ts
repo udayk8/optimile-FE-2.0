@@ -8,6 +8,8 @@ export interface TenantVendor {
   code?: string;
   gstin?: string;
   gstNumber?: string;
+  /** GST rate (%) applied to this vendor's invoices, e.g. 12 or 18. */
+  gstRate?: number;
   pan?: string;
   address?: string;
   vendorType?: string;
@@ -65,6 +67,10 @@ export interface TenantVendorRateCard {
   rate: number;
   status: "active" | "inactive";
   remarks?: string;
+  /** Auction allocation metadata — set only for rows derived from auction-won
+   *  LOT/BULK contracts so booking assignment can honor the L1/L2/L3 split. */
+  allocationRank?: "L1" | "L2" | "L3";
+  volumeAllocationPercent?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +81,7 @@ export interface TenantVendorInput {
   code?: string;
   gstin?: string;
   gstNumber?: string;
+  gstRate?: number;
   pan?: string;
   address?: string;
   vendorType?: string;

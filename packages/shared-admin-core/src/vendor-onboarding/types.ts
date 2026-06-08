@@ -17,6 +17,8 @@ export interface VendorOnboardingDraft {
   companyName: string;
   legalName: string;
   gstin: string;
+  /** GST rate (%) applied to this vendor's invoices, e.g. 12 or 18. */
+  gstRate: number;
   pan: string;
   registeredAddress: VendorOnboardingAddress;
   primaryContact: VendorOnboardingContact;
@@ -33,6 +35,7 @@ export const emptyVendorOnboardingDraft: VendorOnboardingDraft = {
   companyName: "",
   legalName: "",
   gstin: "",
+  gstRate: 18,
   pan: "",
   registeredAddress: { street: "", city: "", state: "", pincode: "" },
   primaryContact: { name: "", phone: "", email: "" },

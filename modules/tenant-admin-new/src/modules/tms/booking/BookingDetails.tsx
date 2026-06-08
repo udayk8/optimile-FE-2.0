@@ -3621,8 +3621,8 @@ export function BookingDetailsPage() {
             ) : (
               <VendorContractComparison
                 entries={vendorComparison}
-                selectedVendorId=""
-                onSelect={sendIndentToVendor}
+                selectedRateCardId={null}
+                onSelect={(targetVendorId) => sendIndentToVendor(targetVendorId)}
                 actionLabel="Send Indent"
                 mutedVendorIds={rejectedIndentVendorIds}
                 showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}

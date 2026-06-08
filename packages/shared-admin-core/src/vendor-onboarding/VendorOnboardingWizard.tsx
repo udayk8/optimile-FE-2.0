@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  FileBadge2,
   FileText,
   Wallet,
   type LucideIcon,
@@ -43,7 +42,6 @@ export type VendorOnboardingWizardProps = {
 
 const BASE_STEPS: { label: string; icon: LucideIcon }[] = [
   { label: "Company", icon: Building2 },
-  { label: "Coverage", icon: FileBadge2 },
   { label: "Bank", icon: Wallet },
 ];
 
@@ -176,6 +174,16 @@ export function VendorOnboardingWizard({
                     className="font-mono"
                   />
                 </Field>
+                <Field label="GST Rate (%)" helper="Applied on this vendor's invoices">
+                  <Select
+                    value={String(draft.gstRate)}
+                    onChange={(e) => update({ gstRate: Number(e.target.value) })}
+                  >
+                    {[0, 5, 10, 12, 18, 28].map((rate) => (
+                      <option key={rate} value={rate}>{rate}%</option>
+                    ))}
+                  </Select>
+                </Field>
                 <Field label="PAN">
                   <Input
                     value={draft.pan}
@@ -289,49 +297,6 @@ export function VendorOnboardingWizard({
           {step === 1 && (
             <div className="space-y-5">
               <div className="flex items-center gap-3">
-                <FileBadge2 className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-extrabold">Service coverage</h2>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field
-                  label="Service regions"
-                  helper="Comma-separated (e.g. KA, TN, AP)"
-                >
-                  <Input
-                    value={draft.serviceRegions.join(", ")}
-                    onChange={(e) =>
-                      update({
-                        serviceRegions: e.target.value
-                          .split(",")
-                          .map((v) => v.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </Field>
-                <Field
-                  label="Supported vehicle types"
-                  helper="Comma-separated (e.g. LCV, MCV, HCV)"
-                >
-                  <Input
-                    value={draft.supportedVehicleTypes.join(", ")}
-                    onChange={(e) =>
-                      update({
-                        supportedVehicleTypes: e.target.value
-                          .split(",")
-                          .map((v) => v.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                </Field>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-5">
-              <div className="flex items-center gap-3">
                 <Wallet className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-extrabold">Bank details</h2>
               </div>
@@ -382,13 +347,13 @@ export function VendorOnboardingWizard({
             </div>
           )}
 
-          {step >= 3 && step < reviewIndex && (
+          {step >= 2 && step < reviewIndex && (
             <div className="space-y-5">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-extrabold">{extraSteps[step - 3]?.label}</h2>
+                <h2 className="text-lg font-extrabold">{extraSteps[step - 2]?.label}</h2>
               </div>
-              {extraSteps[step - 3]?.content}
+              {extraSteps[step - 2]?.content}
             </div>
           )}
 
@@ -400,10 +365,8 @@ export function VendorOnboardingWizard({
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <ReviewCard label="Company" primary={draft.companyName}>
-                  <div className="text-xs text-muted-foreground">Coverage</div>
-                  <div className="text-sm">
-                    {draft.serviceRegions.join(", ") || "—"}
-                  </div>
+                  <div className="text-xs text-muted-foreground">GST Rate</div>
+                  <div className="text-sm">{draft.gstRate}%</div>
                 </ReviewCard>
                 <ReviewCard label="Bank" primary={draft.bankName}>
                   <div className="text-xs text-muted-foreground">Account</div>

@@ -25,7 +25,7 @@ import {
   calculateMarginPercent,
   getPrimaryBookingStatus,
 } from "@/modules/tms/booking/services/booking-engine";
-import { normalizeRateMatchingConfig } from "@/shared/lib/rate-matching-config";
+import { normalizeRateMatchingConfig, scoreRateCardMatch } from "@/shared/lib/rate-matching-config";
 import {
   buildCustomerLookup,
   buildVendorLookup,
@@ -177,33 +177,24 @@ export function AssignmentQueuePage() {
     if (!vendorRateCards.length) return null;
     const config = normalizeRateMatchingConfig(vendorMap.get(vendorRecordId)?.rateMatchingConfig);
     const ctx = bookingMatchContext;
-    const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
-      assigningBooking.pricing.rateType,
-      "PER_MT",
-      "PER_TRIP",
-      "PER_KM",
-    ].filter((value, index, array) => array.indexOf(value) === index) as Array<"PER_MT" | "PER_KM" | "PER_TRIP">;
-    const matched =
-      candidateRateTypes
-        .map((rateType) =>
-          validateVendorRateCard(
-            {
-              bookingDate: assigningBooking.pickupDate ?? null,
-              rateMatchingConfig: config,
-              fromCity: ctx.sourceAddress?.city ?? null,
-              toCity: ctx.destinationAddress?.city ?? null,
-              fromLocation: ctx.sourceAddress?.addressName ?? null,
-              toLocation: ctx.destinationAddress?.addressName ?? null,
-              fromPincode: ctx.sourceAddress?.pincode ?? null,
-              toPincode: ctx.destinationAddress?.pincode ?? null,
-              vehicleType: ctx.vehicleTypeCode,
-              material: ctx.materialCode,
-              rateType,
-            },
-            vendorRateCards,
-          ),
-        )
-        .find(Boolean) ?? null;
+    // Match strictly on the rate type chosen when the contract booking was
+    // created — no cross-rate-type fallback.
+    const matched = validateVendorRateCard(
+      {
+        bookingDate: assigningBooking.pickupDate ?? null,
+        rateMatchingConfig: config,
+        fromCity: ctx.sourceAddress?.city ?? null,
+        toCity: ctx.destinationAddress?.city ?? null,
+        fromLocation: ctx.sourceAddress?.addressName ?? null,
+        toLocation: ctx.destinationAddress?.addressName ?? null,
+        fromPincode: ctx.sourceAddress?.pincode ?? null,
+        toPincode: ctx.destinationAddress?.pincode ?? null,
+        vehicleType: ctx.vehicleTypeCode,
+        material: ctx.materialCode,
+        rateType: assigningBooking.pricing.rateType,
+      },
+      vendorRateCards,
+    );
     if (!matched) return null;
     const freight = calculateVendorFreightFromRateCard({
       rateCard: matched,
@@ -213,28 +204,93 @@ export function AssignmentQueuePage() {
     return { rateCard: matched, freight };
   }
 
-  // Contract Vendor comparison — every vendor with a matching contract, cheapest first.
-  const vendorComparison = useMemo(() => {
+  // Contract Vendor options — EVERY matching contract (auction-won + manual) for
+  // the booking lane, restricted to the rate type chosen on the booking. One row
+  // per contract so the dispatcher sees all options, cheapest buying freight first.
+  const vendorContractOptions = useMemo(() => {
     if (!assigningBooking || !bookingMatchContext) return [];
-    return adminSources.vendors
+    const ctx = bookingMatchContext;
+    const bookingRateType = assigningBooking.pricing.rateType;
+    const matchInput = {
+      fromCity: ctx.sourceAddress?.city ?? null,
+      toCity: ctx.destinationAddress?.city ?? null,
+      fromLocation: ctx.sourceAddress?.addressName ?? null,
+      toLocation: ctx.destinationAddress?.addressName ?? null,
+      fromPincode: ctx.sourceAddress?.pincode ?? null,
+      toPincode: ctx.destinationAddress?.pincode ?? null,
+      vehicleType: ctx.vehicleTypeCode,
+      material: ctx.materialCode,
+    };
+    // Completed bookings already fulfilled by this vendor on the contract lane —
+    // context for how much of an L1/L2/L3 allocation share is used up.
+    const norm = (value?: string | null) => (value ?? "").trim().toLowerCase();
+    const completedOnLane = (vendorId: string, fromCity?: string, toCity?: string) =>
+      bookings.filter((b) => {
+        if (getPrimaryBookingStatus(b.status) !== "COMPLETED") return false;
+        if ((b.assignment?.vendorId ?? null) !== vendorId) return false;
+        const addrs = adminSources.customerAddressMap.get(b.customerId) ?? [];
+        const src = addrs.find((a) => a.id === b.sourceAddressId)?.city;
+        const dst = addrs.find((a) => a.id === b.destinationAddressId)?.city;
+        return norm(src) === norm(fromCity) && norm(dst) === norm(toCity);
+      }).length;
+    const rows: Array<{
+      vendorId: string;
+      vendorName: string;
+      rateCardId: string;
+      source: "Auction" | "Manual";
+      rateType: "PER_MT" | "PER_KM" | "PER_TRIP";
+      unitRate: number;
+      vendorFreight: number;
+      marginAmount: number;
+      marginPercent: number;
+      allocationRank?: "L1" | "L2" | "L3";
+      volumeAllocationPercent?: number;
+      completed: number;
+      nextInLine: boolean;
+    }> = [];
+    adminSources.vendors
       .filter((vendor) => vendor.status === "active")
-      .map((vendor) => {
-        const match = matchVendorContract(vendor.id);
-        if (!match) return null;
-        return {
-          vendorId: vendor.id,
-          vendorName: vendor.name,
-          rateType: match.rateCard.rateType,
-          vendorFreight: match.freight,
-          marginAmount: calculateMarginAmount(customerFreight, match.freight),
-          marginPercent: calculateMarginPercent(customerFreight, match.freight),
-          rateCardId: match.rateCard.id,
-        };
-      })
-      .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
-      .sort((a, b) => a.vendorFreight - b.vendorFreight);
+      .forEach((vendor) => {
+        const config = normalizeRateMatchingConfig(vendor.rateMatchingConfig);
+        const cards = adminSources.vendorRateCardMap.get(vendor.id) ?? [];
+        cards.forEach((card) => {
+          if (card.status !== "active") return;
+          if (card.rateType !== bookingRateType) return;
+          if (scoreRateCardMatch(card, matchInput, config) === null) return;
+          const freight = calculateVendorFreightFromRateCard({
+            rateCard: card,
+            weight: ctx.weight,
+            distanceKm: ctx.distanceKm,
+          });
+          rows.push({
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            rateCardId: card.id,
+            source: card.id.startsWith("auction-") ? "Auction" : "Manual",
+            rateType: card.rateType,
+            unitRate: getVendorRateCardUnitRate(card) ?? 0,
+            vendorFreight: freight,
+            marginAmount: calculateMarginAmount(customerFreight, freight),
+            marginPercent: calculateMarginPercent(customerFreight, freight),
+            allocationRank: card.allocationRank,
+            volumeAllocationPercent: card.volumeAllocationPercent,
+            completed: completedOnLane(vendor.id, card.fromCity, card.toCity),
+            nextInLine: false,
+          });
+        });
+      });
+    // Soft order: honor the auction allocation split — L1 → L2 → L3 first
+    // (cheapest within a rank), then unranked (manual/bulk) by freight.
+    const rankWeight = (rank?: string) => (rank === "L1" ? 1 : rank === "L2" ? 2 : rank === "L3" ? 3 : 99);
+    rows.sort(
+      (a, b) => rankWeight(a.allocationRank) - rankWeight(b.allocationRank) || a.vendorFreight - b.vendorFreight,
+    );
+    // Flag the first ranked (L1) row as the next vendor in line per allocation.
+    const firstRanked = rows.findIndex((row) => row.allocationRank);
+    if (firstRanked !== -1) rows[firstRanked].nextInLine = true;
+    return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminSources.vendors, adminSources.vendorRateCardMap, bookingMatchContext, assigningBooking, customerFreight]);
+  }, [adminSources.vendors, adminSources.vendorRateCardMap, adminSources.customerAddressMap, bookings, bookingMatchContext, assigningBooking, customerFreight]);
 
   const selectedLrConfig = useMemo(
     () =>
@@ -363,8 +419,12 @@ export function AssignmentQueuePage() {
       return;
     }
 
-    // The moment a vendor is selected (Contract OR Manual mode), search that
-    // vendor's contract using its config and auto-fill the buying freight.
+    // Contract mode: the dispatcher picks a specific contract row (which sets the
+    // rate/freight directly), so skip the single auto-match here.
+    if (assignMethod === "CONTRACT") return;
+
+    // Manual mode: the moment a vendor is selected, search that vendor's contract
+    // (booking rate type only) and auto-fill the buying freight.
     const match = matchVendorContract(vendorId);
     if (!match) {
       setVendorFreightSource("MANUAL");
@@ -384,7 +444,7 @@ export function AssignmentQueuePage() {
       `${match.rateCard.rateType} @ ${(getVendorRateCardUnitRate(match.rateCard) ?? 0).toLocaleString()}`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminSources.vendorRateCardMap, bookingMatchContext, assigningBooking, vendorId]);
+  }, [adminSources.vendorRateCardMap, bookingMatchContext, assigningBooking, vendorId, assignMethod]);
 
   // Spot-contract bookings arrive with the winning vendor + locked rate from
   // the one-time spot contract — prefill both so no manual amount is typed.
@@ -608,15 +668,20 @@ export function AssignmentQueuePage() {
           {assignMethod === "CONTRACT" ? (
             <div className="md:col-span-2 space-y-2">
               <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                Matching contract vendors — lowest buying freight first
+                Matching contracts — {assigningBooking?.pricing.rateType} · auction & manual · lowest buying freight first
               </p>
-              {vendorComparison.length ? (
+              {vendorContractOptions.length ? (
                 <div className="overflow-x-auto rounded-xl border">
                   <table className="min-w-full divide-y divide-border text-sm">
                     <thead className="bg-muted/20 text-left text-muted-foreground">
                       <tr>
                         <th className="px-3 py-2 font-medium">Vendor</th>
+                        <th className="px-3 py-2 font-medium">Source</th>
+                        <th className="px-3 py-2 font-medium">Rank</th>
+                        <th className="px-3 py-2 font-medium">Volume</th>
+                        <th className="px-3 py-2 font-medium">Completed</th>
                         <th className="px-3 py-2 font-medium">Rate Type</th>
+                        <th className="px-3 py-2 font-medium">Buying Rate</th>
                         <th className="px-3 py-2 font-medium">Vendor Freight</th>
                         {access.can("ASSIGNMENT_QUEUE", "VIEW_MARGIN") ? (
                           <th className="px-3 py-2 font-medium">Margin</th>
@@ -625,10 +690,28 @@ export function AssignmentQueuePage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/70">
-                      {vendorComparison.map((entry) => (
-                        <tr key={entry.vendorId} className={entry.vendorId === vendorId ? "bg-primary/5" : ""}>
-                          <td className="px-3 py-2 font-medium">{entry.vendorName}</td>
+                      {vendorContractOptions.map((entry) => (
+                        <tr key={entry.rateCardId} className={entry.rateCardId === matchedVendorRateCardId ? "bg-primary/5" : ""}>
+                          <td className="px-3 py-2 font-medium">
+                            {entry.vendorName}
+                            {entry.nextInLine ? (
+                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Next in line</span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                entry.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+                              }`}
+                            >
+                              {entry.source}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{entry.allocationRank ?? "—"}</td>
+                          <td className="px-3 py-2">{entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "100%"}</td>
+                          <td className="px-3 py-2">{entry.completed}</td>
                           <td className="px-3 py-2">{entry.rateType}</td>
+                          <td className="px-3 py-2">Rs {entry.unitRate.toLocaleString()}</td>
                           <td className="px-3 py-2">Rs {entry.vendorFreight.toLocaleString()}</td>
                           {access.can("ASSIGNMENT_QUEUE", "VIEW_MARGIN") ? (
                             <td className="px-3 py-2">
@@ -636,7 +719,7 @@ export function AssignmentQueuePage() {
                             </td>
                           ) : null}
                           <td className="px-3 py-2">
-                            {entry.vendorId === vendorId ? (
+                            {entry.rateCardId === matchedVendorRateCardId ? (
                               <Button size="sm" onClick={() => undefined}>Selected</Button>
                             ) : (
                               <Button
@@ -646,6 +729,12 @@ export function AssignmentQueuePage() {
                                   setVendorId(entry.vendorId);
                                   setVehicleId("");
                                   setDriverId("");
+                                  setVendorFreight(String(entry.vendorFreight));
+                                  setVendorFreightSource("RATE_CARD");
+                                  setVendorRateWarning("");
+                                  setMatchedVendorRateCardId(entry.rateCardId);
+                                  setMatchedVendorRateType(entry.rateType);
+                                  setBuyingRateLabel(`${entry.rateType} @ ${entry.unitRate.toLocaleString()} · ${entry.source}`);
                                 }}
                               >
                                 Select
@@ -659,7 +748,7 @@ export function AssignmentQueuePage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  No vendor contract matches this booking. Switch to Manual Assignment to enter a buying rate.
+                  No {assigningBooking?.pricing.rateType} vendor contract matches this booking lane. Switch to Manual Assignment to enter a buying rate.
                 </div>
               )}
             </div>
