@@ -9,6 +9,7 @@ import type {
 import {
   findBestRateCardMatch,
   normalizeRateMatchingConfig,
+  scoreRateCardMatch,
   type RateMatchInput,
 } from "@/shared/lib/rate-matching-config";
 import type { TenantDriver, TenantVehicle } from "@/types/fleet";
@@ -397,7 +398,7 @@ export function calculateVendorFreightFromRateCard(params: {
   return Number(perTrip(unitRate).toFixed(2));
 }
 
-/** One recommended vendor in the Contract Vendor comparison. */
+/** One matching vendor contract in the Contract Vendor comparison. */
 export type VendorComparisonEntry = {
   vendorId: string;
   vendorName: string;
@@ -408,6 +409,9 @@ export type VendorComparisonEntry = {
   marginAmount: number;
   marginPercent: number;
   rateCardId: string;
+  /** Where the contract came from — auction-won (merged with an `auction-` id
+   *  prefix) or a manually configured vendor rate card. */
+  source: "Auction" | "Manual";
 };
 
 /** Booking-side payload the vendor comparison matches on (resolved by callers). */
@@ -427,11 +431,11 @@ export type VendorComparisonMatchInput = {
 };
 
 /**
- * Vendor Recommendation Engine — for every active vendor, match the booking
- * against that vendor's contract using the SAME config-driven engine as
- * customers, compute the buying freight (Per Trip / Per MT) and margin, and
- * return the list sorted cheapest-buying-freight-first. Vendors without a
- * matching contract are excluded.
+ * Vendor Recommendation Engine — list EVERY contract that matches the booking
+ * lane, across all active vendors, restricted to the rate type chosen on the
+ * booking (no cross-rate-type fallback). Auction-won and manual contracts are
+ * treated uniformly (one entry per contract), sorted cheapest-buying-freight
+ * first. Contracts that don't match the lane/rate type are excluded.
  */
 export function buildVendorComparison(params: {
   vendors: TenantVendor[];
@@ -440,60 +444,49 @@ export function buildVendorComparison(params: {
   customerFreight: number;
 }): VendorComparisonEntry[] {
   const { vendors, vendorRateCardMap, input, customerFreight } = params;
-  const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
-    input.preferredRateType,
-    "PER_MT",
-    "PER_TRIP",
-    "PER_KM",
-  ].filter((value, index, array) => array.indexOf(value) === index) as Array<"PER_MT" | "PER_KM" | "PER_TRIP">;
+  const matchInput: RateMatchInput = {
+    fromCity: input.fromCity,
+    toCity: input.toCity,
+    fromLocation: input.fromLocation,
+    toLocation: input.toLocation,
+    fromPincode: input.fromPincode,
+    toPincode: input.toPincode,
+    vehicleType: input.vehicleType,
+    material: input.material,
+  };
 
-  return vendors
+  const rows: VendorComparisonEntry[] = [];
+  vendors
     .filter((vendor) => vendor.status === "active")
-    .map((vendor) => {
-      const vendorRateCards = vendorRateCardMap.get(vendor.id) ?? [];
-      if (!vendorRateCards.length) return null;
+    .forEach((vendor) => {
       const config = normalizeRateMatchingConfig(vendor.rateMatchingConfig);
-      const matched =
-        candidateRateTypes
-          .map((rateType) =>
-            validateVendorRateCard(
-              {
-                bookingDate: input.bookingDate,
-                rateMatchingConfig: config,
-                fromCity: input.fromCity,
-                toCity: input.toCity,
-                fromLocation: input.fromLocation,
-                toLocation: input.toLocation,
-                fromPincode: input.fromPincode,
-                toPincode: input.toPincode,
-                vehicleType: input.vehicleType,
-                material: input.material,
-                rateType,
-              },
-              vendorRateCards,
-            ),
-          )
-          .find(Boolean) ?? null;
-      if (!matched) return null;
-      const vendorFreight = calculateVendorFreightFromRateCard({
-        rateCard: matched,
-        weight: input.weight,
-        distanceKm: input.distanceKm,
+      const vendorRateCards = vendorRateCardMap.get(vendor.id) ?? [];
+      vendorRateCards.forEach((card) => {
+        if (card.status !== "active") return;
+        // Only contracts of the booking's rate type.
+        if (normalizeVendorRateType(card.rateType) !== input.preferredRateType) return;
+        // Only contracts whose lane (and configured dimensions) match.
+        if (scoreRateCardMatch(card, matchInput, config) === null) return;
+        const vendorFreight = calculateVendorFreightFromRateCard({
+          rateCard: card,
+          weight: input.weight,
+          distanceKm: input.distanceKm,
+        });
+        rows.push({
+          vendorId: vendor.id,
+          vendorName: vendor.name,
+          rateType: normalizeVendorRateType(card.rateType),
+          buyingRate: getVendorRateCardUnitRate(card) ?? 0,
+          vendorFreight,
+          customerFreight,
+          marginAmount: calculateMarginAmount(customerFreight, vendorFreight),
+          marginPercent: calculateMarginPercent(customerFreight, vendorFreight),
+          rateCardId: card.id,
+          source: card.id.startsWith("auction-") ? "Auction" : "Manual",
+        });
       });
-      return {
-        vendorId: vendor.id,
-        vendorName: vendor.name,
-        rateType: normalizeVendorRateType(matched.rateType),
-        buyingRate: getVendorRateCardUnitRate(matched) ?? 0,
-        vendorFreight,
-        customerFreight,
-        marginAmount: calculateMarginAmount(customerFreight, vendorFreight),
-        marginPercent: calculateMarginPercent(customerFreight, vendorFreight),
-        rateCardId: matched.id,
-      } satisfies VendorComparisonEntry;
-    })
-    .filter((entry): entry is VendorComparisonEntry => Boolean(entry))
-    .sort((a, b) => a.vendorFreight - b.vendorFreight);
+    });
+  return rows.sort((a, b) => a.vendorFreight - b.vendorFreight);
 }
 
 export function getQuantityUOMOptions(

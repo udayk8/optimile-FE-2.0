@@ -8,7 +8,7 @@ import type { VendorComparisonEntry } from "@/modules/tms/booking/services/booki
  */
 export function VendorContractComparison({
   entries,
-  selectedVendorId,
+  selectedRateCardId,
   onSelect,
   showMargin = true,
   showCustomerFreight = true,
@@ -17,8 +17,8 @@ export function VendorContractComparison({
   header,
 }: {
   entries: VendorComparisonEntry[];
-  selectedVendorId: string;
-  onSelect: (vendorId: string) => void;
+  selectedRateCardId: string | null;
+  onSelect: (vendorId: string, rateCardId: string) => void;
   showMargin?: boolean;
   showCustomerFreight?: boolean;
   /** Label for the per-row action button (e.g. "Send Indent"). */
@@ -36,7 +36,7 @@ export function VendorContractComparison({
         <Summary label="Customer Freight" value={money(header.customerFreight)} />
         <Summary label="Vehicle Type" value={header.vehicleType || "-"} />
         <Summary label="Material" value={header.material || "-"} />
-        <Summary label="Matched Vendors" value={String(entries.length)} />
+        <Summary label="Matched Contracts" value={String(entries.length)} />
       </div>
 
       {entries.length ? (
@@ -45,6 +45,7 @@ export function VendorContractComparison({
             <thead className="bg-muted/20 text-left text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Vendor</th>
+                <th className="px-3 py-2 font-medium">Source</th>
                 <th className="px-3 py-2 font-medium">Rate Type</th>
                 <th className="px-3 py-2 font-medium">Buying Rate</th>
                 {showCustomerFreight ? <th className="px-3 py-2 font-medium">Customer Freight</th> : null}
@@ -57,12 +58,21 @@ export function VendorContractComparison({
                 const isMuted = muted.has(entry.vendorId);
                 return (
                   <tr
-                    key={entry.vendorId}
-                    className={`${entry.vendorId === selectedVendorId ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
+                    key={entry.rateCardId}
+                    className={`${entry.rateCardId === selectedRateCardId ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
                   >
                     <td className="px-3 py-2 font-medium">
                       {entry.vendorName}
                       {isMuted ? <span className="ml-2 text-[11px] font-normal text-rose-600">Rejected</span> : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          entry.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {entry.source}
+                      </span>
                     </td>
                     <td className="px-3 py-2">{entry.rateType === "PER_MT" ? "Per MT" : entry.rateType === "PER_KM" ? "Per KM" : "Per Trip"}</td>
                     <td className="px-3 py-2">{money(entry.vendorFreight)}</td>
@@ -73,10 +83,10 @@ export function VendorContractComparison({
                       </td>
                     ) : null}
                     <td className="px-3 py-2">
-                      {entry.vendorId === selectedVendorId ? (
+                      {entry.rateCardId === selectedRateCardId ? (
                         <Button size="sm" onClick={() => undefined}>Selected</Button>
                       ) : (
-                        <Button size="sm" variant="outline" onClick={() => onSelect(entry.vendorId)}>
+                        <Button size="sm" variant="outline" onClick={() => onSelect(entry.vendorId, entry.rateCardId)}>
                           {isMuted ? "Resend" : actionLabel}
                         </Button>
                       )}
@@ -89,7 +99,7 @@ export function VendorContractComparison({
         </div>
       ) : (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          No vendor contract found for this booking. Switch to Manual Assignment.
+          No matching vendor contract for this booking lane and rate type. Switch to Manual Assignment.
         </div>
       )}
     </div>
