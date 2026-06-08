@@ -18,6 +18,13 @@ const STATUS_FILTERS: { value: ContractStatus | 'ALL'; label: string }[] = [
   { value: 'EXPIRED', label: 'Expired' },
 ]
 
+// Manually uploaded contracts vs auction-won (Bulk/Lot/Spot) contracts.
+type ContractSourceTab = 'MANUAL' | 'AUCTION'
+const SOURCE_TABS: { value: ContractSourceTab; label: string }[] = [
+  { value: 'MANUAL', label: 'Manual Contracts' },
+  { value: 'AUCTION', label: 'Auction Contracts' },
+]
+
 function laneLabel(contract: Contract): string {
   const { origin, destination } = contract.laneDetails
   return formatLaneDisplay(origin.city, destination.city)
@@ -25,6 +32,7 @@ function laneLabel(contract: Contract): string {
 
 export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'ALL'>('ALL')
+  const [sourceTab, setSourceTab] = useState<ContractSourceTab>('MANUAL')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const navigate = useNavigate()
@@ -40,6 +48,10 @@ export default function ContractsPage() {
   const filtered = contracts.filter((c) => {
     if (c.status === 'DRAFT') return false
     if (selectedContractId && c.id !== selectedContractId) return false
+    // Manual tab = manually uploaded contracts; Auction tab = auction-won.
+    const isAuction = c.source === 'AUCTION_WIN'
+    if (sourceTab === 'AUCTION' && !isAuction) return false
+    if (sourceTab === 'MANUAL' && isAuction) return false
     if (statusFilter !== 'ALL' && c.status !== statusFilter) return false
     if (search && !c.id.toLowerCase().includes(search.toLowerCase()) && !laneLabel(c).toLowerCase().includes(search.toLowerCase())) return false
     return true
@@ -57,6 +69,22 @@ export default function ContractsPage() {
         subtitle="Manage your active rate contracts and historical agreements"
         icon={<FileText className="h-5 w-5 text-primary" />}
       />
+      <div className="mt-6 flex gap-2 border-b border-gray-200">
+        {SOURCE_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => { setSourceTab(tab.value); setPage(1); }}
+            className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+              sourceTab === tab.value
+                ? 'border-primary text-primary'
+                : 'border-transparent text-gray-500 hover:text-primary'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-6 mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
         <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
           {STATUS_FILTERS.map((f) => (
