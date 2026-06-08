@@ -1,5 +1,7 @@
 export type VehicleOwnershipType = "OWN" | "VENDOR";
 export type VehicleFuelType = "DIESEL" | "PETROL" | "CNG" | "LNG" | "ELECTRIC";
+// How a vehicle reports location — mirrors the vendor portal's tracking model.
+export type VehicleTrackingType = "GPS_DEVICE" | "SIM" | "NONE";
 export type DrugTestStatus = "CLEAR" | "PENDING" | "FAILED";
 export type VehicleOperationalStatus = "ACTIVE" | "UNDER_MAINTENANCE" | "INACTIVE";
 export type ComplianceStatus = "COMPLIANT" | "EXPIRING_SOON" | "EXPIRED" | "PENDING_DOCS";
@@ -64,6 +66,10 @@ export interface TenantVehicle {
   engineNumber?: string;
   capacityKg?: string;
   baseLocation?: string;
+  // Location reporting method (GPS device / SIM / none). GPS device id is set
+  // only when trackingType === "GPS_DEVICE".
+  trackingType?: VehicleTrackingType;
+  gpsDeviceId?: string | null;
   operationalStatus?: VehicleOperationalStatus;
   complianceStatus?: ComplianceStatus;
   complianceDocuments?: FleetComplianceDocument[];
@@ -108,6 +114,10 @@ export interface TenantVehicleInput {
   engineNumber?: string;
   capacityKg?: string;
   baseLocation?: string;
+  // Location reporting method (GPS device / SIM / none). GPS device id is set
+  // only when trackingType === "GPS_DEVICE".
+  trackingType?: VehicleTrackingType;
+  gpsDeviceId?: string | null;
   operationalStatus?: VehicleOperationalStatus;
   complianceStatus?: ComplianceStatus;
   complianceDocuments?: FleetComplianceDocument[];

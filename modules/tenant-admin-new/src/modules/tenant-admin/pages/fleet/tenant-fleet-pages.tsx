@@ -36,9 +36,15 @@ import type {
   TenantVehicleInput,
   VehicleFuelType,
   VehicleOperationalStatus,
+  VehicleTrackingType,
 } from "@/types/fleet";
 
 const FUEL_TYPES: VehicleFuelType[] = ["DIESEL", "PETROL", "CNG", "LNG", "ELECTRIC"];
+const TRACKING_TYPES: Array<{ value: VehicleTrackingType; label: string }> = [
+  { value: "NONE", label: "No Tracking" },
+  { value: "GPS_DEVICE", label: "GPS Device" },
+  { value: "SIM", label: "SIM Based" },
+];
 const OPERATIONAL_STATUSES: Array<{ value: VehicleOperationalStatus; label: string }> = [
   { value: "ACTIVE", label: "Active" },
   { value: "UNDER_MAINTENANCE", label: "Under Maintenance" },
@@ -465,7 +471,6 @@ function VehicleModal({
   isOpen,
   onClose,
   initialVehicle,
-  activeVendors,
   activeVehicleTypes,
   onCreate,
   onUpdate,
@@ -489,6 +494,8 @@ function VehicleModal({
     operationalStatus: "ACTIVE" as VehicleOperationalStatus,
     ownershipType: "OWN" as "OWN" | "VENDOR",
     vendorId: "" as string | "",
+    trackingType: "NONE" as VehicleTrackingType,
+    gpsDeviceId: "",
   });
   const [docs, setDocs] = useState(emptyDocs);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -511,6 +518,8 @@ function VehicleModal({
         operationalStatus: initialVehicle.operationalStatus ?? (initialVehicle.isActive ? "ACTIVE" : "INACTIVE"),
         ownershipType: initialVehicle.ownershipType,
         vendorId: initialVehicle.vendorId ?? "",
+        trackingType: initialVehicle.trackingType ?? "NONE",
+        gpsDeviceId: initialVehicle.gpsDeviceId ?? "",
       });
       setDocs(complianceDocsToMap(initialVehicle.complianceDocuments, [...VEHICLE_DOC_KEYS]));
     } else {
@@ -528,6 +537,8 @@ function VehicleModal({
         operationalStatus: "ACTIVE",
         ownershipType: "OWN",
         vendorId: "",
+        trackingType: "NONE",
+        gpsDeviceId: "",
       });
       setDocs(complianceDocsToMap(undefined, [...VEHICLE_DOC_KEYS]));
     }
@@ -542,7 +553,6 @@ function VehicleModal({
 
   function handleSubmit() {
     if (!form.registrationNumber.trim() || !form.vehicleTypeId) return;
-    if (form.ownershipType === "VENDOR" && !form.vendorId) return;
     const input: TenantVehicleInput = {
       registrationNumber: form.registrationNumber,
       vehicleTypeId: form.vehicleTypeId,
@@ -554,8 +564,11 @@ function VehicleModal({
       chassisNo: form.chassisNo,
       capacityKg: form.capacityKg,
       baseLocation: form.baseLocation,
+      trackingType: form.trackingType,
+      gpsDeviceId: form.trackingType === "GPS_DEVICE" ? form.gpsDeviceId || null : null,
       operationalStatus: form.operationalStatus,
       ownershipType: form.ownershipType,
+      // Vendor link is not picked during onboarding; preserved on edit if present.
       vendorId: form.ownershipType === "VENDOR" ? form.vendorId || null : null,
       insurance: { number: docs.Insurance.referenceNo, expiry: docs.Insurance.expiryDate },
       fitness: { number: docs.FC.referenceNo, expiry: docs.FC.expiryDate },
@@ -652,12 +665,14 @@ function VehicleModal({
                 <option value="VENDOR">VENDOR</option>
               </Select>
             </Field>
-            {form.ownershipType === "VENDOR" ? (
-              <Field label="Vendor">
-                <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
-                  <option value="">Select vendor</option>
-                  {activeVendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
+            <Field label="Tracking Type">
+              <Select value={form.trackingType} onChange={(e) => setField("trackingType", e.target.value as VehicleTrackingType)}>
+                {TRACKING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </Select>
+            </Field>
+            {form.trackingType === "GPS_DEVICE" ? (
+              <Field label="GPS Device ID">
+                <Input value={form.gpsDeviceId} onChange={(e) => setField("gpsDeviceId", e.target.value)} placeholder="GPS-001" />
               </Field>
             ) : null}
           </div>
@@ -913,8 +928,6 @@ function DriverModal({
   isOpen,
   onClose,
   initialDriver,
-  activeVehicles,
-  activeVendors,
   onCreate,
   onUpdate,
 }: DriverModalProps) {
@@ -1091,23 +1104,6 @@ function DriverModal({
             </Field>
             <Field label="DL Valid Till">
               <Input type="date" value={form.licenseExpiry} onChange={(e) => setField("licenseExpiry", e.target.value)} />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Assignment">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Assigned Vehicle">
-              <Select value={form.assignedVehicleId} onChange={(e) => setField("assignedVehicleId", e.target.value)}>
-                <option value="">No vehicle mapped</option>
-                {activeVehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
-              </Select>
-            </Field>
-            <Field label="Vendor Affiliation">
-              <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
-                <option value="">Own Driver</option>
-                {activeVendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </Select>
             </Field>
           </div>
         </Section>

@@ -6776,6 +6776,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               ? updates.vendorId ?? existing.vendorId ?? null
               : null,
           chassisNo: updates.chassisNo ?? existing.chassisNo,
+          trackingType: updates.trackingType ?? existing.trackingType,
+          gpsDeviceId:
+            (updates.trackingType ?? existing.trackingType) === "GPS_DEVICE"
+              ? updates.gpsDeviceId ?? existing.gpsDeviceId ?? null
+              : null,
           insurance: updates.insurance ?? existing.insurance,
           fitness: updates.fitness ?? existing.fitness,
           puc: updates.puc ?? existing.puc,
@@ -7469,10 +7474,9 @@ function validateVehicleInput(
   if (!tenantVehicleTypes.some((item) => item.id === vehicle.vehicleTypeId && item.status === "active")) {
     throw new Error("Select an active vehicle type.");
   }
-  if (vehicle.ownershipType === "VENDOR") {
-    if (!vehicle.vendorId) {
-      throw new Error("Vendor is required for vendor-owned vehicles.");
-    }
+  // Vendor link is no longer picked during onboarding (details + compliance
+  // only), so it is optional. When a vendorId IS set, it must be an active vendor.
+  if (vehicle.ownershipType === "VENDOR" && vehicle.vendorId) {
     const vendor = tenantVendors.find((item) => item.id === vehicle.vendorId && item.status === "active");
     if (!vendor) {
       throw new Error("Select an active vendor for this vehicle.");
