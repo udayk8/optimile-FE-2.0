@@ -1055,7 +1055,7 @@ function TenantVendorRateCardSection({
             )),
             <Badge key={`${rateCard.id}-type`} variant="outline">{formatVendorRateType(rateCard.rateType)}</Badge>,
             `${(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0).toLocaleString()}`,
-            "100%",
+            "—",
             rateCard.effectiveFromDate || "—",
             rateCard.effectiveToDate || "—",
             <Badge key={`${rateCard.id}-kind`} variant="secondary">Manual</Badge>,

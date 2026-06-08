@@ -184,6 +184,7 @@ export function BookingDetailsPage() {
   const { data: orgUnits } = useTenantOrgUnits(tenant.id);
   const access = useTenantAccess();
   const {
+    data: allBookings,
     getBookingById,
     transitionBooking,
     updateBooking,
@@ -202,6 +203,8 @@ export function BookingDetailsPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   // Contract Vendor (auto-match + comparison) vs Manual Assignment. Default Contract.
   const [assignMethod, setAssignMethod] = useState<"CONTRACT" | "MANUAL">("CONTRACT");
+  // Reason required when bypassing the default L1/lowest contract (manual assign).
+  const [manualReason, setManualReason] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -435,9 +438,20 @@ export function BookingDetailsPage() {
           distanceKm: assignDistanceKm,
           preferredRateType: bookingRecord.pricing.rateType,
         },
+        // Trips already fulfilled by a vendor on the lane → drives trips-remaining.
+        completedTrips: (vendorId, fromCity, toCity) => {
+          const norm = (value?: string | null) => (value ?? "").trim().toLowerCase();
+          return allBookings.filter((b) => {
+            if (getPrimaryBookingStatus(b.status) !== "COMPLETED") return false;
+            if ((b.assignment?.vendorId ?? null) !== vendorId) return false;
+            const src = addressMap.get(b.sourceAddressId)?.city;
+            const dst = addressMap.get(b.destinationAddressId)?.city;
+            return norm(src) === norm(fromCity) && norm(dst) === norm(toCity);
+          }).length;
+        },
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode],
+    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode, allBookings, addressMap],
   );
 
   // Contract Vendor indent stage. The booking stays PENDING_ASSIGNMENT throughout;
@@ -868,6 +882,7 @@ export function BookingDetailsPage() {
       setMatchedVendorRateCardId(null);
       setMatchedVendorRateType(null);
       setBuyingRateLabel(null);
+      setManualReason("");
       setPreferredLrNumber("");
       if (bookingRecord.lrType === "AUTO") {
         setSelectedLrMode("AUTO");
@@ -1528,6 +1543,11 @@ export function BookingDetailsPage() {
       if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
         return;
       }
+    // Manual assignment on a contract booking bypasses the default L1/lowest
+    // contract — reason required.
+    if (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) {
+      return;
+    }
     const assignment: BookingAssignmentInput = {
       vendorId: normalizedVendorId,
       vendorName: vendorId === OWN_FLEET_VENDOR ? "Own Fleet" : vendorMap.get(vendorId)?.name ?? "Vendor",
@@ -1554,6 +1574,7 @@ export function BookingDetailsPage() {
         lrConfigId: selectedAssignmentLrConfig?.id ?? null,
         preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
+        manualAssignmentReason: assignMethod === "MANUAL" && !isSpotBooking ? manualReason.trim() : null,
       };
     assignBooking(bookingRecord.id, assignment);
     resetAssignmentDialog();
@@ -3561,6 +3582,7 @@ export function BookingDetailsPage() {
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
                   (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) ||
                   !activeLrOrgUnitId
                 }
             >
@@ -3619,21 +3641,30 @@ export function BookingDetailsPage() {
                 </div>
               </div>
             ) : (
-              <VendorContractComparison
-                entries={vendorComparison}
-                selectedRateCardId={null}
-                onSelect={(targetVendorId) => sendIndentToVendor(targetVendorId)}
-                actionLabel="Send Indent"
-                mutedVendorIds={rejectedIndentVendorIds}
-                showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
-                showCustomerFreight={false}
-                header={{
-                  route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
-                  customerFreight,
-                  vehicleType: assignVehicleTypeCode ?? "-",
-                  material: assignMaterialCode ?? "-",
-                }}
-              />
+              <div className="space-y-2">
+                {/* Only the L1 / lowest-rate contract is offered. To use a
+                    different vendor, switch to Manual Assignment (reason required). */}
+                <VendorContractComparison
+                  entries={vendorComparison.filter((entry) => entry.vendorFreight === vendorComparison[0]?.vendorFreight)}
+                  selectedRateCardId={null}
+                  onSelect={(targetVendorId) => sendIndentToVendor(targetVendorId)}
+                  actionLabel="Send Indent"
+                  mutedVendorIds={rejectedIndentVendorIds}
+                  showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
+                  showCustomerFreight={false}
+                  header={{
+                    route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
+                    customerFreight,
+                    vehicleType: assignVehicleTypeCode ?? "-",
+                    material: assignMaterialCode ?? "-",
+                  }}
+                />
+                {vendorComparison.length ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Showing the lowest-rate (L1) contract(s) — all vendors tied at the best rate (auction & manual). To pick another vendor, switch to Manual Assignment — a reason is required.
+                  </p>
+                ) : null}
+              </div>
             )
           ) : null}
 
@@ -3657,6 +3688,17 @@ export function BookingDetailsPage() {
                     <Input value={vendorMap.get(vendorId)?.name ?? "Contract vendor"} disabled />
                   )}
                 </CompactField>
+                {assignMethod === "MANUAL" && !isSpotBooking ? (
+                  <CompactField label="Reason for manual assignment *">
+                    <textarea
+                      value={manualReason}
+                      onChange={(event) => setManualReason(event.target.value)}
+                      rows={2}
+                      placeholder="Why are you not using the recommended L1 / lowest-rate contract?"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </CompactField>
+                ) : null}
                 <CompactField label="Vehicle">
                   <Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setDriverId(""); }} disabled={!vendorId}>
                     <option value="">Select vehicle</option>

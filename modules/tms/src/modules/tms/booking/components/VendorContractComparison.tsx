@@ -46,6 +46,9 @@ export function VendorContractComparison({
               <tr>
                 <th className="px-3 py-2 font-medium">Vendor</th>
                 <th className="px-3 py-2 font-medium">Source</th>
+                <th className="px-3 py-2 font-medium">Volume</th>
+                <th className="px-3 py-2 font-medium">Est. Trips</th>
+                <th className="px-3 py-2 font-medium">Trips Left</th>
                 <th className="px-3 py-2 font-medium">Rate Type</th>
                 <th className="px-3 py-2 font-medium">Buying Rate</th>
                 {showCustomerFreight ? <th className="px-3 py-2 font-medium">Customer Freight</th> : null}
@@ -74,6 +77,12 @@ export function VendorContractComparison({
                         {entry.source}
                       </span>
                     </td>
+                    <td className="px-3 py-2">
+                      {entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "—"}
+                      {entry.allocationRank ? <span className="ml-1 text-[11px] text-muted-foreground">({entry.allocationRank})</span> : null}
+                    </td>
+                    <td className="px-3 py-2">{entry.estimatedTrips ?? "—"}</td>
+                    <td className="px-3 py-2">{entry.tripsRemaining ?? "—"}</td>
                     <td className="px-3 py-2">{entry.rateType === "PER_MT" ? "Per MT" : entry.rateType === "PER_KM" ? "Per KM" : "Per Trip"}</td>
                     <td className="px-3 py-2">{money(entry.vendorFreight)}</td>
                     {showCustomerFreight ? <td className="px-3 py-2">{money(entry.customerFreight)}</td> : null}

@@ -71,6 +71,8 @@ export function AssignmentQueuePage() {
   const [matchedVendorRateCardId, setMatchedVendorRateCardId] = useState<string | null>(null);
   const [matchedVendorRateType, setMatchedVendorRateType] = useState<"PER_TRIP" | "PER_KM" | "PER_MT" | null>(null);
   const [buyingRateLabel, setBuyingRateLabel] = useState<string | null>(null);
+  // Reason required when bypassing the default L1/lowest contract (manual assign).
+  const [manualReason, setManualReason] = useState("");
   const [preferredLrNumber, setPreferredLrNumber] = useState("");
   const [selectedLrMode, setSelectedLrMode] = useState<"MANUAL" | "PRE_GENERATED" | "AUTO">("MANUAL");
 
@@ -292,6 +294,11 @@ export function AssignmentQueuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminSources.vendors, adminSources.vendorRateCardMap, adminSources.customerAddressMap, bookings, bookingMatchContext, assigningBooking, customerFreight]);
 
+  // Default contract = the L1 / lowest-rate match (first after the soft-order
+  // sort). Contract-based assignment shows ONLY this one; choosing another vendor
+  // requires switching to Manual Assignment (with a reason).
+  const defaultContract = vendorContractOptions[0] ?? null;
+
   const selectedLrConfig = useMemo(
     () =>
       adminSources.lrConfigs.find((config) => config.status === "active" && config.lrType === "MANUAL") ??
@@ -392,6 +399,7 @@ export function AssignmentQueuePage() {
       setMatchedVendorRateCardId(null);
       setMatchedVendorRateType(null);
       setBuyingRateLabel(null);
+      setManualReason("");
       setPreferredLrNumber("");
       applyBookingLrPreference();
   }
@@ -446,6 +454,27 @@ export function AssignmentQueuePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminSources.vendorRateCardMap, bookingMatchContext, assigningBooking, vendorId, assignMethod]);
 
+  // Contract mode: auto-apply the default L1/lowest contract (only one shown).
+  useEffect(() => {
+    if (assignMethod !== "CONTRACT" || !assigningBooking) return;
+    if (!defaultContract) {
+      setVendorFreightSource("MANUAL");
+      setMatchedVendorRateCardId(null);
+      setMatchedVendorRateType(null);
+      setBuyingRateLabel(null);
+      setVendorRateWarning(`No ${assigningBooking.pricing.rateType} vendor contract matches this booking lane. Switch to Manual Assignment.`);
+      return;
+    }
+    setVendorId(defaultContract.vendorId);
+    setVendorFreight(String(defaultContract.vendorFreight));
+    setVendorFreightSource("RATE_CARD");
+    setVendorRateWarning("");
+    setMatchedVendorRateCardId(defaultContract.rateCardId);
+    setMatchedVendorRateType(defaultContract.rateType);
+    setBuyingRateLabel(`${defaultContract.rateType} @ ${defaultContract.unitRate.toLocaleString()} · ${defaultContract.source}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignMethod, defaultContract?.rateCardId, assigningBookingId]);
+
   // Spot-contract bookings arrive with the winning vendor + locked rate from
   // the one-time spot contract — prefill both so no manual amount is typed.
   useEffect(() => {
@@ -469,6 +498,10 @@ export function AssignmentQueuePage() {
       if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
         return;
       }
+    // Manual assignment bypasses the default L1/lowest contract — reason required.
+    if (assignMethod === "MANUAL" && !manualReason.trim()) {
+      return;
+    }
 
     assignBooking(assigningBooking.id, {
       vendorId: normalizedVendorId,
@@ -496,6 +529,7 @@ export function AssignmentQueuePage() {
         lrConfigId: selectedAssignmentLrConfig?.id ?? null,
         preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
+        manualAssignmentReason: assignMethod === "MANUAL" ? manualReason.trim() : null,
       });
     // One-time spot contract consumed by this booking — mark it Used so it is
     // never offered to another booking and the vendor sees it spent.
@@ -618,6 +652,7 @@ export function AssignmentQueuePage() {
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
                   (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  (assignMethod === "MANUAL" && !manualReason.trim()) ||
                   autoLrBlocked ||
                   !activeLrOrgUnitId
                 }
@@ -668,83 +703,41 @@ export function AssignmentQueuePage() {
           {assignMethod === "CONTRACT" ? (
             <div className="md:col-span-2 space-y-2">
               <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                Matching contracts — {assigningBooking?.pricing.rateType} · auction & manual · lowest buying freight first
+                Recommended contract — lowest rate (L1) · {assigningBooking?.pricing.rateType}
               </p>
-              {vendorContractOptions.length ? (
-                <div className="overflow-x-auto rounded-xl border">
-                  <table className="min-w-full divide-y divide-border text-sm">
-                    <thead className="bg-muted/20 text-left text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 font-medium">Vendor</th>
-                        <th className="px-3 py-2 font-medium">Source</th>
-                        <th className="px-3 py-2 font-medium">Rank</th>
-                        <th className="px-3 py-2 font-medium">Volume</th>
-                        <th className="px-3 py-2 font-medium">Completed</th>
-                        <th className="px-3 py-2 font-medium">Rate Type</th>
-                        <th className="px-3 py-2 font-medium">Buying Rate</th>
-                        <th className="px-3 py-2 font-medium">Vendor Freight</th>
-                        {access.can("ASSIGNMENT_QUEUE", "VIEW_MARGIN") ? (
-                          <th className="px-3 py-2 font-medium">Margin</th>
-                        ) : null}
-                        <th className="px-3 py-2 font-medium">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/70">
-                      {vendorContractOptions.map((entry) => (
-                        <tr key={entry.rateCardId} className={entry.rateCardId === matchedVendorRateCardId ? "bg-primary/5" : ""}>
-                          <td className="px-3 py-2 font-medium">
-                            {entry.vendorName}
-                            {entry.nextInLine ? (
-                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Next in line</span>
-                            ) : null}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                entry.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {entry.source}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{entry.allocationRank ?? "—"}</td>
-                          <td className="px-3 py-2">{entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "100%"}</td>
-                          <td className="px-3 py-2">{entry.completed}</td>
-                          <td className="px-3 py-2">{entry.rateType}</td>
-                          <td className="px-3 py-2">Rs {entry.unitRate.toLocaleString()}</td>
-                          <td className="px-3 py-2">Rs {entry.vendorFreight.toLocaleString()}</td>
-                          {access.can("ASSIGNMENT_QUEUE", "VIEW_MARGIN") ? (
-                            <td className="px-3 py-2">
-                              Rs {entry.marginAmount.toLocaleString()} ({entry.marginPercent}%)
-                            </td>
-                          ) : null}
-                          <td className="px-3 py-2">
-                            {entry.rateCardId === matchedVendorRateCardId ? (
-                              <Button size="sm" onClick={() => undefined}>Selected</Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setVendorId(entry.vendorId);
-                                  setVehicleId("");
-                                  setDriverId("");
-                                  setVendorFreight(String(entry.vendorFreight));
-                                  setVendorFreightSource("RATE_CARD");
-                                  setVendorRateWarning("");
-                                  setMatchedVendorRateCardId(entry.rateCardId);
-                                  setMatchedVendorRateType(entry.rateType);
-                                  setBuyingRateLabel(`${entry.rateType} @ ${entry.unitRate.toLocaleString()} · ${entry.source}`);
-                                }}
-                              >
-                                Select
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {defaultContract ? (
+                <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="font-semibold">{defaultContract.vendorName}</span>
+                      <span
+                        className={`ml-2 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          defaultContract.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+                        }`}
+                      >
+                        {defaultContract.source}
+                      </span>
+                      {defaultContract.allocationRank ? (
+                        <span className="ml-2 text-xs font-medium text-muted-foreground">
+                          {defaultContract.allocationRank} · {defaultContract.volumeAllocationPercent ?? 100}%
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-medium">Rs {defaultContract.vendorFreight.toLocaleString()}</span>
+                      <span className="ml-1 text-muted-foreground">
+                        ({defaultContract.rateType} @ {defaultContract.unitRate.toLocaleString()})
+                      </span>
+                    </div>
+                  </div>
+                  {access.can("ASSIGNMENT_QUEUE", "VIEW_MARGIN") ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Margin Rs {defaultContract.marginAmount.toLocaleString()} ({defaultContract.marginPercent}%)
+                    </div>
+                  ) : null}
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Lowest-rate contract auto-selected. To use a different vendor, switch to Manual Assignment.
+                  </p>
                 </div>
               ) : (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -753,24 +746,37 @@ export function AssignmentQueuePage() {
               )}
             </div>
           ) : (
-            <CompactField label="Vendor">
-              <Select
-                value={vendorId}
-                onChange={(event) => {
-                  setVendorId(event.target.value);
-                  setVehicleId("");
-                  setDriverId("");
-                }}
-              >
-                <option value="">Select vendor</option>
-                <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
-                {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
-                  <option key={vendor.id} value={vendor.id}>
-                    {vendor.name}
-                  </option>
-                ))}
-              </Select>
-            </CompactField>
+            <>
+              <CompactField label="Vendor">
+                <Select
+                  value={vendorId}
+                  onChange={(event) => {
+                    setVendorId(event.target.value);
+                    setVehicleId("");
+                    setDriverId("");
+                  }}
+                >
+                  <option value="">Select vendor</option>
+                  <option value={OWN_FLEET_VENDOR}>Own Fleet</option>
+                  {adminSources.vendors.filter((vendor) => vendor.status === "active").map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </option>
+                  ))}
+                </Select>
+              </CompactField>
+              <div className="md:col-span-2">
+                <CompactField label="Reason for manual assignment *">
+                  <textarea
+                    value={manualReason}
+                    onChange={(event) => setManualReason(event.target.value)}
+                    rows={2}
+                    placeholder="Why are you not using the recommended L1 / lowest-rate contract?"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </CompactField>
+              </div>
+            </>
           )}
           <CompactField label="Customer Freight / Selling Rate">
             <Input value={customerFreight ? customerFreight.toLocaleString() : ""} disabled />

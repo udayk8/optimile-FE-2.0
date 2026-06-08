@@ -412,6 +412,12 @@ export type VendorComparisonEntry = {
   /** Where the contract came from — auction-won (merged with an `auction-` id
    *  prefix) or a manually configured vendor rate card. */
   source: "Auction" | "Manual";
+  /** Auction volume metadata (undefined for manual contracts). */
+  allocationRank?: "L1" | "L2" | "L3";
+  volumeAllocationPercent?: number;
+  estimatedTrips?: number;
+  /** estimatedTrips minus trips already fulfilled on this lane (when known). */
+  tripsRemaining?: number;
 };
 
 /** Booking-side payload the vendor comparison matches on (resolved by callers). */
@@ -442,8 +448,10 @@ export function buildVendorComparison(params: {
   vendorRateCardMap: Map<string, TenantVendorRateCard[]>;
   input: VendorComparisonMatchInput;
   customerFreight: number;
+  /** Optional: trips already fulfilled by a vendor on a lane, for trips-remaining. */
+  completedTrips?: (vendorId: string, fromCity?: string, toCity?: string) => number;
 }): VendorComparisonEntry[] {
-  const { vendors, vendorRateCardMap, input, customerFreight } = params;
+  const { vendors, vendorRateCardMap, input, customerFreight, completedTrips } = params;
   const matchInput: RateMatchInput = {
     fromCity: input.fromCity,
     toCity: input.toCity,
@@ -472,6 +480,8 @@ export function buildVendorComparison(params: {
           weight: input.weight,
           distanceKm: input.distanceKm,
         });
+        const estimatedTrips = card.estimatedTrips;
+        const done = completedTrips?.(vendor.id, card.fromCity, card.toCity) ?? 0;
         rows.push({
           vendorId: vendor.id,
           vendorName: vendor.name,
@@ -483,6 +493,10 @@ export function buildVendorComparison(params: {
           marginPercent: calculateMarginPercent(customerFreight, vendorFreight),
           rateCardId: card.id,
           source: card.id.startsWith("auction-") ? "Auction" : "Manual",
+          allocationRank: card.allocationRank,
+          volumeAllocationPercent: card.volumeAllocationPercent,
+          estimatedTrips,
+          tripsRemaining: estimatedTrips != null ? Math.max(0, estimatedTrips - done) : undefined,
         });
       });
     });

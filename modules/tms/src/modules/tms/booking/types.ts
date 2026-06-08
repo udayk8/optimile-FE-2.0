@@ -843,6 +843,9 @@ export interface BookingAssignmentInput {
   lrConfigId?: string | null;
   preferredLrNumber?: string | null;
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
+  /** Why the dispatcher bypassed the default L1/lowest contract — required for
+   *  manual assignment (deviation from the recommended contract vendor). */
+  manualAssignmentReason?: string | null;
 }
 
 export interface BookingReassignmentInput {

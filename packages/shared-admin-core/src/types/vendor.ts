@@ -71,6 +71,8 @@ export interface TenantVendorRateCard {
    *  LOT/BULK contracts so booking assignment can honor the L1/L2/L3 split. */
   allocationRank?: "L1" | "L2" | "L3";
   volumeAllocationPercent?: number;
+  /** Volume-based auction contracts carry an estimated trip count for the term. */
+  estimatedTrips?: number;
   createdAt: string;
   updatedAt: string;
 }

@@ -5599,6 +5599,18 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               type: "SYSTEM_REMARK",
               message: `Assigned ${input.vehicleLabel} to ${input.driverName} under ${input.vendorName}.`,
             },
+            // Manual assignment deviates from the default L1/lowest contract — log why.
+            ...(input.manualAssignmentReason
+              ? [
+                  {
+                    id: `booking-remark-reason-${Date.now()}`,
+                    timestamp,
+                    actor: input.actor,
+                    type: "SYSTEM_REMARK" as const,
+                    message: `Manual assignment — reason: ${input.manualAssignmentReason}`,
+                  },
+                ]
+              : []),
           ],
         };
         setTenantBookings((current) => current.map((item) => (item.id === bookingId ? updated : item)));
