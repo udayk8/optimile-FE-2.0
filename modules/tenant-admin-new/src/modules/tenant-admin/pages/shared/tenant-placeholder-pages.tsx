@@ -65,32 +65,36 @@ import { formatRoleUserPlaceSummary } from "@/shared/lib/role-user-summary";
 import { getRoleSuggestionLabel, sortRolesForUserType } from "@/shared/lib/tenant-rbac";
 import type { OrgUnit, RolePermission, UserRecord, UserStatus, UserType } from "@/types/access";
 
-const DEFAULT_HIERARCHY_LEVEL_NAMES = ["Region", "Zone", "Branch", "Sub-Branch", "Hub"] as const;
-const MAX_HIERARCHY_LEVELS = 5;
+// Example level names offered as quick-pick chips in the Add Level dialog.
+// Tenants can type anything; these are only suggestions.
+const LEVEL_NAME_EXAMPLES = ["Region", "Branch", "Hub", "Zone", "Cluster", "Depot", "Warehouse"] as const;
 
 export function TenantHierarchyPage() {
   const { tenantId, tenant } = useTenantRouteContext();
   const { data: hierarchyState, saveHierarchy } = useTenantHierarchy(tenantId);
-  const { data: orgUnits } = useTenantOrgUnits(tenantId);
-  const { data: roles } = useTenantRoles(tenantId);
+  const { data: orgUnits, updateOrgUnit } = useTenantOrgUnits(tenantId);
+  const { data: roles, updateRole } = useTenantRoles(tenantId);
 
-  const storedLevels = useMemo(
+  // Levels are user-managed and fully dynamic: a tenant may have ZERO levels
+  // (Company Root only) or any number. Company Root is the permanent implicit
+  // parent and is never a configurable level. The stored shape
+  // (id / tenantId / order / name / active) is unchanged, so existing tenants,
+  // org units, roles, scope and data filtering keep working exactly as before.
+  const levels = useMemo(
     () => [...hierarchyState.hierarchy.levels].sort((a, b) => a.order - b.order),
     [hierarchyState.hierarchy.levels],
   );
 
-  const [customEnabled, setCustomEnabled] = useState(storedLevels.length > 0);
-  const [levelCount, setLevelCount] = useState(Math.max(1, Math.min(MAX_HIERARCHY_LEVELS, storedLevels.length || 3)));
-  const [levelNames, setLevelNames] = useState<string[]>(() => {
-    const names = storedLevels.map((level) => level.name);
-    const padded = [...names];
-    while (padded.length < MAX_HIERARCHY_LEVELS) {
-      padded.push(DEFAULT_HIERARCHY_LEVEL_NAMES[padded.length] ?? `Level ${padded.length + 1}`);
-    }
-    return padded;
-  });
   const [feedback, setFeedback] = useState("");
   const [error, setError] = useState("");
+
+  // Add / rename dialog. editingLevelId === null means "add a new level".
+  const [levelDialogOpen, setLevelDialogOpen] = useState(false);
+  const [editingLevelId, setEditingLevelId] = useState<string | null>(null);
+  const [levelNameInput, setLevelNameInput] = useState("");
+
+  // Delete confirmation dialog.
+  const [deletingLevelId, setDeletingLevelId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!feedback) return;
@@ -98,61 +102,107 @@ export function TenantHierarchyPage() {
     return () => window.clearTimeout(timer);
   }, [feedback]);
 
-  function updateName(index: number, value: string) {
-    setLevelNames((current) => current.map((name, i) => (i === index ? value : name)));
-  }
-
-  function resetToDefault() {
-    setLevelCount(3);
-    setLevelNames([...DEFAULT_HIERARCHY_LEVEL_NAMES]);
-    setError("");
-  }
-
-  function save() {
-    const trimmed = levelNames.slice(0, levelCount).map((name) => name.trim());
-    if (trimmed.some((name) => name.length < 1)) {
-      setError("Every level needs a name.");
-      return;
-    }
-    const lowercased = trimmed.map((name) => name.toLowerCase());
-    if (new Set(lowercased).size !== lowercased.length) {
-      setError("Level names must be unique.");
-      return;
-    }
-
-    // Reuse existing level ids by order so org units stay linked to the same
-    // level when names change.
-    const nextLevels = trimmed.map((name, index) => {
-      const existing = storedLevels[index];
-      return {
-        id: existing?.id ?? `level-${tenantId}-${index + 1}-${Date.now()}`,
-        tenantId,
-        order: index + 1,
-        name,
-        active: true,
-      };
-    });
-
-    // Reject if shrinking would orphan org units / roles tied to dropped levels.
-    if (storedLevels.length > nextLevels.length) {
-      const droppedIds = new Set(storedLevels.slice(nextLevels.length).map((level) => level.id));
-      const orphanUnit = orgUnits.some((unit) => droppedIds.has(unit.hierarchyLevelId));
-      const orphanRole = roles.some((role) => droppedIds.has(role.hierarchyLevelId));
-      if (orphanUnit || orphanRole) {
-        setError(
-          "Cannot shrink: there are org units or roles bound to the levels being removed. Reassign or delete those first.",
-        );
-        return;
-      }
-    }
-
+  // Persist an ordered levels array. saveHierarchy re-derives `order` from array
+  // position and preserves each level's id, so rename / add / reorder never
+  // break the org-unit or role linkage (they reference levels by id, not order).
+  function persistLevels(nextLevels: typeof levels) {
     saveHierarchy({
       ...hierarchyState.hierarchy,
       levels: nextLevels,
       lastUpdated: new Date().toISOString(),
     });
+  }
+
+  function openAddLevel() {
+    setEditingLevelId(null);
+    setLevelNameInput("");
     setError("");
-    setFeedback("Hierarchy saved.");
+    setLevelDialogOpen(true);
+  }
+
+  function openRenameLevel(level: (typeof levels)[number]) {
+    setEditingLevelId(level.id);
+    setLevelNameInput(level.name);
+    setError("");
+    setLevelDialogOpen(true);
+  }
+
+  function submitLevel() {
+    const name = levelNameInput.trim();
+    if (!name) {
+      setError("Level name is required.");
+      return;
+    }
+    if (!isBusinessHierarchyLevel({ name })) {
+      setError('"Company Root" is the fixed root — choose a different level name.');
+      return;
+    }
+    const duplicate = levels.some(
+      (level) => level.id !== editingLevelId && level.name.trim().toLowerCase() === name.toLowerCase(),
+    );
+    if (duplicate) {
+      setError("Level names must be unique.");
+      return;
+    }
+
+    if (editingLevelId) {
+      // Rename only: keep the SAME id and order so bound org units / roles keep
+      // their scope — just the label changes.
+      persistLevels(levels.map((level) => (level.id === editingLevelId ? { ...level, name } : level)));
+      setFeedback("Level renamed.");
+    } else {
+      // Add: append beneath the current deepest level.
+      persistLevels([
+        ...levels,
+        { id: `level-${tenantId}-${Date.now()}`, tenantId, order: levels.length + 1, name, active: true },
+      ]);
+      setFeedback("Level added.");
+    }
+    setLevelDialogOpen(false);
+    setError("");
+  }
+
+  const deletingLevel = levels.find((level) => level.id === deletingLevelId) ?? null;
+  const deleteBoundUnits = deletingLevel
+    ? orgUnits.filter((unit) => unit.hierarchyLevelId === deletingLevel.id)
+    : [];
+  // Company-Root roles are scoped to the whole tenant, NOT to a business level —
+  // their hierarchyLevelId is incidental and ignored by scope/label logic, so
+  // they must never block deleting a level (otherwise a tenant whose only role is
+  // the system Tenant Admin could never return to "Company Root only"). We match
+  // BOTH the system Tenant Admin role (by id/name — the onboarding wizard creates
+  // it with no dataScope) AND any ALL_TENANT-scoped role.
+  const deleteBoundRoles = deletingLevel
+    ? roles.filter(
+        (role) =>
+          role.hierarchyLevelId === deletingLevel.id &&
+          !isTenantLevelRole(role) &&
+          !isTenantAdminRole(role),
+      )
+    : [];
+  const deleteParentLevel = deletingLevel
+    ? levels.find((level) => level.order === deletingLevel.order - 1) ?? null
+    : null;
+  const deleteBoundCount = deleteBoundUnits.length + deleteBoundRoles.length;
+  // A top-most level that still has records bound to it has no parent level to
+  // absorb them — block deletion so nothing is orphaned (reassign first).
+  const deleteBlocked = deleteBoundCount > 0 && !deleteParentLevel;
+
+  function confirmDeleteLevel() {
+    if (!deletingLevel || deleteBlocked) return;
+    // Re-point any bound org units & roles up to the parent level so nothing is
+    // orphaned. Each record keeps its own id; only its level pointer moves.
+    if (deleteParentLevel && deleteBoundCount > 0) {
+      deleteBoundUnits.forEach((unit) => updateOrgUnit(unit.id, { hierarchyLevelId: deleteParentLevel.id }));
+      deleteBoundRoles.forEach((role) => updateRole(role.id, { hierarchyLevelId: deleteParentLevel.id }));
+    }
+    persistLevels(levels.filter((level) => level.id !== deletingLevel.id));
+    setFeedback(
+      deleteBoundCount > 0
+        ? `Level removed. ${deleteBoundCount} record${deleteBoundCount === 1 ? "" : "s"} moved up to ${deleteParentLevel?.name}.`
+        : "Level removed.",
+    );
+    setDeletingLevelId(null);
   }
 
   return (
@@ -160,11 +210,10 @@ export function TenantHierarchyPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Hierarchy Setup</h1>
-          <p className="mt-0.5 text-[13px] text-slate-500">Define tenant business structure.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={resetToDefault}>Reset to Default</Button>
-          <Button size="sm" onClick={save}>Save Hierarchy</Button>
+          <p className="mt-0.5 text-[13px] text-slate-500">
+            Build the tenant's structure under Company Root. Add, rename, or remove levels anytime — a tenant
+            can also run on Company Root alone.
+          </p>
         </div>
       </div>
 
@@ -173,100 +222,185 @@ export function TenantHierarchyPage() {
           {feedback}
         </div>
       ) : null}
-      {error ? (
+      {error && !levelDialogOpen ? (
         <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
           {error}
         </div>
       ) : null}
 
-      <div className="rounded-xl border bg-card p-4">
-        <label className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-900">Enable Custom Hierarchy</p>
-            <p className="text-[12px] text-slate-500">Customize level names. When off, defaults are used.</p>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Structure management */}
+        <div className="rounded-xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-2.5">
+            <h2 className="text-[13px] font-semibold text-slate-900">Hierarchy Structure</h2>
+            <Button size="sm" onClick={openAddLevel}>
+              <Plus className="size-4" />
+              Add Level
+            </Button>
           </div>
-          <input
-            type="checkbox"
-            className="size-4 accent-primary"
-            checked={customEnabled}
-            onChange={(event) => {
-              const value = event.target.checked;
-              setCustomEnabled(value);
-              if (!value) {
-                setLevelNames([...DEFAULT_HIERARCHY_LEVEL_NAMES]);
-              }
-            }}
-          />
-        </label>
-      </div>
-
-      <div className="rounded-xl border bg-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-900">Number of Levels</p>
-            <p className="text-[12px] text-slate-500">1 to {MAX_HIERARCHY_LEVELS} levels (tenant itself is not a level).</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={1}
-              max={MAX_HIERARCHY_LEVELS}
-              value={levelCount}
-              onChange={(event) => setLevelCount(Number(event.target.value))}
-              className="w-48 accent-primary"
-            />
-            <span className="min-w-[2ch] text-center text-[13px] font-semibold text-slate-900">{levelCount}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-slate-900">Level Names</h2>
-        </div>
-        <div className="space-y-2 p-3">
-          {Array.from({ length: levelCount }).map((_, index) => (
-            <div key={index} className="flex items-center gap-3">
-              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[11px] font-semibold text-slate-700">
-                {index + 1}
+          <div className="space-y-3 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                Company Root
               </span>
-              <div className="flex flex-1 items-center gap-2">
-                <label className="w-[120px] text-[12px] text-slate-500">Level {index + 1} Name</label>
-                <Input
-                  value={levelNames[index] ?? ""}
-                  disabled={!customEnabled}
-                  onChange={(event) => updateName(index, event.target.value)}
-                  placeholder={DEFAULT_HIERARCHY_LEVEL_NAMES[index] ?? `Level ${index + 1}`}
-                />
+              <span className="font-semibold text-slate-900">{tenant.name}</span>
+              <span className="text-[11px] text-slate-400">Permanent root</span>
+            </div>
+
+            <div>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-slate-500">Configured Levels</p>
+              {levels.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-slate-50/60 px-3 py-4 text-center text-[12px] text-slate-500">
+                  No levels yet — this tenant operates under Company Root only. Add a level to start building the structure.
+                </div>
+              ) : (
+                <ol className="space-y-2">
+                  {levels.map((level, index) => (
+                    <li key={level.id} className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2">
+                      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-slate-100 text-[11px] font-semibold text-slate-700">
+                        {index + 1}
+                      </span>
+                      <span className="flex-1 truncate text-[13px] font-medium text-slate-900">{level.name}</span>
+                      <Button size="sm" variant="ghost" onClick={() => openRenameLevel(level)}>
+                        <Pencil className="size-4" />
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setDeletingLevelId(level.id)}>
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div className="rounded-xl border bg-card">
+          <div className="border-b px-4 py-2.5">
+            <h2 className="text-[13px] font-semibold text-slate-900">Preview</h2>
+          </div>
+          <div className="space-y-1.5 px-4 py-3 text-[13px]">
+            {/* Company Root — the tenant itself is the permanent parent of the
+                configured hierarchy. It is not a configurable level but is shown
+                here so the structure reads as a real tree. */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
+                Company Root
+              </span>
+              <span className="font-semibold text-slate-900">{tenant.name}</span>
+            </div>
+            {levels.map((level, index) => (
+              <div key={level.id} className="flex items-center gap-2 text-slate-700" style={{ paddingLeft: `${(index + 1) * 14}px` }}>
+                <span className="text-slate-400">↳</span>
+                <span>{level.name}</span>
+                <span className="text-[11px] text-slate-400">Level {index + 1}</span>
+              </div>
+            ))}
+            {levels.length === 0 ? (
+              <p className="pl-[14px] text-[12px] italic text-slate-400">No levels — records live directly under Company Root.</p>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      {/* Add / rename level dialog */}
+      <Dialog
+        open={levelDialogOpen}
+        onOpenChange={(open) => {
+          setLevelDialogOpen(open);
+          if (!open) setError("");
+        }}
+        title={editingLevelId ? "Rename Level" : "Add Level"}
+        description={
+          editingLevelId
+            ? "Change the level's label. Records bound to this level keep their scope."
+            : "Add a new level beneath the current structure."
+        }
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => { setLevelDialogOpen(false); setError(""); }}>Cancel</Button>
+            <Button onClick={submitLevel}>{editingLevelId ? "Save" : "Add Level"}</Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {error ? (
+            <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">{error}</div>
+          ) : null}
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-slate-700">Level Name *</label>
+            <Input
+              autoFocus
+              value={levelNameInput}
+              onChange={(event) => setLevelNameInput(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") submitLevel(); }}
+              placeholder="e.g. Region"
+            />
+          </div>
+          {!editingLevelId ? (
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.06em] text-slate-400">Examples</p>
+              <div className="flex flex-wrap gap-1.5">
+                {LEVEL_NAME_EXAMPLES.map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => setLevelNameInput(example)}
+                    className="rounded-full border border-border bg-background px-2.5 py-1 text-[12px] text-slate-600 transition hover:border-primary/30 hover:bg-primary/[0.04]"
+                  >
+                    {example}
+                  </button>
+                ))}
               </div>
             </div>
-          ))}
+          ) : null}
         </div>
-      </div>
+      </Dialog>
 
-      <div className="rounded-xl border bg-card">
-        <div className="border-b px-4 py-2.5">
-          <h2 className="text-[13px] font-semibold text-slate-900">Preview</h2>
-        </div>
-        <div className="space-y-1.5 px-4 py-3 text-[13px]">
-          {/* Company Root — the tenant itself is the permanent parent of the
-              configured hierarchy. It is not counted as a configurable level
-              but is shown here so the structure reads as a real tree. */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
-              Company Root
-            </span>
-            <span className="font-semibold text-slate-900">{tenant.name}</span>
+      {/* Delete level confirmation */}
+      <Dialog
+        open={Boolean(deletingLevelId)}
+        onOpenChange={(open) => { if (!open) setDeletingLevelId(null); }}
+        title="Delete Level"
+        description={deletingLevel ? `Remove "${deletingLevel.name}" from the hierarchy?` : ""}
+        footer={
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDeletingLevelId(null)}>Cancel</Button>
+            <Button onClick={confirmDeleteLevel} disabled={deleteBlocked}>Confirm Delete</Button>
           </div>
-          {levelNames.slice(0, levelCount).map((name, index) => (
-            <div key={index} className="flex items-center gap-2 text-slate-700" style={{ paddingLeft: `${(index + 1) * 14}px` }}>
-              <span className="text-slate-400">↳</span>
-              <span>{name.trim() || "—"}</span>
-              <span className="text-[11px] text-slate-400">Level {index + 1}</span>
+        }
+      >
+        <div className="space-y-2 text-[13px] text-slate-600">
+          {deleteBoundCount === 0 ? (
+            <p>This level has no org units or roles bound to it. It will be removed and the remaining levels renumbered.</p>
+          ) : deleteBlocked ? (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <p className="font-medium">
+                This is the top level and has {deleteBoundUnits.length} org unit{deleteBoundUnits.length === 1 ? "" : "s"} and{" "}
+                {deleteBoundRoles.length} role{deleteBoundRoles.length === 1 ? "" : "s"} bound to it.
+              </p>
+              <p className="mt-1">
+                There is no parent level to move them to. Reassign or remove those records from Org Units / Roles first,
+                then delete this level.
+              </p>
             </div>
-          ))}
+          ) : (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+              <p className="font-medium">
+                {deletingLevel?.name} has {deleteBoundUnits.length} org unit{deleteBoundUnits.length === 1 ? "" : "s"} and{" "}
+                {deleteBoundRoles.length} role{deleteBoundRoles.length === 1 ? "" : "s"} bound to it.
+              </p>
+              <p className="mt-1">
+                They will be moved up to <span className="font-semibold">{deleteParentLevel?.name}</span> so nothing is
+                orphaned. No records are deleted.
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+      </Dialog>
     </div>
   );
 }
@@ -391,6 +525,29 @@ export function TenantOrgUnitsPage() {
       setFeedback(deleteError instanceof Error ? deleteError.message : "Could not delete.");
     }
     setConfirmDeleteId(null);
+  }
+
+  // Company Root Only: with no hierarchy levels configured there are no org
+  // units to manage — everything lives directly under Company Root. Hide the
+  // whole module and explain why (add a level in Hierarchy Setup to enable it).
+  if (orderedLevels.length === 0) {
+    return (
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-[20px] font-semibold tracking-[-0.01em] text-slate-900">Org Units</h1>
+          <p className="mt-0.5 text-[13px] text-slate-500">Tenant business structure.</p>
+        </div>
+        <TenantEmptyState
+          title="Hierarchy is not enabled"
+          description={`All users, roles and operations are managed directly under Company Root — ${tenant.name}. Add a level in Hierarchy Setup to start using org units.`}
+          action={
+            <Button asChild variant="outline">
+              <Link to={`/tenant/${tenantId}/hierarchy`}>Open Hierarchy Setup</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
   }
 
   return (
@@ -646,6 +803,9 @@ export function TenantUsersPage() {
   const roleMap = useMemo(() => new Map(roles.map((role) => [role.id, role])), [roles]);
   const levelMap = useMemo(() => new Map(levels.map((level) => [level.id, level.name])), [levels]);
   const orgUnitMap = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
+  // Company Root Only mode: no hierarchy levels → no org units → every user is
+  // mapped directly to Company Root, so the org-unit access-scope UI is hidden.
+  const hierarchyEnabled = levels.length > 0;
 
   type UserFormState = {
     name: string;
@@ -911,7 +1071,7 @@ export function TenantUsersPage() {
                       <td className="px-4 py-2.5 text-slate-700">{user.userType.toLowerCase()}</td>
                       <td className="px-4 py-2.5 text-slate-700">{role?.name ?? "—"}</td>
                       <td className="px-4 py-2.5 text-slate-600">
-                        {role?.dataScope === "ALL_TENANT" ? (
+                        {!hierarchyEnabled || role?.dataScope === "ALL_TENANT" ? (
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
                               Company Root
@@ -1014,46 +1174,58 @@ export function TenantUsersPage() {
               <option value="invited">Invited</option>
             </Select>
           </SmallField>
-          <div className="md:col-span-2 space-y-1.5">
-            <label className="text-[12px] font-medium text-slate-700">
-              Access Scope
-              {selectedRole ? (
-                <span className="ml-1 text-slate-500">
-                  (role level: {selectedRoleIsTenantWide ? `Company Root — ${tenant.name}` : levelMap.get(selectedRole.hierarchyLevelId) ?? "—"})
-                </span>
-              ) : null}
-            </label>
-            {selectedRoleIsTenantWide ? (
+          {!hierarchyEnabled ? (
+            // Company Root Only: no org units exist, so there's nothing to scope —
+            // the user is mapped directly to Company Root (read-only).
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-700">Mapped To</label>
               <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[12px] text-indigo-800">
-                <span className="font-medium">Company Root scope.</span> This role spans the entire tenant ({tenant.name}); no
-                org-unit selection is required.
+                <span className="font-medium">Company Root — {tenant.name}.</span> Hierarchy is not enabled, so all users are
+                managed directly under Company Root.
               </div>
-            ) : scopeOrgUnits.length === 0 ? (
-              <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-                No org units exist at this role's level yet. You can save the user now — they'll be unscoped until you add one. {selectedRole ? (
-                  <Link
-                    to={`/tenant/${tenantId}/org-units`}
-                    className="font-medium underline underline-offset-2 hover:text-amber-900"
-                    onClick={() => setOpen(false)}
-                  >
-                    Manage Org Units →
-                  </Link>
+            </div>
+          ) : (
+            <div className="md:col-span-2 space-y-1.5">
+              <label className="text-[12px] font-medium text-slate-700">
+                Access Scope
+                {selectedRole ? (
+                  <span className="ml-1 text-slate-500">
+                    (role level: {selectedRoleIsTenantWide ? `Company Root — ${tenant.name}` : levelMap.get(selectedRole.hierarchyLevelId) ?? "—"})
+                  </span>
                 ) : null}
-              </div>
-            ) : (
-              <div className="grid gap-1.5 sm:grid-cols-2">
-                {scopeOrgUnits.map((unit) => {
-                  const checked = form.orgUnitIds.includes(unit.id);
-                  return (
-                    <label key={unit.id} className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-1.5 text-[12px] transition ${checked ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"}`}>
-                      <span>{unit.name}</span>
-                      <input type="checkbox" className="size-3.5 accent-primary" checked={checked} onChange={() => toggleOrgUnit(unit.id)} />
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+              </label>
+              {selectedRoleIsTenantWide ? (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[12px] text-indigo-800">
+                  <span className="font-medium">Company Root scope.</span> This role spans the entire tenant ({tenant.name}); no
+                  org-unit selection is required.
+                </div>
+              ) : scopeOrgUnits.length === 0 ? (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                  No org units exist at this role's level yet. You can save the user now — they'll be unscoped until you add one. {selectedRole ? (
+                    <Link
+                      to={`/tenant/${tenantId}/org-units`}
+                      className="font-medium underline underline-offset-2 hover:text-amber-900"
+                      onClick={() => setOpen(false)}
+                    >
+                      Manage Org Units →
+                    </Link>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {scopeOrgUnits.map((unit) => {
+                    const checked = form.orgUnitIds.includes(unit.id);
+                    return (
+                      <label key={unit.id} className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-1.5 text-[12px] transition ${checked ? "border-primary bg-primary/5" : "border-border hover:bg-slate-50"}`}>
+                        <span>{unit.name}</span>
+                        <input type="checkbox" className="size-3.5 accent-primary" checked={checked} onChange={() => toggleOrgUnit(unit.id)} />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           {!editingId ? (
             <div className="md:col-span-2">
               <SmallField label="Temporary Password (optional)">
@@ -1119,6 +1291,10 @@ export function TenantRolesPage() {
     [tenantModuleEntries],
   );
   const levelMap = useMemo(() => new Map(levels.map((level) => [level.id, level.name])), [levels]);
+  // Company Root Only mode: no hierarchy levels → every role is assigned
+  // directly to Company Root (dataScope ALL_TENANT), and the level-scope picker
+  // is hidden.
+  const hierarchyEnabled = levels.length > 0;
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(0);
@@ -1146,6 +1322,16 @@ export function TenantRolesPage() {
   // was unwieldy and is rarely needed up-front.
   const [permissionsMode, setPermissionsMode] = useState<"DEFER" | "NOW">("DEFER");
   const [advancedModules, setAdvancedModules] = useState<Set<string>>(new Set());
+
+  // Company Root Only: drop the "Hierarchy Level" step (index 1) entirely, so
+  // the wizard becomes Role Details → Module Access → Permissions. The
+  // index-based content blocks are unchanged — we simply never navigate to
+  // step 1 when hierarchy is disabled.
+  const activeStepIndices = hierarchyEnabled ? [0, 1, 2, 3] : [0, 2, 3];
+  const activeWizardSteps = activeStepIndices.map((index) => ROLE_WIZARD_STEPS[index]);
+  const wizardPos = Math.max(0, activeStepIndices.indexOf(wizardStep));
+  const totalWizardSteps = activeStepIndices.length;
+  const isLastWizardStep = wizardPos === totalWizardSteps - 1;
 
   useEffect(() => {
     if (!feedback) return;
@@ -1230,8 +1416,9 @@ export function TenantRolesPage() {
       if (form.name.trim().length < 2) return "Role name is required.";
     } else if (step === 1) {
       // Company Root scope auto-pins to the first business level (store
-      // requires a hierarchyLevelId), so the user doesn't pick one.
-      if (scopeMode === "LEVEL" && !form.hierarchyLevelId) return "Choose a hierarchy level.";
+      // requires a hierarchyLevelId), so the user doesn't pick one. With no
+      // levels at all, there is nothing to choose — the role is Company Root.
+      if (hierarchyEnabled && scopeMode === "LEVEL" && !form.hierarchyLevelId) return "Choose a hierarchy level.";
     } else if (step === 2) {
       if (!form.moduleCodes.length) return "Select at least one module.";
     }
@@ -1242,8 +1429,8 @@ export function TenantRolesPage() {
     const stepError = validateStep(wizardStep);
     if (stepError) { setWizardError(stepError); return; }
     setWizardError("");
-    if (wizardStep === 3) { submitWizard(); return; }
-    setWizardStep((c) => Math.min(c + 1, 3));
+    if (isLastWizardStep) { submitWizard(); return; }
+    setWizardStep(activeStepIndices[wizardPos + 1]);
   }
 
   function submitWizard() {
@@ -1253,8 +1440,10 @@ export function TenantRolesPage() {
       // shape used by seeded tenant-wide roles (CEO, COO, Tenant Admin). The
       // store still requires a hierarchyLevelId so we auto-pin it to the top
       // business level; only the access scope widens.
-      const dataScope = scopeMode === "TENANT" ? "ALL_TENANT" : undefined;
-      const hierarchyLevelId = scopeMode === "TENANT"
+      // With no hierarchy levels (Company Root Only) every role is tenant-wide.
+      const effectiveScopeMode = hierarchyEnabled ? scopeMode : "TENANT";
+      const dataScope = effectiveScopeMode === "TENANT" ? "ALL_TENANT" : undefined;
+      const hierarchyLevelId = effectiveScopeMode === "TENANT"
         ? (form.hierarchyLevelId || levels.filter(isBusinessHierarchyLevel)[0]?.id || levels[0]?.id || "")
         : form.hierarchyLevelId;
       if (editingRoleId) {
@@ -1457,7 +1646,7 @@ export function TenantRolesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-slate-700">
-                        {role.dataScope === "ALL_TENANT" ? (
+                        {!hierarchyEnabled || role.dataScope === "ALL_TENANT" ? (
                           <span className="inline-flex items-center gap-1.5">
                             <span className="inline-flex items-center rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-indigo-700">
                               Company Root
@@ -1527,27 +1716,27 @@ export function TenantRolesPage() {
           if (!open) setWizardError("");
         }}
         title={editingRoleId ? "Edit Role" : "Add Role"}
-        description={`Step ${wizardStep + 1} of 4 · ${ROLE_WIZARD_STEPS[wizardStep].title}`}
+        description={`Step ${wizardPos + 1} of ${totalWizardSteps} · ${ROLE_WIZARD_STEPS[wizardStep].title}`}
         widthClassName="max-w-3xl"
         footer={
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[12px] text-slate-500">Step {wizardStep + 1} of 4</span>
+            <span className="text-[12px] text-slate-500">Step {wizardPos + 1} of {totalWizardSteps}</span>
             <div className="flex gap-2">
-              {wizardStep > 0 ? (
-                <Button variant="ghost" size="sm" onClick={() => setWizardStep((c) => c - 1)}>
+              {wizardPos > 0 ? (
+                <Button variant="ghost" size="sm" onClick={() => setWizardStep(activeStepIndices[wizardPos - 1])}>
                   <ArrowLeft className="size-4" />
                   Back
                 </Button>
               ) : null}
               <Button size="sm" onClick={next}>
-                {wizardStep === 3 ? (<><CheckCircle2 className="size-4" />{editingRoleId ? "Save Role" : "Create Role"}</>) : (<>Continue<ArrowRight className="size-4" /></>)}
+                {isLastWizardStep ? (<><CheckCircle2 className="size-4" />{editingRoleId ? "Save Role" : "Create Role"}</>) : (<>Continue<ArrowRight className="size-4" /></>)}
               </Button>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
-          <RoleStepper current={wizardStep} />
+          <RoleStepper steps={activeWizardSteps} current={wizardPos} />
           {wizardError ? (
             <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
               {wizardError}
@@ -1582,6 +1771,15 @@ export function TenantRolesPage() {
 
           {wizardStep === 1 ? (
             <div className="grid gap-3">
+              {!hierarchyEnabled ? (
+                <RoleField label="Scope">
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 px-3 py-2 text-[12px] text-indigo-800">
+                    <span className="font-medium">Company Root — {tenant.name}.</span> Hierarchy is not enabled, so this role is
+                    assigned directly to Company Root. Add a level in Hierarchy Setup to scope roles to Region / Branch.
+                  </div>
+                </RoleField>
+              ) : (
+                <>
               <RoleField label="Scope">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <label
@@ -1639,6 +1837,8 @@ export function TenantRolesPage() {
                 <p className="text-[12px] text-slate-500">
                   Role spans the whole tenant ({tenant.name}). No level mapping required.
                 </p>
+              )}
+                </>
               )}
             </div>
           ) : null}
@@ -1851,13 +2051,13 @@ function buildEmptyActions(): Record<TenantPermissionAction, boolean> {
   );
 }
 
-function RoleStepper({ current }: { current: number }) {
+function RoleStepper({ steps, current }: { steps: { title: string }[]; current: number }) {
   return (
     <ol className="flex items-center gap-1">
-      {ROLE_WIZARD_STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isComplete = index < current;
         const isCurrent = index === current;
-        const isLast = index === ROLE_WIZARD_STEPS.length - 1;
+        const isLast = index === steps.length - 1;
         return (
           <li key={step.title} className="flex flex-1 items-center gap-1.5">
             <div className="flex items-center gap-2">

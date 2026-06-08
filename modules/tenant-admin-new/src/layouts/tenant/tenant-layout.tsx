@@ -22,6 +22,8 @@ import { useTenantRoles } from "@/modules/tenant-admin/hooks/useTenantRoles";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useTenantUsers } from "@/modules/tenant-admin/hooks/useTenantUsers";
 import { useTenantOrgUnits } from "@/modules/tenant-admin/hooks/useTenantOrgUnits";
+import { useTenantOrgTypes } from "@/modules/tenant-admin/hooks/useTenantOrgTypes";
+import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { computeEffectiveUserScope } from "@/modules/tenant-admin/lib/user-scope";
 import { useSessionContext } from "@/shared/auth/session-context";
 import {
@@ -49,6 +51,11 @@ export function TenantLayout() {
   const { data: users } = useTenantUsers(tenant.id);
   const { data: roles } = useTenantRoles(tenant.id);
   const { data: rolePermissions } = useTenantRolePermissions(tenant.id);
+  const { data: hierarchyLevels } = useTenantOrgTypes(tenant.id);
+  // "Company Root Only" mode: no configured hierarchy levels. Org Units are
+  // meaningless then (everything sits directly under Company Root), so the
+  // Org Units nav entry is hidden until a level is added in Hierarchy Setup.
+  const hierarchyEnabled = hierarchyLevels.length > 0;
   usePermissionMatrixVersion();
   const bookingFocused = location.pathname.includes("/bookings");
   // No preview mode anymore. The active role is the logged-in user's role,
@@ -134,7 +141,11 @@ export function TenantLayout() {
         activeRole && isTenantAdminRole(activeRole)
           ? [
               { to: paths.hierarchy, label: "Hierarchy Setup", icon: Building2, pageCode: "HIERARCHY" },
-              { to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" },
+              // Org Units only appears once the tenant has at least one
+              // hierarchy level (Company Root Only hides it).
+              ...(hierarchyEnabled
+                ? [{ to: paths.orgUnits, label: "Org Units", icon: Building2, pageCode: "ORG_UNITS" }]
+                : []),
               { to: paths.users, label: "Users", icon: Users, pageCode: "USERS" },
               { to: paths.roles, label: "Roles", icon: ShieldCheck, pageCode: "ROLES" },
               { to: paths.rolePermissions, label: "Role Permissions", icon: ShieldCheck, pageCode: "ROLE_PERMISSIONS" },
@@ -143,7 +154,7 @@ export function TenantLayout() {
 
       const setupChildren: Array<ExplorerNavItem & { featureCode?: string }> = tenant.enabledModuleCodes.includes("TMS")
         ? [
-            { to: paths.customers, label: "Customers", icon: Users, pageCode: "CUSTOMERS", featureCode: "CUSTOMERS" },
+            { to: paths.customers, label: isDirectCustomerTenant(tenant) ? "Company Profile" : "Customers", icon: Users, pageCode: "CUSTOMERS", featureCode: "CUSTOMERS" },
             { to: paths.vendors, label: "Vendors", icon: Truck, pageCode: "VENDORS", featureCode: "VENDORS" },
             { to: paths.vehicles, label: "Vehicles", icon: Truck, pageCode: "VEHICLES", featureCode: "VEHICLE_TYPES" },
             { to: paths.drivers, label: "Drivers", icon: Users, pageCode: "DRIVERS", featureCode: "VEHICLE_TYPES" },

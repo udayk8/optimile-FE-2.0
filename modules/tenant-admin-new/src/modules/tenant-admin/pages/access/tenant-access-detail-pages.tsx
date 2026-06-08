@@ -50,6 +50,8 @@ export function TenantUserDetailPage() {
   const user = users.find((item) => item.id === userId) ?? null;
   const role = roles.find((item) => item.id === user?.roleId) ?? null;
   const levelMap = new Map(levels.map((level) => [level.id, level.name]));
+  // Company Root Only: no hierarchy levels → scope is simply Company Root.
+  const hierarchyEnabled = levels.length > 0;
   const vendorMap = new Map(vendors.map((vendor) => [vendor.id, vendor]));
   const customerMap = new Map(customers.map((customer) => [customer.id, customer]));
   const driverMap = new Map(drivers.map((driver) => [driver.id, driver]));
@@ -117,10 +119,11 @@ export function TenantUserDetailPage() {
               }
             />
             <InfoRow label="Role" value={role?.name ?? "Role missing"} />
-            <InfoRow
-              label="Role level"
-              value={getRoleScopeLevelLabel(role, levelMap)}
-            />
+            {hierarchyEnabled ? (
+              <InfoRow label="Role level" value={getRoleScopeLevelLabel(role, levelMap)} />
+            ) : (
+              <InfoRow label="Mapped to" value={`Company Root — ${tenant.name}`} />
+            )}
             <InfoRow label="Access note" value={getUserTypeHelper(user.userType)} />
             {user.userType === "VENDOR" ? (
               <InfoRow label="Linked vendor" value={vendorMap.get(user.linkedVendorId ?? "")?.name ?? "No vendor linked"} />
@@ -131,14 +134,16 @@ export function TenantUserDetailPage() {
             {user.userType === "DRIVER" ? (
               <InfoRow label="Driver reference" value={driverMap.get(user.linkedDriverId ?? "")?.name ?? `${user.driverName || "No driver name"}${user.driverCode ? ` (${user.driverCode})` : ""}`} />
             ) : null}
-            <InfoRow
-              label="Assigned access scope"
-              value={
-                user.orgUnitIds.length
-                  ? user.orgUnitIds.map((orgUnitId) => orgUnits.find((item) => item.id === orgUnitId)?.name ?? orgUnitId).join(", ")
-                  : "Not required for scoped external users"
-              }
-            />
+            {hierarchyEnabled ? (
+              <InfoRow
+                label="Assigned access scope"
+                value={
+                  user.orgUnitIds.length
+                    ? user.orgUnitIds.map((orgUnitId) => orgUnits.find((item) => item.id === orgUnitId)?.name ?? orgUnitId).join(", ")
+                    : "Not required for scoped external users"
+                }
+              />
+            ) : null}
           </div>
         </TenantPanel>
 
@@ -167,6 +172,8 @@ export function TenantRoleDetailPage() {
   const role = roles.find((item) => item.id === roleId) ?? null;
   const assignedUsers = sortUsersByHierarchy(users.filter((user) => user.roleId === roleId), orgUnits, levels);
   const levelMap = new Map(levels.map((level) => [level.id, level.name]));
+  // Company Root Only: no hierarchy levels → scope is simply Company Root.
+  const hierarchyEnabled = levels.length > 0;
 
   if (!role) {
     return (
@@ -201,7 +208,11 @@ export function TenantRoleDetailPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <TenantSummaryCard label="Status" value={role.active ? "Active" : "Inactive"} helper="Assignment availability" />
-        <TenantSummaryCard label="Mapped level" value={getRoleScopeLevelLabel(role, levelMap)} helper="User org-unit assignment level" />
+        <TenantSummaryCard
+          label={hierarchyEnabled ? "Mapped level" : "Scope"}
+          value={hierarchyEnabled ? getRoleScopeLevelLabel(role, levelMap) : `Company Root — ${tenant.name}`}
+          helper={hierarchyEnabled ? "User org-unit assignment level" : "Tenant-wide (hierarchy not enabled)"}
+        />
         <TenantSummaryCard label="Modules" value={String(role.moduleCodes.length)} helper="Role-module mapping count" />
         <TenantSummaryCard label="Assigned users" value={String(assignedUsers.length)} helper="Single role currently supported (multi-role ready)" />
       </div>
@@ -211,7 +222,8 @@ export function TenantRoleDetailPage() {
         role={role}
         assignedUsers={assignedUsers}
         orgUnits={orgUnits}
-        levelLabel={getRoleScopeLevelLabel(role, levelMap)}
+        levelLabel={hierarchyEnabled ? getRoleScopeLevelLabel(role, levelMap) : `Company Root — ${tenant.name}`}
+        hierarchyEnabled={hierarchyEnabled}
         modules={modules}
         rolePermissions={rolePermissions}
         onSaveRole={(updates) => updateRole(role.id, updates)}

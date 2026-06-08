@@ -7310,7 +7310,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       },
       listTenantRoles: (tenantId) => roles.filter((item) => item.tenantId === tenantId),
       createTenantRole: (input) => {
-        if (!input.hierarchyLevelId) {
+        // Company-Root roles (dataScope ALL_TENANT) span the whole tenant and
+        // need no hierarchy level — it's required only for level-scoped roles.
+        // This lets "Company Root Only" tenants (no levels) create roles.
+        if (!input.hierarchyLevelId && input.dataScope !== "ALL_TENANT") {
           throw new Error("Select the hierarchy level for this role.");
         }
         validateRoleModules(input, platformTenants, modules);
@@ -7322,12 +7325,15 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         return created;
       },
       updateTenantRole: (roleId, updates) => {
-        if (updates.hierarchyLevelId !== undefined && !updates.hierarchyLevelId) {
-          throw new Error("Select the hierarchy level for this role.");
-        }
         const currentRole = roles.find((role) => role.id === roleId);
         if (!currentRole) {
           return;
+        }
+        // Company-Root roles (ALL_TENANT) don't need a hierarchy level; only
+        // level-scoped roles do. Honour an incoming dataScope change too.
+        const effectiveScope = updates.dataScope ?? currentRole.dataScope;
+        if (updates.hierarchyLevelId !== undefined && !updates.hierarchyLevelId && effectiveScope !== "ALL_TENANT") {
+          throw new Error("Select the hierarchy level for this role.");
         }
         const tenant = platformTenants.find((item) => item.id === currentRole.tenantId);
         const nextRole = tenant

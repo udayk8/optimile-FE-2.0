@@ -59,6 +59,7 @@ export function RoleAccessWorkspace({
   assignedUsers,
   orgUnits,
   levelLabel,
+  hierarchyEnabled = true,
   modules,
   rolePermissions,
   onSaveRole,
@@ -68,10 +69,17 @@ export function RoleAccessWorkspace({
   assignedUsers: UserRecord[];
   orgUnits: OrgUnit[];
   levelLabel: string;
+  // When false (Company Root Only), hierarchy-level data scopes (Region/Branch)
+  // are hidden — only tenant-wide / entity scopes apply.
+  hierarchyEnabled?: boolean;
   modules: PlatformModule[];
   rolePermissions: RolePermission[];
   onSaveRole: (updates: Partial<Pick<RoleDefinition, "moduleCodes" | "dataScope" | "roleAccess">>) => void;
 }) {
+  // Region/Branch scopes require a hierarchy; drop them in Company Root Only mode.
+  const availableDataScopes = hierarchyEnabled
+    ? dataScopeOptions
+    : dataScopeOptions.filter((scope) => scope !== "REGION" && scope !== "BRANCH");
   const navigate = useNavigate();
   const { session, setSession } = useSessionContext();
   const [activeTab, setActiveTab] = useState("Module Access");
@@ -507,7 +515,7 @@ export function RoleAccessWorkspace({
           }
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {dataScopeOptions.map((scope) => {
+            {availableDataScopes.map((scope) => {
               const checked = dataScopeDraft === scope;
               return (
                 <button

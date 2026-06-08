@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
+import { isDirectCustomerTenant } from "@/shared/lib/tenant-config";
 import { FileDown, Pencil, PencilLine, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { DataTable } from "@/shared/components/common/data-table";
@@ -592,6 +593,20 @@ export function TenantCustomersPage() {
     isFullyConfigured(normalizeSetupProgress(customer.setupProgress)),
   ).length;
 
+  // Enterprise (direct-customer) tenants are not 3PLs: there is no customer
+  // list, only the tenant's own Company Profile. We resolve the self-customer
+  // record (auto-created at tenant setup — the same one booking auto-uses) and
+  // open it directly, so this module reads as "manage my company", not a list.
+  if (isDirectCustomerTenant(tenant)) {
+    const selfCustomerId =
+      data.find((customer) => customer.id === `tenant-customer-self-${tenant.code.trim().toLowerCase()}`)?.id ??
+      data.find((customer) => (customer.code ?? "").trim().toUpperCase() === tenant.code.trim().toUpperCase())?.id ??
+      data[0]?.id;
+    if (selfCustomerId) {
+      return <Navigate to={`/tenant/${tenant.id}/customers/${selfCustomerId}`} replace />;
+    }
+  }
+
   return (
     <div className="space-y-4">
       {!open ? (
@@ -889,6 +904,14 @@ export function TenantCustomerDetailPage() {
     updateTenantCustomer,
   } = useTenantCustomers(tenant.id);
   const tenantCustomer = getTenantCustomerById(tenantCustomerId);
+  // Enterprise (direct-customer) tenants render this as their single Company
+  // Profile: no Credit & Billing tab, and "Basic Details" reads "Company Details".
+  const isEnterprise = isDirectCustomerTenant(tenant);
+  const detailFlowSteps = isEnterprise
+    ? customerFlowSteps.filter((step) => step !== "Credit & Billing")
+    : customerFlowSteps;
+  const tabLabelFor = (step: CustomerFlowStep) =>
+    isEnterprise && step === "Basic Details" ? "Company Details" : getCustomerFlowLabel(step);
   const [activeTab, setActiveTab] = useState<CustomerFlowStep>("Basic Details");
   const [message, setMessage] = useState("");
   const [detailForm, setDetailForm] = useState<TenantCustomerInput>(initialCustomerForm);
@@ -1084,7 +1107,8 @@ export function TenantCustomerDetailPage() {
   }
 
   function handleTabChange(nextTabLabel: string) {
-    const nextTab = getCustomerFlowStepFromLabel(nextTabLabel);
+    const nextTab =
+      nextTabLabel === "Company Details" ? "Basic Details" : getCustomerFlowStepFromLabel(nextTabLabel);
     if (nextTab === activeTab) {
       return;
     }
@@ -1122,12 +1146,16 @@ export function TenantCustomerDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-border/70 bg-gradient-to-r from-slate-100 to-white px-4 py-2.5 shadow-sm">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Link to={`/tenant/${tenant.id}/customers`} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition hover:text-primary">← Customers</Link>
+          {isEnterprise ? (
+            <span className="text-[12px] font-medium text-muted-foreground">Company Profile</span>
+          ) : (
+            <Link to={`/tenant/${tenant.id}/customers`} className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground transition hover:text-primary">← Customers</Link>
+          )}
           <span className="text-slate-300">|</span>
           <h1 className="truncate text-xl font-semibold tracking-tight">{tenantCustomer.name}</h1>
           <Badge variant={tenantCustomer.status === "active" ? "success" : "warning"}>{tenantCustomer.status}</Badge>
         </div>
-        {missingSteps.length ? (
+        {!isEnterprise && missingSteps.length ? (
           <Button size="sm" onClick={() => handleTabChange(getCustomerFlowLabel(missingSteps[0]))}>Complete Setup</Button>
         ) : null}
       </div>
@@ -1138,9 +1166,13 @@ export function TenantCustomerDetailPage() {
 
       {/* Compact stat strip — values only, no helper essays. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border/70 bg-card px-4 py-2.5 text-[12px] text-muted-foreground shadow-sm">
-        <span>Setup <span className="font-semibold text-foreground">{missingSteps.length ? "Incomplete" : "Complete"}</span></span>
-        <span>Credit Limit <span className="font-semibold text-foreground">{formatCurrency(detailForm.creditLimit ?? 0)}</span></span>
-        <span>Outstanding <span className="font-semibold text-foreground">{formatCurrency(detailForm.currentOutstanding ?? 0)}</span></span>
+        {!isEnterprise ? (
+          <>
+            <span>Setup <span className="font-semibold text-foreground">{missingSteps.length ? "Incomplete" : "Complete"}</span></span>
+            <span>Credit Limit <span className="font-semibold text-foreground">{formatCurrency(detailForm.creditLimit ?? 0)}</span></span>
+            <span>Outstanding <span className="font-semibold text-foreground">{formatCurrency(detailForm.currentOutstanding ?? 0)}</span></span>
+          </>
+        ) : null}
         <span>Addresses <span className="font-semibold text-foreground">{draftAddresses.length}</span></span>
         <span>Rate Cards <span className="font-semibold text-foreground">{detailRateCards.length}</span></span>
         {!draftAddresses.length ? (
@@ -1152,11 +1184,11 @@ export function TenantCustomerDetailPage() {
       </div>
 
       <TenantPanel
-        title={getCustomerFlowLabel(activeTab)}
+        title={tabLabelFor(activeTab)}
         action={
           <Tabs
-            tabs={customerFlowSteps.map((step) => getCustomerFlowLabel(step))}
-            active={getCustomerFlowLabel(activeTab)}
+            tabs={detailFlowSteps.map((step) => tabLabelFor(step))}
+            active={tabLabelFor(activeTab)}
             onChange={handleTabChange}
           />
         }
