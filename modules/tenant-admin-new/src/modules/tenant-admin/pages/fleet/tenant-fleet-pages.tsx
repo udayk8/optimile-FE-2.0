@@ -251,24 +251,33 @@ function PaginationFooter({
 
 // ============================ VEHICLES ============================
 
-// Human label for a master-data record's origin module. Records created before
-// provenance tracking (or directly in Administration) default to "Admin".
-function masterDataSourceLabel(source?: string): string {
-  if (source === "VENDOR_PORTAL") return "Vendor Portal";
-  if (source === "FLEET_MODULE") return "Fleet";
-  return "Admin";
+// Who created this master-data record: the vendor (when added from the Vendor
+// Portal) or "Administration" (when added here in Tenant Admin). Records created
+// before provenance tracking default to Administration.
+type CreatedByRecord = {
+  source?: string;
+  createdByLoginType?: string;
+  createdByVendorId?: string | null;
+  vendorName?: string;
+};
+
+function createdByLabel(record: CreatedByRecord): string {
+  const byVendor = record.createdByLoginType === "VENDOR" || record.source === "VENDOR_PORTAL";
+  if (byVendor) return record.vendorName ?? "Vendor";
+  return "Administration";
 }
 
-function SourceBadge({ source }: { source?: string }) {
-  const label = masterDataSourceLabel(source);
-  const tone =
-    source === "VENDOR_PORTAL"
-      ? "bg-indigo-50 text-indigo-700"
-      : source === "FLEET_MODULE"
-        ? "bg-amber-50 text-amber-700"
-        : "bg-gray-100 text-gray-600";
+function CreatedByCell({ record }: { record: CreatedByRecord }) {
+  const label = createdByLabel(record);
+  const byVendor = label !== "Administration";
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+        byVendor ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -353,7 +362,7 @@ export function TenantVehiclesPage() {
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vendor</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created By</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
@@ -408,7 +417,7 @@ export function TenantVehiclesPage() {
                         </div>
                       </td>
                       <td className="p-4 align-top">
-                        <SourceBadge source={vehicle.source} />
+                        <CreatedByCell record={vehicle} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(vehicle)}>
@@ -808,7 +817,7 @@ export function TenantDriversPage() {
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">License</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created By</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
@@ -870,7 +879,7 @@ export function TenantDriversPage() {
                         </div>
                       </td>
                       <td className="p-4 align-top">
-                        <SourceBadge source={driver.source} />
+                        <CreatedByCell record={driver} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(driver)}>
