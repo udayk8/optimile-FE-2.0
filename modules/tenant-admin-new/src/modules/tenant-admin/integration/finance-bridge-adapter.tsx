@@ -352,6 +352,20 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         const variancePct = contractedTotal
           ? Number((((subtotalLive - contractedTotal) / contractedTotal) * 100).toFixed(2))
           : 0;
+        // 3PL profit rollup: sum selling (customer freight) and buying (vendor
+        // freight) over ASSIGNED bookings only; margin = selling − buying. Left
+        // undefined when no booking on the invoice has a vendor assigned yet.
+        const assignedBookings = invBookings.filter((b) => b.assignment?.vendorFreight != null);
+        const sellingFreight = assignedBookings.length
+          ? assignedBookings.reduce((s, b) => s + (b.pricing?.calculatedFreight ?? 0), 0)
+          : undefined;
+        const buyingFreight = assignedBookings.length
+          ? assignedBookings.reduce((s, b) => s + (b.assignment?.vendorFreight ?? 0), 0)
+          : undefined;
+        const margin =
+          sellingFreight != null && buyingFreight != null
+            ? Number((sellingFreight - buyingFreight).toFixed(2))
+            : undefined;
         return {
           id: inv.invoiceId,
           tripId: inv.bookingIds?.[0],
@@ -372,6 +386,9 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           expenseItems,
           commercialType: firstBooking?.commercialType ?? undefined,
           rateCard: arContracts.find((c) => c.rateCard)?.rateCard,
+          sellingFreight,
+          buyingFreight,
+          margin,
           // One drop per booking so multi-booking invoices resolve every trip.
           drops: invBookings.length > 1
             ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))

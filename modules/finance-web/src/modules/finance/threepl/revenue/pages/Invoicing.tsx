@@ -12,6 +12,7 @@ import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMat
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
 import RateCardPanel from "@finance/components/RateCardPanel";
+import MarginSummary from "@finance/components/MarginSummary";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -322,6 +323,9 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
       {/* Contract rate card behind this invoice's `contracted` baseline — shown for
           contract / spot bookings so the client sees what the rate was matched on. */}
       {inv.rateCard && <RateCardPanel rateCard={inv.rateCard} commercialType={inv.commercialType} />}
+
+      {/* 3PL profit on this invoice — selling (customer) vs buying (vendor) freight. */}
+      <MarginSummary selling={inv.sellingFreight} buying={inv.buyingFreight} margin={inv.margin} />
 
       {podTrips.length > 1 ? (
         /* Consolidated invoice — show expenses grouped per booking. */

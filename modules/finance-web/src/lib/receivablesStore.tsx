@@ -117,6 +117,12 @@ export interface ARInvoice {
   // present only for bridged invoices whose booking has a contract/spot source).
   commercialType?: 'SPOT' | 'CONTRACT'
   rateCard?: RateCardDescriptor
+  // 3PL profit rollup across the invoice's bookings: selling (customer freight),
+  // buying (vendor freight) and margin (selling − buying). Present only when at
+  // least one booking has a vendor assigned; absent for mock/standalone invoices.
+  sellingFreight?: number
+  buyingFreight?: number
+  margin?: number
 }
 
 export interface LedgerEntry {

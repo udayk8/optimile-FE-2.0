@@ -4,13 +4,39 @@ import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finan
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { PROFIT_CLIENT, PROFIT_LANE, PROFIT_VEHICLE, PROFIT_TRIPS } from "@finance/data/mock";
 import { exportCsv } from "@finance/lib/csv";
+import { useReceivables } from "@finance/lib/receivablesStore";
 
-const TABS = { client: PROFIT_CLIENT, lane: PROFIT_LANE, vehicle: PROFIT_VEHICLE };
-const withMargin = (r: any) => ({ ...r, margin: r.revenue - r.cost, pct: ((r.revenue - r.cost) / r.revenue) * 100 });
+const withMargin = (r: any) => ({ ...r, margin: r.revenue - r.cost, pct: r.revenue ? ((r.revenue - r.cost) / r.revenue) * 100 : 0 });
+
+// Roll up trip rows (revenue + cost) into {name, revenue, cost} by the given key.
+function aggregateBy(trips: any[], key: "client" | "lane" | "vehicle") {
+  const byName = new Map<string, { name: string; revenue: number; cost: number }>();
+  for (const t of trips) {
+    const name = t[key] ?? "—";
+    const cur = byName.get(name) ?? { name, revenue: 0, cost: 0 };
+    cur.revenue += t.revenue ?? 0;
+    cur.cost += t.cost ?? 0;
+    byName.set(name, cur);
+  }
+  return [...byName.values()];
+}
 
 export default function Profitability({ toast }: any) {
   const [tab, setTab] = useState<"client" | "lane" | "vehicle">("client");
   const [drill, setDrill] = useState<string | null>(null);
+
+  const { trips } = useReceivables();
+  // Real bridged bookings with a vendor assigned → trip-level revenue/cost rows.
+  const realTrips = trips
+    .filter((t) => t.buyingFreight != null && t.margin != null)
+    .map((t) => ({ trip: t.bookingId ?? t.id, client: t.client, lane: t.lane, vehicle: t.vehicle ?? "—", revenue: t.revenue ?? 0, cost: t.buyingFreight ?? 0 }));
+  const useReal = realTrips.length > 0;
+  const tripRows = useReal ? realTrips : PROFIT_TRIPS;
+
+  // Aggregate from real trips when available; fall back to the mock aggregates.
+  const TABS = useReal
+    ? { client: aggregateBy(realTrips, "client"), lane: aggregateBy(realTrips, "lane"), vehicle: aggregateBy(realTrips, "vehicle") }
+    : { client: PROFIT_CLIENT, lane: PROFIT_LANE, vehicle: PROFIT_VEHICLE };
   const data = TABS[tab].map(withMargin);
 
   const download = () => {
@@ -26,7 +52,7 @@ export default function Profitability({ toast }: any) {
   };
 
   const drillTrips = drill
-    ? PROFIT_TRIPS.filter((t) => (t as any)[tab] === drill).map(withMargin)
+    ? tripRows.filter((t) => (t as any)[tab] === drill).map(withMargin)
     : [];
 
   return (
