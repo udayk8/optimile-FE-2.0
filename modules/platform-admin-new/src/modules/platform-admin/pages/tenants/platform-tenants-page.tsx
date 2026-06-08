@@ -1,10 +1,13 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  Ban,
+  Building2,
   CheckCircle2,
   Eye,
+  Hourglass,
   Layers,
   Pencil,
   Plus,
@@ -96,8 +99,16 @@ export function PlatformTenantsPage() {
   const activeModules = useMemo(() => modules.filter((module) => module.status === "active"), [modules]);
   const wizardModules = useMemo(() => buildWizardModules(activeModules), [activeModules]);
 
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "trial" | "paused">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "trial" | "paused">(
+    parseStatusParam(searchParams.get("status")),
+  );
+
+  // Keep the filter in sync when arriving from a dashboard stat-card deep link.
+  useEffect(() => {
+    setStatusFilter(parseStatusParam(searchParams.get("status")));
+  }, [searchParams]);
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState(0);
@@ -122,14 +133,16 @@ export function PlatformTenantsPage() {
     const query = search.trim().toLowerCase();
     return tenants
       .filter((tenant) => {
-        if (query && !`${tenant.name} ${tenant.code} ${tenant.region}`.toLowerCase().includes(query)) {
-          return false;
+        if (query) {
+          const admin = getTenantPrimaryAdminUser(tenant.id);
+          const haystack = `${tenant.name} ${tenant.code} ${tenant.region} ${businessTypeLabel(tenant)} ${admin?.name ?? ""} ${admin?.email ?? ""}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
         }
         if (statusFilter !== "all" && tenant.status !== statusFilter) return false;
         return true;
       })
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  }, [search, statusFilter, tenants]);
+  }, [search, statusFilter, tenants, getTenantPrimaryAdminUser]);
 
   function openWizard() {
     setStep(0);
@@ -203,10 +216,11 @@ export function PlatformTenantsPage() {
 
     try {
       const created = createTenant(payload);
+      // defaultTimezone is already persisted via the createTenant payload above;
+      // updateTenant only accepts the fields below.
       updateTenant(created.id, {
         region: form.region.trim(),
         industry: businessType?.label ?? "Logistics",
-        defaultTimezone: form.defaultTimezone.trim(),
         enabledModuleCodes,
       });
       setCreatedId(created.id);
@@ -248,10 +262,42 @@ export function PlatformTenantsPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Total" value={stats.total} />
-        <Stat label="Active" value={stats.active} tone="emerald" />
-        <Stat label="Onboarding" value={stats.onboarding} tone="amber" />
-        <Stat label="Inactive" value={stats.inactive} tone="slate" />
+        <Stat
+          label="Total"
+          value={stats.total}
+          hint="All tenants"
+          icon={Building2}
+          tone="slate"
+          active={statusFilter === "all"}
+          onClick={() => setStatusFilter("all")}
+        />
+        <Stat
+          label="Active"
+          value={stats.active}
+          hint={`${formatShare(stats.active, stats.total)} of total`}
+          icon={CheckCircle2}
+          tone="emerald"
+          active={statusFilter === "active"}
+          onClick={() => setStatusFilter("active")}
+        />
+        <Stat
+          label="Onboarding"
+          value={stats.onboarding}
+          hint={stats.onboarding === 0 ? "All set up" : "Awaiting activation"}
+          icon={Hourglass}
+          tone="amber"
+          active={statusFilter === "trial"}
+          onClick={() => setStatusFilter("trial")}
+        />
+        <Stat
+          label="Inactive"
+          value={stats.inactive}
+          hint="Paused tenants"
+          icon={Ban}
+          tone="slate"
+          active={statusFilter === "paused"}
+          onClick={() => setStatusFilter("paused")}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2.5">
@@ -260,7 +306,7 @@ export function PlatformTenantsPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name, code, or region"
+            placeholder="Search by name, code, region, type, or admin"
             className="h-9 pl-9"
           />
         </div>
@@ -284,8 +330,7 @@ export function PlatformTenantsPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
-                <th className="px-4 py-2.5">Tenant Name</th>
-                <th className="px-4 py-2.5">Code</th>
+                <th className="px-4 py-2.5">Tenant</th>
                 <th className="px-4 py-2.5">Business Type</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Modules</th>
@@ -297,8 +342,20 @@ export function PlatformTenantsPage() {
             <tbody>
               {visibleTenants.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-[13px] text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-[13px] text-slate-500">
                     No tenants match the current filters.
+                    {search || statusFilter !== "all" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch("");
+                          setStatusFilter("all");
+                        }}
+                        className="ml-2 font-medium text-primary hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ) : (
@@ -307,17 +364,22 @@ export function PlatformTenantsPage() {
                   return (
                     <tr key={tenant.id} className="border-b last:border-0 hover:bg-slate-50/60">
                       <td className="px-4 py-2.5">
-                        <Link to={paths.tenant(tenant.id)} className="font-medium text-slate-900 hover:underline">
-                          {tenant.name}
+                        <Link to={paths.tenant(tenant.id)} className="group flex items-center gap-3">
+                          <Avatar name={tenant.name} />
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 group-hover:underline">{tenant.name}</p>
+                            <p className="text-[11px] text-slate-500">{tenant.code}</p>
+                          </div>
                         </Link>
                       </td>
-                      <td className="px-4 py-2.5 text-slate-700">{tenant.code}</td>
                       <td className="px-4 py-2.5 text-slate-700">{businessTypeLabel(tenant)}</td>
                       <td className="px-4 py-2.5">
                         <StatusBadge status={tenant.status} />
                       </td>
-                      <td className="px-4 py-2.5 text-slate-700">{ensureRequiredModuleCodes(tenant.enabledModuleCodes).length}</td>
-                      <td className="px-4 py-2.5 text-slate-700">{admin?.name ?? "-"}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="neutral">{ensureRequiredModuleCodes(tenant.enabledModuleCodes).length}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-700">{admin?.name ?? "—"}</td>
                       <td className="px-4 py-2.5 text-slate-600">{formatDate(tenant.createdAt)}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1">
@@ -795,20 +857,69 @@ function Field({
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "emerald" | "amber" | "slate" }) {
-  const accent = tone === "emerald"
-    ? "text-emerald-700"
-    : tone === "amber"
-      ? "text-amber-700"
-      : tone === "slate"
-        ? "text-slate-700"
-        : "text-slate-900";
+function Stat({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+  tone: "emerald" | "amber" | "slate" | "indigo";
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const palette = {
+    slate: "bg-slate-100 text-slate-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    amber: "bg-amber-100 text-amber-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+  }[tone];
   return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <p className={`mt-1 text-[22px] font-semibold tracking-[-0.02em] ${accent}`}>{value}</p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={`Filter by ${label}`}
+      className={`flex flex-col rounded-xl border bg-card px-4 py-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+        active ? "border-primary ring-1 ring-primary/40" : "hover:border-primary/40"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
+        <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${palette}`}>
+          <Icon className="size-4" />
+        </div>
+      </div>
+      <p className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em] text-slate-900">{value}</p>
+      <p className="mt-1.5 text-[11px] text-slate-500">{hint}</p>
+    </button>
   );
+}
+
+function Avatar({ name }: { name: string }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold uppercase text-slate-600">
+      {initials(name)}
+    </span>
+  );
+}
+
+function initials(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "—";
+  if (words.length === 1) return words[0].slice(0, 2);
+  return `${words[0][0]}${words[words.length - 1][0]}`;
+}
+
+function formatShare(value: number, total: number) {
+  if (total === 0) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
 }
 
 function IconButton({
@@ -848,6 +959,10 @@ function formatDate(value: string) {
 
 function sanitizePhoneNumber(value: string) {
   return value.replace(/\D/g, "").slice(0, 10);
+}
+
+function parseStatusParam(value: string | null): "all" | "active" | "trial" | "paused" {
+  return value === "active" || value === "trial" || value === "paused" ? value : "all";
 }
 
 function ensureRequiredModuleCodes(moduleCodes: string[]) {

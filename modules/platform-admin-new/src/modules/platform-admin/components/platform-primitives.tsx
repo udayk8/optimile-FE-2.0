@@ -1,8 +1,69 @@
 import type { ReactNode } from "react";
-import { ArrowRight, Search } from "lucide-react";
+import { AlertTriangle, ArrowRight, Search } from "lucide-react";
+import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
+import { Dialog } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 import { cn } from "@/shared/lib/utils";
+
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  body,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  tone = "default",
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  body?: ReactNode;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  tone?: "default" | "danger";
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const isDanger = tone === "danger";
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onCancel();
+      }}
+      title={title}
+      description={description}
+      widthClassName="max-w-md"
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+          <Button
+            size="sm"
+            onClick={onConfirm}
+            className={isDanger ? "bg-rose-600 text-white hover:bg-rose-700" : undefined}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      }
+    >
+      <div
+        className={cn(
+          "flex items-start gap-3 rounded-xl border px-4 py-3 text-[13px] leading-relaxed",
+          isDanger ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-900",
+        )}
+      >
+        <AlertTriangle className={cn("mt-0.5 size-4 shrink-0", isDanger ? "text-rose-600" : "text-amber-600")} />
+        <div>{body}</div>
+      </div>
+    </Dialog>
+  );
+}
 
 export function PlatformPanel({
   title,

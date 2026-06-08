@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Pencil, Plus, Power, Search, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
+import { CheckCircle2, Layers, Package2, Pencil, Plus, Power, Search, Users } from "lucide-react";
 import { z } from "zod";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -10,6 +11,7 @@ import { Textarea } from "@/shared/components/ui/textarea";
 import { usePlatformModules } from "@/modules/platform-admin/hooks/usePlatformModules";
 import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { displayModule, getModuleDisplayName, getModuleDisplayCode } from "@/modules/platform-admin/lib/module-display";
+import { ConfirmDialog } from "@/modules/platform-admin/components/platform-primitives";
 import type { PlatformModule } from "@/types/platform";
 
 const moduleSchema = z.object({
@@ -31,14 +33,21 @@ const initialForm: Omit<PlatformModule, "id"> = {
 export function PlatformModulesPage() {
   const { data: modules, createModule, updateModule } = usePlatformModules();
   const { data: tenants } = useTenants();
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(parseModuleStatusParam(searchParams.get("status")));
+
+  // Apply the status filter when arriving from a dashboard stat-card deep link.
+  useEffect(() => {
+    setStatusFilter(parseModuleStatusParam(searchParams.get("status")));
+  }, [searchParams]);
   const [open, setOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<PlatformModule | null>(null);
   const [form, setForm] = useState(initialForm);
   const [formError, setFormError] = useState("");
   const [tenantListModule, setTenantListModule] = useState<PlatformModule | null>(null);
+  const [pendingDeactivate, setPendingDeactivate] = useState<PlatformModule | null>(null);
 
   const enriched = useMemo(
     () =>
@@ -57,7 +66,10 @@ export function PlatformModulesPage() {
   const visibleModules = useMemo(() => {
     const query = search.trim().toLowerCase();
     return enriched.filter((module) => {
-      if (query && !`${module.displayName} ${module.displayCode}`.toLowerCase().includes(query)) return false;
+      if (query) {
+        const haystack = `${module.displayName} ${module.displayCode} ${module.name} ${module.code} ${module.description} ${module.category} ${module.folderPath ?? ""} ${module.startRoute ?? ""}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
       if (categoryFilter !== "all" && module.category !== categoryFilter) return false;
       if (statusFilter !== "all" && module.status !== statusFilter) return false;
       return true;
@@ -65,6 +77,7 @@ export function PlatformModulesPage() {
   }, [categoryFilter, enriched, search, statusFilter]);
 
   const totalModules = modules.length;
+  const totalTenants = tenants.length;
   const activeModulesCount = modules.filter((module) => module.status === "active").length;
   const totalEnablements = enriched.reduce((total, module) => total + module.tenantCount, 0);
 
@@ -106,9 +119,25 @@ export function PlatformModulesPage() {
     }
   }
 
-  function toggleStatus(module: PlatformModule) {
-    updateModule(module.id, { status: module.status === "active" ? "inactive" : "active" });
+  function requestToggleStatus(module: PlatformModule) {
+    // Deactivating is platform-wide and affects every tenant using the module,
+    // so confirm it. Activating is benign and applies immediately.
+    if (module.status === "active") {
+      setPendingDeactivate(module);
+    } else {
+      updateModule(module.id, { status: "active" });
+    }
   }
+
+  function confirmDeactivate() {
+    if (!pendingDeactivate) return;
+    updateModule(pendingDeactivate.id, { status: "inactive" });
+    setPendingDeactivate(null);
+  }
+
+  const pendingDeactivateTenantCount = pendingDeactivate
+    ? tenants.filter((tenant) => tenant.enabledModuleCodes.includes(pendingDeactivate.code)).length
+    : 0;
 
   return (
     <div className="space-y-5">
@@ -124,9 +153,31 @@ export function PlatformModulesPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Total Modules" value={totalModules} />
-        <Stat label="Active Modules" value={activeModulesCount} tone="emerald" />
-        <Stat label="Tenant Enablements" value={totalEnablements} tone="indigo" />
+        <Stat
+          label="Total Modules"
+          value={totalModules}
+          hint="In catalog"
+          icon={Package2}
+          tone="slate"
+          active={statusFilter === "all"}
+          onClick={() => setStatusFilter("all")}
+        />
+        <Stat
+          label="Active Modules"
+          value={activeModulesCount}
+          hint={`${activeModulesCount} of ${totalModules} enabled`}
+          icon={CheckCircle2}
+          tone="emerald"
+          active={statusFilter === "active"}
+          onClick={() => setStatusFilter("active")}
+        />
+        <Stat
+          label="Tenant Enablements"
+          value={totalEnablements}
+          hint="Module activations across tenants"
+          icon={Layers}
+          tone="indigo"
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2.5">
@@ -135,7 +186,7 @@ export function PlatformModulesPage() {
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search modules"
+            placeholder="Search by name, code, description, or route"
             className="h-9 pl-9"
           />
         </div>
@@ -145,6 +196,7 @@ export function PlatformModulesPage() {
           className="h-9 w-auto min-w-[150px]"
         >
           <option value="all">All categories</option>
+          <option value="Administration">Administration</option>
           <option value="Operations">Operations</option>
           <option value="Fleet">Fleet</option>
           <option value="Procurement">Procurement</option>
@@ -152,7 +204,7 @@ export function PlatformModulesPage() {
         </Select>
         <Select
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
+          onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
           className="h-9 w-auto min-w-[140px]"
         >
           <option value="all">All statuses</option>
@@ -167,37 +219,59 @@ export function PlatformModulesPage() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b bg-slate-50/60 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
-                <th className="px-4 py-2.5">Module Name</th>
-                <th className="px-4 py-2.5">Code</th>
-                <th className="px-4 py-2.5">Folder</th>
-                <th className="px-4 py-2.5">Start Route</th>
+                <th className="px-4 py-2.5">Module</th>
+                <th className="px-4 py-2.5">Source</th>
                 <th className="px-4 py-2.5">Category</th>
                 <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Enabled Tenants</th>
+                <th className="px-4 py-2.5">Adoption</th>
                 <th className="px-4 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {visibleModules.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-[13px] text-slate-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-[13px] text-slate-500">
                     No modules match the current filters.
+                    {search || categoryFilter !== "all" || statusFilter !== "all" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearch("");
+                          setCategoryFilter("all");
+                          setStatusFilter("all");
+                        }}
+                        className="ml-2 font-medium text-primary hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ) : (
                 visibleModules.map((module) => (
                   <tr key={module.id} className="border-b last:border-0 hover:bg-slate-50/60">
-                    <td className="px-4 py-2.5 font-medium text-slate-900">{module.displayName}</td>
-                    <td className="px-4 py-2.5 text-slate-700">{module.displayCode}</td>
-                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">{module.folderPath ?? "—"}</td>
-                    <td className="px-4 py-2.5 font-mono text-[11px] text-slate-500">{module.startRoute ?? "—"}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <ModuleAvatar code={module.displayCode} />
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900">{module.displayName}</p>
+                          <p className="text-[11px] text-slate-500">{module.displayCode}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <p className="font-mono text-[11px] text-slate-500">{module.folderPath ?? "—"}</p>
+                      <p className="font-mono text-[11px] text-slate-400">{module.startRoute ?? "—"}</p>
+                    </td>
                     <td className="px-4 py-2.5">
                       <Badge variant={categoryVariant(module.category)}>{module.category}</Badge>
                     </td>
                     <td className="px-4 py-2.5">
                       <Badge variant={module.status === "active" ? "success" : "warning"}>{module.status}</Badge>
                     </td>
-                    <td className="px-4 py-2.5 text-slate-700">{module.tenantCount}</td>
+                    <td className="px-4 py-2.5">
+                      <AdoptionCell count={module.tenantCount} total={totalTenants} />
+                    </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-1">
                         <Button
@@ -214,7 +288,7 @@ export function PlatformModulesPage() {
                           size="sm"
                           title={module.status === "active" ? "Deactivate" : "Activate"}
                           className="h-7 w-7 p-0"
-                          onClick={() => toggleStatus(module)}
+                          onClick={() => requestToggleStatus(module)}
                         >
                           <Power className="size-4" />
                         </Button>
@@ -276,6 +350,7 @@ export function PlatformModulesPage() {
                 setForm((current) => ({ ...current, category: event.target.value as PlatformModule["category"] }))
               }
             >
+              <option value="Administration">Administration</option>
               <option value="Operations">Operations</option>
               <option value="Fleet">Fleet</option>
               <option value="Procurement">Procurement</option>
@@ -320,6 +395,34 @@ export function PlatformModulesPage() {
       >
         {tenantListModule ? <TenantList moduleCode={tenantListModule.code} /> : null}
       </Dialog>
+
+      <ConfirmDialog
+        open={pendingDeactivate !== null}
+        tone="danger"
+        title="Deactivate module?"
+        confirmLabel="Deactivate"
+        onCancel={() => setPendingDeactivate(null)}
+        onConfirm={confirmDeactivate}
+        body={
+          pendingDeactivate ? (
+            <>
+              <span className="font-medium">{getModuleDisplayName(pendingDeactivate.name, pendingDeactivate.code)}</span> will
+              be deactivated platform-wide. It will no longer be available for provisioning
+              {pendingDeactivateTenantCount > 0 ? (
+                <>
+                  {" "}and is currently enabled for{" "}
+                  <span className="font-medium">
+                    {pendingDeactivateTenantCount} {pendingDeactivateTenantCount === 1 ? "tenant" : "tenants"}
+                  </span>
+                  .
+                </>
+              ) : (
+                <>. No tenants currently enable it.</>
+              )}
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }
@@ -342,16 +445,79 @@ function TenantList({ moduleCode }: { moduleCode: string }) {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone?: "emerald" | "indigo" }) {
-  const accent = tone === "emerald"
-    ? "text-emerald-700"
-    : tone === "indigo"
-      ? "text-indigo-700"
-      : "text-slate-900";
+function Stat({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  hint: string;
+  icon: ComponentType<{ className?: string }>;
+  tone: "slate" | "emerald" | "indigo";
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const palette = {
+    slate: "bg-slate-100 text-slate-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+    indigo: "bg-indigo-100 text-indigo-700",
+  }[tone];
+
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
+        <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${palette}`}>
+          <Icon className="size-4" />
+        </div>
+      </div>
+      <p className="mt-2 text-[26px] font-semibold leading-none tracking-[-0.02em] text-slate-900">{value}</p>
+      <p className="mt-1.5 text-[11px] text-slate-500">{hint}</p>
+    </>
+  );
+
+  if (!onClick) {
+    return <div className="flex flex-col rounded-xl border bg-card px-4 py-3.5">{content}</div>;
+  }
+
   return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">{label}</p>
-      <p className={`mt-1 text-[22px] font-semibold tracking-[-0.02em] ${accent}`}>{value}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      title={`Filter by ${label}`}
+      className={`flex flex-col rounded-xl border bg-card px-4 py-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+        active ? "border-primary ring-1 ring-primary/40" : "hover:border-primary/40"
+      }`}
+    >
+      {content}
+    </button>
+  );
+}
+
+function ModuleAvatar({ code }: { code: string }) {
+  return (
+    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold uppercase text-slate-600">
+      {code.slice(0, 2)}
+    </span>
+  );
+}
+
+function AdoptionCell({ count, total }: { count: number; total: number }) {
+  const pct = total === 0 ? 0 : Math.round((count / total) * 100);
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="whitespace-nowrap text-[12px] text-slate-600">
+        {count} {count === 1 ? "tenant" : "tenants"}
+      </span>
     </div>
   );
 }
@@ -363,6 +529,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </div>
   );
+}
+
+function parseModuleStatusParam(value: string | null): "all" | "active" | "inactive" {
+  return value === "active" || value === "inactive" ? value : "all";
 }
 
 function categoryVariant(category: PlatformModule["category"]) {

@@ -11,6 +11,7 @@ import { useTenants } from "@/modules/platform-admin/hooks/useTenants";
 import { useMockStore } from "@/shared/store/mock-store";
 import { usePlatformPaths } from "@platform-admin/hooks/usePlatformPaths";
 import { displayModule } from "@/modules/platform-admin/lib/module-display";
+import { ConfirmDialog } from "@/modules/platform-admin/components/platform-primitives";
 import { UserPlus } from "lucide-react";
 
 type BusinessType = "DIRECT_ENTERPRISE" | "THREE_PL" | "FLEET_MANAGEMENT";
@@ -56,6 +57,7 @@ export function PlatformTenantDetailPage() {
     businessType: "DIRECT_ENTERPRISE" as BusinessType,
   });
   const [editError, setEditError] = useState("");
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const [modulesOpen, setModulesOpen] = useState(false);
   const [moduleCodes, setModuleCodes] = useState<string[]>([]);
@@ -65,6 +67,7 @@ export function PlatformTenantDetailPage() {
   const [adminMode, setAdminMode] = useState<"create" | "edit">("create");
   const [adminForm, setAdminForm] = useState({ name: "", email: "", phone: "", password: "" });
   const [adminError, setAdminError] = useState("");
+  const [pendingDisableModule, setPendingDisableModule] = useState<{ code: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!tenant) return;
@@ -134,6 +137,17 @@ export function PlatformTenantDetailPage() {
       return;
     }
 
+    // Deactivating a tenant cuts off its users' access — confirm before saving.
+    if (editForm.status === "paused" && tenant!.status !== "paused") {
+      setEditError("");
+      setConfirmDeactivate(true);
+      return;
+    }
+
+    commitEdit();
+  }
+
+  function commitEdit() {
     const tenantType: "DIRECT_CUSTOMER" | "LOGISTICS_PROVIDER_3PL" =
       editForm.businessType === "THREE_PL" ? "LOGISTICS_PROVIDER_3PL" : "DIRECT_CUSTOMER";
 
@@ -150,6 +164,7 @@ export function PlatformTenantDetailPage() {
         customerPortalEnabled: editForm.businessType === "FLEET_MANAGEMENT",
       });
       setEditError("");
+      setConfirmDeactivate(false);
       setEditOpen(false);
       setFeedback("Tenant updated.");
     } catch (saveError) {
@@ -475,7 +490,7 @@ export function PlatformTenantDetailPage() {
                     size="sm"
                     title="Disable"
                     className="h-7 w-7 p-0"
-                    onClick={() => toggleModule(module.code)}
+                    onClick={() => setPendingDisableModule({ code: module.code, name: display.name })}
                   >
                     <Power className="size-4" />
                   </Button>
@@ -665,6 +680,42 @@ export function PlatformTenantDetailPage() {
           </div>
         </div>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeactivate}
+        tone="danger"
+        title="Set tenant to Inactive?"
+        confirmLabel="Set Inactive"
+        onCancel={() => setConfirmDeactivate(false)}
+        onConfirm={commitEdit}
+        body={
+          <>
+            <span className="font-medium">{tenant.name}</span> will be marked inactive. Its users will be unable to sign in
+            and its workspaces become unavailable until the tenant is reactivated.
+          </>
+        }
+      />
+
+      <ConfirmDialog
+        open={pendingDisableModule !== null}
+        tone="danger"
+        title="Disable module?"
+        confirmLabel="Disable"
+        onCancel={() => setPendingDisableModule(null)}
+        onConfirm={() => {
+          if (pendingDisableModule) toggleModule(pendingDisableModule.code);
+          setPendingDisableModule(null);
+        }}
+        body={
+          pendingDisableModule ? (
+            <>
+              <span className="font-medium">{pendingDisableModule.name}</span> will be disabled for{" "}
+              <span className="font-medium">{tenant.name}</span>. Users in this tenant will lose access to it until it is
+              re-enabled.
+            </>
+          ) : null
+        }
+      />
     </div>
   );
 }
