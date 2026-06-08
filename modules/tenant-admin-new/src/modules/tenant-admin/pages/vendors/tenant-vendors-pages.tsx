@@ -732,8 +732,14 @@ function VendorRateFormDialog({
       setError("Rate must be greater than zero.");
       return;
     }
-    if (form.effectiveFromDate && form.effectiveToDate && form.effectiveToDate < form.effectiveFromDate) {
-      setError("Effective To must not be before Effective From.");
+    // Manual contracts carry the same validity window as auction-won (LOT/BULK)
+    // contracts, so the start/end dates are mandatory here too.
+    if (!form.effectiveFromDate || !form.effectiveToDate) {
+      setError("Start and end dates are required.");
+      return;
+    }
+    if (form.effectiveToDate < form.effectiveFromDate) {
+      setError("End date must not be before start date.");
       return;
     }
     const configuredFields = new Set(columns.map((column) => column.field));
@@ -814,14 +820,14 @@ function VendorRateFormDialog({
         <VendorField label="Rate *">
           <Input type="number" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} placeholder="16000" />
         </VendorField>
-        <VendorField label="Effective From (optional)">
+        <VendorField label="Start Date *">
           <Input
             type="date"
             value={form.effectiveFromDate}
             onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))}
           />
         </VendorField>
-        <VendorField label="Effective To (optional)">
+        <VendorField label="End Date *">
           <Input
             type="date"
             value={form.effectiveToDate}
