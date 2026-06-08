@@ -28,6 +28,8 @@ type AuctionStoreContract = {
   startDate: string;
   endDate: string;
   status: string;
+  allocationRank?: "L1" | "L2" | "L3";
+  volumeAllocationPercent?: number;
 };
 
 /**
@@ -72,6 +74,8 @@ function auctionContractsAsRateCards(vendor: {
         effectiveFromDate: contract.startDate,
         effectiveToDate: contract.endDate,
         status: "active",
+        allocationRank: contract.allocationRank,
+        volumeAllocationPercent: contract.volumeAllocationPercent,
         createdAt: contract.startDate,
         updatedAt: contract.startDate,
       } satisfies TenantVendorRateCard));

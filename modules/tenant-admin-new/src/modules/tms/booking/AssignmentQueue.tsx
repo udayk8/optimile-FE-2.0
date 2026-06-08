@@ -221,6 +221,18 @@ export function AssignmentQueuePage() {
       vehicleType: ctx.vehicleTypeCode,
       material: ctx.materialCode,
     };
+    // Completed bookings already fulfilled by this vendor on the contract lane —
+    // context for how much of an L1/L2/L3 allocation share is used up.
+    const norm = (value?: string | null) => (value ?? "").trim().toLowerCase();
+    const completedOnLane = (vendorId: string, fromCity?: string, toCity?: string) =>
+      bookings.filter((b) => {
+        if (getPrimaryBookingStatus(b.status) !== "COMPLETED") return false;
+        if ((b.assignment?.vendorId ?? null) !== vendorId) return false;
+        const addrs = adminSources.customerAddressMap.get(b.customerId) ?? [];
+        const src = addrs.find((a) => a.id === b.sourceAddressId)?.city;
+        const dst = addrs.find((a) => a.id === b.destinationAddressId)?.city;
+        return norm(src) === norm(fromCity) && norm(dst) === norm(toCity);
+      }).length;
     const rows: Array<{
       vendorId: string;
       vendorName: string;
@@ -231,6 +243,10 @@ export function AssignmentQueuePage() {
       vendorFreight: number;
       marginAmount: number;
       marginPercent: number;
+      allocationRank?: "L1" | "L2" | "L3";
+      volumeAllocationPercent?: number;
+      completed: number;
+      nextInLine: boolean;
     }> = [];
     adminSources.vendors
       .filter((vendor) => vendor.status === "active")
@@ -256,12 +272,25 @@ export function AssignmentQueuePage() {
             vendorFreight: freight,
             marginAmount: calculateMarginAmount(customerFreight, freight),
             marginPercent: calculateMarginPercent(customerFreight, freight),
+            allocationRank: card.allocationRank,
+            volumeAllocationPercent: card.volumeAllocationPercent,
+            completed: completedOnLane(vendor.id, card.fromCity, card.toCity),
+            nextInLine: false,
           });
         });
       });
-    return rows.sort((a, b) => a.vendorFreight - b.vendorFreight);
+    // Soft order: honor the auction allocation split — L1 → L2 → L3 first
+    // (cheapest within a rank), then unranked (manual/bulk) by freight.
+    const rankWeight = (rank?: string) => (rank === "L1" ? 1 : rank === "L2" ? 2 : rank === "L3" ? 3 : 99);
+    rows.sort(
+      (a, b) => rankWeight(a.allocationRank) - rankWeight(b.allocationRank) || a.vendorFreight - b.vendorFreight,
+    );
+    // Flag the first ranked (L1) row as the next vendor in line per allocation.
+    const firstRanked = rows.findIndex((row) => row.allocationRank);
+    if (firstRanked !== -1) rows[firstRanked].nextInLine = true;
+    return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminSources.vendors, adminSources.vendorRateCardMap, bookingMatchContext, assigningBooking, customerFreight]);
+  }, [adminSources.vendors, adminSources.vendorRateCardMap, adminSources.customerAddressMap, bookings, bookingMatchContext, assigningBooking, customerFreight]);
 
   const selectedLrConfig = useMemo(
     () =>
@@ -648,6 +677,9 @@ export function AssignmentQueuePage() {
                       <tr>
                         <th className="px-3 py-2 font-medium">Vendor</th>
                         <th className="px-3 py-2 font-medium">Source</th>
+                        <th className="px-3 py-2 font-medium">Rank</th>
+                        <th className="px-3 py-2 font-medium">Volume</th>
+                        <th className="px-3 py-2 font-medium">Completed</th>
                         <th className="px-3 py-2 font-medium">Rate Type</th>
                         <th className="px-3 py-2 font-medium">Buying Rate</th>
                         <th className="px-3 py-2 font-medium">Vendor Freight</th>
@@ -660,7 +692,12 @@ export function AssignmentQueuePage() {
                     <tbody className="divide-y divide-border/70">
                       {vendorContractOptions.map((entry) => (
                         <tr key={entry.rateCardId} className={entry.rateCardId === matchedVendorRateCardId ? "bg-primary/5" : ""}>
-                          <td className="px-3 py-2 font-medium">{entry.vendorName}</td>
+                          <td className="px-3 py-2 font-medium">
+                            {entry.vendorName}
+                            {entry.nextInLine ? (
+                              <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Next in line</span>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-2">
                             <span
                               className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -670,6 +707,9 @@ export function AssignmentQueuePage() {
                               {entry.source}
                             </span>
                           </td>
+                          <td className="px-3 py-2">{entry.allocationRank ?? "—"}</td>
+                          <td className="px-3 py-2">{entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "100%"}</td>
+                          <td className="px-3 py-2">{entry.completed}</td>
                           <td className="px-3 py-2">{entry.rateType}</td>
                           <td className="px-3 py-2">Rs {entry.unitRate.toLocaleString()}</td>
                           <td className="px-3 py-2">Rs {entry.vendorFreight.toLocaleString()}</td>

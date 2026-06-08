@@ -65,6 +65,10 @@ export interface TenantVendorRateCard {
   rate: number;
   status: "active" | "inactive";
   remarks?: string;
+  /** Auction allocation metadata — set only for rows derived from auction-won
+   *  LOT/BULK contracts so booking assignment can honor the L1/L2/L3 split. */
+  allocationRank?: "L1" | "L2" | "L3";
+  volumeAllocationPercent?: number;
   createdAt: string;
   updatedAt: string;
 }
