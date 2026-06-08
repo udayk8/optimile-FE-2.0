@@ -5,8 +5,9 @@ import type { BookingRecord, BookingExpenseRecord, BookingStatus } from "@/modul
 import { areAllDeliveryPodsCaptured, perTrip, perMT, perKM } from "@/modules/tms/booking/services/booking-engine";
 import { calculateVendorFreightFromRateCard, getVendorRateCardUnitRate } from "@/modules/tms/booking/services/booking-selectors";
 import { readVendorContracts, type VendorContract } from "@shared-utils";
+import { computeCreditUsage } from "@/modules/tenant-admin/integration/credit-usage";
 import { AR_TOLERANCE_PCT } from "@finance/data/mock";
-import type { FinanceDataBridge, RateCardDescriptor } from "@finance/integration/finance-data-bridge";
+import type { FinanceDataBridge, RateCardDescriptor, FinanceCustomerCredit } from "@finance/integration/finance-data-bridge";
 import type { ARInvoice, ARTrip, LedgerExpense, PodStage } from "@finance/lib/receivablesStore";
 import type { VendorBill } from "@finance/lib/payablesStore";
 
@@ -315,8 +316,8 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
 
     const trips: ARTrip[] = eligible.map(bookingToTrip);
 
-    const invoices: ARInvoice[] = store
-      .listTenantInvoices(tenantId)
+    const rawInvoices = store.listTenantInvoices(tenantId);
+    const invoices: ARInvoice[] = rawInvoices
       .map((inv) => {
         const invBookings = (inv.bookingIds ?? [])
           .map((bid) => allBookings.find((b) => b.bookingId === bid))
@@ -366,6 +367,14 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           sellingFreight != null && buyingFreight != null
             ? Number((sellingFreight - buyingFreight).toFixed(2))
             : undefined;
+        // Real persisted lifecycle stage (default submitted). Once approved, derive
+        // the due date / aging status the AR Report + Collections show.
+        const stage = inv.stage ?? "submitted";
+        const due = inv.dueDate ? inv.dueDate.slice(0, 10) : undefined;
+        const deltaDays = due ? Math.round((new Date(due).getTime() - Date.now()) / 86400000) : undefined;
+        const arStatus = stage === "approved" && deltaDays != null
+          ? (deltaDays < 0 ? "overdue" : deltaDays <= 7 ? "due-soon" : "current")
+          : undefined;
         return {
           id: inv.invoiceId,
           tripId: inv.bookingIds?.[0],
@@ -373,6 +382,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           lane: firstBooking ? laneOf(firstBooking) : "—",
           truck: firstBooking?.assignment?.vehicleLabel ?? "—",
           date: (inv.createdAt ?? "").slice(0, 10),
+          due,
           terms: "Net 30",
           base,
           accessorials: [],
@@ -381,7 +391,10 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           amount: totalLive,
           variancePct,
           flagged: Math.abs(variancePct) > AR_TOLERANCE_PCT,
-          stage: "submitted",
+          stage,
+          status: arStatus,
+          daysOverdue: deltaDays != null && deltaDays < 0 ? -deltaDays : undefined,
+          daysUntil: deltaDays != null && deltaDays >= 0 ? deltaDays : undefined,
           bookingIds: inv.bookingIds,
           expenseItems,
           commercialType: firstBooking?.commercialType ?? undefined,
@@ -389,6 +402,8 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           sellingFreight,
           buyingFreight,
           margin,
+          paymentStatus: inv.paymentStatus ?? "unpaid",
+          paidAt: inv.paidAt ?? undefined,
           // One drop per booking so multi-booking invoices resolve every trip.
           drops: invBookings.length > 1
             ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))
@@ -453,9 +468,76 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
       };
     });
 
+    /* ---------- Credit-limit monitoring + indent block (BRD 3.5) ----------
+       One row per customer. Utilisation uses the SHARED live-exposure helper
+       (unpaid invoices + active un-invoiced bookings) so the finance screen, the
+       indent-creation warning and the customer profile never disagree. The block
+       fields mirror the customer's persisted indentBlock flag. */
+    const customers: FinanceCustomerCredit[] = store
+      .listTenantCustomers(tenantId)
+      .map((c) => {
+        const usage = computeCreditUsage(c, allBookings, rawInvoices);
+        return {
+          customerId: c.id,
+          name: c.name,
+          creditLimit: usage.creditLimit,
+          used: usage.used,
+          utilizationPercent: usage.utilizationPercent,
+          blocked: Boolean(c.indentBlock?.blocked),
+          blockReason: c.indentBlock?.reason,
+          blockedBy: c.indentBlock?.blockedBy,
+          blockedAt: c.indentBlock?.blockedAt,
+          overridden: Boolean(c.indentBlock?.override),
+        };
+      });
+
+    /* ---------- AR ledger from REAL invoices (BRD 4.x) ----------
+       An 'Invoice' row (+total) when raised, a 'Payment' row (−total) when paid,
+       sorted by date with a running balance — so Ledgers → AR reflects reality. */
+    const arLedgerEvents = rawInvoices.flatMap((inv) => {
+      const client = customerName(inv.customerId);
+      const events: { date: string; type: string; ref: string; amt: number; client: string }[] = [
+        { date: (inv.createdAt ?? "").slice(0, 10), type: "Invoice", ref: inv.invoiceId, amt: inv.total, client },
+      ];
+      if (inv.paymentStatus === "paid") {
+        events.push({ date: (inv.paidAt ?? inv.createdAt ?? "").slice(0, 10), type: "Payment", ref: inv.invoiceId, amt: -inv.total, client });
+      }
+      return events;
+    });
+    arLedgerEvents.sort((a, b) => a.date.localeCompare(b.date));
+    let arBal = 0;
+    const arLedger = arLedgerEvents.map((e) => {
+      arBal += e.amt;
+      return { ...e, bal: arBal };
+    });
+
     return {
       trips,
       vendorBills,
+      customers,
+      arLedger,
+      // Finance sets / clears the indent block on the shared customer record so
+      // indent creation (CreateBooking) can enforce it. Note is mandatory on block.
+      setIndentBlock: (customerId: string, blocked: boolean, note: string) => {
+        store.updateTenantCustomer(customerId, {
+          indentBlock: blocked
+            ? { blocked: true, reason: note, blockedBy: "Finance", blockedAt: new Date().toISOString(), override: null }
+            : null,
+        });
+      },
+      // Authorised override for the block — documented justification recorded on
+      // the customer's block (the customer stays blocked; the justification is the
+      // audit). Used when finance allows a specific exception.
+      overrideIndentBlock: (customerId: string, justification: string) => {
+        const existing = store.getTenantCustomerById(customerId)?.indentBlock;
+        if (!existing?.blocked) return;
+        store.updateTenantCustomer(customerId, {
+          indentBlock: {
+            ...existing,
+            override: { justification, overriddenBy: "Finance", overriddenAt: new Date().toISOString() },
+          },
+        });
+      },
       // Finance-driven lifecycle — writes back to the shared collection so the
       // vendor portal's tabs reflect the decision.
       approveVendorBill: (id: string) => store.financeApproveVendorInvoice(id),
@@ -519,6 +601,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           sgst,
           total,
           createdAt: new Date().toISOString(),
+          stage: "submitted",
         });
 
         // Mark each booking invoiced so it leaves Ready-to-Invoice and can't be
@@ -529,6 +612,27 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
 
         return invoiceId;
       },
+
+      // Customer payment received — marks the AR invoice paid so it leaves the
+      // client's live credit utilisation (BRD 3.5).
+      recordPayment: (invoiceId: string) => store.recordTenantInvoicePayment(invoiceId),
+
+      // AR lifecycle write-backs — persist the stage so finance decisions stick.
+      submitInvoice: (invoiceId: string) => store.setTenantInvoiceStage(invoiceId, "submitted"),
+      decideInvoice: (invoiceId: string, decision: "approve" | "correction" | "dispute") => {
+        if (decision === "approve") {
+          const inv = store.listTenantInvoices(tenantId).find((i) => i.invoiceId === invoiceId);
+          const base = inv?.createdAt ? new Date(inv.createdAt) : new Date();
+          const dueDate = new Date(base.getTime() + 30 * 86400000).toISOString(); // Net 30
+          store.setTenantInvoiceStage(invoiceId, "approved", { approvedAt: new Date().toISOString(), dueDate });
+        } else {
+          store.setTenantInvoiceStage(invoiceId, decision === "dispute" ? "disputed" : "correction");
+        }
+      },
+
+      // Commit a working-capital budget as the customer's credit limit (Contract Budget CTA).
+      setCreditLimit: (customerId: string, amount: number) =>
+        store.updateTenantCustomer(customerId, { creditLimit: amount }),
     };
   }, [store, tenantId]);
 }

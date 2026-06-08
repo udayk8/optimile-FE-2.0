@@ -4,6 +4,7 @@ import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finan
 import { exportCsv } from "@finance/lib/csv";
 import { useReceivables, type ARInvoice } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
+import { useAuditLogger } from "@finance/lib/auditStore";
 
 /* BRD 8.1 — Collections / Accounts Receivable Report.
    Aging summary strip + detailed trip-row table with filters, export, drill-down. */
@@ -29,6 +30,11 @@ const ageLabel = (delta: number) => (delta >= 0 ? `in ${delta}d` : `${-delta}d o
 export default function ARReport({ toast }: any) {
   const { invoices } = useReceivables();
   const { disputes } = useDisputes();
+  const logAudit = useAuditLogger();
+  const remind = (id: string, client: string) => {
+    logAudit({ user: "Finance", action: "Payment reminder sent", entity: id, type: "Invoice", to: client });
+    toast(`Reminder email sent to ${client}`);
+  };
   const [client, setClient] = useState("all");
   const [status, setStatus] = useState("all");
   const [bucket, setBucket] = useState<"all" | BucketKey>("all");
@@ -41,8 +47,9 @@ export default function ARReport({ toast }: any) {
     [disputes],
   );
 
-  // Approved invoices = the live receivables position.
-  const all = useMemo(() => invoices.filter((i) => i.stage === "approved").map((i) => {
+  // Raised & unpaid invoices = the live receivables position (submitted or approved,
+  // not yet paid). Paid invoices drop out of outstanding.
+  const all = useMemo(() => invoices.filter((i) => (i.stage === "submitted" || i.stage === "approved") && i.paymentStatus !== "paid").map((i) => {
     const delta = daysTo(i.due);
     const disputed = disputedIds.has(i.id);
     return {
@@ -153,7 +160,7 @@ export default function ARReport({ toast }: any) {
                   <td className="px-4 py-3"><Pill tone={tone as any}>{r.statusLabel}</Pill></td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {r.delta < 0 && <button onClick={() => toast(`Reminder email sent to ${r.client}`)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><Bell size={11} />Remind</button>}
+                      {r.delta < 0 && <button onClick={() => remind(r.id, r.client)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><Bell size={11} />Remind</button>}
                       <button onClick={() => setDrill(r)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Trip<ArrowRight size={11} /></button>
                     </div>
                   </td>
@@ -171,6 +178,7 @@ export default function ARReport({ toast }: any) {
 }
 
 function DrillModal({ inv, onClose, toast }: { inv: ARInvoice & any; onClose: () => void; toast: (m: string) => void }) {
+  const logAudit = useAuditLogger();
   const field = (k: string, v: React.ReactNode) => (
     <div className="flex justify-between border-b border-slate-100 py-2 text-sm last:border-0"><span className="text-slate-500">{k}</span><span className="text-slate-800">{v}</span></div>
   );
@@ -189,7 +197,7 @@ function DrillModal({ inv, onClose, toast }: { inv: ARInvoice & any; onClose: ()
         {field("Status", inv.statusLabel)}
         <div className="mt-5 flex gap-3">
           <Btn variant="ghost" className="flex-1 py-2.5" onClick={onClose}><X size={14} />Close</Btn>
-          {inv.delta < 0 && <Btn className="flex-1 py-2.5" onClick={() => { toast(`Reminder email sent to ${inv.client}`); onClose(); }}><Bell size={14} />Send reminder</Btn>}
+          {inv.delta < 0 && <Btn className="flex-1 py-2.5" onClick={() => { logAudit({ user: "Finance", action: "Payment reminder sent", entity: inv.id, type: "Invoice", to: inv.client }); toast(`Reminder email sent to ${inv.client}`); onClose(); }}><Bell size={14} />Send reminder</Btn>}
         </div>
       </div>
     </Modal>

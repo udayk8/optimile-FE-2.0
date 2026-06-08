@@ -1,11 +1,26 @@
-import React from "react";
-import { Zap, Landmark, CreditCard } from "lucide-react";
+import React, { useState } from "react";
+import { Zap, Landmark, CreditCard, Check } from "lucide-react";
 import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { fmtL } from "@finance/lib/format";
 import { DISCOUNT_OFFERS, FACTORING, CREDIT_LINE } from "@finance/data/mock";
+import { useAuditLogger } from "@finance/lib/auditStore";
 
 export default function WorkingCapital({ toast }: any) {
   const linePct = (CREDIT_LINE.used / CREDIT_LINE.limit) * 100;
+  const logAudit = useAuditLogger();
+  // Track which offers/requests have been sent so the CTA reflects the action.
+  const [offered, setOffered] = useState<Set<string>>(new Set());
+  const [factored, setFactored] = useState<Set<string>>(new Set());
+  const sendOffer = (o: typeof DISCOUNT_OFFERS[number]) => {
+    setOffered((s) => new Set(s).add(o.invoice));
+    logAudit({ user: "Finance", action: "Early-payment offer sent", entity: o.invoice, type: "Vendor invoice", amount: o.saving, to: o.vendor });
+    toast(`Early-payment offer sent for ${o.invoice}`);
+  };
+  const requestFactoring = (f: typeof FACTORING[number]) => {
+    setFactored((s) => new Set(s).add(f.invoice));
+    logAudit({ user: "Finance", action: "Factoring requested", entity: f.invoice, type: "Invoice", amount: Math.round(f.amount * f.advance / 100), to: f.client });
+    toast(`Factoring requested for ${f.invoice}`);
+  };
   return (
     <div>
       <SectionTitle sub="Bridge the gap between paying sub-vendors (short cycle) and collecting from clients (long cycle).">Working Capital Optimisation</SectionTitle>
@@ -23,7 +38,11 @@ export default function WorkingCapital({ toast }: any) {
                 </div>
                 <div className="text-right">
                   <Money value={o.saving} className="font-semibold text-emerald-600" />
-                  <button onClick={() => toast(`Early-payment offer sent for ${o.invoice}`)} className="mt-1 block rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Offer</button>
+                  {offered.has(o.invoice) ? (
+                    <span className="mt-1 flex items-center justify-end gap-1 text-xs font-medium text-emerald-600"><Check size={11} />Offer sent</span>
+                  ) : (
+                    <button onClick={() => sendOffer(o)} className="mt-1 block rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Offer</button>
+                  )}
                 </div>
               </div>
             ))}
@@ -42,7 +61,11 @@ export default function WorkingCapital({ toast }: any) {
                 </div>
                 <div className="text-right">
                   <Money value={Math.round(f.amount * f.advance / 100)} className="font-semibold text-blue-600" />
-                  <button onClick={() => toast(`Factoring requested for ${f.invoice}`)} className="mt-1 block rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Factor</button>
+                  {factored.has(f.invoice) ? (
+                    <span className="mt-1 flex items-center justify-end gap-1 text-xs font-medium text-blue-600"><Check size={11} />Request sent</span>
+                  ) : (
+                    <button onClick={() => requestFactoring(f)} className="mt-1 block rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">Factor</button>
+                  )}
                 </div>
               </div>
             ))}

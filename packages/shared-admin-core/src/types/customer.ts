@@ -79,6 +79,23 @@ export type RateMatchingFieldKey =
 
 export type RateMatchingConfig = RateMatchingFieldKey[];
 
+/** Finance-owned flag that stops new indents (bookings) for a customer whose
+ *  credit limit is exhausted / payments are overdue. Set from the finance
+ *  Credit Limits screen after internal alignment; read by indent creation to
+ *  block the booking. `override` documents an authorised exception for a single
+ *  indent (the customer stays blocked). See BRD 3.5. */
+export interface TenantCustomerIndentBlock {
+  blocked: boolean;
+  reason: string;
+  blockedBy: string;
+  blockedAt: string;
+  override?: {
+    justification: string;
+    overriddenBy: string;
+    overriddenAt: string;
+  } | null;
+}
+
 export interface TenantCustomer {
   id: string;
   tenantId: string;
@@ -107,6 +124,8 @@ export interface TenantCustomer {
   creditLimit?: number | null;
   creditDays?: number | null;
   currentOutstanding?: number | null;
+  /** Finance credit-limit block on new indents (BRD 3.5). Absent ⇒ not blocked. */
+  indentBlock?: TenantCustomerIndentBlock | null;
   gstChargeType?: string;
   tdsApplicable?: boolean;
   invoiceFormat?: string;
@@ -237,6 +256,8 @@ export interface TenantCustomerInput {
   creditLimit?: number | null;
   creditDays?: number | null;
   currentOutstanding?: number | null;
+  /** Finance credit-limit block on new indents (BRD 3.5). Absent ⇒ not blocked. */
+  indentBlock?: TenantCustomerIndentBlock | null;
   gstChargeType?: string;
   tdsApplicable?: boolean;
   invoiceFormat?: string;

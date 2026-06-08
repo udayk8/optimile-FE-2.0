@@ -4,6 +4,7 @@ import { Card, Pill, Money, SectionTitle, Modal, ModalHeader } from "@finance/co
 import { exportCsv } from "@finance/lib/csv";
 import { useDisputes } from "@finance/lib/disputesStore";
 import { useReceivables } from "@finance/lib/receivablesStore";
+import { useAuditLogger } from "@finance/lib/auditStore";
 
 const STATUS_LABEL = { overdue: "Overdue", "due-soon": "Due soon", current: "Current" };
 const STATUS_TONE = { overdue: "red", "due-soon": "amber", current: "green" };
@@ -49,11 +50,16 @@ function RaiseDisputeModal({ invoice, onClose, onSubmit }: any) {
 export default function Collections({ toast }: any) {
   const { disputes, addDispute } = useDisputes();
   const { invoices } = useReceivables();
+  const logAudit = useAuditLogger();
+  const remind = (inv: { id: string; client: string }) => {
+    logAudit({ user: "Finance", action: "Payment reminder sent", entity: inv.id, type: "Invoice", to: inv.client });
+    toast(`Reminder email sent to ${inv.client}`);
+  };
   const [customer, setCustomer] = useState("all");
   const [raising, setRaising] = useState<any>(null);
 
-  // Debtors = invoices the client has approved (now outstanding in the AR ledger).
-  const approved = useMemo(() => invoices.filter((i) => i.stage === "approved"), [invoices]);
+  // Debtors = raised & unpaid invoices (submitted or approved, not yet paid).
+  const approved = useMemo(() => invoices.filter((i) => (i.stage === "submitted" || i.stage === "approved") && i.paymentStatus !== "paid"), [invoices]);
   const customers = useMemo(() => [...new Set(approved.map((i) => i.client))], [approved]);
   const rows = approved.filter((i) => customer === "all" || i.client === customer);
 
@@ -153,7 +159,7 @@ export default function Collections({ toast }: any) {
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-2">
                       {inv.status === "overdue" && (
-                        <button onClick={() => toast("Reminder email sent to " + inv.client)}
+                        <button onClick={() => remind(inv)}
                           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
                           <Bell size={12} />Remind
                         </button>

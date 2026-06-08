@@ -268,6 +268,16 @@ interface MockStoreValue {
   actionTenantBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) => BookingRecord;
   listTenantInvoices: (tenantId: string) => TenantInvoiceRecord[];
   createTenantInvoice: (input: TenantInvoiceRecord) => TenantInvoiceRecord;
+  // AR lifecycle: persist the invoice stage (submit / approve / dispute / correction)
+  // so finance decisions stick in embedded mode. BRD 4.x.
+  setTenantInvoiceStage: (
+    invoiceId: string,
+    stage: NonNullable<TenantInvoiceRecord["stage"]>,
+    opts?: { approvedAt?: string; dueDate?: string },
+  ) => void;
+  // Record a customer payment against an AR invoice (marks it paid so it leaves
+  // the customer's live credit utilisation). BRD 3.5.
+  recordTenantInvoicePayment: (invoiceId: string, opts?: { at?: string }) => void;
   // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
   listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
   vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
@@ -6173,6 +6183,30 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       createTenantInvoice: (input) => {
         setTenantInvoices((current) => [input, ...current]);
         return input;
+      },
+      setTenantInvoiceStage: (invoiceId, stage, opts) => {
+        setTenantInvoices((current) =>
+          current.map((inv) =>
+            inv.invoiceId === invoiceId
+              ? {
+                  ...inv,
+                  stage,
+                  approvedAt: opts?.approvedAt ?? (stage === "approved" ? new Date().toISOString() : inv.approvedAt ?? null),
+                  dueDate: opts?.dueDate ?? inv.dueDate ?? null,
+                }
+              : inv,
+          ),
+        );
+      },
+      recordTenantInvoicePayment: (invoiceId, opts) => {
+        const at = opts?.at ?? new Date().toISOString();
+        setTenantInvoices((current) =>
+          current.map((inv) =>
+            inv.invoiceId === invoiceId
+              ? { ...inv, paymentStatus: "paid", paidAt: at, paidAmount: inv.total }
+              : inv,
+          ),
+        );
       },
       // ---- Vendor (AP) invoice lifecycle ----------------------------------
       listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),

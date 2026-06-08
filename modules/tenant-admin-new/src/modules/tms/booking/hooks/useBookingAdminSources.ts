@@ -5,6 +5,8 @@ export function useBookingAdminSources(tenantId: string) {
 
   return {
     customers: appStore.customers,
+    bookings: appStore.bookings,
+    invoices: appStore.invoices,
     users: appStore.users,
     customerAddressMap: appStore.customerAddressMap,
     customerMap: appStore.customerMap,

@@ -5,9 +5,10 @@ import { usePayables, type LedgerEntry } from "@finance/lib/payablesStore";
 import { useReceivables } from "@finance/lib/receivablesStore";
 
 /* Filter AR rows by client, sort by date, and recompute the running balance
-   so the column + outstanding stay correct for any selection. */
-function arRowsFor(client: string): LedgerEntry[] {
-  const filtered = (client === "all" ? CLIENT_LEDGER : CLIENT_LEDGER.filter((e) => e.client === client))
+   so the column + outstanding stay correct for any selection. `source` is the
+   real bridged AR ledger when embedded, else the CLIENT_LEDGER mock. */
+function arRowsFor(client: string, source: LedgerEntry[]): LedgerEntry[] {
+  const filtered = (client === "all" ? source : source.filter((e) => e.client === client))
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date));
   let bal = 0;
@@ -67,12 +68,14 @@ function ProfitTable({ rows }: { rows: ProfitRow[] }) {
 
 export default function Ledgers() {
   const { apLedger } = usePayables();
-  const { trips } = useReceivables();
+  const { trips, arLedger } = useReceivables();
   const [tab, setTab] = useState<"ar" | "ap" | "profit">("ar");
   const [client, setClient] = useState("all");
 
-  const clients = useMemo(() => [...new Set(CLIENT_LEDGER.map((e) => e.client))].sort(), []);
-  const arRows = useMemo(() => arRowsFor(client), [client]);
+  // Real bridged AR ledger when embedded; else the CLIENT_LEDGER demo mock.
+  const arSource = arLedger && arLedger.length ? arLedger : CLIENT_LEDGER;
+  const clients = useMemo(() => [...new Set(arSource.map((e) => e.client).filter(Boolean) as string[])].sort(), [arSource]);
+  const arRows = useMemo(() => arRowsFor(client, arSource), [client, arSource]);
   const arOutstanding = arRows.length ? arRows[arRows.length - 1].bal : 0;
   const apOutstanding = apLedger.length ? apLedger[apLedger.length - 1].bal : 0;
 

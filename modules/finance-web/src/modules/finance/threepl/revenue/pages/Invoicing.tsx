@@ -232,8 +232,10 @@ function previewInvoiceFromDrops(drops: ARTrip[]): ARInvoice {
 }
 
 function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
-  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision } = useReceivables();
+  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision, recordPayment } = useReceivables();
   const { addDispute } = useDisputes();
+  const paid = inv.paymentStatus === "paid";
+  const markPaid = () => { recordPayment?.(inv.id); toast(`Payment recorded for ${inv.id} — credit released`); };
   const [adding, setAdding] = useState(false);
   const [preview, setPreview] = useState(false);
   const [dl, setDl] = useState(false);
@@ -300,6 +302,7 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
             {inv.flagged && (
               <Pill tone="red">Variance {inv.variancePct > 0 ? "+" : ""}{inv.variancePct.toFixed(1)}% vs contract</Pill>
             )}
+            {paid && <Pill tone="green">Paid</Pill>}
           </div>
           <p className="mt-1 text-sm text-slate-500">{inv.client} · {inv.lane} · {inv.truck} {inv.tripId && <>· trip {inv.tripId}</>}</p>
         </div>
@@ -464,6 +467,20 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         )}
         {inv.stage === "disputed" && (
           <div className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle size={16} />Disputed — tracked on the Disputes page.</div>
+        )}
+        {/* Customer payment (AR) — records the receipt so the client's credit
+            utilisation is released (BRD 3.5). Available on bridged invoices. */}
+        {recordPayment && !editable && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            {paid ? (
+              <span className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} />Payment received{inv.paidAt ? ` on ${inv.paidAt.slice(0, 10)}` : ""} — credit released.</span>
+            ) : (
+              <>
+                <span className="text-sm text-slate-500">Once the customer settles this invoice, record the receipt to free up their credit limit.</span>
+                <Btn onClick={markPaid}><Check size={14} />Mark payment received</Btn>
+              </>
+            )}
+          </div>
         )}
       </Card>
 
@@ -654,7 +671,8 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
 
   const customers = buildCustomers(trips);
-  const working = invoices.filter((i) => i.stage !== "approved");
+  // Drafts & in-progress = not yet approved and not yet paid.
+  const working = invoices.filter((i) => i.stage !== "approved" && i.paymentStatus !== "paid");
   const c = cust ? customers.find((x) => x.customer === cust) : null;
 
   // ---------- Customer drill: all bookings for one customer + KPIs + bill ----------

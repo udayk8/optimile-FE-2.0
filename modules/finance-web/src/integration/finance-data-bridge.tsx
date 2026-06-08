@@ -1,5 +1,5 @@
 import { createContext, useContext, type PropsWithChildren } from 'react'
-import type { ARInvoice, ARTrip } from '@finance/lib/receivablesStore'
+import type { ARInvoice, ARTrip, LedgerEntry } from '@finance/lib/receivablesStore'
 import type { VendorBill } from '@finance/lib/payablesStore'
 
 /**
@@ -26,6 +26,25 @@ export interface RateCardDescriptor {
   sourceAuctionId?: string
   allocationRank?: 'L1' | 'L2' | 'L3'
   volumeAllocationPercent?: number
+}
+
+/**
+ * Per-customer credit-limit snapshot surfaced to the finance Credit Limits screen
+ * (BRD 3.5). `used` is the live outstanding (unpaid AR) for that customer; the
+ * block fields mirror the customer's persisted indent-block flag. Absent when
+ * finance runs standalone (the page falls back to its CLIENTS mock).
+ */
+export interface FinanceCustomerCredit {
+  customerId: string
+  name: string
+  creditLimit: number
+  used: number
+  utilizationPercent: number
+  blocked: boolean
+  blockReason?: string
+  blockedBy?: string
+  blockedAt?: string
+  overridden?: boolean
 }
 
 /**
@@ -72,6 +91,24 @@ export interface FinanceDataBridge {
   requestVendorResubmission?: (id: string, message?: string) => void
   rejectVendorBill?: (id: string, reason?: string) => void
   replyToVendorDispute?: (id: string, message: string) => void
+
+  // Credit-limit monitoring + indent blocking (BRD 3.5). `customers` carries each
+  // client's live utilization; the two actions persist a block flag / documented
+  // override onto the shared customer record so indent creation can enforce it.
+  customers?: FinanceCustomerCredit[]
+  setIndentBlock?: (customerId: string, blocked: boolean, note: string) => void
+  overrideIndentBlock?: (customerId: string, justification: string) => void
+  // Commit a working-capital budget as the customer's credit limit (BRD 3.5).
+  setCreditLimit?: (customerId: string, amount: number) => void
+
+  // Record a customer payment against an AR invoice — marks it paid so it leaves
+  // the client's live credit utilisation (BRD 3.5).
+  recordPayment?: (invoiceId: string) => void
+  // AR lifecycle write-backs so finance decisions persist in embedded mode.
+  submitInvoice?: (invoiceId: string) => void
+  decideInvoice?: (invoiceId: string, decision: 'approve' | 'correction' | 'dispute') => void
+  // Real AR ledger projected from invoices (Invoice + Payment rows, running balance).
+  arLedger?: LedgerEntry[]
 }
 
 const FinanceDataBridgeContext = createContext<FinanceDataBridge | null>(null)

@@ -81,3 +81,10 @@ export function useAudit() {
   const entries = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)
   return { entries }
 }
+
+/** A logger bound to the page's active finance mode — for pages (not stores) that
+ *  need to append an audit entry from an event handler. */
+export function useAuditLogger() {
+  const mode = useContext(AuditModeContext)
+  return (entry: Omit<AuditEntry, 'ts'> & { ts?: string }) => logAudit(mode, entry)
+}
