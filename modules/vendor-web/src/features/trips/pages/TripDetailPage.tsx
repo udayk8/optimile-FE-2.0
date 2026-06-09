@@ -347,13 +347,13 @@ export default function TripDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" /> Approved Expenses
+                  <Package className="h-5 w-5 text-primary" /> Expenses
                 </CardTitle>
                 <Button size="sm" onClick={() => openExpenseModal('expense')}>Add Expense</Button>
               </CardHeader>
               <CardContent className="space-y-3">
                 {tripExpenses.length === 0 ? (
-                  <EmptyState title="No approved expenses for this booking" />
+                  <EmptyState title="No expenses for this booking" />
                 ) : (
                   <>
                     {tripExpenses.map((expense) => (
@@ -368,12 +368,11 @@ export default function TripDetailPage() {
                         </div>
                         <div className="text-right">
                           <div className="font-bold text-text"><CurrencyDisplay amount={expense.amount} /></div>
-                          {expense.status ? <StatusBadge status={expense.status === 'Approved' ? 'APPROVED' : expense.status.toUpperCase()} /> : null}
                         </div>
                       </div>
                     ))}
                     <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <span className="font-semibold text-text">Total Approved Expenses</span>
+                      <span className="font-semibold text-text">Total Expenses</span>
                       <span className="font-bold text-text"><CurrencyDisplay amount={trip?.approvedExpenses ?? 0} /></span>
                     </div>
                   </>
