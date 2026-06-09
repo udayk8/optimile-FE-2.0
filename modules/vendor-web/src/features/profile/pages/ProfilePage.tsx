@@ -98,11 +98,6 @@ export default function ProfilePage() {
           <div className="mt-1 flex items-center gap-2">
             {vendor ? <StatusBadge status="ACTIVE" /> : <Badge variant="muted">Draft</Badge>}
           </div>
-          <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Completion</div>
-          <div className="mt-2 h-2 rounded-full bg-gray-100">
-            <div className="h-2 rounded-full bg-primary" style={{ width: `${completion}%` }} />
-          </div>
-          <div className="mt-2 text-right text-xs text-gray-500">{completion}%</div>
         </div>
       </div>
 

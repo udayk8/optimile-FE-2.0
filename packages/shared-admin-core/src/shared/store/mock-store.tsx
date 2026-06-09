@@ -7077,6 +7077,12 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             expiry: nextVehicle.permit.expiry,
           },
           odometer: nextVehicle.odometer.trim(),
+          // operationalStatus / compliance aren't part of TenantVehicleInput but
+          // the vendor portal sends them (active/inactive toggle, doc updates) —
+          // carry them through so the change reflects in both portals.
+          operationalStatus: (updates as Partial<TenantVehicle>).operationalStatus ?? existing.operationalStatus,
+          complianceStatus: (updates as Partial<TenantVehicle>).complianceStatus ?? existing.complianceStatus,
+          complianceDocuments: (updates as Partial<TenantVehicle>).complianceDocuments ?? existing.complianceDocuments,
           updatedAt: new Date().toISOString(),
         };
         setTenantVehicles((current) =>
@@ -7145,6 +7151,10 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           endorsements: Array.from(new Set(nextDriver.endorsements.map((item) => item.trim()).filter(Boolean))),
           assignedVehicleId: nextDriver.assignedVehicleId ?? null,
           vendorId: nextDriver.vendorId ?? null,
+          // Compliance/status aren't in TenantDriverInput but the vendor portal
+          // sends them (doc updates) — carry through so both portals reflect it.
+          complianceStatus: (updates as Partial<TenantDriver>).complianceStatus ?? existing.complianceStatus,
+          complianceDocuments: (updates as Partial<TenantDriver>).complianceDocuments ?? existing.complianceDocuments,
           updatedAt: new Date().toISOString(),
         };
         setTenantDrivers((current) =>
