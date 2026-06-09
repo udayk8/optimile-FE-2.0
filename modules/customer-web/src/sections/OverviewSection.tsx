@@ -2,11 +2,13 @@ import {
   AlertCircle,
   AlertTriangle,
   BarChart2,
+  CalendarDays,
   Clock3,
+  LineChart,
   TrendingUp,
   Truck,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Badge } from '@shared-ui/badge'
 import { Button } from '@shared-ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@shared-ui/card'
@@ -39,22 +41,79 @@ const FEED_STATUS_LABEL: Partial<Record<BookingStatus, string>> = {
   READY_FOR_DISPATCH: 'Ready to Dispatch',
 }
 
-function use7DayTrend(bookings: Booking[]): { labels: string[]; heights: number[] } {
+// Booking trend that adapts to the active date filter: daily buckets for short
+// ranges, weekly for medium, monthly for long — so the chart always shows a
+// readable number of bars regardless of how wide the filter is.
+function useBookingTrend(bookings: Booking[], dateFrom: string, dateTo: string) {
   return useMemo(() => {
-    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    const today = new Date()
-    const labels: string[] = []
-    const counts: number[] = []
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today)
-      d.setDate(today.getDate() - i)
-      const dateStr = d.toISOString().slice(0, 10)
-      labels.push(DAYS[d.getDay()] ?? 'Day')
-      counts.push(bookings.filter((b) => b.bookingDate.startsWith(dateStr)).length)
+    const DAY_MS = 86_400_000
+    const atMidnight = (s: string) => new Date(`${s}T00:00:00`)
+    const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const fmtShort = (d: Date) => d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+
+    // Resolve the window: explicit filter dates, else earliest booking → today.
+    const end = dateTo ? atMidnight(dateTo) : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d })()
+    let start: Date
+    if (dateFrom) {
+      start = atMidnight(dateFrom)
+    } else {
+      const days = bookings.map((b) => (b.bookingDate ?? '').slice(0, 10)).filter(Boolean).sort()
+      start = days.length ? atMidnight(days[0]!) : (() => { const d = new Date(end); d.setDate(d.getDate() - 6); return d })()
     }
+    if (start.getTime() > end.getTime()) start = new Date(end)
+
+    const spanDays = Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1
+    const granularity: 'day' | 'week' | 'month' = spanDays <= 14 ? 'day' : spanDays <= 92 ? 'week' : 'month'
+
+    const buckets: Array<{ label: string; from: number; to: number }> = []
+    if (granularity === 'day') {
+      for (let i = 0; i < spanDays; i++) {
+        const ds = new Date(start); ds.setDate(start.getDate() + i)
+        const from = ds.getTime()
+        buckets.push({ label: spanDays <= 7 ? (WD[ds.getDay()] ?? 'Day') : fmtShort(ds), from, to: from + DAY_MS - 1 })
+      }
+    } else if (granularity === 'week') {
+      const cursor = new Date(start)
+      while (cursor.getTime() <= end.getTime()) {
+        const from = cursor.getTime()
+        const wEnd = new Date(cursor); wEnd.setDate(wEnd.getDate() + 7)
+        buckets.push({ label: fmtShort(cursor), from, to: Math.min(wEnd.getTime() - 1, end.getTime() + DAY_MS - 1) })
+        cursor.setDate(cursor.getDate() + 7)
+      }
+    } else {
+      const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+      while (cursor.getTime() <= end.getTime()) {
+        const from = cursor.getTime()
+        const mEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999)
+        buckets.push({ label: cursor.toLocaleDateString('en-US', { month: 'short' }), from, to: mEnd.getTime() })
+        cursor.setMonth(cursor.getMonth() + 1)
+      }
+    }
+
+    const counts = buckets.map((bk) =>
+      bookings.filter((b) => {
+        const s = (b.bookingDate ?? '').slice(0, 10)
+        if (!s) return false
+        const t = atMidnight(s).getTime()
+        return t >= bk.from && t <= bk.to
+      }).length,
+    )
     const maxCount = Math.max(...counts, 1)
-    return { labels, heights: counts.map((c) => Math.round((c / maxCount) * 80 + 10)) }
-  }, [bookings])
+    const heights = counts.map((c) => Math.round((c / maxCount) * 80 + 10))
+    const labels = buckets.map((b) => b.label)
+
+    const periodWord = granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month'
+    const granularityLabel = granularity === 'day' ? 'Daily' : granularity === 'week' ? 'Weekly' : 'Monthly'
+
+    let deltaPct: number | null = null
+    if (counts.length >= 2) {
+      const last = counts[counts.length - 1] ?? 0
+      const prev = counts[counts.length - 2] ?? 0
+      deltaPct = prev === 0 ? (last > 0 ? 100 : 0) : Math.round(((last - prev) / prev) * 100)
+    }
+
+    return { labels, counts, heights, maxCount, periodWord, granularityLabel, deltaPct }
+  }, [bookings, dateFrom, dateTo])
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -124,9 +183,55 @@ function useDerivedKpis(bookings: Booking[]) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function OverviewSection({ bookings, setActiveSection, setSelectedBookingId, setQuery, setPresetFilter, onViewFinance, onGoToReports }: OverviewSectionProps) {
-  const d = useDerivedKpis(bookings)
-  const trend = use7DayTrend(bookings)
+  // ── Date filter — scopes the entire dashboard by booking date ───────────────
+  const [dateFrom, setDateFrom]         = useState('')
+  const [dateTo, setDateTo]             = useState('')
+  const [activePreset, setActivePreset] = useState<string>('all')
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+
+  const filtered = useMemo(() => {
+    if (!dateFrom && !dateTo) return bookings
+    return bookings.filter((b) => {
+      const day = (b.bookingDate ?? '').slice(0, 10)
+      if (!day) return false
+      if (dateFrom && day < dateFrom) return false
+      if (dateTo && day > dateTo) return false
+      return true
+    })
+  }, [bookings, dateFrom, dateTo])
+
+  function applyPreset(key: string) {
+    setActivePreset(key)
+    if (key === 'all') { setDateFrom(''); setDateTo(''); return }
+    const from = new Date()
+    from.setDate(from.getDate() - (Number(key) - 1))
+    setDateFrom(from.toISOString().slice(0, 10))
+    setDateTo(todayStr)
+  }
+  function clearDateFilter() { setDateFrom(''); setDateTo(''); setActivePreset('all') }
+  const hasDateFilter = Boolean(dateFrom || dateTo)
+
+  const DATE_PRESETS = [
+    { key: 'all', label: 'All time' },
+    { key: '7',   label: 'Last 7 days' },
+    { key: '30',  label: 'Last 30 days' },
+    { key: '90',  label: 'Last 90 days' },
+  ]
+
+  const [chartType, setChartType] = useState<'bar' | 'line'>('bar')
+
+  const d = useDerivedKpis(filtered)
+  const trend = useBookingTrend(filtered, dateFrom, dateTo)
   const dayLabels = trend.labels
+
+  // Line-chart geometry: points centered per bucket (so they line up with the
+  // bar columns), reusing the same normalised heights. SVG viewBox is 0..100.
+  const pointXs = trend.heights.map((_, i) => ((i + 0.5) / trend.heights.length) * 100)
+  const linePoints = trend.heights.map((h, i) => `${pointXs[i]},${100 - h}`).join(' ')
+  const areaPoints = trend.heights.length
+    ? `${pointXs[0]},100 ${linePoints} ${pointXs[pointXs.length - 1]},100`
+    : ''
 
   function goToBookings(preset: string) {
     if (preset === '__finance__') { onViewFinance?.(); return }
@@ -148,7 +253,7 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
 
   const consigneeStats = useMemo(() => {
     const map = new Map<string, { trips: number; onTime: number }>()
-    for (const b of bookings) {
+    for (const b of filtered) {
       if (!b.consignee) continue
       const entry = map.get(b.consignee) ?? { trips: 0, onTime: 0 }
       entry.trips++
@@ -163,10 +268,10 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
       }))
       .sort((a, b) => b.trips - a.trips)
       .slice(0, 8)
-  }, [bookings])
+  }, [filtered])
 
   const financeStats = useMemo(() => {
-    const delivered = bookings.filter((b) => b.status === 'DELIVERED' && (b.freight ?? 0) > 0)
+    const delivered = filtered.filter((b) => b.status === 'DELIVERED' && (b.freight ?? 0) > 0)
     const today = new Date().toISOString().slice(0, 10)
     const overdueInvoices = delivered.filter((b) => {
       const due = new Date(new Date(b.bookingDate.slice(0, 10)).getTime() + 15 * 86_400_000).toISOString().slice(0, 10)
@@ -195,19 +300,19 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
         { label: 'Total Freight YTD',  value: fmt(totalYTD),     detail: 'Booked freight visible to you',                                                                 icon: BarChart2,   isOverdue: false,             financeTab: 'all'      as const },
       ],
     }
-  }, [bookings])
+  }, [filtered])
 
   const stageCounts = useMemo(() => ({
-    erp:        bookings.filter((b) => b.createdBy === 'ERP').length,
-    draft:      bookings.filter((b) => b.status === 'DRAFT').length,
-    assignment: bookings.filter((b) => ['PENDING_RATE_APPROVAL','PENDING_AUCTION','PENDING_ASSIGNMENT'].includes(b.status)).length,
-    transit:    bookings.filter((b) => ['DISPATCHED','READY_FOR_DISPATCH','IN_TRANSIT'].includes(b.status)).length,
-    pod:        bookings.filter((b) => ['DISPATCHED','IN_TRANSIT'].includes(b.status) && b.epod?.status !== 'Captured').length,
-    completed:  bookings.filter((b) => b.status === 'DELIVERED').length,
-    invoiced:   bookings.filter((b) => b.status === 'DELIVERED').length,
-    exception:  bookings.filter((b) => ['IN_TRANSIT_DELAYED','IN_TRANSIT_EXCEPTION'].includes(b.status)).length,
-    cancelled:  bookings.filter((b) => b.status === 'CANCELLED').length,
-  }), [bookings])
+    erp:        filtered.filter((b) => b.createdBy === 'ERP').length,
+    draft:      filtered.filter((b) => b.status === 'DRAFT').length,
+    assignment: filtered.filter((b) => ['PENDING_RATE_APPROVAL','PENDING_AUCTION','PENDING_ASSIGNMENT'].includes(b.status)).length,
+    transit:    filtered.filter((b) => ['DISPATCHED','READY_FOR_DISPATCH','IN_TRANSIT'].includes(b.status)).length,
+    pod:        filtered.filter((b) => ['DISPATCHED','IN_TRANSIT'].includes(b.status) && b.epod?.status !== 'Captured').length,
+    completed:  filtered.filter((b) => b.status === 'DELIVERED').length,
+    invoiced:   filtered.filter((b) => b.status === 'DELIVERED').length,
+    exception:  filtered.filter((b) => ['IN_TRANSIT_DELAYED','IN_TRANSIT_EXCEPTION'].includes(b.status)).length,
+    cancelled:  filtered.filter((b) => b.status === 'CANCELLED').length,
+  }), [filtered])
 
   interface PipelineNavStage {
     key:     string
@@ -234,6 +339,69 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
 
   return (
     <>
+      {/* ── Date filter — scopes every metric below ───────────────────────── */}
+      <section
+        aria-label="Filter dashboard by date"
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm"
+      >
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-gray-500">
+          <CalendarDays className="h-3.5 w-3.5" />
+          Date
+        </span>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {DATE_PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => applyPreset(p.key)}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                activePreset === p.key
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={dateFrom}
+            max={dateTo || todayStr}
+            onChange={(e) => { setDateFrom(e.target.value); setActivePreset('custom') }}
+            aria-label="From date"
+            className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+          <span className="text-xs text-gray-400">to</span>
+          <input
+            type="date"
+            value={dateTo}
+            min={dateFrom || undefined}
+            max={todayStr}
+            onChange={(e) => { setDateTo(e.target.value); setActivePreset('custom') }}
+            aria-label="To date"
+            className="h-9 rounded-lg border border-gray-300 bg-white px-2 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
+        </div>
+
+        {hasDateFilter && (
+          <button
+            type="button"
+            onClick={clearDateFilter}
+            className="text-xs font-semibold text-primary transition hover:underline"
+          >
+            Clear
+          </button>
+        )}
+
+        <span className="ml-auto text-xs text-gray-500">
+          Showing <span className="font-bold text-text">{filtered.length}</span> of {bookings.length} bookings
+        </span>
+      </section>
+
       {/* ── Pipeline Navigation Strip ──────────────────────────────────────── */}
       <section aria-label="Booking pipeline stages">
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-5 lg:grid-cols-9">
@@ -305,9 +473,9 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
           <CardContent className="space-y-6">
 
             {/* Stacked bar */}
-            {bookings.length === 0 ? (
+            {filtered.length === 0 ? (
               <div className="flex h-7 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
-                No bookings yet
+                No bookings in this range
               </div>
             ) : (
               <div>
@@ -342,12 +510,45 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
               </div>
             )}
 
-            {/* 7-day booking trend */}
+            {/* Booking trend — buckets adapt to the active date filter */}
             <div>
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-bold text-text">7-day booking trend</p>
-                {/* TODO: Derive week-over-week % from actual daily booking counts */}
-                <Badge variant="success">+12% week over week</Badge>
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-text">Booking trend</p>
+                  <p className="text-[11px] text-gray-400">
+                    {trend.granularityLabel} · {trend.labels.length} {trend.periodWord}{trend.labels.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Bar / line chart toggle */}
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setChartType('bar')}
+                      aria-label="Bar chart"
+                      aria-pressed={chartType === 'bar'}
+                      title="Bar chart"
+                      className={`rounded-md p-1 transition ${chartType === 'bar' ? 'bg-primary text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      <BarChart2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartType('line')}
+                      aria-label="Line chart"
+                      aria-pressed={chartType === 'line'}
+                      title="Line chart"
+                      className={`rounded-md p-1 transition ${chartType === 'line' ? 'bg-primary text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      <LineChart className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {trend.deltaPct !== null && (
+                    <Badge variant={trend.deltaPct >= 0 ? 'success' : 'destructive'}>
+                      {trend.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(trend.deltaPct)}% vs prev {trend.periodWord}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               {/* Chart: relative position container so gridlines layer under bars */}
@@ -366,21 +567,66 @@ export default function OverviewSection({ bookings, setActiveSection, setSelecte
                   </div>
                 ))}
 
-                {/* Bar columns — pl-8 to clear y-axis labels, pb-5 for day labels */}
-                <div className="absolute inset-0 grid grid-cols-7 items-end gap-2 pb-5 pl-8">
-                  {trend.heights.map((height, i) => (
-                    <div key={i} className="flex h-full flex-col justify-end gap-1">
-                      <div
-                        className="rounded-t-md bg-primary/75 transition-all hover:bg-primary"
-                        style={{ height: `${height}%` }}
-                        title={`${dayLabels[i]}: ${trend.heights[i]} bookings`}
-                      />
-                      <p className="text-center text-[10px] font-semibold text-gray-500">
-                        {dayLabels[i]}
-                      </p>
+                {chartType === 'bar' ? (
+                  /* Bar columns — pl-8 to clear y-axis labels, pb-5 for bucket labels */
+                  <div
+                    className="absolute inset-0 grid items-end gap-1.5 pb-5 pl-8"
+                    style={{ gridTemplateColumns: `repeat(${trend.labels.length}, minmax(0, 1fr))` }}
+                  >
+                    {trend.heights.map((height, i) => (
+                      <div key={i} className="flex h-full flex-col justify-end gap-1">
+                        <div
+                          className="rounded-t-md bg-primary/75 transition-all hover:bg-primary"
+                          style={{ height: `${height}%` }}
+                          title={`${dayLabels[i]}: ${trend.counts[i]} booking${trend.counts[i] !== 1 ? 's' : ''}`}
+                        />
+                        <p className="truncate text-center text-[10px] font-semibold text-gray-500">
+                          {dayLabels[i]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* Line + area chart over the same plot area */
+                  <>
+                    <div className="absolute inset-0 pb-5 pl-8">
+                      <svg
+                        className="h-full w-full text-primary"
+                        viewBox="0 0 100 100"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                      >
+                        <polygon points={areaPoints} fill="currentColor" opacity="0.1" />
+                        <polyline
+                          points={linePoints}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          vectorEffect="non-scaling-stroke"
+                          strokeLinejoin="round"
+                          strokeLinecap="round"
+                        />
+                      </svg>
                     </div>
-                  ))}
-                </div>
+                    {/* Per-bucket hover targets + labels, aligned with the line points */}
+                    <div
+                      className="absolute inset-0 grid items-end gap-1.5 pb-5 pl-8"
+                      style={{ gridTemplateColumns: `repeat(${trend.labels.length}, minmax(0, 1fr))` }}
+                    >
+                      {trend.counts.map((count, i) => (
+                        <div
+                          key={i}
+                          className="flex h-full flex-col justify-end"
+                          title={`${dayLabels[i]}: ${count} booking${count !== 1 ? 's' : ''}`}
+                        >
+                          <p className="truncate text-center text-[10px] font-semibold text-gray-500">
+                            {dayLabels[i]}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
