@@ -120,8 +120,15 @@ export default function TripsPage() {
   const navigate = useNavigate()
   const activeTab = getBookingsTab(location.pathname, location.search)
 
-  const { indents, trips, declineIndent, acceptIndent, isBridgeRecord } = useVendorBookings()
+  const { indents, trips, declineIndent, acceptIndent, isBridgeRecord, getBookingDetail } = useVendorBookings()
   const { invoices } = useVendorInvoices()
+
+  // Customer (the tenant the booking belongs to) for a row — from the bridge
+  // detail when embedded, else the originating indent's contract reference.
+  const customerFor = (id: string, indentId?: string) =>
+    getBookingDetail(id)?.customerName
+    ?? indents.find((i) => i.id === (indentId ?? id))?.contractReference
+    ?? '—'
 
   // Map each invoiced trip → the invoice number it belongs to.
   const invoiceByTripId = useMemo(() => {
@@ -347,6 +354,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
@@ -359,6 +367,7 @@ export default function TripsPage() {
                       <tr key={row.id} className={rowClass(row.id)}>
                         <td className="px-5 py-4"><StatusBadge status={row.status} /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{row.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(row.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{row.originCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{row.destinationCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{row.pickup ? formatDateTime(row.pickup) : '—'}</td>
@@ -389,6 +398,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
@@ -402,6 +412,7 @@ export default function TripsPage() {
                       <tr key={indent.id} className={rowClass(indent.id)}>
                         <td className="px-5 py-4"><StatusBadge status={indent.status} label="Pending Allocation" /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{indent.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(indent.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{indent.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{indent.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(indent.reportingDateTime)}</td>
@@ -441,6 +452,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
@@ -455,6 +467,7 @@ export default function TripsPage() {
                       <tr key={booking.id} className={rowClass(booking.id)}>
                         <td className="px-5 py-4"><StatusBadge status={booking.status} /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{booking.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(booking.id, booking.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{(() => { const p = pickupOfTrip(booking); return p ? formatDateTime(p) : '—' })()}</td>
@@ -494,6 +507,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
@@ -513,6 +527,7 @@ export default function TripsPage() {
                           </div>
                         </td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
@@ -545,6 +560,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
@@ -558,6 +574,7 @@ export default function TripsPage() {
                       <tr key={trip.id} className={rowClass(trip.id)}>
                         <td className="px-5 py-4"><StatusBadge status="POD_PENDING" /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
@@ -599,6 +616,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
@@ -613,6 +631,7 @@ export default function TripsPage() {
                       <tr key={trip.id} className={rowClass(trip.id)}>
                         <td className="px-5 py-4"><StatusBadge status="COMPLETED" /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
@@ -645,6 +664,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Invoice ID</th>
@@ -658,6 +678,7 @@ export default function TripsPage() {
                       <tr key={trip.id} className={rowClass(trip.id)}>
                         <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 font-mono text-sm font-semibold text-primary">{invoiceByTripId.get(trip.id) ?? '—'}</td>
@@ -689,6 +710,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Issue</th>
@@ -709,6 +731,7 @@ export default function TripsPage() {
                           </div>
                         </td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4">
@@ -758,6 +781,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
@@ -772,6 +796,7 @@ export default function TripsPage() {
                       <tr key={booking.id} className={rowClass(booking.id)}>
                         <td className="px-5 py-4"><StatusBadge status="CANCELLED" /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{booking.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(booking.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
@@ -804,6 +829,7 @@ export default function TripsPage() {
                     <tr>
                       <th className="px-5 py-3 font-bold">Status</th>
                       <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
@@ -818,6 +844,7 @@ export default function TripsPage() {
                       <tr key={booking.id} className={rowClass(booking.id)}>
                         <td className="px-5 py-4"><StatusBadge status="REJECTED" /></td>
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{booking.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{customerFor(booking.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
