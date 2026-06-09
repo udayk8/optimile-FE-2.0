@@ -96,7 +96,7 @@ export default function ProfilePage() {
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm xl:w-[240px] xl:shrink-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Account status</div>
           <div className="mt-1 flex items-center gap-2">
-            {vendor?.status ? <StatusBadge status={vendor.status} /> : <Badge variant="muted">Draft</Badge>}
+            {vendor ? <StatusBadge status="ACTIVE" /> : <Badge variant="muted">Draft</Badge>}
           </div>
           <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Completion</div>
           <div className="mt-2 h-2 rounded-full bg-gray-100">

@@ -38,9 +38,8 @@ export default function DashboardPage() {
 
   const inTransitBookings = vendorTrips.filter(t => ['IN_TRANSIT', 'DESTINATION_REACHED'].includes(t.status) && !t.exceptionFlag)
   
-  const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
-  const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')
-  const complianceAlerts = nonCompliantVehicles.length + nonCompliantDrivers.length
+  // Vehicles blocked on compliance (non-compliant docs) — drivers are not counted.
+  const blockedVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
 
   return (
     <div>
@@ -165,22 +164,18 @@ export default function DashboardPage() {
             </div>
         </KPICard>
 
-        {/* Fleet Compliance Alerts */}
+        {/* Fleet Compliance — vehicles blocked on compliance */}
         <KPICard
           title="Fleet Compliance"
-          value={complianceAlerts}
-          insight="Requires attention"
+          value={blockedVehicles.length}
+          insight={blockedVehicles.length > 0 ? 'Vehicles blocked on compliance' : 'All vehicles compliant'}
           icon={<AlertTriangle className="h-4 w-4 text-danger" />}
           onClick={() => navigate('/vendor/fleet')}
         >
            <div className="mt-3 space-y-2 px-1">
               <div className="flex items-center justify-between gap-4 text-xs">
-                <span className="text-gray-600">Vehicles needing action</span>
-                <span className="font-medium text-danger">{nonCompliantVehicles.length}</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-xs">
-                <span className="text-gray-600">Drivers needing action</span>
-                <span className="font-medium text-danger">{nonCompliantDrivers.length}</span>
+                <span className="text-gray-600">Vehicles blocked</span>
+                <span className="font-medium text-danger">{blockedVehicles.length}</span>
               </div>
             </div>
         </KPICard>
