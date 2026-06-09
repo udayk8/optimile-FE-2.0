@@ -10,6 +10,7 @@ import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { Truck, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
@@ -29,6 +30,7 @@ type BookingsTab =
   | 'in-transit'
   | 'pending-pod'
   | 'completed'
+  | 'invoiced'
   | 'exception'
   | 'cancelled'
   | 'rejected'
@@ -40,6 +42,7 @@ const BOOKING_TABS: BookingsTab[] = [
   'in-transit',
   'pending-pod',
   'completed',
+  'invoiced',
   'exception',
   'cancelled',
   'rejected',
@@ -118,6 +121,18 @@ export default function TripsPage() {
   const activeTab = getBookingsTab(location.pathname, location.search)
 
   const { indents, trips, declineIndent, acceptIndent, isBridgeRecord } = useVendorBookings()
+  const { invoices } = useVendorInvoices()
+
+  // Map each invoiced trip → the invoice number it belongs to.
+  const invoiceByTripId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const invoice of invoices) {
+      const label = invoice.invoiceNumber || invoice.id
+      ;(invoice.tripReferences ?? []).forEach((ref) => map.set(ref, label))
+      invoice.lineItems.forEach((line) => { if (line.tripId) map.set(line.tripId, label) })
+    }
+    return map
+  }, [invoices])
 
   // Cross-module (bridge) bookings render on white; local mock demo rows on light gray.
   const rowClass = (id: string) =>
@@ -138,9 +153,10 @@ export default function TripsPage() {
     setPage(1)
   }, [activeTab, search, fromDate, toDate])
 
-  // Pickup date/time comes from the originating indent's reporting slot.
-  const pickupOfTrip = (trip: { indentId?: string }) =>
-    indents.find((indent) => indent.id === (trip as { indentId?: string }).indentId)?.reportingDateTime
+  // Pickup date/time comes from the originating indent's reporting slot; falls
+  // back to the booking creation time so the column is never empty.
+  const pickupOfTrip = (trip: { indentId?: string; createdAt?: string }) =>
+    indents.find((indent) => indent.id === trip.indentId)?.reportingDateTime ?? trip.createdAt
 
   const pendingAllocation = indents.filter((indent) => indent.status === 'PENDING')
 
@@ -263,6 +279,11 @@ export default function TripsPage() {
   const fRejected = rejectedBookings.filter(
     (b) => matches(b.id, b.originCity, b.destinationCity, b.stage, b.reason) && dateOk(b.createdAt, true),
   )
+  // Invoiced bookings — any trip referenced by an invoice.
+  const invoicedBookings = trips.filter((trip) => invoiceByTripId.has(trip.id))
+  const fInvoiced = invoicedBookings.filter(
+    (t) => matches(t.id, t.laneDetails.origin.city, t.laneDetails.destination.city, t.status, invoiceByTripId.get(t.id)) && dateOk(t.createdAt, true),
+  )
 
   const tabs: { key: BookingsTab; label: string; count: number }[] = [
     { key: 'all', label: 'All', count: fAll.length },
@@ -271,6 +292,7 @@ export default function TripsPage() {
     { key: 'in-transit', label: 'In Transit', count: fInTransit.length },
     { key: 'pending-pod', label: 'Pending POD', count: fPendingPod.length },
     { key: 'completed', label: 'Completed', count: fCompleted.length },
+    { key: 'invoiced', label: 'Invoiced', count: fInvoiced.length },
     { key: 'exception', label: 'Exception', count: fException.length },
     { key: 'cancelled', label: 'Cancelled', count: fCancelled.length },
     { key: 'rejected', label: 'Rejected', count: fRejected.length },
@@ -474,7 +496,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Booking</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle</th>
                       <th className="px-5 py-3 font-bold">Driver</th>
@@ -494,7 +515,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
-                        <td className="px-5 py-4 text-sm text-text">{(() => { const p = pickupOfTrip(trip); return p ? formatDateTime(p) : '—' })()}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
@@ -608,6 +628,50 @@ export default function TripsPage() {
                 </table>
               </div>
               <Pager total={fCompleted.length} page={page} setPage={setPage} />
+            </>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'invoiced' && (
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          {fInvoiced.length === 0 ? (
+            <div className="p-8"><EmptyState icon={<CheckCircle className="h-12 w-12" />} title="No invoiced bookings" /></div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1200px] text-left">
+                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th className="px-5 py-3 font-bold">Status</th>
+                      <th className="px-5 py-3 font-bold">Booking</th>
+                      <th className="px-5 py-3 font-bold">Source</th>
+                      <th className="px-5 py-3 font-bold">Destination</th>
+                      <th className="px-5 py-3 font-bold">Invoice ID</th>
+                      <th className="px-5 py-3 font-bold">Freight</th>
+                      <th className="px-5 py-3 font-bold">Last Update</th>
+                      <th className="px-5 py-3 text-right font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {pageSlice(fInvoiced).map((trip) => (
+                      <tr key={trip.id} className={rowClass(trip.id)}>
+                        <td className="px-5 py-4"><StatusBadge status={trip.status} /></td>
+                        <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{trip.id}</div></td>
+                        <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
+                        <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
+                        <td className="px-5 py-4 font-mono text-sm font-semibold text-primary">{invoiceByTripId.get(trip.id) ?? '—'}</td>
+                        <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
+                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
+                        <td className="px-5 py-4 text-right">
+                          <Button size="sm" variant="outline" onClick={() => navigate(detailPathForTrip(trip))}>View Details</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pager total={fInvoiced.length} page={page} setPage={setPage} />
             </>
           )}
         </div>

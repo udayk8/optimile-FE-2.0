@@ -58,26 +58,36 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto pt-2 pb-4">
         {modules.map((mod) => {
-          const isOpen = expanded.has(mod.key)
+          // Single-module apps (e.g. the vendor portal) keep the section always
+          // expanded with a static heading — no collapse toggle that could hide
+          // the whole nav.
+          const isSingleModule = modules.length === 1
+          const isOpen = isSingleModule || expanded.has(mod.key)
           const isActiveModule = activeKey === mod.key
           return (
             <div key={mod.key} className="mb-1">
-              <button
-                type="button"
-                onClick={() => toggle(mod.key)}
-                className={`flex w-full items-center gap-2 px-6 py-3 text-[12px] font-extrabold uppercase tracking-[0.14em] transition-colors ${
-                  isActiveModule || isOpen
-                    ? 'text-gray-800'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <span className="flex-1 text-left">{mod.label}</span>
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 text-gray-400" strokeWidth={2.5} />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-400" strokeWidth={2.5} />
-                )}
-              </button>
+              {isSingleModule ? (
+                <div className="px-6 py-3 text-[12px] font-extrabold uppercase tracking-[0.14em] text-gray-500">
+                  {mod.label}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => toggle(mod.key)}
+                  className={`flex w-full items-center gap-2 px-6 py-3 text-[12px] font-extrabold uppercase tracking-[0.14em] transition-colors ${
+                    isActiveModule || isOpen
+                      ? 'text-gray-800'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <span className="flex-1 text-left">{mod.label}</span>
+                  {isOpen ? (
+                    <ChevronDown className="h-4 w-4 text-gray-400" strokeWidth={2.5} />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400" strokeWidth={2.5} />
+                  )}
+                </button>
+              )}
 
               {isOpen && (
                 <div className="pb-1">
@@ -89,22 +99,19 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
                         to={item.path}
                         end={item.path === mod.basePath}
                         className={({ isActive }) =>
-                          `relative flex items-center gap-3 px-6 py-2.5 text-[14px] font-medium transition-colors ${
+                          `relative mx-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-all ${
                             isActive
-                              ? 'bg-primary/[0.06] font-semibold text-primary'
-                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                              ? 'bg-primary font-semibold text-white shadow-sm'
+                              : 'text-gray-700 hover:bg-primary/[0.06] hover:text-primary'
                           }`
                         }
                       >
                         {({ isActive }) => (
                           <>
-                            {isActive && (
-                              <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r bg-primary" />
-                            )}
                             {ItemIcon ? (
                               <ItemIcon
                                 className={`h-[18px] w-[18px] shrink-0 ${
-                                  isActive ? 'text-primary' : 'text-gray-500'
+                                  isActive ? 'text-white' : 'text-gray-500'
                                 }`}
                               />
                             ) : (

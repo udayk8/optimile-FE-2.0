@@ -287,15 +287,8 @@ export default function InvoicesPage() {
         </Card>
       </div>
 
-      <div className="flex justify-end">
-        <Button onClick={() => navigate('/vendor/invoices/create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Invoice
-        </Button>
-      </div>
-
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-6">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
             {tabs.map((tab) => (
               <button
@@ -314,6 +307,10 @@ export default function InvoicesPage() {
               </button>
             ))}
           </div>
+          <Button onClick={() => navigate('/vendor/invoices/create')}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
