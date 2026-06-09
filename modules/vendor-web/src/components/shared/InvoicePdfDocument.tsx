@@ -147,8 +147,8 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.laneDetails.destination.city ?? '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
                   <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{(trip?.advance ?? 0) > 0 ? inr(trip!.advance!) : '–'}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{expense > 0 ? inr(expense) : '–'}</td>
+                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(trip?.advance ?? 0)}</td>
+                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(expense)}</td>
                   <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
               )
