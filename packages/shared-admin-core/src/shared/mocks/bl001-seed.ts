@@ -1569,6 +1569,124 @@ export const bl001VehicleTypes = [
     "updatedAt": "2026-05-31T13:29:38.469Z"
   }
 ] as unknown as TenantVehicleType[];
+
+// ── Generated compliant + active fleet for the three Bluedart vendors ────────
+// 6 vehicles + 6 drivers per vendor, all COMPLIANT / ACTIVE, scoped to bl001.
+const BL001_FLEET_VENDORS = [
+  { id: "tenant-vendor-hh8uo8c", name: "Mahesh Transport", reg: "KA05MH" },
+  { id: "tenant-vendor-nqup09r", name: "ABC transport", reg: "KA06AB" },
+  { id: "tenant-vendor-af8xr8p", name: "VRL transports", reg: "KA07VR" },
+];
+const BL001_FLEET_TYPE_ID = "vehicle-type-d29xwv3";
+const BL001_FLEET_EXPIRY = "2027-12-31";
+const BL001_FLEET_AT = "2026-06-01T09:00:00.000Z";
+function bl001VehicleDocs(tag: string) {
+  return ["RC", "Insurance", "PUC", "FC", "NationalPermit"].map((type) => ({
+    id: `${type}-${tag}`,
+    type,
+    referenceNo: `${type}-${tag.toUpperCase()}`,
+    fileName: "LR copy format for AI.pdf",
+    fileUrl: "/docs/LR copy format for AI.pdf",
+    expiryDate: BL001_FLEET_EXPIRY,
+    status: "VALID",
+    uploadedAt: BL001_FLEET_AT,
+  }));
+}
+function bl001DriverDocs(tag: string) {
+  return ["DL", "MedicalCertificate"].map((type) => ({
+    id: `${type}-${tag}`,
+    type,
+    referenceNo: `${type}-${tag.toUpperCase()}`,
+    fileName: "LR copy format for AI.pdf",
+    fileUrl: "/docs/LR copy format for AI.pdf",
+    expiryDate: BL001_FLEET_EXPIRY,
+    status: "VALID",
+    uploadedAt: BL001_FLEET_AT,
+  }));
+}
+function genBl001Vehicles() {
+  const out: Record<string, unknown>[] = [];
+  BL001_FLEET_VENDORS.forEach((v, vi) => {
+    for (let i = 1; i <= 6; i++) {
+      const tag = `bl001-veh-${vi}-${i}`;
+      out.push({
+        tenantId: "tenant-bl001",
+        registrationNumber: `${v.reg}${1000 + i}`,
+        make: "TATA",
+        model: "LPT 1613",
+        year: "2021",
+        vehicleTypeId: BL001_FLEET_TYPE_ID,
+        fuelType: "DIESEL",
+        ownershipType: "VENDOR",
+        vendorId: v.id,
+        chassisNo: `CHS${vi}${i}${1000 + i}`,
+        insurance: { number: `INS-${vi}${i}`, expiry: BL001_FLEET_EXPIRY },
+        fitness: { number: `FC-${vi}${i}`, expiry: BL001_FLEET_EXPIRY },
+        puc: { number: `PUC-${vi}${i}`, expiry: BL001_FLEET_EXPIRY },
+        permit: { type: "National", expiry: BL001_FLEET_EXPIRY },
+        odometer: "",
+        engineNumber: `ENG${vi}${i}${1000 + i}`,
+        capacityKg: "15000",
+        baseLocation: "KA",
+        operationalStatus: "ACTIVE",
+        complianceStatus: "COMPLIANT",
+        complianceDocuments: bl001VehicleDocs(tag),
+        isActive: true,
+        vendorName: v.name,
+        source: "VENDOR_PORTAL",
+        createdByLoginType: "VENDOR",
+        createdByVendorId: v.id,
+        id: `vehicle-${tag}`,
+        createdAt: BL001_FLEET_AT,
+        updatedAt: BL001_FLEET_AT,
+      });
+    }
+  });
+  return out;
+}
+function genBl001Drivers() {
+  const out: Record<string, unknown>[] = [];
+  const firstNames = ["Ramesh", "Suresh", "Vikram", "Anil", "Manoj", "Deepak"];
+  BL001_FLEET_VENDORS.forEach((v, vi) => {
+    for (let i = 1; i <= 6; i++) {
+      const tag = `bl001-drv-${vi}-${i}`;
+      const phone = `90000${vi}${String(i).padStart(2, "0")}0`;
+      out.push({
+        tenantId: "tenant-bl001",
+        name: `${firstNames[i - 1]} ${v.name.split(" ")[0]}`,
+        dob: "",
+        photoUrl: null,
+        phone,
+        address: "Bengaluru, Karnataka",
+        bloodGroup: "",
+        licenseNumber: `KA${vi}${i}DL${2000 + i}`,
+        licenseType: "HMV",
+        licenseExpiry: BL001_FLEET_EXPIRY,
+        medicalExpiry: BL001_FLEET_EXPIRY,
+        drugTestStatus: "CLEAR",
+        endorsements: [],
+        vendorId: v.id,
+        email: `driver${vi}${i}@${v.reg.toLowerCase()}.in`,
+        gender: "MALE",
+        baseLocation: "KA",
+        aadhaarMasked: `XXXX-XXXX-${1000 + i}`,
+        licenseClasses: ["HMV"],
+        mobile: phone,
+        complianceStatus: "COMPLIANT",
+        complianceDocuments: bl001DriverDocs(tag),
+        isActive: true,
+        vendorName: v.name,
+        source: "VENDOR_PORTAL",
+        createdByLoginType: "VENDOR",
+        createdByVendorId: v.id,
+        id: `driver-${tag}`,
+        createdAt: BL001_FLEET_AT,
+        updatedAt: BL001_FLEET_AT,
+      });
+    }
+  });
+  return out;
+}
 export const bl001Vehicles = [
   {
     "tenantId": "tenant-bl001",
@@ -1792,7 +1910,8 @@ export const bl001Vehicles = [
     "id": "vehicle-xekotwe",
     "createdAt": "2026-05-31T13:36:46.028Z",
     "updatedAt": "2026-05-31T16:10:13.656Z"
-  }
+  },
+  ...genBl001Vehicles(),
 ] as unknown as TenantVehicle[];
 export const bl001Drivers = [
   {
@@ -1934,7 +2053,8 @@ export const bl001Drivers = [
     "id": "driver-44gjj1g",
     "createdAt": "2026-05-31T13:40:00.847Z",
     "updatedAt": "2026-05-31T16:10:31.701Z"
-  }
+  },
+  ...genBl001Drivers(),
 ] as unknown as TenantDriver[];
 export const bl001Materials = [
   {
