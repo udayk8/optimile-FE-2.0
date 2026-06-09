@@ -25,22 +25,20 @@ const CUSTOMER_ADDRESS =
   '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
 // Per-booking editable charges (string-backed for the inputs).
-type ChargeEdit = { freight: string; advance: string; detention: string; loading: string; others: string }
+type ChargeEdit = { freight: string; advance: string; detention: string; loading: string }
 
 // Default charges pulled from the booking — freight rate + approved expenses,
-// bucketed into detention / loading-unloading / others, plus the advance.
+// bucketed into detention / loading-unloading, plus the advance.
 function chargeDefaults(trip: Trip): ChargeEdit {
   const approved = (trip.expenses ?? []).filter((e) => e.status === 'Approved')
   const bucket = (re: RegExp) => approved.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
   const detention = bucket(/detention/i)
   const loading = bucket(/load|unload/i)
-  const others = Math.max(0, (trip.approvedExpenses ?? 0) - detention - loading)
   return {
     freight: String(trip.freightRate || 0),
     advance: String(trip.advance ?? 0),
     detention: String(detention),
     loading: String(loading),
-    others: String(others),
   }
 }
 
@@ -61,8 +59,17 @@ export default function CreateInvoicePage() {
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
   // Editable per-booking charges, keyed by trip id.
   const [edits, setEdits] = useState<Record<string, ChargeEdit>>({})
+  // Rows are read-only until the user clicks the row's "Edit".
+  const [editingRows, setEditingRows] = useState<Set<string>>(new Set())
+  const toggleRowEdit = (tripId: string) =>
+    setEditingRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(tripId)) next.delete(tripId)
+      else next.add(tripId)
+      return next
+    })
   const setEditField = (tripId: string, field: keyof ChargeEdit, value: string) =>
-    setEdits((prev) => ({ ...prev, [tripId]: { ...(prev[tripId] ?? { freight: '0', advance: '0', detention: '0', loading: '0', others: '0' }), [field]: value } }))
+    setEdits((prev) => ({ ...prev, [tripId]: { ...(prev[tripId] ?? { freight: '0', advance: '0', detention: '0', loading: '0' }), [field]: value } }))
 
   // Resubmission: ?resubmit=<invoiceId> loads that invoice's bookings + charges
   // into the same editable flow, then submits as a corrected (superseding) invoice.
@@ -103,7 +110,6 @@ export default function CreateInvoicePage() {
         const freight = num(c.freight)
         const detention = num(c.detention)
         const loading = num(c.loading)
-        const others = num(c.others)
         return {
           tripId: trip.id,
           tripReference: trip.id,
@@ -111,8 +117,7 @@ export default function CreateInvoicePage() {
           advance: num(c.advance),
           detentionCharges: detention,
           loadingUnloadingCharges: loading,
-          otherCharges: others,
-          lineTotal: freight + detention + loading + others,
+          lineTotal: freight + detention + loading,
         }
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,13 +186,12 @@ export default function CreateInvoicePage() {
     const seeded: Record<string, ChargeEdit> = {}
     for (const li of resubmitInvoice.lineItems) {
       const trip = trips.find((t) => t.id === li.tripId)
-      const def = trip ? chargeDefaults(trip) : { freight: '0', advance: '0', detention: '0', loading: '0', others: '0' }
+      const def = trip ? chargeDefaults(trip) : { freight: '0', advance: '0', detention: '0', loading: '0' }
       seeded[li.tripId] = {
         freight: String(li.freightCharge ?? def.freight),
         advance: String(li.advance ?? def.advance),
         detention: String(li.detentionCharges ?? def.detention),
         loading: String(li.loadingUnloadingCharges ?? def.loading),
-        others: String(li.otherCharges ?? def.others),
       }
     }
     setEdits((prev) => ({ ...seeded, ...prev }))
@@ -447,44 +451,64 @@ export default function CreateInvoicePage() {
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-text">Review &amp; edit charges</h3>
-              <p className="mt-1 text-sm text-gray-500">Adjust freight, advance, detention, loading &amp; unloading and other charges per booking before raising the invoice.</p>
+              <p className="mt-1 text-sm text-gray-500">Charges are read-only by default — click <span className="font-semibold">Edit</span> on a row to adjust its freight, advance, detention and loading &amp; unloading before raising the invoice.</p>
             </div>
-            <div className="divide-y divide-gray-100">
-              {selectedTrips.map((trip) => {
-                const c = chargesFor(trip)
-                const lineTotal = num(c.freight) + num(c.detention) + num(c.loading) + num(c.others)
-                const field = (label: string, key: keyof ChargeEdit) => (
-                  <div>
-                    <label className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{label}</label>
-                    <input
-                      type="number"
-                      value={c[key]}
-                      onChange={(e) => setEditField(trip.id, key, e.target.value)}
-                      className="mt-1 h-9 w-full rounded-lg border border-gray-300 px-2 text-sm outline-none focus:border-primary"
-                    />
-                  </div>
-                )
-                return (
-                  <div key={trip.id} className="space-y-3 p-6">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-semibold text-text">{trip.id}</span>
-                      <StatusBadge status={trip.status} />
-                      <span className="text-sm text-gray-500">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                      {field('Freight', 'freight')}
-                      {field('Advance', 'advance')}
-                      {field('Detention Charges', 'detention')}
-                      {field('Loading & Unloading', 'loading')}
-                      {field('Others', 'others')}
-                      <div className="flex flex-col justify-end">
-                        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Line total (taxable)</span>
-                        <span className="mt-1 font-semibold text-text"><CurrencyDisplay amount={lineTotal} /></span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-left text-sm">
+                <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3">Booking</th>
+                    <th className="px-4 py-3">Route</th>
+                    <th className="px-4 py-3 text-right">Freight</th>
+                    <th className="px-4 py-3 text-right">Advance</th>
+                    <th className="px-4 py-3 text-right">Detention</th>
+                    <th className="px-4 py-3 text-right">Loading &amp; Unloading</th>
+                    <th className="px-4 py-3 text-right">Line total</th>
+                    <th className="px-4 py-3 text-right">Edit</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {selectedTrips.map((trip) => {
+                    const c = chargesFor(trip)
+                    const lineTotal = num(c.freight) + num(c.detention) + num(c.loading)
+                    const editing = editingRows.has(trip.id)
+                    const cell = (key: keyof ChargeEdit) => (
+                      <td className="px-4 py-3 text-right">
+                        {editing ? (
+                          <input
+                            type="number"
+                            value={c[key]}
+                            onChange={(e) => setEditField(trip.id, key, e.target.value)}
+                            className="h-9 w-28 rounded-lg border border-gray-300 px-2 text-right text-sm outline-none focus:border-primary"
+                          />
+                        ) : (
+                          <CurrencyDisplay amount={num(c[key])} />
+                        )}
+                      </td>
+                    )
+                    return (
+                      <tr key={trip.id}>
+                        <td className="px-4 py-3"><span className="font-mono text-sm font-semibold text-text">{trip.id}</span></td>
+                        <td className="px-4 py-3 text-gray-600">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
+                        {cell('freight')}
+                        {cell('advance')}
+                        {cell('detention')}
+                        {cell('loading')}
+                        <td className="px-4 py-3 text-right font-semibold text-text"><CurrencyDisplay amount={lineTotal} /></td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => toggleRowEdit(trip.id)}
+                            className="text-sm font-semibold text-primary hover:underline"
+                          >
+                            {editing ? 'Done' : 'Edit'}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

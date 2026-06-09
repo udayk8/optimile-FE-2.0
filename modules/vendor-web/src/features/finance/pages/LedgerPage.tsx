@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react'
-import { Download, FileSpreadsheet } from 'lucide-react'
+import { CalendarDays, Download, FileSpreadsheet, Search } from 'lucide-react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
-import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import type { LedgerEntry, LedgerType } from '@vendor/types'
 
@@ -29,7 +28,6 @@ export default function LedgerPage() {
   // Date filter is unapplied by default — the full ledger shows until a range is set.
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [invoiceFilter, setInvoiceFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const activeTab: LedgerTab = 'CUSTOMER'
   const [page, setPage] = useState(1)
@@ -41,15 +39,10 @@ export default function LedgerPage() {
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [fromDate, toDate, ledger])
 
-  const invoiceOptions = useMemo(() => {
-    return Array.from(new Set(dateFilteredEntries.map((entry) => entry.invoiceId))).sort()
-  }, [dateFilteredEntries])
-
   const tabEntries = useMemo(() => {
     const q = search.trim().toLowerCase()
     return dateFilteredEntries
       .filter((entry) => entry.ledgerType === activeTab)
-      .filter((entry) => invoiceFilter === 'ALL' || entry.invoiceId === invoiceFilter)
       .filter((entry) => {
         if (!q) return true
         return [entry.invoiceId, entry.referenceNumber ?? '', entry.description, ENTRY_TYPE_LABEL[entry.entryType] ?? entry.entryType]
@@ -57,7 +50,7 @@ export default function LedgerPage() {
           .toLowerCase()
           .includes(q)
       })
-  }, [activeTab, dateFilteredEntries, invoiceFilter, search])
+  }, [activeTab, dateFilteredEntries, search])
 
   // All summary cards reflect the active date filter — computed from the
   // date-filtered entries, not the full ledger history.
@@ -141,27 +134,23 @@ export default function LedgerPage() {
     <div className="space-y-6">
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 px-6 py-6">
-          <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
             <HeroCard
               eyebrow="FINANCE"
               title="Transaction Ledger"
               subtitle="Customer ledger tracks receivable (Dr) across invoices."
               icon={<FileSpreadsheet className="h-6 w-6 text-primary" />}
             />
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarDays className="h-4 w-4 text-gray-400" />
+              <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+              <span className="text-xs text-gray-400">to</span>
+              <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+              {(fromDate || toDate) && (
+                <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}>Clear</Button>
+              )}
+            </div>
           </div>
-        </div>
-
-        <div className="px-6 pt-5">
-          <PageFilterBar
-            search={search}
-            onSearch={(v) => { setSearch(v); setPage(1) }}
-            searchPlaceholder="Search type, description, reference"
-            fromDate={fromDate}
-            toDate={toDate}
-            onFromDate={(v) => { setFromDate(v); setPage(1) }}
-            onToDate={(v) => { setToDate(v); setPage(1) }}
-            onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
-          />
         </div>
 
         <div className="grid gap-3 border-b border-gray-100 bg-gray-50/70 px-6 py-5 sm:grid-cols-2 md:grid-cols-4">
@@ -201,17 +190,14 @@ export default function LedgerPage() {
             </Button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={invoiceFilter}
-              onChange={(e) => { setInvoiceFilter(e.target.value); setPage(1) }}
-              className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm"
-            >
-              <option value="ALL">All Invoices</option>
-              {invoiceOptions.map((invoiceId) => (
-                <option key={invoiceId} value={invoiceId}>{invoiceId}</option>
-              ))}
-            </select>
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search type, description, reference"
+              className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
           </div>
         </div>
 

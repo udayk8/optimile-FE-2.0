@@ -62,10 +62,9 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     const bucket = (re: RegExp) => approvedExp.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
     const detention = item.detentionCharges ?? bucket(/detention/i)
     const loading = item.loadingUnloadingCharges ?? bucket(/load|unload/i)
-    const others = item.otherCharges ?? Math.max(0, (trip?.approvedExpenses ?? 0) - bucket(/detention/i) - bucket(/load|unload/i))
     const advance = item.advance ?? trip?.advance ?? 0
     const freight = item.freightCharge
-    return { item, trip, detention, loading, others, advance, freight, totalCost: freight + detention + loading + others }
+    return { item, trip, detention, loading, advance, freight, totalCost: freight + detention + loading }
   })
   const totalAdvance = rows.reduce((sum, r) => sum + r.advance, 0)
 
@@ -142,13 +141,13 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         <table className="w-full table-fixed border-t-2 text-[10px]" style={{ borderColor: BLUE }}>
           <thead>
             <tr className="text-white" style={{ backgroundColor: BLUE }}>
-              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Vehicle No', 'LR No', 'Freight Cost', 'Advance', 'Detention Charges', 'Loading and Unloading Charges', 'Others', 'Total Cost'].map((h) => (
+              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Vehicle No', 'LR No', 'Freight Cost', 'Advance', 'Detention Charges', 'Loading and Unloading Charges', 'Total Cost'].map((h) => (
                 <th key={h} className="border px-1.5 py-2 text-center font-bold" style={{ borderColor: '#C7CBEF' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ item, trip, detention, loading, others, advance, freight, totalCost }, index) => (
+            {rows.map(({ item, trip, detention, loading, advance, freight, totalCost }, index) => (
                 <tr key={item.tripId}>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{index + 1}</td>
                   <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{item.tripReference}</td>
@@ -160,14 +159,13 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(advance)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(detention)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(loading)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(others)}</td>
                   <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
             ))}
             {/* exactly one filler row below the booking rows */}
             {Array.from({ length: 1 }).map((_, i) => (
               <tr key={`filler-${i}`}>
-                {Array.from({ length: 12 }).map((__, j) => (
+                {Array.from({ length: 11 }).map((__, j) => (
                   <td key={j} className="border px-1.5 py-3" style={{ borderColor: '#C7CBEF' }}>&nbsp;</td>
                 ))}
               </tr>

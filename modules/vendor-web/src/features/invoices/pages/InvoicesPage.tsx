@@ -4,7 +4,6 @@ import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
-import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -16,7 +15,7 @@ import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useAppStore } from '@vendor/stores/app.store'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
 import { useVendorInvoiceProfile, type VendorInvoiceProfileData } from '@vendor/integration/useVendorInvoiceProfile'
-import { CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
+import { CalendarDays, CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, Search } from 'lucide-react'
 import type { Dispute, Invoice, InvoiceLineItem, Trip } from '@vendor/types'
 
 const CUSTOMER_ADDRESS =
@@ -230,23 +229,23 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <HeroCard
-        eyebrow="FINANCE"
-        title="Invoices"
-        subtitle="Track the normal invoice flow, respond to disputes, and resubmit corrections from one workspace."
-        icon={<CreditCard className="h-5 w-5 text-primary" />}
-      />
-
-      <PageFilterBar
-        search={searchText}
-        onSearch={(v) => { setSearchText(v); setInvoicePage(1) }}
-        searchPlaceholder="Search invoice no / status…"
-        fromDate={fromDate}
-        toDate={toDate}
-        onFromDate={(v) => { setFromDate(v); setInvoicePage(1) }}
-        onToDate={(v) => { setToDate(v); setInvoicePage(1) }}
-        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setInvoicePage(1) }}
-      />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <HeroCard
+          eyebrow="FINANCE"
+          title="Invoices"
+          subtitle="Track the normal invoice flow, respond to disputes, and resubmit corrections from one workspace."
+          icon={<CreditCard className="h-5 w-5 text-primary" />}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-gray-400" />
+          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+          <span className="text-xs text-gray-400">to</span>
+          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+          {(fromDate || toDate) && (
+            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setInvoicePage(1) }}>Clear</Button>
+          )}
+        </div>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -299,6 +298,18 @@ export default function InvoicesPage() {
             <Plus className="mr-2 h-4 w-4" />
             Create Invoice
           </Button>
+        </div>
+
+        <div className="border-b border-gray-100 px-6 py-4">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              value={searchText}
+              onChange={(e) => { setSearchText(e.target.value); setInvoicePage(1) }}
+              placeholder="Search invoice no / status…"
+              className="h-10 w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
