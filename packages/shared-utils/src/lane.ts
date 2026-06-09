@@ -31,6 +31,7 @@ export function splitLaneCode(value: string): [string, string] | null {
   const normalized = normalizeLaneCode(value)
   if (!LANE_CODE_REGEX.test(normalized)) return null
   const [origin, destination] = normalized.split('-')
+  if (!origin || !destination) return null
   return [origin, destination]
 }
 

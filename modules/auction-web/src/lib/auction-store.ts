@@ -1,5 +1,6 @@
 import { cityLaneKey, locationCodeToCity, splitLaneCode } from '@shared-utils'
 import type { Auction, Contract } from '@auction/types'
+import { MOCK_AUCTIONS, MOCK_CONTRACTS } from '@auction/lib/mock-data'
 
 /**
  * Cross-module source of truth for auctions + contracts.
@@ -14,8 +15,11 @@ import type { Auction, Contract } from '@auction/types'
  * seeds — it only reads/writes an existing store and falls back to its own demo
  * data when the key is absent (standalone vendor build).
  */
-// v2: store reset — no seeded mock auctions/contracts (flow-only data).
-export const AUCTION_STORE_KEY = 'optimile.auction-store.v2'
+// v3: re-seed mock auctions/contracts (key bumped so caches that were emptied
+// in v2 pick the seed back up).
+export const AUCTION_STORE_KEY = 'optimile.auction-store.v3'
+// One-time refresh of seeded demo contracts' vehicle type (v1 = all MGV).
+const AUCTION_SEED_REFRESH_KEY = 'optimile.auction-seed-refresh.v1'
 const SESSION_CONTEXT_KEY = 'optimile.session.context'
 
 /**
@@ -133,16 +137,17 @@ function migrateLegacyLanes(snapshot: AuctionStoreSnapshot): { snapshot: Auction
 }
 
 export function loadStore(): AuctionStoreSnapshot {
-  // No hardcoded mock auctions/contracts — the board shows only auctions
-  // created in-flow (and contracts they produce).
   if (typeof window === 'undefined') {
-    return { auctions: [], contracts: [] }
+    return { auctions: [...MOCK_AUCTIONS], contracts: [...MOCK_CONTRACTS] }
   }
   const raw = window.localStorage.getItem(AUCTION_STORE_KEY)
   if (!raw) {
-    const seeded: AuctionStoreSnapshot = { auctions: [], contracts: [] }
+    const seeded: AuctionStoreSnapshot = {
+      auctions: [...MOCK_AUCTIONS],
+      contracts: [...MOCK_CONTRACTS],
+    }
     window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(seeded))
-    return seeded
+    return sweepExpiredAuctions(seeded)
   }
   try {
     const parsed = JSON.parse(raw) as Partial<AuctionStoreSnapshot>
@@ -153,6 +158,36 @@ export function loadStore(): AuctionStoreSnapshot {
     const snapshot = migration.snapshot
     if (migration.changed) {
       window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+    }
+    // Merge-missing seed auctions/contracts (by id) so demo data added to
+    // the seed reaches browsers whose store was created before the seed grew.
+    const existingAuctionIds = new Set(snapshot.auctions.map((a) => a.id))
+    const missingAuctions = MOCK_AUCTIONS.filter((a) => !existingAuctionIds.has(a.id))
+    const existingContractIds = new Set(snapshot.contracts.map((c) => c.id))
+    const missingContracts = MOCK_CONTRACTS.filter((c) => !existingContractIds.has(c.id))
+    if (missingAuctions.length > 0 || missingContracts.length > 0) {
+      snapshot.auctions = [...snapshot.auctions, ...missingAuctions]
+      snapshot.contracts = [...snapshot.contracts, ...missingContracts]
+      window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+    }
+    // One-time: refresh the VEHICLE TYPE of seeded demo contracts to the latest
+    // seed value (the merge-missing above only adds new ids, never updates
+    // existing rows). Touches only seed ids and only the vehicleType field, so
+    // user-created contracts and other fields (status, consumedByBookingId…) are
+    // left intact. Bump the version key to push further field refreshes.
+    if (window.localStorage.getItem(AUCTION_SEED_REFRESH_KEY) !== '1') {
+      const seedVehicleById = new Map(MOCK_CONTRACTS.map((c) => [c.id, c.vehicleType]))
+      let refreshed = false
+      snapshot.contracts = snapshot.contracts.map((c) => {
+        const seedVehicle = seedVehicleById.get(c.id)
+        if (seedVehicle != null && seedVehicle !== c.vehicleType) {
+          refreshed = true
+          return { ...c, vehicleType: seedVehicle }
+        }
+        return c
+      })
+      if (refreshed) window.localStorage.setItem(AUCTION_STORE_KEY, JSON.stringify(snapshot))
+      window.localStorage.setItem(AUCTION_SEED_REFRESH_KEY, '1')
     }
     return sweepExpiredAuctions(snapshot)
   } catch {

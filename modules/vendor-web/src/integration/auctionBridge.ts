@@ -28,7 +28,7 @@ import { useAppStore } from '@vendor/stores/app.store'
  * vendor build, or auction-web never opened), the hooks return empty and pages
  * fall back to their local demo store.
  */
-const AUCTION_STORE_KEY = 'optimile.auction-store.v2'
+const AUCTION_STORE_KEY = 'optimile.auction-store.v3'
 const SESSION_CONTEXT_KEY = 'optimile.session.context'
 
 // ── auction-web data shapes (read-only mirror; kept local to preserve the

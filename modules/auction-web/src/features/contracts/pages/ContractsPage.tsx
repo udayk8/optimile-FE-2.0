@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
+import { useModuleNavigate as useNavigate } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@auction/components/ui/card'

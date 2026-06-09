@@ -104,7 +104,6 @@ export default function AuctionDetailPage() {
 
   const spotLane = auction?.lanes[0]
   const rankOrder = { L1: 0, L2: 1, L3: 2 } as const
-  const hasAnyBids = auction?.lanes.some((lane) => lane.ranking.length > 0) ?? false
 
   // Invited vendors with bid / no-bid status. Names resolve from the lane
   // rankings (bidders); silent invitees fall back to their vendor id.

@@ -144,7 +144,7 @@ export function parseVendorContractCsv(text: string): VendorContractCsvResult {
     return { headerErrors: ['The file is empty.'], validRows: [], invalidRows: [] }
   }
 
-  const headers = lines[0].split(',').map((header) => header.trim())
+  const headers = (lines[0] ?? '').split(',').map((header) => header.trim())
   const headerErrors = validateVendorContractCsvHeaders(headers)
   if (headerErrors.length > 0) return { headerErrors, validRows: [], invalidRows: [] }
 

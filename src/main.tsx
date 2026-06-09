@@ -14,7 +14,7 @@ import UnifiedLoginPage from '@shared-admin-core/auth/unified-login-page'
 import { ShellLayout, buildShellChildRoutes, getDefaultLandingPath } from './shell/registry'
 import './styles.css'
 
-const CustomerApp = lazy(() => import('@customer/app/CustomerApp'))
+const CustomerApp = lazy(() => import('@customer/app/App'))
 const CustomerBrdDashboard = lazy(() => import('@customer/app/CustomerBrdDashboard'))
 const TrackingApp = lazy(() => import('@track-trace/app/TrackTraceApp'))
 const PlatformAdminApp = lazy(() => import('@platform-admin/app/PlatformAdminApp'))
