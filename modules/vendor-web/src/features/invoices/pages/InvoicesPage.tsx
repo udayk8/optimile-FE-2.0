@@ -154,13 +154,22 @@ export default function InvoicesPage() {
     return map
   }, [disputes])
 
+  // Tab count badges reflect the active date + search filter (not all invoices).
   const tabCounts = useMemo(() => {
-    const counts: Record<InvoiceWorkspaceTab, number> = { all: invoices.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, paid: 0, closed: 0 }
-    invoices.forEach((invoice) => {
+    const q = searchText.trim().toLowerCase()
+    const filtered = invoices.filter((invoice) => {
+      const createdOn = (invoice.createdAt ?? '').slice(0, 10)
+      if (fromDate && createdOn < fromDate) return false
+      if (toDate && createdOn > toDate) return false
+      if (q && ![invoice.invoiceNumber, invoice.id, invoice.status].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+      return true
+    })
+    const counts: Record<InvoiceWorkspaceTab, number> = { all: filtered.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, paid: 0, closed: 0 }
+    filtered.forEach((invoice) => {
       counts[tabForInvoice(invoice, paidInvoiceIds)] += 1
     })
     return counts
-  }, [invoices, paidInvoiceIds])
+  }, [invoices, paidInvoiceIds, fromDate, toDate, searchText])
 
   const tabs: Array<{ key: InvoiceWorkspaceTab; label: string }> = [
     { key: 'all', label: 'All' },
