@@ -2990,13 +2990,15 @@ export function BookingDetailsPage() {
               <option value="Cheque">Cheque</option>
             </Select>
           </CompactField>
-          <CompactField label="Paid by *">
-            <Select value={expensePaidBy} onChange={(event) => setExpensePaidBy(event.target.value)}>
-              {BOOKING_EXPENSE_PAID_BY.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </Select>
-          </CompactField>
+          {expenseMode === "advance" ? null : (
+            <CompactField label="Paid by *">
+              <Select value={expensePaidBy} onChange={(event) => setExpensePaidBy(event.target.value)}>
+                {BOOKING_EXPENSE_PAID_BY.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </Select>
+            </CompactField>
+          )}
           <CompactField label="Bill / Receipt *">
             <div className="flex items-center gap-2">
               <label className="inline-flex cursor-pointer items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium">
