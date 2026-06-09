@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
-import { Input } from '@vendor/components/ui/input'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
-import { Truck, Package, CheckCircle, XCircle, Route, Upload, Wrench, CalendarDays, Search } from 'lucide-react'
+import { Truck, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
@@ -286,24 +286,17 @@ export default function TripsPage() {
       />
 
       {/* Search + date filter (date applies to every tab except Pending Allocation). */}
-      <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div className="relative w-full lg:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            value={search}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-            placeholder="Search bookings by ID, source, destination, status…"
-            className="pl-9"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-gray-400" />
-          <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)} className="w-[160px]" />
-          <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} className="w-[160px]" />
-          {(fromDate || toDate) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate('') }}>Clear dates</Button>
-          )}
-        </div>
+      <div className="mt-6">
+        <PageFilterBar
+          search={search}
+          onSearch={setSearch}
+          searchPlaceholder="Search bookings by ID, source, destination, status…"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDate={setFromDate}
+          onToDate={setToDate}
+          onClear={() => { setSearch(''); setFromDate(''); setToDate('') }}
+        />
       </div>
 
       <div className="mt-4 mb-6 flex items-center justify-between gap-4">
