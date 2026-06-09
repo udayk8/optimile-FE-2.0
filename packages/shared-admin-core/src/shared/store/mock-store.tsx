@@ -914,7 +914,9 @@ function ensureDemoTenantsRehydrated(): void {
 // v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
 // v3: 3 vendors get configured GST rates (Mahesh 10 / ABC 12 / VRL 18).
 // v4: 3 vendors get bank details + logo + invoice terms (for the invoice PDF).
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v4";
+// v5: 2nd customer (Ultratech, Bengaluru->Hyderabad) + addresses + customer &
+//     vendor rate cards for that lane.
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v5";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
