@@ -115,7 +115,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
             <Row label="Invoice No.:" value={invoice.invoiceNumber || invoice.id} />
             <Row label="Bill Date:" value={formatDate(invoice.invoiceDate)} />
             <Row label="Terms Of Payment:" value={`${paymentTermDays} Days`} />
-            <Row label="Customer Code:" value={customerCode || '—'} />
+            <Row label="Company Code:" value={customerCode || '—'} />
             <Row label="Due Date:" value={formatDate(invoice.paymentDueDate)} strong />
           </div>
         </div>
@@ -163,8 +163,8 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                 </tr>
               )
             })}
-            {/* filler rows so short invoices still look like the printed form */}
-            {Array.from({ length: Math.max(0, 3 - invoice.lineItems.length) }).map((_, i) => (
+            {/* exactly one filler row below the booking rows */}
+            {Array.from({ length: 1 }).map((_, i) => (
               <tr key={`filler-${i}`}>
                 {Array.from({ length: 12 }).map((__, j) => (
                   <td key={j} className="border px-1.5 py-3" style={{ borderColor: '#C7CBEF' }}>&nbsp;</td>
