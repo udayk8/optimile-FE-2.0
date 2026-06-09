@@ -144,6 +144,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
   const vendorId = session.vendorId ?? null;
   const vendorName = session.vendorName ?? null;
   const tenantName = (tenantId ? getTenantById(tenantId)?.name : null) ?? null;
+  const tenantCode = (tenantId ? getTenantById(tenantId)?.code : null) ?? null;
 
   // Pull the raw shared collections (re-runs when the store changes).
   const vehicleTypes = isVendorSession ? listTenantVehicleTypes(tenantId) : [];
@@ -503,6 +504,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     return {
       tenantId,
       tenantName,
+      tenantCode,
       vendorId,
       vendorName,
       invoiceProfile,
@@ -532,6 +534,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     isVendorSession,
     tenantId,
     tenantName,
+    tenantCode,
     vendorId,
     vendorName,
     tenantVehicles,

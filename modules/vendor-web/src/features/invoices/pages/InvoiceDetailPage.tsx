@@ -234,6 +234,7 @@ export default function InvoiceDetailPage() {
           terms={invoiceProfile.terms}
           logoUrl={invoiceProfile.logoUrl}
           customerName={customerName}
+          customerCode={bridge?.tenantCode ?? undefined}
           customerAddress={CUSTOMER_ADDRESS}
           getLrNumber={getLrNumber}
         />

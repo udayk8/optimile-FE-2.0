@@ -225,7 +225,8 @@ export default function CreateInvoicePage() {
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold text-right">Freight</th>
                       <th className="px-5 py-3 font-bold text-right">Advance</th>
-                      <th className="px-5 py-3 font-bold text-right">Expenses</th>
+                      <th className="px-5 py-3 font-bold text-right">Detention Charges</th>
+                      <th className="px-5 py-3 font-bold text-right">Loading &amp; Unloading</th>
                       <th className="px-5 py-3 font-bold text-right">Line total</th>
                     </tr>
                   </thead>
@@ -233,6 +234,10 @@ export default function CreateInvoicePage() {
                     {pagedTrips.map((trip) => {
                       const lineTotal = trip.freightRate
                       const selected = selectedTripIds.includes(trip.id)
+                      const approvedExp = (trip.expenses ?? []).filter((e) => e.status === 'Approved')
+                      const bucket = (re: RegExp) => approvedExp.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
+                      const detention = bucket(/detention/i)
+                      const loading = bucket(/load|unload/i)
                       return (
                         <tr
                           key={trip.id}
@@ -269,7 +274,10 @@ export default function CreateInvoicePage() {
                             <CurrencyDisplay amount={trip.advance ?? 0} />
                           </td>
                           <td className="px-5 py-4 text-right text-sm text-text">
-                            <CurrencyDisplay amount={trip.approvedExpenses ?? 0} />
+                            <CurrencyDisplay amount={detention} />
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-text">
+                            <CurrencyDisplay amount={loading} />
                           </td>
                           <td className="px-5 py-4 text-right font-semibold text-text">
                             <CurrencyDisplay amount={lineTotal} />
@@ -423,6 +431,7 @@ export default function CreateInvoicePage() {
                 terms={invoiceProfile.terms}
                 logoUrl={invoiceProfile.logoUrl}
                 customerName={customerName}
+                customerCode={bridge?.tenantCode ?? undefined}
                 customerAddress={CUSTOMER_ADDRESS}
                 getLrNumber={getLrNumber}
               />

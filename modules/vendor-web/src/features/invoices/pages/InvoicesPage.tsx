@@ -28,6 +28,7 @@ function HiddenInvoicePdf({
   trips,
   profile,
   customerName,
+  customerCode,
   getLrNumber,
   onDone,
 }: {
@@ -35,6 +36,7 @@ function HiddenInvoicePdf({
   trips: Trip[]
   profile: VendorInvoiceProfileData
   customerName: string
+  customerCode?: string
   getLrNumber: (tripId: string) => string | null
   onDone: () => void
 }) {
@@ -56,6 +58,7 @@ function HiddenInvoicePdf({
         terms={profile.terms}
         logoUrl={profile.logoUrl}
         customerName={customerName}
+        customerCode={customerCode}
         customerAddress={CUSTOMER_ADDRESS}
         getLrNumber={getLrNumber}
       />
@@ -329,7 +332,7 @@ export default function InvoicesPage() {
               />
             </div>
           ) : (
-            <table className="w-full min-w-[1450px] text-left text-sm">
+            <table className="w-full table-fixed text-center text-sm">
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
@@ -338,8 +341,8 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Last Update</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                 </tr>
               </thead>
@@ -361,11 +364,11 @@ export default function InvoicesPage() {
                         ) : null}
                       </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
-                      <td className="p-4 text-right">
+                      <td className="p-4">
                         <CurrencyDisplay amount={invoice.grandTotal + expense} className="font-semibold" />
                       </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                           {invoice.status === 'RESUBMISSION_REQUIRED' ? (
                             <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => openEditModal(invoice.id)}>
                               <RefreshCw className="mr-1 h-3.5 w-3.5" />
@@ -486,6 +489,7 @@ export default function InvoicesPage() {
           trips={allBookings}
           profile={invoiceProfile}
           customerName={customerName}
+          customerCode={bridge?.tenantCode ?? undefined}
           getLrNumber={getLrNumber}
           onDone={() => setDownloadInvoiceId(null)}
         />

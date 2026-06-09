@@ -85,6 +85,8 @@ export interface TenantDataBridge {
   // Logged-in identity (from the shared session context).
   tenantId: string
   tenantName: string | null
+  /** Tenant's unique code (shown as the invoice "Customer Code"). */
+  tenantCode: string | null
   vendorId: string | null
   vendorName: string | null
 
