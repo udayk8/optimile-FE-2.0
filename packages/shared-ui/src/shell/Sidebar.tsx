@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ModuleManifest } from './types'
 
 interface SidebarProps {
@@ -18,6 +18,8 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
   const location = useLocation()
   const activeKey = findModuleForPath(modules, location.pathname)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(activeKey ? [activeKey] : []))
+  // Collapsed = icon-only rail. Toggled ONLY by the button below — never on hover.
+  const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     if (activeKey) {
@@ -40,14 +42,35 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
   }
 
   return (
-    <aside className="sticky top-0 z-40 flex h-screen w-[268px] flex-col border-r border-gray-200 bg-white shadow-[1px_0_0_0_rgba(15,23,42,0.04)]">
+    <aside
+      className={`sticky top-0 z-40 flex h-screen flex-col border-r border-gray-200 bg-white shadow-[1px_0_0_0_rgba(15,23,42,0.04)] transition-[width] duration-200 ${
+        collapsed ? 'w-[76px]' : 'w-[268px]'
+      }`}
+    >
       {/* Brand band */}
-      <div className="flex h-[64px] shrink-0 items-center justify-center bg-primary px-6">
-        {logo ?? <span className="text-2xl font-bold tracking-tight text-white">Optimile</span>}
+      <div className="flex h-[64px] shrink-0 items-center justify-center bg-primary px-4">
+        {collapsed ? (
+          <span className="text-2xl font-bold tracking-tight text-white">O</span>
+        ) : (
+          logo ?? <span className="text-2xl font-bold tracking-tight text-white">Optimile</span>
+        )}
       </div>
 
+      {/* Collapse / expand toggle — click only */}
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        title={collapsed ? 'Expand menu' : 'Collapse menu'}
+        aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+        className={`flex items-center gap-2 border-b border-gray-100 py-2.5 text-gray-500 transition-colors hover:bg-gray-50 hover:text-primary ${
+          collapsed ? 'justify-center px-0' : 'justify-end px-4'
+        }`}
+      >
+        {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+      </button>
+
       {/* Tenant */}
-      {tenantName && (
+      {tenantName && !collapsed && (
         <div className="px-5 py-4">
           <p className="text-[12px] font-extrabold uppercase tracking-[0.16em] text-primary">
             {tenantName}
@@ -60,13 +83,13 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
         {modules.map((mod) => {
           // Single-module apps (e.g. the vendor portal) keep the section always
           // expanded with a static heading — no collapse toggle that could hide
-          // the whole nav.
+          // the whole nav. When the rail is collapsed, headings are hidden.
           const isSingleModule = modules.length === 1
-          const isOpen = isSingleModule || expanded.has(mod.key)
+          const isOpen = collapsed || isSingleModule || expanded.has(mod.key)
           const isActiveModule = activeKey === mod.key
           return (
             <div key={mod.key} className="mb-1">
-              {isSingleModule ? (
+              {collapsed ? null : isSingleModule ? (
                 <div className="px-6 py-3 text-[12px] font-extrabold uppercase tracking-[0.14em] text-gray-500">
                   {mod.label}
                 </div>
@@ -98,8 +121,11 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
                         key={item.path}
                         to={item.path}
                         end={item.path === mod.basePath}
+                        title={collapsed ? item.label : undefined}
                         className={({ isActive }) =>
-                          `relative mx-3 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-all ${
+                          `relative mx-3 flex items-center rounded-xl text-[14px] font-medium transition-all ${
+                            collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5'
+                          } ${
                             isActive
                               ? 'bg-primary font-semibold text-white shadow-sm'
                               : 'text-gray-700 hover:bg-primary/[0.06] hover:text-primary'
@@ -117,7 +143,7 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
                             ) : (
                               <span className="h-[18px] w-[18px]" />
                             )}
-                            <span className="truncate">{item.label}</span>
+                            {!collapsed && <span className="truncate">{item.label}</span>}
                           </>
                         )}
                       </NavLink>
@@ -131,14 +157,16 @@ export function ShellSidebar({ modules, logo, tenantName, footer }: SidebarProps
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-gray-100 px-6 py-4">
-        {footer ?? (
-          <>
-            <p className="text-[12px] font-medium text-gray-500">© 2025 Optimile ERP</p>
-            <p className="text-[11px] text-gray-400">v1.0.0</p>
-          </>
-        )}
-      </div>
+      {!collapsed && (
+        <div className="border-t border-gray-100 px-6 py-4">
+          {footer ?? (
+            <>
+              <p className="text-[12px] font-medium text-gray-500">© 2025 Optimile ERP</p>
+              <p className="text-[11px] text-gray-400">v1.0.0</p>
+            </>
+          )}
+        </div>
+      )}
     </aside>
   )
 }
