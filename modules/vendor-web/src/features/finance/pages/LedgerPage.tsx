@@ -170,7 +170,7 @@ export default function LedgerPage() {
             <div className="mt-2 text-xs text-gray-500">Amount customer still owes across invoices.</div>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">TDS Deducted (Selected Range)</div>
+            <div className="text-sm font-medium text-gray-500">TDS Deducted</div>
             <div className="mt-2 text-2xl font-semibold tracking-tight text-text">₹{summary.tdsDeducted.toLocaleString('en-IN')}</div>
             <div className="mt-2 text-xs text-gray-500">Total TDS posted in current date filter.</div>
           </div>

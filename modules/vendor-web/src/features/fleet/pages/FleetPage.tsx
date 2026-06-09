@@ -191,6 +191,7 @@ export default function FleetPage() {
               <thead className="border-b bg-gray-50">
                 <tr>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Type</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
@@ -204,7 +205,7 @@ export default function FleetPage() {
                         <ComplianceIcon status={vehicle.complianceStatus} />
                         <div>
                           <div className="font-mono text-sm font-semibold">{vehicle.registrationNumber}</div>
-                          <p className="text-xs text-gray-500">{vehicle.vehicleType}{vehicle.baseLocation ? ` · ${vehicle.baseLocation}` : ''}</p>
+                          <p className="text-xs text-gray-500">{vehicle.baseLocation || '—'}</p>
                         </div>
                       </div>
                       {vehicle.operationalStatus === 'INACTIVE' && (
@@ -228,6 +229,7 @@ export default function FleetPage() {
                         </div>
                       )}
                     </td>
+                    <td className="p-4 align-top text-sm text-text">{vehicle.vehicleType || '—'}</td>
                     <td className="p-4 align-top">
                       <ToggleSwitch
                         active={vehicle.operationalStatus === 'ACTIVE'}
