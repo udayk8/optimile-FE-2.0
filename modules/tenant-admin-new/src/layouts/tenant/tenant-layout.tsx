@@ -37,6 +37,7 @@ import { hasPermission, usePermissionMatrixVersion, type PermissionAction } from
 import { isTenantAdminRole } from "@/modules/tenant-admin/lib/tenant-modules";
 import { TenantProfileMenu } from "@/modules/tenant-admin/components/tenant-profile-menu";
 import { HeaderNotificationBell } from "@vendor/components/shared/HeaderNotificationBell";
+import { CustomerNotificationBell } from "@/modules/tenant-admin/components/CustomerNotificationBell";
 import { manifestSidebarToTenantChildren } from "@/embedded-module";
 import { vendorManifest } from "@vendor/app/manifest";
 import { auctionManifest } from "@auction/app/manifest";
@@ -110,7 +111,6 @@ export function TenantLayout() {
                   sectionItem("overview", "Overview", LayoutDashboard),
                   sectionItem("bookings", "Bookings", Boxes),
                   sectionItem("create", "Create Booking", Plus),
-                  sectionItem("tracking", "Track & ePOD", MapPin),
                   sectionItem("finance", "Finance", Landmark),
                   sectionItem("reports", "Reports", Building2),
                 ],
@@ -422,8 +422,9 @@ export function TenantLayout() {
       searchPlaceholder="Search tenant setup, users, roles, org units, and activity"
       headerRight={
         <div className="flex items-center gap-2">
-          {/* Vendor sessions get the vendor notification bell in the top bar. */}
-          {portalModule === "VENDOR" && <HeaderNotificationBell />}
+          {/* Portal-specific notification bells in the top bar. */}
+          {portalModule === "VENDOR"    && <HeaderNotificationBell />}
+          {portalModule === "CUSTOMER"  && <CustomerNotificationBell />}
           <TenantProfileMenu />
         </div>
       }

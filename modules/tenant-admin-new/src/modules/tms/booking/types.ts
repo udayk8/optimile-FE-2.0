@@ -708,6 +708,7 @@ export interface BookingRecord {
   uom: string;
   weightUom?: string | null;
   vehicleTypeId?: string | null;
+  goodsValue?: number | null;
   lrType: "AUTO" | "MANUAL" | "PRE_GENERATED";
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
   status: BookingStatus;
@@ -773,6 +774,7 @@ export interface BookingInput {
   uom: string;
   weightUom?: string | null;
   vehicleTypeId?: string | null;
+  goodsValue?: number | null;
   lrType: "AUTO" | "MANUAL" | "PRE_GENERATED";
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
   status: BookingStatus;
