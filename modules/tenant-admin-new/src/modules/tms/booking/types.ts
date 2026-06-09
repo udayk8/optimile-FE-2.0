@@ -492,6 +492,16 @@ export interface TenantInvoiceRecord {
   sgst: number;
   total: number;
   createdAt: string;
+  // AR lifecycle stage (BRD 4.x). Persisted so finance Approve/Dispute/Correction
+  // stick across renders in embedded mode. Absent ⇒ treated as 'submitted'.
+  stage?: "submitted" | "approved" | "disputed" | "correction";
+  approvedAt?: string | null;
+  dueDate?: string | null;
+  // Customer payment (AR). Absent ⇒ unpaid. A paid invoice no longer counts
+  // toward the customer's credit utilisation (BRD 3.5).
+  paymentStatus?: "unpaid" | "paid";
+  paidAt?: string | null;
+  paidAmount?: number | null;
 }
 
 export interface BookingShipmentDocuments {
@@ -698,6 +708,7 @@ export interface BookingRecord {
   uom: string;
   weightUom?: string | null;
   vehicleTypeId?: string | null;
+  goodsValue?: number | null;
   lrType: "AUTO" | "MANUAL" | "PRE_GENERATED";
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
   status: BookingStatus;
@@ -763,6 +774,7 @@ export interface BookingInput {
   uom: string;
   weightUom?: string | null;
   vehicleTypeId?: string | null;
+  goodsValue?: number | null;
   lrType: "AUTO" | "MANUAL" | "PRE_GENERATED";
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
   status: BookingStatus;
@@ -814,6 +826,9 @@ export interface BookingAssignmentInput {
   lrConfigId?: string | null;
   preferredLrNumber?: string | null;
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
+  /** Why the dispatcher bypassed the default L1/lowest contract — required for
+   *  manual assignment (deviation from the recommended contract vendor). */
+  manualAssignmentReason?: string | null;
 }
 
 export interface BookingReassignmentInput {

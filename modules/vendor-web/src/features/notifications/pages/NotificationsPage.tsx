@@ -4,6 +4,7 @@ import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { Badge } from '@vendor/components/ui/badge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { PageHero } from '@shared-ui/page-hero'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
@@ -30,6 +31,10 @@ export default function NotificationsPage() {
 
   const [readFilter, setReadFilter] = useState<ReadFilter>('ALL')
   const [typeFilter, setTypeFilter] = useState<NotificationCategory | null>(null)
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [page, setPage] = useState(1)
 
   const filtered = useMemo(() => {
@@ -38,9 +43,14 @@ export default function NotificationsPage() {
       .filter((n) => {
         if (readFilter === 'UNREAD' && n.isRead) return false
         if (typeFilter && n.type !== typeFilter) return false
+        const created = (n.createdAt ?? '').slice(0, 10)
+        if (fromDate && created < fromDate) return false
+        if (toDate && created > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![n.title, n.message, n.type].some((v) => (v ?? '').toLowerCase().includes(q))) return false
         return true
       })
-  }, [notifications, readFilter, typeFilter])
+  }, [notifications, readFilter, typeFilter, fromDate, toDate, searchText])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -77,6 +87,17 @@ export default function NotificationsPage() {
             </Button>
           </div>
         }
+      />
+
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setPage(1) }}
+        searchPlaceholder="Search notifications…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
       />
 
       {/* Type filter chips */}

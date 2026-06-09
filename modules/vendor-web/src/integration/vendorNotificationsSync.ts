@@ -1,26 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@vendor/stores/app.store'
-import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
+import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { formatDateTime, formatDate } from '@vendor/lib/date-utils'
 import type { Notification, NotificationCategory } from '@vendor/types'
 
 /**
- * Cross-module ledger sync: when finance (tenant side) approves a vendor
- * invoice in the shared store, mirror it into the local store and open its
- * receivable in the ledger automatically. Recorded payments then post
- * against that opening entry, so both flows land in the Ledger page.
+ * Cross-module ledger sync: every APPROVED invoice the vendor can see — whether
+ * approved in the finance module (bridge) or locally — gets its receivable
+ * opened in the ledger automatically. Uses the same merged invoice list the
+ * Invoices page shows (bridge + local mock), so no approved invoice is missing
+ * from the Ledger. Recorded payments then post against that opening entry, so
+ * both INVOICE_APPROVED and CUSTOMER_PAYMENT flows land in the Ledger page.
+ * Idempotent: ensureInvoiceLedgerOpened never duplicates an opening entry.
  */
 export function useVendorLedgerSync(): void {
-  const bridge = useTenantBridge()
+  const { invoices } = useVendorInvoices()
   const ensureInvoiceLedgerOpened = useAppStore((s) => s.ensureInvoiceLedgerOpened)
-  const bridgeInvoices = bridge?.vendorInvoices
 
   useEffect(() => {
-    if (!bridgeInvoices) return
-    bridgeInvoices
+    invoices
       .filter((invoice) => invoice.status === 'APPROVED')
       .forEach((invoice) => ensureInvoiceLedgerOpened(invoice))
-  }, [bridgeInvoices, ensureInvoiceLedgerOpened])
+  }, [invoices, ensureInvoiceLedgerOpened])
 }
 
 /**

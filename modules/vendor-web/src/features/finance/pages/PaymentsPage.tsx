@@ -4,6 +4,7 @@ import { PageHero } from '@shared-ui/page-hero'
 import { Button } from '@shared-ui/button'
 import { Input } from '@shared-ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import type { CustomerLedgerEntryType, PaymentKind } from '@vendor/types'
@@ -45,6 +46,10 @@ export default function PaymentsPage() {
   } = useAppStore()
 
   const [page, setPage] = useState(1)
+  // Date filter unapplied by default (filters the recorded-payments list).
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
   const [entryType, setEntryType] = useState<LedgerEntryInputType>('CUSTOMER_PAYMENT')
@@ -56,8 +61,16 @@ export default function PaymentsPage() {
   const rows = useMemo(() =>
     payments
       .map((p) => ({ payment: p, invoice: invoices.find((inv) => inv.id === p.invoiceId) }))
+      .filter(({ payment, invoice }) => {
+        const d = (payment.paymentDate ?? '').slice(0, 10)
+        if (fromDate && d < fromDate) return false
+        if (toDate && d > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![payment.invoiceId, invoice?.invoiceNumber].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+        return true
+      })
       .sort((a, b) => b.payment.paymentDate.localeCompare(a.payment.paymentDate)),
-    [payments, invoices]
+    [payments, invoices, fromDate, toDate, searchText]
   )
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
@@ -109,6 +122,17 @@ export default function PaymentsPage() {
         subtitle="Add paid transaction entries."
         icon={<Banknote className="h-6 w-6 text-primary" />}
         action={<Button variant="outline" onClick={openModal}><Plus className="h-4 w-4" />Record Payment</Button>}
+      />
+
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setPage(1) }}
+        searchPlaceholder="Search invoice no…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
       />
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">

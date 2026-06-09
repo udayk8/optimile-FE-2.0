@@ -45,6 +45,8 @@ import {
   useTenantVehicleTypes,
 } from "@/modules/tenant-admin/hooks/useTenantMasterData";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
+import { useAppStore } from "@/shared/store/useAppStore";
+import { computeCreditUsage } from "@/modules/tenant-admin/integration/credit-usage";
 import type {
   AddressImportResult,
   CustomerAddressMasterEntry,
@@ -903,6 +905,7 @@ export function TenantCustomerDetailPage() {
     updateTenantCustomer,
   } = useTenantCustomers(tenant.id);
   const tenantCustomer = getTenantCustomerById(tenantCustomerId);
+  const appStore = useAppStore(tenant.id);
   // Enterprise (direct-customer) tenants render this as their single Company
   // Profile: no Credit & Billing tab, and "Basic Details" reads "Company Details".
   const isEnterprise = isDirectCustomerTenant(tenant);
@@ -1162,6 +1165,24 @@ export function TenantCustomerDetailPage() {
       {message ? (
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</div>
       ) : null}
+
+      {/* Credit-limit status (BRD 3.5): block notice, or 80%/100% utilisation warning.
+          Utilisation uses the SHARED live exposure so it matches the finance screen. */}
+      {!isEnterprise && tenantCustomer && (() => {
+        const block = tenantCustomer.indentBlock;
+        const { utilizationPercent: util } = computeCreditUsage(tenantCustomer, appStore.bookings, appStore.invoices);
+        if (block?.blocked) {
+          return (
+            <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <span className="font-semibold">New indents blocked.</span>{block.reason ? ` ${block.reason}` : ""}
+              {block.blockedBy ? <span className="text-red-400"> · by {block.blockedBy}</span> : null}
+            </div>
+          );
+        }
+        if (util >= 100) return <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">Over credit limit — {util.toFixed(0)}% utilised. Review with finance.</div>;
+        if (util >= 80) return <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-700">Credit limit at {util.toFixed(0)}% — approaching the cap.</div>;
+        return null;
+      })()}
 
       {/* Compact stat strip — values only, no helper essays. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border/70 bg-card px-4 py-2.5 text-[12px] text-muted-foreground shadow-sm">

@@ -13,7 +13,7 @@ import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { useVendorInvoiceProfile } from '@vendor/integration/useVendorInvoiceProfile'
 import { ArrowLeft, Download, FileText, MessageSquareWarning, ReceiptText, Route } from 'lucide-react'
 
 // Customer block for the printable invoice (the tenant the vendor bills).
@@ -49,7 +49,7 @@ export default function InvoiceDetailPage() {
   const supersededBy = invoice.supersededByInvoiceId ? invoices.find((item) => item.id === invoice.supersededByInvoiceId) : undefined
   const supersedes = invoice.supersedesInvoiceId ? invoices.find((item) => item.id === invoice.supersedesInvoiceId) : undefined
 
-  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
 
@@ -83,9 +83,6 @@ export default function InvoiceDetailPage() {
             <StatusBadge status={invoice.status} />
             <Button variant="outline" onClick={handleDownload} disabled={downloading}>
               <Download className="mr-2 h-4 w-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/vendor/invoices')}>
-              <ReceiptText className="mr-2 h-4 w-4" /> Back to list
             </Button>
           </div>
         }
@@ -219,8 +216,6 @@ export default function InvoiceDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div><span className="text-gray-500">Vendor GSTIN: </span>{invoice.vendorGstin}</div>
-              <div><span className="text-gray-500">Customer GSTIN: </span>{invoice.customerGstin}</div>
-              <div><span className="text-gray-500">PDF URL: </span>{invoice.pdfUrl}</div>
               <div><span className="text-gray-500">Status: </span><StatusBadge status={invoice.status} /></div>
             </CardContent>
           </Card>
@@ -233,9 +228,11 @@ export default function InvoiceDetailPage() {
           ref={pdfRef}
           invoice={invoice}
           trips={trips}
-          companyName={companyName}
-          companyInfo={MOCK_COMPANY_INFO}
-          bank={MOCK_BANK}
+          companyName={invoiceProfile.companyName}
+          companyInfo={invoiceProfile.companyInfo}
+          bank={invoiceProfile.bank}
+          terms={invoiceProfile.terms}
+          logoUrl={invoiceProfile.logoUrl}
           customerName={customerName}
           customerAddress={CUSTOMER_ADDRESS}
           getLrNumber={getLrNumber}

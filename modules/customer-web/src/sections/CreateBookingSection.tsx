@@ -1,157 +1,149 @@
+import { ArrowRight, ClipboardList } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Button } from '@shared-ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@shared-ui/card'
-import { CheckCircle2, Send } from 'lucide-react'
 import type { CustomerDataBridge } from '../integration/customer-data-bridge'
-import type { useCreateBooking } from '../hooks/useCreateBooking'
+import { CustomerCreateBookingForm } from './CustomerCreateBookingForm'
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 type Props = {
-  bridge: CustomerDataBridge | null
-  displayName: string
-  form: ReturnType<typeof useCreateBooking>['form']
-  setForm: ReturnType<typeof useCreateBooking>['setForm']
-  message: string
-  onSubmit: () => void
-  onCreated: (id: string) => void
+  bridge:            CustomerDataBridge | null
+  displayName:       string
+  onCreated:         (id: string) => void
+  editingBookingId?: string
 }
 
-export function CreateBookingSection({ bridge, displayName, form, setForm, message, onSubmit, onCreated }: Props) {
-  return (
-    <>
-      {bridge?.renderCreateBooking ? (
-        <section className="space-y-4">
-          {bridge.renderCreateBooking(onCreated)}
-        </section>
-      ) : (
-        <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Booking Creation</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {bridge ? (
-                <>
-                  {message && (
-                    <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary">{message}</div>
-                  )}
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Customer</span>
-                      <input disabled value={displayName} className="h-11 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600" />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle Type</span>
-                      <select value={form.vehicleTypeId} onChange={(e) => setForm((f) => ({ ...f, vehicleTypeId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
-                        <option value="">Select vehicle type</option>
-                        {bridge.vehicleTypes.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Origin</span>
-                      <select value={form.originAddressId} onChange={(e) => setForm((f) => ({ ...f, originAddressId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
-                        <option value="">Select origin</option>
-                        {bridge.addresses.filter((a) => a.usage !== 'DESTINATION').map((a) => <option key={a.id} value={a.id}>{a.label} - {a.city}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Destination</span>
-                      <select value={form.destinationAddressId} onChange={(e) => setForm((f) => ({ ...f, destinationAddressId: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
-                        <option value="">Select destination</option>
-                        {bridge.addresses.filter((a) => a.usage !== 'ORIGIN').map((a) => <option key={a.id} value={a.id}>{a.label} - {a.city}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Commodity / Material</span>
-                      <select value={form.materialId} onChange={(e) => { const m = bridge.materials.find((x) => x.id === e.target.value); setForm((f) => ({ ...f, materialId: e.target.value, uom: m?.uom ?? f.uom })) }} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20">
-                        <option value="">Select material</option>
-                        {bridge.materials.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                      </select>
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Loading Date</span>
-                      <input type="date" value={form.pickupDate} onChange={(e) => setForm((f) => ({ ...f, pickupDate: e.target.value }))} className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Quantity</span>
-                      <input type="number" min="0" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} placeholder="e.g. 980" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">UOM</span>
-                      <input value={form.uom} onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))} placeholder="e.g. NOS / bags" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Weight (MTS)</span>
-                      <input type="number" min="0" step="0.001" value={form.weight} onChange={(e) => setForm((f) => ({ ...f, weight: e.target.value }))} placeholder="e.g. 24.5" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                    <label className="space-y-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Goods Value (Rs)</span>
-                      <input type="number" min="0" value={form.goodsValue} onChange={(e) => setForm((f) => ({ ...f, goodsValue: e.target.value }))} placeholder="E-way bill required above Rs 50,000" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                    <label className="space-y-2 md:col-span-2">
-                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Special Instructions</span>
-                      <input value={form.specialInstructions} onChange={(e) => setForm((f) => ({ ...f, specialInstructions: e.target.value }))} placeholder="Hazmat, fragile, temperature-sensitive" className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" />
-                    </label>
-                  </div>
-                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
-                    <p className="text-sm font-bold text-text">Post-submission routing</p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Your booking is sent to operations for rate approval, then enters the standard shipment lifecycle. Track it under My Trips / Shipments.
-                    </p>
-                  </div>
-                  <div className="flex justify-end gap-3">
-                    <Button onClick={onSubmit}><Send className="h-4 w-4" /> Submit Booking</Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {[
-                      ['Customer', displayName],
-                      ['Origin', 'Select from Location Master'],
-                      ['Destination', 'Select from Location Master'],
-                      ['Lane', 'Auto-derived from origin and destination'],
-                      ['Commodity Type', 'Select from Commodity Master'],
-                      ['Vehicle Type', 'Select from Vehicle Type Master'],
-                      ['Loading Date/Time', 'Future date-time picker'],
-                      ['Material Quantity & UOM', 'Numeric input with UOM'],
-                      ['Goods Value', 'E-way bill required above Rs 50,000'],
-                      ['Special Instructions', 'Hazmat, fragile, temperature-sensitive'],
-                    ].map(([label, placeholder]) => (
-                      <label key={label} className="space-y-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>
-                        <input className="h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/20" placeholder={placeholder} />
-                      </label>
-                    ))}
-                  </div>
-                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
-                    <p className="text-sm font-bold text-text">Post-submission routing</p>
-                    <p className="mt-1 text-sm text-gray-600">
-                      Rate deviation sends the booking to Processing. Approved vendor sourcing moves to Vendor Selection. Own-fleet shipments move to Assigning Vehicle.
-                    </p>
-                  </div>
-                  <div className="flex justify-end gap-3">
-                    <Button variant="outline">Save Draft</Button>
-                    <Button><Send className="h-4 w-4" /> Submit Booking</Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+// ─── Shared primitives ────────────────────────────────────────────────────────
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Validation Sources</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {['Customer Master', 'Location Master', 'Lane Master', 'Commodity Master', 'Vehicle Type Master', 'Finance AR rules'].map((item) => (
-                <div key={item} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  <span className="text-sm font-semibold text-gray-700">{item}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </section>
-      )}
-    </>
+function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }) {
+  return (
+    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+      {children}
+      {required && <span className="ml-1 text-danger" aria-hidden>*</span>}
+    </span>
+  )
+}
+
+// ─── Standalone preview (no bridge — standalone build or preview mode) ────────
+
+function StandaloneForm(_: { displayName: string }) {
+  const ghostInput = (ph: string) => (
+    <input
+      disabled
+      placeholder={ph}
+      className="h-11 w-full rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 text-sm text-gray-400 placeholder:text-gray-300"
+    />
+  )
+
+  return (
+    <div className="space-y-8 pb-24">
+      {/* Preview notice */}
+      <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+        <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+        <div>
+          <p className="text-sm font-bold text-text">Preview mode</p>
+          <p className="mt-0.5 text-sm text-gray-600">
+            When embedded in your tenant workspace all dropdowns will be pre-loaded with your
+            registered locations, materials, and vehicle types.
+          </p>
+        </div>
+      </div>
+
+      {/* Route */}
+      <div>
+        <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Route</p>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel required>Origin</FieldLabel>
+            {ghostInput('Select from your registered pickup locations')}
+          </label>
+          <div className="flex h-11 items-center justify-center text-gray-300">
+            <ArrowRight className="h-5 w-5" />
+          </div>
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel required>Destination</FieldLabel>
+            {ghostInput('Select from your registered delivery locations')}
+          </label>
+        </div>
+      </div>
+
+      {/* Cargo */}
+      <div>
+        <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Cargo Details</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-1.5 md:col-span-2">
+            <FieldLabel required>Commodity</FieldLabel>
+            {ghostInput('Select commodity / material')}
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel required>Quantity</FieldLabel>
+            {ghostInput('e.g. 980')}
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel required>Weight (MT)</FieldLabel>
+            {ghostInput('e.g. 24.5')}
+          </label>
+          <label className="flex flex-col gap-1.5 md:col-span-2">
+            <FieldLabel>Goods Value (₹)</FieldLabel>
+            {ghostInput('Declared value — e-way bill required above ₹50,000')}
+          </label>
+        </div>
+      </div>
+
+      {/* Schedule */}
+      <div>
+        <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Schedule</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>Loading Date</FieldLabel>
+            {ghostInput('Select pickup date')}
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <FieldLabel>Vehicle Type</FieldLabel>
+            {ghostInput('Select preferred vehicle type (optional)')}
+          </label>
+        </div>
+      </div>
+
+      {/* Additional */}
+      <div>
+        <p className="mb-3 text-[11px] font-extrabold uppercase tracking-widest text-gray-400">Additional</p>
+        <label className="flex flex-col gap-1.5">
+          <FieldLabel>Special Instructions</FieldLabel>
+          {ghostInput('Hazmat, fragile, temperature-sensitive…')}
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="outline" disabled size="lg" className="sm:min-w-[140px]">Save Draft</Button>
+        <Button disabled size="lg" className="sm:min-w-[180px]">Submit Booking</Button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export function CreateBookingSection({ bridge, displayName, onCreated, editingBookingId }: Props) {
+  if (bridge) {
+    return <CustomerCreateBookingForm bridge={bridge} onCreated={onCreated} editingBookingId={editingBookingId} />
+  }
+
+  return (
+    <section className="max-w-4xl space-y-6">
+      <div>
+        <h2 className="text-xl font-extrabold text-text">{editingBookingId ? `Edit Booking — ${editingBookingId}` : 'New Booking'}</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Fields marked <span className="text-danger font-bold" aria-hidden>*</span> are required.
+        </p>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>Booking Details</CardTitle></CardHeader>
+        <CardContent>
+          <StandaloneForm displayName={displayName} />
+        </CardContent>
+      </Card>
+    </section>
   )
 }

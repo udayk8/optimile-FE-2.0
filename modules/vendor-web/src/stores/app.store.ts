@@ -12,13 +12,20 @@ import {
   MOCK_NOTIFICATIONS,
   MOCK_EXCEPTIONS,
   MOCK_DISPUTES,
+  MOCK_COMPANY_INFO,
 } from '@vendor/lib/mock-data'
+import { computeGst, stateCodeOf } from '@shared-utils'
 import {
   Indent, Trip, Auction, Vehicle, Driver, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
   Dispute, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
 } from '@vendor/types'
+
+// Buyer (the 3PL / Optimile entity the vendor bills). Single source so we never
+// scatter the GSTIN literal; its state code is the place of supply for the
+// vendor's outgoing invoice. Tenant-configurable in a real deployment.
+const BUYER_GSTIN = '27AABCU9603R1ZM'
 
 interface AppState {
   indents: Indent[]
@@ -519,7 +526,16 @@ export const useAppStore = create<AppState>((set) => ({
         (sum, trip) => sum + (trip.freightRate || 0),
         0
       )
-      const gstAmount = Math.round(subtotal * (gstRate / 100))
+      // Split GST by place of supply: supplier = vendor's own GSTIN state,
+      // place of supply = buyer's GSTIN state. Inter-state -> IGST, intra -> CGST+SGST.
+      const vendorGstin = MOCK_COMPANY_INFO.gstin
+      const tax = computeGst({
+        taxableValue: subtotal,
+        ratePct: gstRate,
+        supplierStateCode: stateCodeOf(vendorGstin),
+        placeOfSupplyStateCode: stateCodeOf(BUYER_GSTIN),
+      })
+      const gstAmount = tax.igst + tax.cgst + tax.sgst
       const finalDueDate = dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       const generatedInvoiceNumber = invoiceNumber ?? `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
 
@@ -540,11 +556,14 @@ export const useAppStore = create<AppState>((set) => ({
         paymentDueDate: finalDueDate,
         subtotal,
         gstAmount,
-        grandTotal: subtotal + gstAmount,
+        igst: tax.igst,
+        cgst: tax.cgst,
+        sgst: tax.sgst,
+        grandTotal: tax.total,
         status: 'PENDING' as any,
         lineItems,
-        vendorGstin: '29AABCF1234M1ZP',
-        customerGstin: selectedTrips[0]?.contractId ? '27AABCU9603R1ZM' : '27AABCU9603R1ZM',
+        vendorGstin,
+        customerGstin: BUYER_GSTIN,
         billingPeriod: {
           from: selectedTrips
             .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
@@ -556,6 +575,7 @@ export const useAppStore = create<AppState>((set) => ({
         pdfUrl: `/invoices/${generatedInvoiceNumber}.pdf`,
         tripReferences: selectedTrips.map((trip) => trip.id),
         createdAt: invoiceDate,
+        statusUpdatedAt: invoiceDate,
       } as unknown as Invoice
 
       // Mark only the actually-billed trips as invoiced
@@ -865,22 +885,18 @@ export const useAppStore = create<AppState>((set) => ({
 
         const timestamp = new Date().toISOString()
         const action =
-          status === 'ACKNOWLEDGED'
-            ? 'Acknowledged'
-            : status === 'IN_PROGRESS'
-              ? 'In Progress'
-              : status === 'RESOLVED'
-                ? 'Resolved'
-                : 'Closed'
+          status === 'IN_PROGRESS'
+            ? 'In Progress'
+            : status === 'RESOLVED'
+              ? 'Resolved'
+              : 'Open'
 
         const defaultNotes =
-          status === 'ACKNOWLEDGED'
-            ? 'Operations confirmed receipt and started triage.'
-            : status === 'IN_PROGRESS'
-              ? 'Working on recovery and customer communication.'
-              : status === 'RESOLVED'
-                ? 'Issue has been resolved.'
-                : 'Exception closed after resolution.'
+          status === 'IN_PROGRESS'
+            ? 'Working on recovery and customer communication.'
+            : status === 'RESOLVED'
+              ? 'Issue has been resolved.'
+              : 'Exception reported and awaiting triage.'
 
         return {
           ...exception,
@@ -1008,8 +1024,15 @@ export const useAppStore = create<AppState>((set) => ({
       if (!oldInvoice || oldInvoice.status !== 'RESUBMISSION_REQUIRED') return state
 
       const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const gstRate = oldInvoice.subtotal > 0 ? oldInvoice.gstAmount / oldInvoice.subtotal : 0.12
-      const gstAmount = Math.round(subtotal * gstRate)
+      const gstFraction = oldInvoice.subtotal > 0 ? oldInvoice.gstAmount / oldInvoice.subtotal : 0.12
+      // Re-split GST by place of supply, carrying the original invoice's GSTINs.
+      const tax = computeGst({
+        taxableValue: subtotal,
+        ratePct: gstFraction * 100,
+        supplierStateCode: stateCodeOf(oldInvoice.vendorGstin),
+        placeOfSupplyStateCode: stateCodeOf(oldInvoice.customerGstin),
+      })
+      const gstAmount = tax.igst + tax.cgst + tax.sgst
       const nowIso = new Date().toISOString()
       const newInvoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
 
@@ -1025,7 +1048,10 @@ export const useAppStore = create<AppState>((set) => ({
         lineItems: updatedLineItems,
         subtotal,
         gstAmount,
-        grandTotal: subtotal + gstAmount,
+        igst: tax.igst,
+        cgst: tax.cgst,
+        sgst: tax.sgst,
+        grandTotal: tax.total,
         notes: `Resubmission of ${oldInvoice.invoiceNumber}.`,
         pdfUrl: `/invoices/${newInvoiceNumber}.pdf`,
         createdAt: nowIso,
@@ -1037,7 +1063,7 @@ export const useAppStore = create<AppState>((set) => ({
           newInvoice,
           ...state.invoices.map((inv) =>
             inv.id === oldInvoiceId
-              ? { ...inv, status: 'CLOSED' as const, closeReason: 'SUPERSEDED' as const, supersededByInvoiceId: newInvoiceNumber }
+              ? { ...inv, status: 'CLOSED' as const, closeReason: 'SUPERSEDED' as const, statusUpdatedAt: new Date().toISOString(), supersededByInvoiceId: newInvoiceNumber }
               : inv
           ),
         ],
@@ -1070,7 +1096,7 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         invoices: state.invoices.map((inv) =>
           inv.id === invoiceId && (inv.status === 'PENDING' || inv.status === 'DISPUTED')
-            ? { ...inv, status: 'APPROVED' as const }
+            ? { ...inv, status: 'APPROVED' as const, statusUpdatedAt: new Date().toISOString() }
             : inv
         ),
         disputes: state.disputes.map((d) =>
@@ -1133,7 +1159,7 @@ export const useAppStore = create<AppState>((set) => ({
             messages: [{ id: `dmsg-${num}-1`, sender: 'FINANCE', message: reason, createdAt: nowIso }],
           }
       return {
-        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'DISPUTED' as const } : inv)),
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'DISPUTED' as const, statusUpdatedAt: nowIso } : inv)),
         disputes: existing
           ? state.disputes.map((d) => (d.invoiceId === invoiceId ? dispute : d))
           : [dispute, ...state.disputes],
@@ -1146,7 +1172,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (!invoice || invoice.status !== 'DISPUTED') return state
       const timestamp = new Date().toISOString()
       return {
-        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'RESUBMISSION_REQUIRED' as const } : inv)),
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'RESUBMISSION_REQUIRED' as const, statusUpdatedAt: timestamp } : inv)),
         disputes: state.disputes.map((d) =>
           d.invoiceId === invoiceId && d.status === 'OPEN'
             ? {
@@ -1175,7 +1201,7 @@ export const useAppStore = create<AppState>((set) => ({
       const timestamp = new Date().toISOString()
       return {
         invoices: state.invoices.map((inv) =>
-          inv.id === invoiceId ? { ...inv, status: 'CLOSED' as const, closeReason: 'REJECTED' as const } : inv
+          inv.id === invoiceId ? { ...inv, status: 'CLOSED' as const, closeReason: 'REJECTED' as const, statusUpdatedAt: timestamp } : inv
         ),
         disputes: state.disputes.map((d) =>
           d.invoiceId === invoiceId && d.status === 'OPEN'

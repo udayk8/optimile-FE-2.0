@@ -5,6 +5,7 @@ import { BookingPageHeader } from "./components/BookingPageHeader";
 import { TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantCustomers } from "@/modules/tenant-admin/hooks/useTenantCustomers";
+import { computeCreditUsage } from "@/modules/tenant-admin/integration/credit-usage";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog } from "@/shared/components/ui/dialog";
@@ -206,6 +207,11 @@ export function CreateBookingPage({
     externalBookingNumber: null,
     integrationStatus: "MOCK",
   });
+  // Credit-limit indent block (BRD 3.5): per-indent override allowing this one
+  // booking despite the customer being blocked. Cleared when the customer changes.
+  const [creditOverrideActive, setCreditOverrideActive] = useState(false);
+  const [creditOverrideOpen, setCreditOverrideOpen] = useState(false);
+  const [creditOverrideText, setCreditOverrideText] = useState("");
 
   const editingBooking = bookingId ? getBookingById(normalizeBookingId(bookingId)) : null;
 
@@ -468,6 +474,7 @@ export function CreateBookingPage({
       deliveries: [createEmptyDeliveryDraft(1)],
     });
     setError("");
+    setCreditOverrideActive(false);
   }
 
   function updateDelivery(index: number, field: keyof DeliveryDraft, value: string) {
@@ -635,6 +642,12 @@ export function CreateBookingPage({
     if (!draft.customerId) {
       return "Select customer.";
     }
+    // Credit-limit indent block (BRD 3.5): finance has blocked new indents for
+    // this client. Allow only when an authorised per-indent override is active.
+    if (selectedCustomer?.indentBlock?.blocked && !creditOverrideActive) {
+      const reason = selectedCustomer.indentBlock.reason;
+      return `New indents are blocked for ${selectedCustomer.name}${reason ? ` — ${reason}` : ""}. Use Override to proceed with authorisation.`;
+    }
     if (!draft.pickupDateTime) {
       return "Select pickup date and time.";
     }
@@ -778,6 +791,10 @@ export function CreateBookingPage({
           : []),
         ...(draft.deviationRemark.trim()
           ? [{ id: `booking-remark-${Date.now()}-deviation`, timestamp, actor: "Tenant Admin", type: "RATE_DEVIATION_REMARK" as const, message: draft.deviationRemark.trim() }]
+          : []),
+        // Document the credit-block override on the indent itself (BRD 3.5).
+        ...(creditOverrideActive && selectedCustomer?.indentBlock?.blocked
+          ? [{ id: `booking-remark-${Date.now()}-credit-override`, timestamp, actor: "Tenant Admin", type: "OPS_REMARK" as const, message: `Credit block override — ${creditOverrideText.trim() || "authorised exception"}` }]
           : []),
       ],
       statusTimeline:
@@ -951,6 +968,63 @@ export function CreateBookingPage({
           </div>
         </div>
       ) : null}
+
+      {/* Credit-limit status for the selected client (BRD 3.5): hard block banner,
+          or an 80%/100% utilisation advisory. Utilisation uses the SHARED live
+          exposure (unpaid invoices + active un-invoiced bookings) so it matches
+          the finance Credit Limits screen exactly. */}
+      {selectedCustomer && (() => {
+        const block = selectedCustomer.indentBlock;
+        const { utilizationPercent: util } = computeCreditUsage(selectedCustomer, adminSources.bookings, adminSources.invoices);
+        if (block?.blocked) {
+          return (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div>
+                <span className="font-semibold">New indents blocked for {selectedCustomer.name}.</span>
+                {block.reason ? <> {block.reason}</> : null}
+                {creditOverrideActive && <span className="ml-1 font-medium text-amber-700">· Override active for this indent.</span>}
+              </div>
+              {!creditOverrideActive && (
+                <Button type="button" variant="outline" size="sm" onClick={() => { setCreditOverrideText(""); setCreditOverrideOpen(true); }}>
+                  Override
+                </Button>
+              )}
+            </div>
+          );
+        }
+        if (util >= 100) {
+          return <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{selectedCustomer.name} is over its credit limit ({util.toFixed(0)}% used). Review with finance.</div>;
+        }
+        if (util >= 80) {
+          return <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700">{selectedCustomer.name} has crossed 80% of its credit limit ({util.toFixed(0)}% used).</div>;
+        }
+        return null;
+      })()}
+
+      {/* Per-indent credit override — documented justification (BRD 3.5). */}
+      {creditOverrideOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4" onClick={() => setCreditOverrideOpen(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-lg">
+            <div className="text-sm font-semibold text-foreground">Override credit block</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {selectedCustomer?.name} is blocked. Record the authorisation/justification for allowing this single indent — it is saved on the booking.
+            </p>
+            <textarea
+              value={creditOverrideText}
+              onChange={(e) => setCreditOverrideText(e.target.value)}
+              rows={3}
+              placeholder="Justification (e.g. VP Ops approved — critical shipment)…"
+              className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-foreground/40"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setCreditOverrideOpen(false)}>Cancel</Button>
+              <Button type="button" size="sm" disabled={!creditOverrideText.trim()} onClick={() => { setCreditOverrideActive(true); setCreditOverrideOpen(false); setError(""); }}>
+                Allow this indent
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* STEP 1 — Booking Setup */}
       <StepSection

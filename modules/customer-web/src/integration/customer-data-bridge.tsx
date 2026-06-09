@@ -102,8 +102,14 @@ export interface CustomerAddressOption {
 }
 export interface CustomerMaterialOption {
   id: string
+  /** Material code shown in the selector (e.g. "MAT-001"). */
   label: string
+  /** Human-readable description / sub-brand (e.g. "OPC 53 Grade Cement"). */
+  description: string
   uom: string
+  /** Weight per 1 unit of `uom`, in `weightUom` units. Null means no auto-calculation. */
+  conversionValue: number | null
+  weightUom: string | null
 }
 export interface CustomerVehicleTypeOption {
   id: string
@@ -112,17 +118,65 @@ export interface CustomerVehicleTypeOption {
 
 // Form payload the dashboard submits; the adapter expands it into a full
 // shared BookingRecord (customerId/tenantId/source/lifecycle status injected).
+export type CustomerCommercialType  = 'SPOT' | 'CONTRACT'
+export type CustomerServiceType     = 'FTL' | 'PTL'
+export type CustomerContractRateType = 'PER_TRIP' | 'PER_MT' | 'PER_KM'
+
 export interface CustomerCreateBookingInput {
-  originAddressId: string
+  commercialType:      CustomerCommercialType
+  serviceType:         CustomerServiceType
+  contractRateType:    CustomerContractRateType
+  originAddressId:     string
   destinationAddressId: string
-  materialId: string
-  quantity: number
-  weight: number
-  uom: string
-  vehicleTypeId: string | null
-  pickupDate: string | null
-  goodsValue: number | null
+  materialId:          string
+  quantity:            number
+  weight:              number
+  uom:                 string
+  weightUom:           string
+  vehicleTypeId:       string | null
+  pickupDate:          string | null
+  pickupTime:          string | null
+  goodsValue:          number | null
   specialInstructions: string | null
+  distanceKm:          number | null
+  spotContractId:      string | null
+  enteredRate:         number | null
+  deviationRemark:     string | null
+  /** When true the booking is persisted with DRAFT status instead of PENDING_ASSIGNMENT. */
+  asDraft?:            boolean
+}
+
+export interface CustomerAddressInput {
+  contactPersonName: string
+  phone: string
+  email: string
+  addressName: string
+  addressLine1: string
+  addressLine2: string
+  pincode: string
+  country: string
+  state: string
+  city: string
+  gstin: string
+  /** Whether the address can be used as origin, destination, or both. */
+  usage: 'ORIGIN' | 'DESTINATION' | 'BOTH'
+}
+
+export interface CustomerRateCardResult {
+  rate: number
+  rateType: 'PER_TRIP' | 'PER_MT' | 'PER_KM'
+  laneKey: string | null
+}
+
+export interface CustomerSpotContractMatch {
+  contractId: string
+  sourceAuctionId: string
+  vendorName: string
+  contractedRate: number
+  rateUnit: string
+  originCity: string
+  destinationCity: string
+  endDate: string
 }
 
 export interface CustomerDataBridge {
@@ -142,10 +196,44 @@ export interface CustomerDataBridge {
   materials: CustomerMaterialOption[]
   vehicleTypes: CustomerVehicleTypeOption[]
 
+  // Looks up a CONTRACT rate card for the given lane / route configuration.
+  // Returns the matched rate and rate type, or null when no rate card covers the lane.
+  lookupContractRate: (params: {
+    originAddressId: string
+    destinationCity: string
+    vehicleTypeCode: string | null
+    rateType: CustomerContractRateType
+    weight: number
+    pickupDate: string | null
+  }) => CustomerRateCardResult | null
+
+  // Weight UOM options for the Create Booking form (tenant-configured, e.g. KG, MT, TON).
+  weightUomOptions: string[]
+
+  // Returns a live SPOT auction contract for the given city pair, or null if none.
+  // Used by the Create Booking form to surface the spot contract panel (mirrors TMS).
+  getSpotContractForLane: (originCity: string, destinationCity: string) => CustomerSpotContractMatch | null
+
+  // Saves a new address under the logged-in customer and returns it so the form
+  // can immediately select it without a reload.
+  createAddress: (input: CustomerAddressInput) => CustomerAddressOption
+
   // Creates a booking AS the logged-in customer through the SAME shared store
   // method the internal module uses (source=CUSTOMER_PORTAL). Returns the new
   // booking id so the UI can navigate to it.
   createBooking: (input: CustomerCreateBookingInput) => string
+
+  /** Cancel a booking — only allowed for pre-dispatch statuses. */
+  cancelBooking: (bookingId: string, reason: string) => void
+
+  /** Update an existing DRAFT / PENDING booking in place. Returns the same bookingId. */
+  updateBooking: (bookingId: string, input: CustomerCreateBookingInput) => string
+
+  /**
+   * Return form-compatible pre-fill data for an existing booking so the edit
+   * form can initialise its state without re-fetching.
+   */
+  getBookingForEdit: (bookingId: string) => CustomerCreateBookingInput | null
 
   requestDestinationChange: (bookingId: string, reason: string) => void
 

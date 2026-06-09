@@ -36,15 +36,20 @@ import type {
   TenantVehicleInput,
   VehicleFuelType,
   VehicleOperationalStatus,
+  VehicleTrackingType,
 } from "@/types/fleet";
 
 const FUEL_TYPES: VehicleFuelType[] = ["DIESEL", "PETROL", "CNG", "LNG", "ELECTRIC"];
+const TRACKING_TYPES: Array<{ value: VehicleTrackingType; label: string }> = [
+  { value: "NONE", label: "No Tracking" },
+  { value: "GPS_DEVICE", label: "GPS Device" },
+  { value: "SIM", label: "SIM Based" },
+];
 const OPERATIONAL_STATUSES: Array<{ value: VehicleOperationalStatus; label: string }> = [
   { value: "ACTIVE", label: "Active" },
   { value: "UNDER_MAINTENANCE", label: "Under Maintenance" },
   { value: "INACTIVE", label: "Inactive" },
 ];
-const LICENSE_CLASSES = ["HMV", "HMV Hazmat", "LMV Transport", "LMV", "HCV", "LCV"];
 
 const STATUS_STYLES: Record<ComplianceStatus, string> = {
   COMPLIANT: "bg-emerald-100 text-emerald-700",
@@ -245,24 +250,33 @@ function PaginationFooter({
 
 // ============================ VEHICLES ============================
 
-// Human label for a master-data record's origin module. Records created before
-// provenance tracking (or directly in Administration) default to "Admin".
-function masterDataSourceLabel(source?: string): string {
-  if (source === "VENDOR_PORTAL") return "Vendor Portal";
-  if (source === "FLEET_MODULE") return "Fleet";
-  return "Admin";
+// Who created this master-data record: the vendor (when added from the Vendor
+// Portal) or "Administration" (when added here in Tenant Admin). Records created
+// before provenance tracking default to Administration.
+type CreatedByRecord = {
+  source?: string;
+  createdByLoginType?: string;
+  createdByVendorId?: string | null;
+  vendorName?: string;
+};
+
+function createdByLabel(record: CreatedByRecord): string {
+  const byVendor = record.createdByLoginType === "VENDOR" || record.source === "VENDOR_PORTAL";
+  if (byVendor) return record.vendorName ?? "Vendor";
+  return "Administration";
 }
 
-function SourceBadge({ source }: { source?: string }) {
-  const label = masterDataSourceLabel(source);
-  const tone =
-    source === "VENDOR_PORTAL"
-      ? "bg-indigo-50 text-indigo-700"
-      : source === "FLEET_MODULE"
-        ? "bg-amber-50 text-amber-700"
-        : "bg-gray-100 text-gray-600";
+function CreatedByCell({ record }: { record: CreatedByRecord }) {
+  const label = createdByLabel(record);
+  const byVendor = label !== "Administration";
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>{label}</span>
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+        byVendor ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+      }`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -347,7 +361,7 @@ export function TenantVehiclesPage() {
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vendor</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created By</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
@@ -402,7 +416,7 @@ export function TenantVehiclesPage() {
                         </div>
                       </td>
                       <td className="p-4 align-top">
-                        <SourceBadge source={vehicle.source} />
+                        <CreatedByCell record={vehicle} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(vehicle)}>
@@ -465,7 +479,6 @@ function VehicleModal({
   isOpen,
   onClose,
   initialVehicle,
-  activeVendors,
   activeVehicleTypes,
   onCreate,
   onUpdate,
@@ -489,6 +502,8 @@ function VehicleModal({
     operationalStatus: "ACTIVE" as VehicleOperationalStatus,
     ownershipType: "OWN" as "OWN" | "VENDOR",
     vendorId: "" as string | "",
+    trackingType: "NONE" as VehicleTrackingType,
+    gpsDeviceId: "",
   });
   const [docs, setDocs] = useState(emptyDocs);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -511,6 +526,8 @@ function VehicleModal({
         operationalStatus: initialVehicle.operationalStatus ?? (initialVehicle.isActive ? "ACTIVE" : "INACTIVE"),
         ownershipType: initialVehicle.ownershipType,
         vendorId: initialVehicle.vendorId ?? "",
+        trackingType: initialVehicle.trackingType ?? "NONE",
+        gpsDeviceId: initialVehicle.gpsDeviceId ?? "",
       });
       setDocs(complianceDocsToMap(initialVehicle.complianceDocuments, [...VEHICLE_DOC_KEYS]));
     } else {
@@ -528,6 +545,8 @@ function VehicleModal({
         operationalStatus: "ACTIVE",
         ownershipType: "OWN",
         vendorId: "",
+        trackingType: "NONE",
+        gpsDeviceId: "",
       });
       setDocs(complianceDocsToMap(undefined, [...VEHICLE_DOC_KEYS]));
     }
@@ -542,7 +561,6 @@ function VehicleModal({
 
   function handleSubmit() {
     if (!form.registrationNumber.trim() || !form.vehicleTypeId) return;
-    if (form.ownershipType === "VENDOR" && !form.vendorId) return;
     const input: TenantVehicleInput = {
       registrationNumber: form.registrationNumber,
       vehicleTypeId: form.vehicleTypeId,
@@ -554,8 +572,11 @@ function VehicleModal({
       chassisNo: form.chassisNo,
       capacityKg: form.capacityKg,
       baseLocation: form.baseLocation,
+      trackingType: form.trackingType,
+      gpsDeviceId: form.trackingType === "GPS_DEVICE" ? form.gpsDeviceId || null : null,
       operationalStatus: form.operationalStatus,
       ownershipType: form.ownershipType,
+      // Vendor link is not picked during onboarding; preserved on edit if present.
       vendorId: form.ownershipType === "VENDOR" ? form.vendorId || null : null,
       insurance: { number: docs.Insurance.referenceNo, expiry: docs.Insurance.expiryDate },
       fitness: { number: docs.FC.referenceNo, expiry: docs.FC.expiryDate },
@@ -652,12 +673,14 @@ function VehicleModal({
                 <option value="VENDOR">VENDOR</option>
               </Select>
             </Field>
-            {form.ownershipType === "VENDOR" ? (
-              <Field label="Vendor">
-                <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
-                  <option value="">Select vendor</option>
-                  {activeVendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </Select>
+            <Field label="Tracking Type">
+              <Select value={form.trackingType} onChange={(e) => setField("trackingType", e.target.value as VehicleTrackingType)}>
+                {TRACKING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </Select>
+            </Field>
+            {form.trackingType === "GPS_DEVICE" ? (
+              <Field label="GPS Device ID">
+                <Input value={form.gpsDeviceId} onChange={(e) => setField("gpsDeviceId", e.target.value)} placeholder="GPS-001" />
               </Field>
             ) : null}
           </div>
@@ -793,7 +816,7 @@ export function TenantDriversPage() {
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">License</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                 <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Source</th>
+                <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created By</th>
                 <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
               </tr>
             </thead>
@@ -855,7 +878,7 @@ export function TenantDriversPage() {
                         </div>
                       </td>
                       <td className="p-4 align-top">
-                        <SourceBadge source={driver.source} />
+                        <CreatedByCell record={driver} />
                       </td>
                       <td className="p-4 align-top text-right">
                         <Button size="sm" variant="outline" onClick={() => openEdit(driver)}>
@@ -913,8 +936,6 @@ function DriverModal({
   isOpen,
   onClose,
   initialDriver,
-  activeVehicles,
-  activeVendors,
   onCreate,
   onUpdate,
 }: DriverModalProps) {
@@ -923,13 +944,9 @@ function DriverModal({
     name: "",
     dob: "",
     mobile: "",
-    email: "",
     gender: "" as "MALE" | "FEMALE" | "OTHER" | "",
     baseLocation: "",
     aadhaarMasked: "",
-    licenseNumber: "",
-    licenseClasses: "" as string,
-    licenseExpiry: "",
     assignedVehicleId: "" as string,
     vendorId: "" as string,
   });
@@ -944,13 +961,9 @@ function DriverModal({
         name: initialDriver.name,
         dob: initialDriver.dob ?? "",
         mobile: initialDriver.mobile ?? initialDriver.phone ?? "",
-        email: initialDriver.email ?? "",
         gender: (initialDriver.gender ?? "") as "MALE" | "FEMALE" | "OTHER" | "",
         baseLocation: initialDriver.baseLocation ?? "",
         aadhaarMasked: initialDriver.aadhaarMasked ?? "",
-        licenseNumber: initialDriver.licenseNumber ?? "",
-        licenseClasses: (initialDriver.licenseClasses ?? []).join(", "),
-        licenseExpiry: initialDriver.licenseExpiry ?? "",
         assignedVehicleId: initialDriver.assignedVehicleId ?? "",
         vendorId: initialDriver.vendorId ?? "",
       });
@@ -960,13 +973,9 @@ function DriverModal({
         name: "",
         dob: "",
         mobile: "",
-        email: "",
         gender: "",
         baseLocation: "",
         aadhaarMasked: "",
-        licenseNumber: "",
-        licenseClasses: "",
-        licenseExpiry: "",
         assignedVehicleId: "",
         vendorId: "",
       });
@@ -979,14 +988,13 @@ function DriverModal({
   const setDoc = (key: DriverDocKey, patch: Partial<{ fileName: string; referenceNo: string; expiryDate: string }>) =>
     setDocs((c) => ({ ...c, [key]: { ...c[key], ...patch } }));
   const compliance = computeComplianceFromDocs(docs);
-  const parsedClasses = form.licenseClasses
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   function handleSubmit() {
     if (!form.name.trim()) return;
-    if (!form.licenseNumber.trim()) return;
+    // DL number/expiry come from the DL compliance document now that the
+    // standalone License section is gone. DL number stays mandatory.
+    const licenseNumber = docs.DL.referenceNo.trim();
+    if (!licenseNumber) return;
     const input: TenantDriverInput = {
       name: form.name,
       dob: form.dob,
@@ -994,19 +1002,18 @@ function DriverModal({
       phone: form.mobile,
       address: form.baseLocation,
       bloodGroup: "",
-      licenseNumber: form.licenseNumber,
-      licenseType: parsedClasses[0] ?? "",
-      licenseExpiry: form.licenseExpiry,
+      licenseNumber,
+      licenseType: "",
+      licenseExpiry: docs.DL.expiryDate,
       medicalExpiry: docs.MedicalCertificate.expiryDate,
       drugTestStatus: "CLEAR",
       endorsements: [],
       assignedVehicleId: form.assignedVehicleId || null,
       vendorId: form.vendorId || null,
-      email: form.email,
       gender: form.gender,
       baseLocation: form.baseLocation,
       aadhaarMasked: form.aadhaarMasked,
-      licenseClasses: parsedClasses,
+      licenseClasses: [],
       mobile: form.mobile,
       complianceStatus: compliance,
       complianceDocuments: docsToComplianceDocs(docs),
@@ -1021,7 +1028,7 @@ function DriverModal({
       open={isOpen}
       onOpenChange={(open) => (!open ? onClose() : undefined)}
       title={isEdit ? `Edit ${initialDriver?.name}` : "Add Driver"}
-      description="Capture driver personal info, license, and compliance documents."
+      description="Capture driver personal info and compliance documents (DL number is taken from the Driving License document)."
       widthClassName="max-w-3xl"
       footer={
         <div className="flex justify-end gap-3">
@@ -1061,9 +1068,6 @@ function DriverModal({
                 readOnly={isEdit}
               />
             </Field>
-            <Field label="Email">
-              <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} />
-            </Field>
             <Field label="Gender">
               <Select value={form.gender} onChange={(e) => setField("gender", e.target.value as "MALE" | "FEMALE" | "OTHER" | "")}>
                 <option value="">Select</option>
@@ -1077,37 +1081,6 @@ function DriverModal({
             </Field>
             <Field label="Aadhaar (masked)">
               <Input value={form.aadhaarMasked} onChange={(e) => setField("aadhaarMasked", e.target.value)} placeholder="XXXX-XXXX-1234" />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="License">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="DL Number*">
-              <Input value={form.licenseNumber} onChange={(e) => setField("licenseNumber", e.target.value)} />
-            </Field>
-            <Field label={`License Classes (comma-separated: ${LICENSE_CLASSES.join(", ")})`}>
-              <Input value={form.licenseClasses} onChange={(e) => setField("licenseClasses", e.target.value)} placeholder="HMV, HMV Hazmat" />
-            </Field>
-            <Field label="DL Valid Till">
-              <Input type="date" value={form.licenseExpiry} onChange={(e) => setField("licenseExpiry", e.target.value)} />
-            </Field>
-          </div>
-        </Section>
-
-        <Section title="Assignment">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Assigned Vehicle">
-              <Select value={form.assignedVehicleId} onChange={(e) => setField("assignedVehicleId", e.target.value)}>
-                <option value="">No vehicle mapped</option>
-                {activeVehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
-              </Select>
-            </Field>
-            <Field label="Vendor Affiliation">
-              <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
-                <option value="">Own Driver</option>
-                {activeVendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-              </Select>
             </Field>
           </div>
         </Section>

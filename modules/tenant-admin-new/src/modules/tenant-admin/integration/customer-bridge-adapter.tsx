@@ -1,12 +1,22 @@
 import { useMemo } from "react";
 import { useMockStore } from "@/shared/store/mock-store";
 import { useSessionContext } from "@/shared/auth/session-context";
+import { loadStore as loadAuctionStore } from "@auction/lib/auction-store";
+import { cityLaneKey, contractCityLaneKey } from "@shared-utils";
+import {
+  getWeightUOMOptions,
+  validateRateCard,
+} from "@/modules/tms/booking/services/booking-selectors";
+import { getRateCardUnitRate } from "@/modules/tms/booking/services/booking-engine";
 // Import the SAME local booking page TenantAdminApp routes to (relative path,
 // not the @/modules/tms alias which resolves to the standalone tms copy whose
 // MockStoreProvider isn't mounted in the tenant shell — that caused a crash).
 import { CreateBookingPage } from "../../tms/booking/CreateBooking";
 import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
 import type {
+  CustomerAddressInput,
+  CustomerRateCardResult,
+  CustomerSpotContractMatch,
   CustomerAddressOption,
   CustomerBookingStatus,
   CustomerBookingView,
@@ -180,11 +190,22 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
     }));
     const materialOptions: CustomerMaterialOption[] = materials
       .filter((m) => m.status === "active" && (m.mappedCustomerIds.length === 0 || m.mappedCustomerIds.includes(customerId)))
-      .map((m) => ({ id: m.id, label: m.description, uom: m.uom }));
+      .map((m) => ({
+        id: m.id,
+        label: m.materialCode ?? m.description,
+        description: m.description,
+        uom: m.uom,
+        conversionValue: m.conversionValue ?? null,
+        weightUom: m.defaultWeightUOM ?? null,
+      }));
     const vehicleTypes: CustomerVehicleTypeOption[] = store
       .listTenantVehicleTypes(tenantId)
       .filter((v) => v.status === "active")
       .map((v) => ({ id: v.id, label: v.typeCode }));
+    const uomDefinitions = store.listTenantUOMDefinitions ? store.listTenantUOMDefinitions(tenantId) : [];
+    const selectedCustomerRecord = store.getTenantCustomerById(customerId) ?? null;
+    const weightUomOptions = getWeightUOMOptions(uomDefinitions, selectedCustomerRecord);
+    const effectiveWeightUomOptions = weightUomOptions.length > 0 ? weightUomOptions : ["KG", "MT", "TON"];
 
     return {
       tenantId,
@@ -200,6 +221,182 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
       addresses,
       materials: materialOptions,
       vehicleTypes,
+      weightUomOptions: effectiveWeightUomOptions,
+      createAddress: (input: CustomerAddressInput): CustomerAddressOption => {
+        const addressType = input.usage === "ORIGIN" ? "consignor" : input.usage === "DESTINATION" ? "consignee" : "both";
+        const created = store.createTenantCustomerAddress({
+          tenantId,
+          tenantCustomerId: customerId,
+          customerId,
+          addressType,
+          addressUsage: input.usage,
+          addressName: input.addressName || `${input.city} ${input.usage === "DESTINATION" ? "Destination" : input.usage === "ORIGIN" ? "Origin" : "Address"}`,
+          contactPersonName: input.contactPersonName,
+          contactPerson: input.contactPersonName,
+          phone: input.phone,
+          contactNumber: input.phone,
+          email: input.email || undefined,
+          emailId: input.email || undefined,
+          gstin: input.gstin || undefined,
+          addressLine1: input.addressLine1,
+          addressLine2: input.addressLine2 || undefined,
+          city: input.city,
+          state: input.state,
+          country: input.country || "India",
+          pincode: input.pincode,
+          isDefault: false,
+          status: "active",
+        });
+        return {
+          id: created.id,
+          label: created.addressName,
+          city: created.city,
+          usage: input.usage,
+        };
+      },
+      lookupContractRate: (params): CustomerRateCardResult | null => {
+        const customerRateCards = store.listTenantCustomerRateCards(customerId);
+        if (!customerRateCards.length) return null;
+        const sourceAddr = addressRecords.find((a) => a.id === params.originAddressId);
+        if (!sourceAddr) return null;
+        const matched = validateRateCard(
+          {
+            bookingDate: params.pickupDate,
+            customerId,
+            rateMatchingBasis: "CITY_TO_CITY",
+            lane: null,
+            fromCity: sourceAddr.city,
+            toCity: params.destinationCity,
+            fromLocation: sourceAddr.addressName ?? null,
+            toLocation: null,
+            fromPincode: sourceAddr.pincode ?? null,
+            toPincode: null,
+            vehicleType: params.vehicleTypeCode,
+            rateType: params.rateType,
+            weight: params.rateType === "PER_MT" ? params.weight : null,
+          },
+          customerRateCards,
+        );
+        if (!matched) return null;
+        const rate = getRateCardUnitRate(matched);
+        if (rate == null) return null;
+        return { rate, rateType: params.rateType, laneKey: matched.lanes ?? null };
+      },
+      getSpotContractForLane: (originCity, destinationCity): CustomerSpotContractMatch | null => {
+        const laneKey = cityLaneKey(originCity, destinationCity);
+        if (!laneKey) return null;
+        const today = new Date().toISOString().slice(0, 10);
+        const contract = loadAuctionStore().contracts.find(
+          (c) =>
+            c.contractType === "SPOT" &&
+            c.status === "ACTIVE" &&
+            !c.consumedByBookingId &&
+            contractCityLaneKey(c) === laneKey &&
+            c.endDate >= today,
+        ) ?? null;
+        if (!contract) return null;
+        return {
+          contractId: contract.id,
+          sourceAuctionId: contract.sourceAuctionId,
+          vendorName: contract.vendorName,
+          contractedRate: contract.contractedRate,
+          rateUnit: contract.rateUnit,
+          originCity: contract.originCity,
+          destinationCity: contract.destinationCity,
+          endDate: contract.endDate,
+        };
+      },
+      cancelBooking: (bookingId, reason) => {
+        const record = store.getTenantBookingById(bookingId);
+        if (!record || record.customerId !== customerId) return;
+        const now = new Date().toISOString();
+        store.updateTenantBooking(bookingId, {
+          status: "CANCELLED",
+          remarks: [
+            ...(record.remarks ?? []),
+            { id: `remark-cancel-${Date.now()}`, timestamp: now, actor: customerName, type: "OPS_REMARK", message: `Cancelled by customer: ${reason}` },
+          ],
+          statusTimeline: [
+            ...(record.statusTimeline ?? []),
+            { id: `status-cancel-${Date.now()}`, status: "CANCELLED" as const, timestamp: now, actor: customerName, note: reason },
+          ],
+        });
+      },
+
+      updateBooking: (bookingId, input) => {
+        const record = store.getTenantBookingById(bookingId);
+        if (!record || record.customerId !== customerId) return bookingId;
+        const now = new Date().toISOString();
+        const newStatus = input.asDraft ? "DRAFT" : "PENDING_ASSIGNMENT";
+        store.updateTenantBooking(bookingId, {
+          status: newStatus,
+          materialIds: [input.materialId],
+          sourceAddressId: input.originAddressId,
+          destinationAddressId: input.destinationAddressId,
+          consignorAddressId: input.originAddressId,
+          consigneeAddressId: input.destinationAddressId,
+          quantity: input.quantity,
+          weight: input.weight,
+          uom: input.uom,
+          weightUom: input.weightUom,
+          vehicleTypeId: input.vehicleTypeId,
+          pickupDate: input.pickupDate,
+          goodsValue: input.goodsValue,
+          pricing: {
+            rateType: input.contractRateType,
+            contractRateCardId: null,
+            l1Rate: null,
+            enteredRate: input.enteredRate ?? 0,
+            calculatedFreight: input.enteredRate ?? 0,
+            distanceKm: input.distanceKm ?? null,
+            deviationPercent: 0,
+            approvalLevel: "AUTO",
+            deviationRemark: input.deviationRemark ?? null,
+            isAutoApproved: true,
+          },
+          remarks: [
+            ...(record.remarks ?? []),
+            { id: `remark-edit-${Date.now()}`, timestamp: now, actor: customerName, type: "OPS_REMARK", message: `Booking edited via Customer Portal${input.specialInstructions ? ` — ${input.specialInstructions}` : ""}` },
+          ],
+          statusTimeline: [
+            ...(record.statusTimeline ?? []),
+            { id: `status-edit-${Date.now()}`, status: newStatus, timestamp: now, actor: customerName, note: input.asDraft ? "Booking re-saved as draft." : "Booking re-submitted via Customer Portal." },
+          ],
+        });
+        if (!input.asDraft) {
+          try { store.sendBookingVendorIndent(bookingId, customerName, null, null); } catch { /* no vendors */ }
+        }
+        return bookingId;
+      },
+
+      getBookingForEdit: (bookingId) => {
+        const record = store.getTenantBookingById(bookingId);
+        if (!record || record.customerId !== customerId) return null;
+        const firstDelivery = record.deliveries?.[0] ?? null;
+        const material = record.materialIds?.[0] ? materialById.get(record.materialIds[0]) : null;
+        return {
+          commercialType:       (record.pricing?.rateType === "PER_MT" ? "CONTRACT" : "SPOT") as import("@customer/integration/customer-data-bridge").CustomerCommercialType,
+          serviceType:          "FTL" as import("@customer/integration/customer-data-bridge").CustomerServiceType,
+          contractRateType:     (record.pricing?.rateType ?? "PER_TRIP") as import("@customer/integration/customer-data-bridge").CustomerContractRateType,
+          originAddressId:      record.sourceAddressId ?? "",
+          destinationAddressId: record.destinationAddressId ?? firstDelivery?.destinationAddressId ?? "",
+          materialId:           record.materialIds?.[0] ?? "",
+          quantity:             record.quantity ?? 0,
+          weight:               record.weight ?? 0,
+          uom:                  record.uom ?? material?.uom ?? "NOS",
+          weightUom:            record.weightUom ?? material?.defaultWeightUOM ?? "MT",
+          vehicleTypeId:        record.vehicleTypeId ?? null,
+          pickupDate:           record.pickupDate ?? null,
+          pickupTime:           null,
+          goodsValue:           record.goodsValue ?? null,
+          specialInstructions:  null,
+          distanceKm:           record.pricing?.distanceKm ?? firstDelivery?.distanceKm ?? null,
+          spotContractId:       record.spotContract?.contractId ?? null,
+          enteredRate:          record.pricing?.enteredRate ?? null,
+          deviationRemark:      record.pricing?.deviationRemark ?? null,
+        };
+      },
+
       requestDestinationChange: (bookingId, reason) => {
         const record = store.getTenantBookingById(bookingId)
         if (!record) return
@@ -239,36 +436,54 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
           consigneeAddressId: input.destinationAddressId,
           laneKey: null,
           laneFound: false,
+          spotContract: input.spotContractId
+            ? (() => {
+                const c = loadAuctionStore().contracts.find((x) => x.id === input.spotContractId);
+                return c
+                  ? {
+                      contractId: c.id,
+                      sourceAuctionId: c.sourceAuctionId,
+                      vendorId: c.vendorId,
+                      vendorName: c.vendorName,
+                      rate: c.contractedRate,
+                      rateUnit: c.rateUnit,
+                      originCity: c.originCity,
+                      destinationCity: c.destinationCity,
+                    }
+                  : null;
+              })()
+            : null,
           poNumber: null,
           doNumber: null,
           ewayBillNumber: null,
           pickupDate: input.pickupDate,
-          pickupTime: null,
+          pickupTime: input.pickupTime ?? null,
+          goodsValue: input.goodsValue ?? null,
           tat: null,
-          serviceType: "FTL",
-          commercialType: "SPOT",
+          serviceType: input.serviceType,
+          commercialType: input.commercialType,
           pricing: {
-            rateType: "PER_TRIP",
+            rateType: input.contractRateType,
             contractRateCardId: null,
             l1Rate: null,
-            enteredRate: 0,
-            calculatedFreight: 0,
-            distanceKm: null,
+            enteredRate: input.enteredRate ?? 0,
+            calculatedFreight: input.enteredRate ?? 0,
+            distanceKm: input.distanceKm ?? null,
             deviationPercent: 0,
             approvalLevel: "AUTO",
-            deviationRemark: null,
-            isAutoApproved: false,
+            deviationRemark: input.deviationRemark ?? null,
+            isAutoApproved: true,
           },
           chargeType: null,
           subBrand: null,
           quantity: input.quantity,
           weight: input.weight,
           uom: input.uom,
-          weightUom: input.uom,
+          weightUom: input.weightUom,
           vehicleTypeId: input.vehicleTypeId,
           lrType: "MANUAL",
           manualLrPoolPreference: "GENERAL",
-          status: "PENDING_ASSIGNMENT",
+          status: input.asDraft ? "DRAFT" : "PENDING_ASSIGNMENT",
           opsRemark: null,
           pod: null,
           documents: [],
@@ -288,9 +503,9 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
               quantity: input.quantity,
               uom: input.uom,
               weight: input.weight,
-              weightUom: input.uom,
-              distanceKm: null,
-              status: "PENDING_ASSIGNMENT",
+              weightUom: input.weightUom,
+              distanceKm: input.distanceKm ?? null,
+              status: input.asDraft ? "DRAFT" : "PENDING_ASSIGNMENT",
               lrNumber: null,
               pod: null,
             },
@@ -302,18 +517,28 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
               timestamp: now,
               actor: customerName,
               type: "OPS_REMARK",
-              message: `Created via Customer Portal${input.specialInstructions ? ` — ${input.specialInstructions}` : ""}`,
+              message: input.asDraft
+                ? `Draft saved via Customer Portal${input.specialInstructions ? ` — ${input.specialInstructions}` : ""}`
+                : `Created via Customer Portal${input.specialInstructions ? ` — ${input.specialInstructions}` : ""}`,
             },
           ],
           statusTimeline: [
-            { id: `booking-status-${Date.now()}-created`, status: "PENDING_ASSIGNMENT", timestamp: now, actor: customerName, note: "Booking created via Customer Portal." },
+            {
+              id: `booking-status-${Date.now()}-created`,
+              status: input.asDraft ? "DRAFT" : "PENDING_ASSIGNMENT",
+              timestamp: now,
+              actor: customerName,
+              note: input.asDraft ? "Booking saved as draft via Customer Portal." : "Booking created via Customer Portal.",
+            },
           ],
           createdBy: customerName,
         });
-        try {
-          store.sendBookingVendorIndent(created.id, customerName, null, null);
-        } catch {
-          // No active vendors — booking stays in PENDING_ASSIGNMENT for ops to handle
+        if (!input.asDraft) {
+          try {
+            store.sendBookingVendorIndent(created.id, customerName, null, null);
+          } catch {
+            // No active vendors — booking stays in PENDING_ASSIGNMENT for ops to handle
+          }
         }
         return created.bookingId;
       },

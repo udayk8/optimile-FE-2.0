@@ -2,6 +2,17 @@ import { useAppStore } from '@vendor/stores/app.store'
 import { useTenantBridge, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
 import type { Indent, Trip } from '@vendor/types'
 
+// A PENDING indent's SLA is 2h from when it was sent. Once the slaDeadline
+// passes the indent lapses and must not be shown to the vendor anymore — the
+// tenant team assigns a vehicle manually instead. Non-pending indents
+// (accepted / declined) keep showing in their respective tabs.
+function dropExpiredPendingIndents(indents: Indent[]): Indent[] {
+  const now = Date.now()
+  return indents.filter(
+    (i) => i.status !== 'PENDING' || Date.parse(i.slaDeadline) > now,
+  )
+}
+
 export interface VendorBookingsData {
   indents: Indent[]
   trips: Trip[]
@@ -39,7 +50,7 @@ export function useVendorBookings(): VendorBookingsData {
       ...bridge.bookingTrips.map((t) => t.id),
     ])
     return {
-      indents: [...bridge.bookingIndents, ...indents],
+      indents: dropExpiredPendingIndents([...bridge.bookingIndents, ...indents]),
       trips: [...bridge.bookingTrips, ...trips],
       acceptIndent: (id) => (mockIndentIds.has(id) ? acceptIndent(id) : bridge.acceptBooking(id)),
       declineIndent: (id) => (mockIndentIds.has(id) ? declineIndent(id) : bridge.declineBooking(id)),
@@ -55,5 +66,5 @@ export function useVendorBookings(): VendorBookingsData {
   }
 
   // Standalone (no bridge): local mock demo dataset only.
-  return { indents, trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, isBridgeRecord: () => false }
+  return { indents: dropExpiredPendingIndents(indents), trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, isBridgeRecord: () => false }
 }

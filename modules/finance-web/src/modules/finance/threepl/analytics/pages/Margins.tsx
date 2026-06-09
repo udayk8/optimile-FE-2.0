@@ -2,9 +2,18 @@ import React from "react";
 import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { MARGINS } from "@finance/data/mock";
+import { useReceivables } from "@finance/lib/receivablesStore";
 
 export default function Margins() {
-  const data = MARGINS.map((m) => ({ ...m, margin: m.charged - m.paid, pct: (((m.charged - m.paid) / m.charged) * 100).toFixed(1) }));
+  const { trips } = useReceivables();
+  // Real bridged bookings with a vendor assigned (selling AND buying known).
+  const assigned = trips.filter((t) => t.buyingFreight != null && t.margin != null);
+  // Map each booking to a margin row; fall back to mock when there's no real data
+  // (standalone build or no assigned bookings yet).
+  const rows = assigned.length
+    ? assigned.map((t) => ({ trip: t.bookingId ?? t.id, lane: t.lane, charged: t.revenue ?? 0, paid: t.buyingFreight ?? 0 }))
+    : MARGINS;
+  const data = rows.map((m) => ({ ...m, margin: m.charged - m.paid, pct: (m.charged > 0 ? ((m.charged - m.paid) / m.charged) * 100 : 0).toFixed(1) }));
   return (
     <div>
       <SectionTitle sub="The aggregator's lifeblood: what you charged the client minus what you paid the sub-vendor.">Margin Tracker</SectionTitle>

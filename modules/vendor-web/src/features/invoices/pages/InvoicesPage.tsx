@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
-import { Input } from '@vendor/components/ui/input'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -14,8 +13,9 @@ import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useAppStore } from '@vendor/stores/app.store'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { useVendorInvoiceProfile, type VendorInvoiceProfileData } from '@vendor/integration/useVendorInvoiceProfile'
 import { CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
 import type { Dispute, Invoice, InvoiceLineItem, Trip } from '@vendor/types'
 
@@ -26,14 +26,14 @@ const CUSTOMER_ADDRESS =
 function HiddenInvoicePdf({
   invoice,
   trips,
-  companyName,
+  profile,
   customerName,
   getLrNumber,
   onDone,
 }: {
   invoice: Invoice
   trips: Trip[]
-  companyName: string
+  profile: VendorInvoiceProfileData
   customerName: string
   getLrNumber: (tripId: string) => string | null
   onDone: () => void
@@ -50,9 +50,11 @@ function HiddenInvoicePdf({
         ref={ref}
         invoice={invoice}
         trips={trips}
-        companyName={companyName}
-        companyInfo={MOCK_COMPANY_INFO}
-        bank={MOCK_BANK}
+        companyName={profile.companyName}
+        companyInfo={profile.companyInfo}
+        bank={profile.bank}
+        terms={profile.terms}
+        logoUrl={profile.logoUrl}
         customerName={customerName}
         customerAddress={CUSTOMER_ADDRESS}
         getLrNumber={getLrNumber}
@@ -61,19 +63,22 @@ function HiddenInvoicePdf({
   )
 }
 
-type InvoiceWorkspaceTab = 'all' | 'pending' | 'approved' | 'disputed' | 'resubmission' | 'closed'
+type InvoiceWorkspaceTab = 'all' | 'pending' | 'approved' | 'disputed' | 'resubmission' | 'paid' | 'closed'
 type StatusTab = Exclude<InvoiceWorkspaceTab, 'all'>
 
-const INVOICE_TABS: InvoiceWorkspaceTab[] = ['all', 'pending', 'approved', 'disputed', 'resubmission', 'closed']
+const INVOICE_TABS: InvoiceWorkspaceTab[] = ['all', 'pending', 'approved', 'disputed', 'resubmission', 'paid', 'closed']
 
 function getInvoiceTab(search: string): InvoiceWorkspaceTab {
   const requested = new URLSearchParams(search).get('tab')
   return INVOICE_TABS.includes(requested as InvoiceWorkspaceTab) ? (requested as InvoiceWorkspaceTab) : 'all'
 }
 
-// The tab a single invoice belongs to is derived purely from its status — the status is the source of truth.
-function statusToTab(status: Invoice['status']): StatusTab {
-  switch (status) {
+// The tab a single invoice belongs to is derived from its status — except a
+// fully-paid invoice (its ledger receivable settled to zero by recorded
+// payments) moves to the Paid tab regardless of its APPROVED status.
+function tabForInvoice(invoice: Invoice, paidInvoiceIds: Set<string>): StatusTab {
+  if (paidInvoiceIds.has(invoice.id)) return 'paid'
+  switch (invoice.status) {
     case 'APPROVED':
       return 'approved'
     case 'DISPUTED':
@@ -99,15 +104,43 @@ export default function InvoicesPage() {
 
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [invoicePage, setInvoicePage] = useState(1)
   const [editModalInvoiceId, setEditModalInvoiceId] = useState<string | null>(null)
   const [editedItems, setEditedItems] = useState<InvoiceLineItem[]>([])
   const [downloadInvoiceId, setDownloadInvoiceId] = useState<string | null>(null)
 
   const { invoices, disputes, createResubmissionInvoice } = useVendorInvoices()
+  const ledger = useAppStore((s) => s.ledger)
   const bridge = useTenantBridge()
+
+  // An invoice is "fully paid" when its customer-ledger receivable, opened on
+  // approval, has been settled to a zero balance by the payments recorded
+  // against it (payment + TDS entries).
+  const paidInvoiceIds = useMemo(() => {
+    const sorted = [...ledger]
+      .filter((entry) => entry.ledgerType === 'CUSTOMER')
+      .sort((a, b) => a.date.localeCompare(b.date))
+    const opened = new Set<string>()
+    const latestBalance = new Map<string, number>()
+    for (const entry of sorted) {
+      if (entry.entryType === 'INVOICE_APPROVED') opened.add(entry.invoiceId)
+      latestBalance.set(entry.invoiceId, entry.runningBalance)
+    }
+    const paid = new Set<string>()
+    for (const [invoiceId, balance] of latestBalance) {
+      if (opened.has(invoiceId) && balance === 0) paid.add(invoiceId)
+    }
+    return paid
+  }, [ledger])
   const { trips: allBookings, getBookingDetail } = useVendorBookings()
-  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  // Approved driver expenses per trip — added into each invoice's totals.
+  const expenseByTripId = useMemo(() => {
+    const map = new Map<string, number>()
+    allBookings.forEach((trip) => map.set(trip.id, trip.approvedExpenses ?? 0))
+    return map
+  }, [allBookings])
+  const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
   const downloadInvoice = downloadInvoiceId ? invoices.find((item) => item.id === downloadInvoiceId) : null
@@ -121,32 +154,38 @@ export default function InvoicesPage() {
   }, [disputes])
 
   const tabCounts = useMemo(() => {
-    const counts: Record<InvoiceWorkspaceTab, number> = { all: invoices.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, closed: 0 }
+    const counts: Record<InvoiceWorkspaceTab, number> = { all: invoices.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, paid: 0, closed: 0 }
     invoices.forEach((invoice) => {
-      counts[statusToTab(invoice.status)] += 1
+      counts[tabForInvoice(invoice, paidInvoiceIds)] += 1
     })
     return counts
-  }, [invoices])
+  }, [invoices, paidInvoiceIds])
 
   const tabs: Array<{ key: InvoiceWorkspaceTab; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending' },
-    { key: 'approved', label: 'Approved' },
     { key: 'disputed', label: 'Disputed' },
     { key: 'resubmission', label: 'Resubmission Required' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'approved', label: 'Approved' },
     { key: 'closed', label: 'Closed' },
   ]
 
   const invoicesForTab = useMemo(() => {
     return invoices
       .filter((invoice) => {
-        if (activeTab !== 'all' && statusToTab(invoice.status) !== activeTab) return false
-        if (fromDate && invoice.invoiceDate < fromDate) return false
-        if (toDate && invoice.invoiceDate > toDate) return false
+        if (activeTab !== 'all' && tabForInvoice(invoice, paidInvoiceIds) !== activeTab) return false
+        // Filter on the created-on date (date-only portion — createdAt carries a
+        // time suffix that would break a raw string compare at the boundaries).
+        const createdOn = (invoice.createdAt ?? '').slice(0, 10)
+        if (fromDate && createdOn < fromDate) return false
+        if (toDate && createdOn > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![invoice.invoiceNumber, invoice.id, invoice.status].some((v) => (v ?? '').toLowerCase().includes(q))) return false
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [activeTab, fromDate, invoices, toDate])
+  }, [activeTab, fromDate, invoices, toDate, paidInvoiceIds, searchText])
 
   const approvedInvoices = invoices.filter((invoice) => invoice.status === 'APPROVED')
   const approvedSummary = useMemo(() => {
@@ -158,6 +197,14 @@ export default function InvoicesPage() {
       totalGstApproved,
     }
   }, [approvedInvoices])
+  // Totals across ALL invoices (not just approved) for the summary cards.
+  const invoiceSummary = useMemo(
+    () => ({
+      totalInvoiced: invoices.reduce((sum, invoice) => sum + invoice.grandTotal, 0),
+      totalGst: invoices.reduce((sum, invoice) => sum + invoice.gstAmount, 0),
+    }),
+    [invoices],
+  )
 
   const invoicePageSize = 5
   const invoiceTotalPages = Math.max(1, Math.ceil(invoicesForTab.length / invoicePageSize))
@@ -208,29 +255,31 @@ export default function InvoicesPage() {
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-text">Invoice Workspace</h3>
-          <p className="mt-1 text-sm text-gray-500">Tabs separate pending reviews, approvals, disputes, resubmissions, and closed invoices.</p>
-        </div>
-        <Button onClick={() => navigate('/vendor/invoices/create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Invoice
-        </Button>
-      </div>
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setInvoicePage(1) }}
+        searchPlaceholder="Search invoice no / status…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setInvoicePage(1) }}
+        onToDate={(v) => { setToDate(v); setInvoicePage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setInvoicePage(1) }}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Approved Invoices</div>
-            <div className="mt-2 text-2xl font-bold text-text">{approvedSummary.approvedCount}</div>
-          </CardContent>
-        </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Invoice Approved</div>
             <div className="mt-2 text-2xl font-bold text-text">
               <CurrencyDisplay amount={approvedSummary.totalInvoiceApproved} />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total Invoiced</div>
+            <div className="mt-2 text-2xl font-bold text-text">
+              <CurrencyDisplay amount={invoiceSummary.totalInvoiced} />
             </div>
           </CardContent>
         </Card>
@@ -245,7 +294,7 @@ export default function InvoicesPage() {
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 p-6">
+        <div className="flex flex-col gap-3 border-b border-gray-100 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
             {tabs.map((tab) => (
               <button
@@ -264,16 +313,10 @@ export default function InvoicesPage() {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-6 py-4">
-          <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)} className="w-[180px]" />
-          <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} className="w-[180px]" />
-          {(fromDate || toDate) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate('') }}>
-              Clear dates
-            </Button>
-          )}
+          <Button onClick={() => navigate('/vendor/invoices/create')}>
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
@@ -292,64 +335,45 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created On</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Due Date</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Last Update</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Freight Cost</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Cost</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Final Amount</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {pagedInvoices.map((invoice) => {
                   const dispute = disputeByInvoice[invoice.id]
+                  // Approved driver expenses across the invoice's trips.
+                  const expense = invoice.lineItems.reduce((sum, li) => sum + (expenseByTripId.get(li.tripId) ?? 0), 0)
                   return (
                     <tr key={invoice.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
                       <td className="p-4 font-mono font-semibold">{invoice.invoiceNumber || invoice.id}</td>
                       <td className="p-4">{formatDate(invoice.invoiceDate)}</td>
                       <td className="p-4">{formatDateTime(invoice.createdAt)}</td>
+                      <td className="p-4">{formatDateTime(invoice.statusUpdatedAt ?? invoice.createdAt)}</td>
                       <td className="p-4">
-                        {formatDate(invoice.paymentDueDate)}
-                        {invoice.paymentDate ? (
-                          <div className="mt-1 text-xs text-emerald-600">Paid {formatDate(invoice.paymentDate)}</div>
-                        ) : null}
-                      </td>
-                      <td className="p-4">
-                        <StatusBadge status={invoice.status} />
+                        <StatusBadge status={paidInvoiceIds.has(invoice.id) ? 'PAID' : invoice.status} />
                         {invoice.status === 'CLOSED' && invoice.closeReason ? (
                           <p className="mt-1 text-xs text-gray-400">{CLOSE_REASON_LABEL[invoice.closeReason]}</p>
                         ) : null}
                       </td>
-                      <td className="p-4">
-                        {dispute ? (
-                          <div className="space-y-1">
-                            <StatusBadge status={dispute.status} />
-                            {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
                       <td className="p-4 text-right">
-                        <CurrencyDisplay amount={invoice.subtotal} />
+                        <CurrencyDisplay amount={invoice.subtotal + expense} />
                       </td>
                       <td className="p-4 text-right text-gray-600">
                         <CurrencyDisplay amount={invoice.gstAmount} />
                       </td>
                       <td className="p-4 text-right">
-                        <CurrencyDisplay amount={invoice.grandTotal} className="font-semibold" />
+                        <CurrencyDisplay amount={invoice.grandTotal + expense} className="font-semibold" />
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          {invoice.status === 'DISPUTED' && dispute ? (
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
-                              <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
-                              Open Thread
-                            </Button>
-                          ) : null}
                           {invoice.status === 'RESUBMISSION_REQUIRED' ? (
                             <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => openEditModal(invoice.id)}>
                               <RefreshCw className="mr-1 h-3.5 w-3.5" />
@@ -366,6 +390,22 @@ export default function InvoicesPage() {
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
+                      </td>
+                      <td className="p-4">
+                        {dispute ? (
+                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                            <StatusBadge status={dispute.status} />
+                            {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
+                            {invoice.status === 'DISPUTED' ? (
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
+                                <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
+                                Open Thread
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   )
@@ -452,7 +492,7 @@ export default function InvoicesPage() {
         <HiddenInvoicePdf
           invoice={downloadInvoice}
           trips={allBookings}
-          companyName={companyName}
+          profile={invoiceProfile}
           customerName={customerName}
           getLrNumber={getLrNumber}
           onDone={() => setDownloadInvoiceId(null)}

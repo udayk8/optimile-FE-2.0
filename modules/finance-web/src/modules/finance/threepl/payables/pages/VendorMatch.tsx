@@ -10,6 +10,7 @@ import { useDisputes } from "@finance/lib/disputesStore";
 import { usePayables, computeMatch } from "@finance/lib/payablesStore";
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import RateCardPanel from "@finance/components/RateCardPanel";
+import MarginSummary from "@finance/components/MarginSummary";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -133,6 +134,22 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
   const contractedTotal = detail ? detail.comparison.reduce((s: any, r: any) => s + r.contracted, 0) : 0;
   const invoicedTotal = detail ? detail.comparison.reduce((s: any, r: any) => s + r.invoiced, 0) : 0;
 
+  // 3PL profit rollup from the linked bookings (assigned ones only) — selling
+  // (customer freight) vs buying (vendor freight). Undefined when none assigned.
+  const assignedTrips = bridged
+    ? (bill.linkedBookings as any[]).filter((t) => t.buyingFreight != null && t.margin != null)
+    : [];
+  const marginRollup = assignedTrips.length
+    ? assignedTrips.reduce(
+        (acc, t) => ({
+          selling: acc.selling + (t.revenue ?? 0),
+          buying: acc.buying + (t.buyingFreight ?? 0),
+          margin: acc.margin + (t.margin ?? 0),
+        }),
+        { selling: 0, buying: 0, margin: 0 },
+      )
+    : null;
+
   return (
     <div>
       <button onClick={onBack} className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800">
@@ -180,6 +197,9 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
       {/* Contract rate card — transparency on what the `Contract` baseline is built
           from (the awarded spot rate or the standing vendor rate card). */}
       {bill.rateCard && <RateCardPanel rateCard={bill.rateCard} commercialType={bill.commercialType} />}
+
+      {/* 3PL profit on this bill — what the customer was charged vs what the vendor is paid. */}
+      {marginRollup && <MarginSummary selling={marginRollup.selling} buying={marginRollup.buying} margin={marginRollup.margin} />}
 
       {bridged ? (
         <>

@@ -235,10 +235,6 @@ export function AddDriverModal({ isOpen, onClose, initialDriver }: AddDriverModa
                 <Input required value={form.mobile} onChange={(e) => setField('mobile', e.target.value)} placeholder="+91 9876543210" className="mt-1" />
               </div>
               <div>
-                <label className="text-sm font-medium">Email</label>
-                <Input type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} placeholder="driver@vendor.com" className="mt-1" />
-              </div>
-              <div>
                 <label className="text-sm font-medium">Gender</label>
                 <select className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.gender} onChange={(e) => setField('gender', e.target.value as Driver['gender'])}>
                   <option value="">Select</option>

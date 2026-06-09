@@ -2,9 +2,33 @@ import React, { useState } from "react";
 import { FileText, Download, Check, X, FileSpreadsheet } from "lucide-react";
 import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { TDS_ROWS, GST_ROWS, EWAY_BILLS } from "@finance/data/mock";
+import { exportCsv } from "@finance/lib/csv";
+import { usePayables } from "@finance/lib/payablesStore";
 
 export default function Compliance({ toast }: any) {
   const [tab, setTab] = useState("tds");
+  // Prefer real 194C deductions from processed vendor payments; fall back to the
+  // seeded sample when none have run yet (e.g. fresh standalone session).
+  const { tdsRows } = usePayables();
+  const tdsData = tdsRows.length ? tdsRows : TDS_ROWS;
+  // Form 16A = TDS certificate. Generate a real downloadable artifact (CSV) for
+  // the vendor's deducted tax rather than a no-op.
+  const generateForm16A = (r: typeof TDS_ROWS[number]) => {
+    exportCsv(
+      `form-16A-${r.vendor.replace(/\s+/g, "-").toLowerCase()}.csv`,
+      [
+        { key: "vendor", label: "Deductee" },
+        { key: "pan", label: "PAN" },
+        { key: "section", label: "Section" },
+        { label: "Rate %", value: (x: any) => `${x.rate}` },
+        { key: "gross", label: "Amount Paid/Credited" },
+        { key: "tds", label: "Tax Deducted (TDS)" },
+        { key: "net", label: "Net Paid" },
+      ],
+      [r],
+    );
+    toast(`Form 16A generated for ${r.vendor}`);
+  };
   return (
     <div>
       <SectionTitle sub="TDS, GST input credit and e-way bills calculated automatically — no manual compliance work, no penalty risk.">Tax Compliance · TDS &amp; GST</SectionTitle>
@@ -22,7 +46,7 @@ export default function Compliance({ toast }: any) {
               {["Vendor", "PAN", "Section · Rate", "Gross", "TDS", "Net paid", "Form 16A"].map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
             </tr></thead>
             <tbody>
-              {TDS_ROWS.map((r) => (
+              {tdsData.map((r) => (
                 <tr key={r.vendor} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                   <td className="px-5 py-3.5 text-slate-700">{r.vendor}</td>
                   <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{r.pan}</td>
@@ -30,7 +54,7 @@ export default function Compliance({ toast }: any) {
                   <td className="px-5 py-3.5"><Money value={r.gross} /></td>
                   <td className="px-5 py-3.5"><Money value={r.tds} className="font-semibold text-amber-600" /></td>
                   <td className="px-5 py-3.5"><Money value={r.net} className="font-semibold text-slate-800" /></td>
-                  <td className="px-5 py-3.5"><button onClick={() => toast(`Form 16A generated for ${r.vendor}`)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><Download size={12} />Generate</button></td>
+                  <td className="px-5 py-3.5"><button onClick={() => generateForm16A(r)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"><Download size={12} />Generate</button></td>
                 </tr>
               ))}
             </tbody>

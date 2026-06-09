@@ -563,10 +563,23 @@ export interface TenantInvoiceRecord {
   customerId: string;
   bookingIds: string[];
   subtotal: number;
+  // GST split by place of supply: intra-state populates cgst+sgst (igst 0),
+  // inter-state populates igst (cgst+sgst 0). igst is optional for back-compat.
   cgst: number;
   sgst: number;
+  igst?: number;
   total: number;
   createdAt: string;
+  // AR lifecycle stage (BRD 4.x). Persisted so finance Approve/Dispute/Correction
+  // stick across renders in embedded mode. Absent ⇒ treated as 'submitted'.
+  stage?: "submitted" | "approved" | "disputed" | "correction";
+  approvedAt?: string | null;
+  dueDate?: string | null;
+  // Customer payment (AR). Absent ⇒ unpaid. A paid invoice no longer counts
+  // toward the customer's credit utilisation (BRD 3.5).
+  paymentStatus?: "unpaid" | "paid";
+  paidAt?: string | null;
+  paidAmount?: number | null;
 }
 
 export interface BookingShipmentDocuments {
@@ -896,6 +909,9 @@ export interface BookingAssignmentInput {
   lrConfigId?: string | null;
   preferredLrNumber?: string | null;
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
+  /** Why the dispatcher bypassed the default L1/lowest contract — required for
+   *  manual assignment (deviation from the recommended contract vendor). */
+  manualAssignmentReason?: string | null;
 }
 
 export interface BookingReassignmentInput {

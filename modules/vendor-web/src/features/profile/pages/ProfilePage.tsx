@@ -5,9 +5,10 @@ import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Card, CardContent, CardHeader, CardTitle } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { Input } from '@vendor/components/ui/input'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
 import { Building, CreditCard, Save, User } from 'lucide-react'
 import { useAuthStore } from '@vendor/stores/auth.store'
+import { useVendorInvoiceProfile } from '@vendor/integration/useVendorInvoiceProfile'
+import type { CompanyInfo } from '@vendor/types'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { Badge } from '@vendor/components/ui/badge'
 
@@ -18,20 +19,9 @@ const PROFILE_TABS: { key: ProfileTab; label: string; path: string; icon: React.
   { key: 'bank', label: 'Bank Details', path: '/vendor/profile/bank', icon: <CreditCard className="h-4 w-4" /> },
 ]
 
-function buildCompanyForm(vendor: ReturnType<typeof useAuthStore.getState>['vendor']) {
-  const source = vendor
-    ? {
-        tradingName: vendor.tradingName,
-        legalName: vendor.legalName,
-        gstin: vendor.gstin,
-        pan: vendor.pan,
-        registeredAddress: MOCK_COMPANY_INFO.registeredAddress,
-        primaryContact: vendor.primaryContact,
-        serviceRegions: vendor.serviceRegions ?? MOCK_COMPANY_INFO.serviceRegions,
-        supportedVehicleTypes: vendor.supportedVehicleTypes ?? MOCK_COMPANY_INFO.supportedVehicleTypes,
-      }
-    : MOCK_COMPANY_INFO
-
+// Company profile shown to the vendor is the tenant-onboarded record (via the
+// invoice profile), so everything matches what prints on the invoice PDF.
+function buildCompanyForm(source: CompanyInfo) {
   return {
     tradingName: source.tradingName,
     legalName: source.legalName,
@@ -60,8 +50,9 @@ export default function ProfilePage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { vendor, updateVendorProfile } = useAuthStore()
+  const invoiceProfile = useVendorInvoiceProfile()
   const activeTab = getProfileTab(location.pathname)
-  const [companyForm, setCompanyForm] = useState(() => buildCompanyForm(vendor))
+  const [companyForm, setCompanyForm] = useState(() => buildCompanyForm(invoiceProfile.companyInfo))
   const completion = vendor?.profileCompletion ?? 0
 
   useEffect(() => {
@@ -71,8 +62,8 @@ export default function ProfilePage() {
   }, [location.pathname, navigate])
 
   useEffect(() => {
-    setCompanyForm(buildCompanyForm(vendor))
-  }, [vendor])
+    setCompanyForm(buildCompanyForm(invoiceProfile.companyInfo))
+  }, [invoiceProfile.companyInfo])
 
   const saveCompany = () => {
     updateVendorProfile({
@@ -166,14 +157,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div>
-              <h4 className="mb-2 text-base font-bold text-text">Service Details</h4>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Service Regions</label><Input value={companyForm.serviceRegions} onChange={(e) => setCompanyForm((prev) => ({ ...prev, serviceRegions: e.target.value }))} className="mt-1" /></div>
-                <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Supported Vehicle Types</label><Input value={companyForm.supportedVehicleTypes} onChange={(e) => setCompanyForm((prev) => ({ ...prev, supportedVehicleTypes: e.target.value }))} className="mt-1" /></div>
-              </div>
-            </div>
-
             <Button onClick={saveCompany}><Save className="mr-1 h-4 w-4" /> Save Changes</Button>
           </CardContent>
         </Card>
@@ -186,12 +169,12 @@ export default function ProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Bank Name</label><Input value={MOCK_BANK.bankName} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label><Input value={MOCK_BANK.branch} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account Number</label><Input value={MOCK_BANK.accountNumber} readOnly className="mt-1 bg-gray-50 font-mono text-gray-500" /></div>
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">IFSC Code</label><Input value={MOCK_BANK.ifscCode} readOnly className="mt-1 bg-gray-50 font-mono text-gray-500" /></div>
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account Type</label><Input value={MOCK_BANK.accountType} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
-              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Supporting Document URL</label><Input value={MOCK_BANK.supportingDocumentUrl ?? ''} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Bank Name</label><Input value={invoiceProfile.bank.bankName} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Branch</label><Input value={invoiceProfile.bank.branch} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account Number</label><Input value={invoiceProfile.bank.accountNumber} readOnly className="mt-1 bg-gray-50 font-mono text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">IFSC Code</label><Input value={invoiceProfile.bank.ifscCode} readOnly className="mt-1 bg-gray-50 font-mono text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Account Type</label><Input value={invoiceProfile.bank.accountType} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
+              <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Supporting Document URL</label><Input value={invoiceProfile.bank.supportingDocumentUrl ?? ''} readOnly className="mt-1 bg-gray-50 text-gray-500" /></div>
             </div>
           </CardContent>
         </Card>

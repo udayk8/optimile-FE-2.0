@@ -3,6 +3,25 @@ import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import type { Invoice, Dispute, InvoiceLineItem } from '@vendor/types'
 
+/**
+ * Trip ids that are locked by an active invoice and therefore NOT re-billable.
+ * A booking is locked the moment an invoice referencing it is raised, and is
+ * released as soon as that invoice is CLOSED (rejected / superseded without a
+ * live replacement). Deriving eligibility from the invoice list — instead of a
+ * mutable per-trip flag — keeps "raise reduces / close increases" consistent.
+ */
+export function invoicedTripIds(invoices: Invoice[]): Set<string> {
+  const ids = new Set<string>()
+  for (const invoice of invoices) {
+    if (invoice.status === 'CLOSED') continue
+    invoice.lineItems.forEach((item) => {
+      if (item.tripId) ids.add(item.tripId)
+    })
+    invoice.tripReferences?.forEach((ref) => ids.add(ref))
+  }
+  return ids
+}
+
 export interface GenerateInvoicePayload {
   tripIds: string[]
   gstRate?: number

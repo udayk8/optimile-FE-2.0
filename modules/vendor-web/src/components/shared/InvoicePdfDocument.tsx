@@ -1,6 +1,7 @@
 import { forwardRef } from 'react'
 import { amountInWords } from '@vendor/lib/pdf'
 import { formatDate } from '@vendor/lib/date-utils'
+import { stateCodeOf } from '@shared-utils'
 import type { BankDetails, CompanyInfo, Invoice, Trip } from '@vendor/types'
 
 /* Transporter freight invoice — classic blue tabular layout (Royal Carriers
@@ -18,11 +19,21 @@ export interface InvoicePdfProps {
   bank: BankDetails
   customerName: string
   customerAddress: string
+  /** Vendor logo (data URL or URL), configured by the tenant at onboarding. */
+  logoUrl?: string
+  /** Declaration / terms lines, configured by the tenant at onboarding. */
+  terms?: string[]
   /** Resolves shared-booking LR numbers when embedded; optional. */
   getLrNumber?: (tripId: string) => string | null
 }
 
-const inr = (n: number) => n.toLocaleString('en-IN')
+const DEFAULT_TERMS = [
+  'No credit is available unless confirmed in writing by our Authorised Signatory.',
+  'Interest @ 18% per annum will be charged on delayed payments past the due date.',
+  'Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted.',
+]
+
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
 
 function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -34,9 +45,12 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 }
 
 export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(function InvoicePdfDocument(
-  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, getLrNumber },
+  // logoUrl is still accepted (configured at onboarding) but intentionally not
+  // rendered on the PDF for now.
+  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, terms, getLrNumber },
   ref,
 ) {
+  const declarationLines = terms && terms.length > 0 ? terms : DEFAULT_TERMS
   const tripById = new Map(trips.map((t) => [t.id, t]))
   const firstTrip = invoice.lineItems.map((li) => tripById.get(li.tripId)).find(Boolean)
 
@@ -45,7 +59,10 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     if (bridgeLr) return bridgeLr
     const doc = tripById.get(tripId)?.documents?.find((d) => d.type === 'LR_COPY')
     if (doc) return doc.fileName.replace(/\.[a-z]+$/i, '').toUpperCase()
-    return '—'
+    // Fallback mock LR for bookings that don't carry one yet — deterministic
+    // from the booking reference so it stays stable per trip.
+    const digits = tripId.replace(/\D/g, '').slice(-6)
+    return `LR-${digits || tripId.toUpperCase()}`
   }
 
   const paymentTermDays = Math.max(
@@ -53,6 +70,17 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     Math.round((new Date(invoice.paymentDueDate).getTime() - new Date(invoice.invoiceDate).getTime()) / 86400000),
   )
   const gstRate = invoice.subtotal > 0 ? Math.round((invoice.gstAmount / invoice.subtotal) * 100) : 0
+  // Place of supply: inter-state -> IGST, intra-state -> CGST+SGST. Prefer the
+  // stored split; fall back to deriving from the two GSTINs for older invoices.
+  const supplierState = stateCodeOf(invoice.vendorGstin)
+  const buyerState = stateCodeOf(invoice.customerGstin)
+  const interState =
+    invoice.igst != null || invoice.cgst != null
+      ? (invoice.igst ?? 0) > 0
+      : !(supplierState && buyerState && supplierState === buyerState)
+  const cgstAmt = invoice.cgst ?? (interState ? 0 : Math.round(invoice.gstAmount / 2))
+  const sgstAmt = invoice.sgst ?? (interState ? 0 : invoice.gstAmount - Math.round(invoice.gstAmount / 2))
+  const igstAmt = invoice.igst ?? (interState ? invoice.gstAmount : 0)
   const addr = companyInfo.registeredAddress
 
   return (
@@ -87,24 +115,18 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           </div>
         </div>
 
-        {/* ── Bill to / client details ── */}
-        <div className="flex border-t-2" style={{ borderColor: BLUE }}>
-          <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
-            <p className="text-[11px] font-semibold text-gray-500">BILL TO :</p>
-            <p className="mt-1 text-base font-extrabold">{customerName}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-gray-700">{customerAddress}</p>
-          </div>
-          <div className="w-1/2 p-4 text-center">
-            <p className="text-[12px] font-bold" style={{ color: BLUE }}>CLIENT DETAILS</p>
-            <p className="mt-1 text-[11px] font-semibold text-gray-700">GSTIN: {invoice.customerGstin}</p>
-          </div>
+        {/* ── Bill to ── */}
+        <div className="border-t-2 p-4" style={{ borderColor: BLUE }}>
+          <p className="text-[11px] font-semibold text-gray-500">BILL TO :</p>
+          <p className="mt-1 text-base font-extrabold">{customerName}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-gray-700">{customerAddress}</p>
         </div>
 
         {/* ── Line items ── */}
         <table className="w-full border-t-2 text-[10px]" style={{ borderColor: BLUE }}>
           <thead>
             <tr className="text-white" style={{ backgroundColor: BLUE }}>
-              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Truck No', 'Origin', 'Destination', 'LR No', 'Qty', 'Freight', 'Advance', 'Detention', 'Loading & Unloading', 'Other', 'Freight Cost'].map((h) => (
+              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Vehicle No', 'Origin', 'Destination', 'LR No', 'Freight Cost', 'Advance', 'Expense', 'Total Cost'].map((h) => (
                 <th key={h} className="border px-1.5 py-2 text-center font-bold" style={{ borderColor: '#C7CBEF' }}>{h}</th>
               ))}
             </tr>
@@ -112,30 +134,29 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           <tbody>
             {invoice.lineItems.map((item, index) => {
               const trip = tripById.get(item.tripId)
+              const expense = trip?.approvedExpenses ?? 0
+              const totalCost = item.lineTotal + expense
               return (
                 <tr key={item.tripId}>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{index + 1}</td>
                   <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{item.tripReference}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip ? formatDate(trip.createdAt) : '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.assignedVehicle.registrationNumber ?? '—'}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{(trip?.assignedVehicle.registrationNumber ?? '—').replace(/\s*\(.*\)\s*$/, '')}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.laneDetails.origin.city ?? '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.laneDetails.destination.city ?? '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>1</td>
                   <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(item.lineTotal)}</td>
+                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(trip?.advance ?? 0)}</td>
+                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(expense)}</td>
+                  <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
               )
             })}
             {/* filler rows so short invoices still look like the printed form */}
             {Array.from({ length: Math.max(0, 3 - invoice.lineItems.length) }).map((_, i) => (
               <tr key={`filler-${i}`}>
-                {Array.from({ length: 15 }).map((__, j) => (
+                {Array.from({ length: 12 }).map((__, j) => (
                   <td key={j} className="border px-1.5 py-3" style={{ borderColor: '#C7CBEF' }}>&nbsp;</td>
                 ))}
               </tr>
@@ -153,18 +174,23 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
               <span className="text-gray-700">Taxable Value</span>
               <span className="font-semibold">{inr(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
-              <span className="text-gray-700">IGST @ {gstRate}%</span>
-              <span className="font-semibold">{inr(invoice.gstAmount)}</span>
-            </div>
-            <div className="flex justify-between border-b px-4 py-2 text-gray-400" style={{ borderColor: '#C7CBEF' }}>
-              <span>CGST @ {gstRate / 2}%</span>
-              <span>–</span>
-            </div>
-            <div className="flex justify-between border-b px-4 py-2 text-gray-400" style={{ borderColor: '#C7CBEF' }}>
-              <span>SGST @ {gstRate / 2}%</span>
-              <span>–</span>
-            </div>
+            {interState ? (
+              <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                <span className="text-gray-700">IGST @ {gstRate}%</span>
+                <span className="font-semibold">{inr(igstAmt)}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                  <span className="text-gray-700">CGST @ {gstRate / 2}%</span>
+                  <span className="font-semibold">{inr(cgstAmt)}</span>
+                </div>
+                <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                  <span className="text-gray-700">SGST @ {gstRate / 2}%</span>
+                  <span className="font-semibold">{inr(sgstAmt)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between px-4 py-2 text-[12px] font-extrabold" style={{ backgroundColor: '#EEF0FB' }}>
               <span>Total Invoice Value</span>
               <span>{inr(invoice.grandTotal)}</span>
@@ -185,10 +211,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
               <div className="flex"><span className="w-44 text-gray-500">Make all Cheques payable to:</span><span className="font-semibold">{companyName}</span></div>
             </div>
           </div>
-          <div className="flex w-1/2 flex-col justify-between p-4 text-[11px]">
-            <p className="text-right">For <span className="font-bold">{companyName}</span></p>
-            <p className="text-right text-gray-500">(Authorised Signatory)</p>
-          </div>
+          <div className="flex w-1/2 flex-col justify-between p-4 text-[11px]" />
         </div>
 
         {/* ── Declaration ── */}
@@ -196,9 +219,9 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           DECLARATION
         </div>
         <div className="p-4 text-[10px] leading-relaxed text-gray-700">
-          <p>No credit is available unless confirmed in writing by our Authorised Signatory.</p>
-          <p>Interest @ 18% per annum will be charged on delayed payments past the due date.</p>
-          <p>Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted.</p>
+          {declarationLines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
           <p className="mt-2 text-center font-semibold" style={{ color: BLUE }}>This is a Computer Generated Invoice</p>
         </div>
       </div>

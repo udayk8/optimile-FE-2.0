@@ -208,7 +208,6 @@ export function TenantDashboardPage() {
     { label: "Vehicle Types", value: 0, to: paths.vehicleTypes, feature: "VEHICLE_TYPES" },
     { label: "Materials", value: 0, to: paths.materials, feature: "MATERIALS" },
     { label: "UOM", value: 0, to: paths.uomConfig, feature: "UOM" },
-    { label: "Address Book", value: bookingSetup.addressCount, to: paths.addressBook, feature: "ADDRESS_BOOK" },
   ].filter((item) => can(item.feature));
 
   const operationalRules = [
@@ -256,7 +255,6 @@ export function TenantDashboardPage() {
     ...(can("LR_CONFIGURATION") ? [{ label: "Configure LR", icon: FileDigit, to: paths.lrConfig }] : []),
     ...(can("VEHICLE_TYPES") ? [{ label: "Vehicle Types", icon: Truck, to: paths.vehicleTypes }] : []),
     ...(can("MATERIALS") ? [{ label: "Add Material", icon: Package, to: paths.materials }] : []),
-    ...(can("ADDRESS_BOOK") ? [{ label: "Address Book", icon: MapPin, to: paths.addressBook }] : []),
     ...(can("DOCUMENT_RULES") ? [{ label: "Document Rules", icon: ScrollText, to: paths.documentRules }] : []),
     // Booking operations — surface for operational roles who don't see admin actions.
     ...(can("BOOKING_DASHBOARD") ? [{ label: "Booking Dashboard", icon: Truck, to: paths.bookings }] : []),

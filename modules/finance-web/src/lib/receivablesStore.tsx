@@ -117,6 +117,20 @@ export interface ARInvoice {
   // present only for bridged invoices whose booking has a contract/spot source).
   commercialType?: 'SPOT' | 'CONTRACT'
   rateCard?: RateCardDescriptor
+  // 3PL profit rollup across the invoice's bookings: selling (customer freight),
+  // buying (vendor freight) and margin (selling − buying). Present only when at
+  // least one booking has a vendor assigned; absent for mock/standalone invoices.
+  sellingFreight?: number
+  buyingFreight?: number
+  margin?: number
+  // Customer payment (AR) — set on bridged invoices. 'paid' invoices leave the
+  // client's live credit utilisation (BRD 3.5).
+  paymentStatus?: 'unpaid' | 'paid'
+  paidAt?: string
+  // Customer GSTIN (bridged invoices). Its state code is the place of supply that
+  // decides IGST vs CGST+SGST on the printable invoice. Absent for standalone
+  // mock invoices, which then fall back to inter-state (IGST).
+  customerGstin?: string
 }
 
 export interface LedgerEntry {
@@ -447,15 +461,21 @@ export function useReceivables() {
       trips: bridge.trips,
       invoices: bridge.invoices,
       series: state.series,
-      arLedger: state.arLedger,
+      // Real AR ledger from the bridge (Invoice + Payment rows); fall back to the
+      // local ledger if the bridge doesn't supply one.
+      arLedger: bridge.arLedger ?? state.arLedger,
       uploadPod: bridge.uploadPod,
       validatePod: bridge.validatePod,
       generateDraftInvoice: (tripId: string) => bridge.generateInvoice([tripId]),
       generateConsolidatedInvoice: (tripIds: string[]) => bridge.generateInvoice(tripIds),
+      recordPayment: bridge.recordPayment,
       addAccessorial: store.addAccessorial,
       removeAccessorial: store.removeAccessorial,
-      submitInvoice: store.submitInvoice,
-      clientDecision: store.clientDecision,
+      // AR lifecycle now persists via the shared store (bridge), so finance
+      // Submit/Approve/Correction/Dispute decisions stick across renders.
+      submitInvoice: (invoiceId: string) => bridge.submitInvoice?.(invoiceId),
+      clientDecision: (invoiceId: string, decision: 'approve' | 'correction' | 'dispute') =>
+        bridge.decideInvoice?.(invoiceId, decision),
       allocate: store.allocate,
       addSeries: store.addSeries,
       updateSeries: store.updateSeries,
@@ -477,5 +497,7 @@ export function useReceivables() {
     addSeries: store.addSeries,
     updateSeries: store.updateSeries,
     resetFinancialYear: store.resetFinancialYear,
+    // No payment write-back in standalone (mock) mode.
+    recordPayment: undefined as ((invoiceId: string) => void) | undefined,
   }
 }

@@ -37,6 +37,8 @@ import {
   validateVendorRateCard,
 } from "@/modules/tms/booking/services/booking-selectors";
 import { VendorContractComparison } from "@/modules/tms/booking/components/VendorContractComparison";
+import { cityLaneKey, contractCityLaneKey } from "@shared-utils";
+import { loadStore as loadAuctionStore } from "@auction/lib/auction-store";
 import { normalizeRateMatchingConfig } from "@/shared/lib/rate-matching-config";
 import {
   buildDeliveryRevisionRecord,
@@ -184,6 +186,7 @@ export function BookingDetailsPage() {
   const { data: orgUnits } = useTenantOrgUnits(tenant.id);
   const access = useTenantAccess();
   const {
+    data: allBookings,
     getBookingById,
     transitionBooking,
     updateBooking,
@@ -203,6 +206,8 @@ export function BookingDetailsPage() {
   const [cancellationReason, setCancellationReason] = useState("");
   // Contract Vendor (auto-match + comparison) vs Manual Assignment. Default Contract.
   const [assignMethod, setAssignMethod] = useState<"CONTRACT" | "MANUAL">("CONTRACT");
+  // Reason required when bypassing the default L1/lowest contract (manual assign).
+  const [manualReason, setManualReason] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
@@ -436,14 +441,59 @@ export function BookingDetailsPage() {
           distanceKm: assignDistanceKm,
           preferredRateType: bookingRecord.pricing.rateType,
         },
+        // Trips already fulfilled by a vendor on the lane → drives trips-remaining.
+        completedTrips: (vendorId, fromCity, toCity) => {
+          const norm = (value?: string | null) => (value ?? "").trim().toLowerCase();
+          return allBookings.filter((b) => {
+            if (getPrimaryBookingStatus(b.status) !== "COMPLETED") return false;
+            if ((b.assignment?.vendorId ?? null) !== vendorId) return false;
+            const src = addressMap.get(b.sourceAddressId)?.city;
+            const dst = addressMap.get(b.destinationAddressId)?.city;
+            return norm(src) === norm(fromCity) && norm(dst) === norm(toCity);
+          }).length;
+        },
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode],
+    [adminSources.vendors, adminSources.vendorRateCardMap, customerFreight, bookingRecord, assignSourceAddress, assignDestinationAddress, assignVehicleTypeCode, assignMaterialCode, allBookings, addressMap],
   );
+
+  // L1 / lowest-rate contract(s). vendorComparison is sorted cheapest-first, so
+  // the first entry's freight is the best rate; ties (multiple vendors at that
+  // exact rate) are ALL treated as L1 — any of them is a no-remark default pick.
+  const lowestVendorFreight = vendorComparison[0]?.vendorFreight ?? null;
+  const l1Entries = vendorComparison.filter((entry) => entry.vendorFreight === lowestVendorFreight);
+  const l1RateCardIds = l1Entries.map((entry) => entry.rateCardId);
 
   // Contract Vendor indent stage. The booking stays PENDING_ASSIGNMENT throughout;
   // the stage is derived from the vendor indents (send → pending → accepted/rejected).
   const isSpotBooking = bookingRecord.commercialType === "SPOT";
+  // Active, unconsumed spot auction contracts on this lane — a one-time contract
+  // with a locked price. When present, the dispatcher sends the indent to that
+  // vendor instead of broadcasting to all.
+  const spotContractMatches = useMemo(() => {
+    if (!isSpotBooking) return [] as Array<{ contractId: string; vendorId: string; vendorName: string; rate: number }>;
+    const origin = assignSourceAddress?.city;
+    const destination = assignDestinationAddress?.city;
+    if (!origin || !destination) return [];
+    const laneKey = cityLaneKey(origin, destination);
+    const today = new Date().toISOString().slice(0, 10);
+    return loadAuctionStore()
+      .contracts.filter(
+        (contract) =>
+          contract.contractType === "SPOT" &&
+          contract.status === "ACTIVE" &&
+          !contract.consumedByBookingId &&
+          contractCityLaneKey(contract) === laneKey &&
+          contract.endDate >= today,
+      )
+      .map((contract) => ({
+        contractId: contract.id,
+        vendorId: contract.vendorId,
+        vendorName: contract.vendorName,
+        rate: contract.contractedRate,
+      }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSpotBooking, assignSourceAddress?.city, assignDestinationAddress?.city]);
   const myBookingIndents = listBookingVendorIndents(tenant.id).filter((indent) => indent.bookingId === bookingRecord.id);
   const winnerIndent = myBookingIndents.find((indent) => indent.isWinner && indent.status === "ACCEPTED") ?? null;
   const pendingIndent = myBookingIndents.find((indent) => indent.status === "PENDING") ?? null;
@@ -455,7 +505,7 @@ export function BookingDetailsPage() {
   const winnerIndentBuyingRate =
     winnerIndent?.buyingRate ?? vendorComparison.find((entry) => entry.vendorId === winnerIndent?.vendorId)?.vendorFreight ?? null;
 
-  function sendIndentToVendor(targetVendorId: string) {
+  function sendIndentToVendor(targetVendorId: string, reason?: string) {
     const entry = vendorComparison.find((item) => item.vendorId === targetVendorId);
     try {
       sendBookingVendorIndent(
@@ -465,6 +515,24 @@ export function BookingDetailsPage() {
         orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
         targetVendorId,
         entry?.vendorFreight ?? null,
+        undefined,
+        reason ?? null,
+      );
+    } catch (error) {
+      window.alert((error as Error).message);
+    }
+  }
+  // Spot bookings: send the indent to the spot-contract vendor (locked one-time
+  // rate) when one exists, or broadcast to all vendors (targetVendorId = null).
+  function sendSpotIndent(targetVendorId: string | null, buyingRate: number | null) {
+    try {
+      sendBookingVendorIndent(
+        bookingRecord.id,
+        session.actorName || "Dispatcher",
+        session.activeTenantOrgUnitId ?? null,
+        orgUnits.find((unit) => unit.id === session.activeTenantOrgUnitId)?.name ?? null,
+        targetVendorId,
+        buyingRate,
       );
     } catch (error) {
       window.alert((error as Error).message);
@@ -869,6 +937,7 @@ export function BookingDetailsPage() {
       setMatchedVendorRateCardId(null);
       setMatchedVendorRateType(null);
       setBuyingRateLabel(null);
+      setManualReason("");
       setPreferredLrNumber("");
       if (bookingRecord.lrType === "AUTO") {
         setSelectedLrMode("AUTO");
@@ -1529,6 +1598,11 @@ export function BookingDetailsPage() {
       if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
         return;
       }
+    // Manual assignment on a contract booking bypasses the default L1/lowest
+    // contract — reason required.
+    if (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) {
+      return;
+    }
     const assignment: BookingAssignmentInput = {
       vendorId: normalizedVendorId,
       vendorName: vendorId === OWN_FLEET_VENDOR ? "Own Fleet" : vendorMap.get(vendorId)?.name ?? "Vendor",
@@ -1555,6 +1629,7 @@ export function BookingDetailsPage() {
         lrConfigId: selectedAssignmentLrConfig?.id ?? null,
         preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
+        manualAssignmentReason: assignMethod === "MANUAL" && !isSpotBooking ? manualReason.trim() : null,
       };
     assignBooking(bookingRecord.id, assignment);
     resetAssignmentDialog();
@@ -3573,6 +3648,7 @@ export function BookingDetailsPage() {
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
                   (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) ||
                   !activeLrOrgUnitId
                 }
             >
@@ -3599,12 +3675,13 @@ export function BookingDetailsPage() {
             </div>
           ) : (
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              Spot booking — enter the spot vendor rate and assign manually below.
+              Spot booking — send the indent to the spot-contract vendor (if any), or assign manually below.
             </div>
           )}
 
-          {/* CONTRACT mode is staged by indent: recommend → send → pending → accepted. */}
-          {assignMethod === "CONTRACT" && !isSpotBooking ? (
+          {/* CONTRACT mode is staged by indent: recommend → send → pending → accepted.
+              SPOT bookings reuse the same indent stage (spot-contract vendor recommendation). */}
+          {assignMethod === "CONTRACT" || isSpotBooking ? (
             winnerIndent ? (
               <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                 <span className="font-semibold">{winnerIndent.vendorName}</span> accepted the indent
@@ -3630,24 +3707,84 @@ export function BookingDetailsPage() {
                   <Button size="sm" variant="outline" onClick={cancelPendingIndent}>Cancel Indent</Button>
                 </div>
               </div>
+            ) : isSpotBooking ? (
+              // Spot: recommend the one-time spot-contract vendor(s) for the lane;
+              // send the indent to that vendor, else broadcast to all / assign manually.
+              <div className="space-y-2">
+                {spotContractMatches.length ? (
+                  <>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Spot auction contract available on this lane — send the indent to the contract vendor
+                    </p>
+                    <div className="overflow-hidden rounded-xl border">
+                      {spotContractMatches.map((match) => (
+                        <div key={match.contractId} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-3 py-2 text-sm last:border-b-0">
+                          <div>
+                            <span className="font-semibold">{match.vendorName}</span>
+                            <span className="ml-2 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Spot · one-time</span>
+                            <span className="ml-2 text-xs text-muted-foreground">Rs {match.rate.toLocaleString()} · {match.contractId}</span>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={rejectedIndentVendorIds.includes(match.vendorId)}
+                            onClick={() => sendSpotIndent(match.vendorId, match.rate)}
+                          >
+                            {rejectedIndentVendorIds.includes(match.vendorId) ? "Rejected" : "Send Indent"}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">Or assign manually below.</p>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      No spot auction contract for this lane. Send the indent to all vendors, or assign manually below.
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => sendSpotIndent(null, null)}>
+                      Send Indent to all vendors
+                    </Button>
+                  </div>
+                )}
+              </div>
             ) : (
-              <VendorContractComparison
-                entries={vendorComparison}
-                selectedVendorId=""
-                onSelect={sendIndentToVendor}
-                actionLabel="Send Indent"
-                mutedVendorIds={rejectedIndentVendorIds}
-                showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
-                showCustomerFreight={false}
-                header={{
-                  route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
-                  customerFreight,
-                  vehicleType: assignVehicleTypeCode ?? "-",
-                  material: assignMaterialCode ?? "-",
-                }}
-              />
+              <div className="space-y-2">
+                {/* All matching contracts on the lane are shown, cheapest-first.
+                    L1 = lowest-rate contract(s) (ties included) — sent with one
+                    click. A higher-rate vendor opens a remark modal first. */}
+                <VendorContractComparison
+                  entries={vendorComparison}
+                  selectedRateCardId={null}
+                  recommendedRateCardIds={l1RateCardIds}
+                  enableRemark
+                  onSelect={(targetVendorId, _rateCardId, remark) => {
+                    // L1 vendors send with one click (remark optional); higher-rate
+                    // vendors are gated by the inline remark inside the comparison.
+                    sendIndentToVendor(targetVendorId, remark);
+                  }}
+                  actionLabel="Send Indent"
+                  mutedVendorIds={rejectedIndentVendorIds}
+                  showMargin={access.can("BOOKING_DETAIL", "VIEW_MARGIN")}
+                  showCustomerFreight={false}
+                  header={{
+                    route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
+                    customerFreight,
+                    vehicleType: assignVehicleTypeCode ?? "-",
+                    material: assignMaterialCode ?? "-",
+                  }}
+                />
+                {vendorComparison.length ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    {l1Entries.length > 1
+                      ? `${l1Entries.length} vendors tie at the lowest rate (L1) — send the indent to any of them with one click. `
+                      : "The lowest-rate (L1) contract is the default — one click to send. "}
+                    Choosing a higher-rate vendor needs a remark.
+                  </p>
+                ) : null}
+              </div>
             )
           ) : null}
+
 
           {showAssignmentFields ? (
           <>
@@ -3669,6 +3806,17 @@ export function BookingDetailsPage() {
                     <Input value={vendorMap.get(vendorId)?.name ?? "Contract vendor"} disabled />
                   )}
                 </CompactField>
+                {assignMethod === "MANUAL" && !isSpotBooking ? (
+                  <CompactField label="Reason for manual assignment *">
+                    <textarea
+                      value={manualReason}
+                      onChange={(event) => setManualReason(event.target.value)}
+                      rows={2}
+                      placeholder="Why are you not using the recommended L1 / lowest-rate contract?"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+                    />
+                  </CompactField>
+                ) : null}
                 <CompactField label="Vehicle">
                   <Select value={vehicleId} onChange={(event) => { setVehicleId(event.target.value); setDriverId(""); }} disabled={!vendorId}>
                     <option value="">Select vehicle</option>

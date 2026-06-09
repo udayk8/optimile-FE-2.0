@@ -29,9 +29,9 @@ export const MOCK_DASHBOARD: DashboardData = {
   pendingIndents: {
     count: 3,
     items: [
-      { id: 'BKG-2026-1001', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1002', contractId: 'CNT-002', originCity: 'Bengaluru', destinationCity: 'Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
-      { id: 'BKG-2026-1003', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 14400000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1001', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chandausi', vehicleType: 'MGV', reportingDate: '2026-04-26T06:00:00Z', slaDeadline: new Date(Date.now() + 7200000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1002', contractId: 'CNT-002', originCity: 'Bengaluru', destinationCity: 'Hyderabad', vehicleType: 'MGV', reportingDate: '2026-04-27T08:00:00Z', slaDeadline: new Date(Date.now() + 5400000).toISOString(), status: 'PENDING' },
+      { id: 'BKG-2026-1003', contractId: 'CNT-001', originCity: 'Bengaluru', destinationCity: 'Chennai', vehicleType: 'MGV', reportingDate: '2026-04-28T10:00:00Z', slaDeadline: new Date(Date.now() + 3600000).toISOString(), status: 'PENDING' },
     ],
   },
   uninvoicedBookings: { count: 4, totalBillableAmount: 285000 },
@@ -80,7 +80,7 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
     driver: 'Kartik Pawar',
     issueType: 'Delay',
     severity: 'HIGH',
-    status: 'ACKNOWLEDGED',
+    status: 'IN_PROGRESS',
     slaDueAt: '2026-05-06T14:30:00Z',
     createdAt: '2026-05-06T10:02:00Z',
     updatedAt: '2026-05-06T10:11:00Z',
@@ -140,7 +140,7 @@ export const MOCK_EXCEPTIONS: ExceptionRecord[] = [
     driver: 'Kartik Pawar',
     issueType: 'Delay',
     severity: 'HIGH',
-    status: 'CLOSED',
+    status: 'RESOLVED',
     slaDueAt: '2026-05-03T15:10:00Z',
     createdAt: '2026-05-03T11:20:00Z',
     updatedAt: '2026-05-03T15:30:00Z',
@@ -407,21 +407,24 @@ export const MOCK_INDENTS: Indent[] = [
     laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chandausi', city: 'Chandausi', state: '' }, distanceKm: 1980 },
     loadDetails: { commodity: 'Cargo', weightKg: 18000, volumeCbm: 32 },
     vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-26T06:00:00Z',
-    slaDeadline: new Date(Date.now() + 3600000).toISOString(), createdAt: new Date(Date.now() - 1800000).toISOString(),
+    // SLA = 2h from when indent was sent (createdAt). Just sent → full 2h to respond.
+    slaDeadline: new Date(Date.now() + 7200000).toISOString(), createdAt: new Date().toISOString(),
   },
   {
     id: 'BKG-2026-1002', contractId: 'CNT-002', contractReference: 'Shree Cements', status: 'PENDING',
     laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Hyderabad', city: 'Hyderabad', state: '' }, distanceKm: 570 },
     loadDetails: { commodity: 'Cargo', weightKg: 12000, volumeCbm: 40 },
     vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-27T08:00:00Z',
-    slaDeadline: new Date(Date.now() + 7200000).toISOString(), createdAt: new Date(Date.now() - 3600000).toISOString(),
+    // Sent 30m ago → 90m left on the 2h SLA.
+    slaDeadline: new Date(Date.now() + 5400000).toISOString(), createdAt: new Date(Date.now() - 1800000).toISOString(),
   },
   {
     id: 'BKG-2026-1003', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'PENDING',
     laneDetails: { origin: { name: 'Bengaluru', city: 'Bengaluru', state: '' }, destination: { name: 'Chennai', city: 'Chennai', state: '' }, distanceKm: 350 },
     loadDetails: { commodity: 'Cargo', weightKg: 5000, volumeCbm: 15 },
     vehicleTypeRequired: 'MGV', reportingDateTime: '2026-04-28T10:00:00Z',
-    slaDeadline: new Date(Date.now() + 14400000).toISOString(), createdAt: new Date(Date.now() - 7200000).toISOString(),
+    // Sent 1h ago → 60m left on the 2h SLA.
+    slaDeadline: new Date(Date.now() + 3600000).toISOString(), createdAt: new Date(Date.now() - 3600000).toISOString(),
   },
   {
     id: 'BKG-2026-1004', contractId: 'CNT-001', contractReference: 'Kanodia Cements', status: 'DECLINED',

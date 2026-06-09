@@ -3,6 +3,7 @@ import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/ho
 import { useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -59,16 +60,27 @@ export default function SourcingPage() {
   }, [bridgeAuctions, storeAuctions])
   const activeTab = getSourcingTab(location.search)
   const [page, setPage] = useState(1)
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
 
-  const displayedAuctions = useMemo(
-    () =>
+  const displayedAuctions = useMemo(() => {
+    const byTab =
       activeTab === 'ALL'
         ? auctions
         : activeTab === 'ENDED'
           ? auctions.filter((auction) => ENDING_STATES.includes(auction.state))
-          : auctions.filter((auction) => auction.state === activeTab),
-    [activeTab, auctions]
-  )
+          : auctions.filter((auction) => auction.state === activeTab)
+    const q = searchText.trim().toLowerCase()
+    return byTab.filter((auction) => {
+      const created = ((auction as { createdAt?: string }).createdAt ?? '').slice(0, 10)
+      if (fromDate && created < fromDate) return false
+      if (toDate && created > toDate) return false
+      if (q && ![auction.id, (auction as { customerName?: string }).customerName].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [activeTab, auctions, fromDate, toDate, searchText])
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(displayedAuctions.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -91,7 +103,20 @@ export default function SourcingPage() {
         icon={<Search className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mb-6 mt-6 flex max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+      <div className="mt-6">
+        <PageFilterBar
+          search={searchText}
+          onSearch={(v) => { setSearchText(v); setPage(1) }}
+          searchPlaceholder="Search auction id / customer…"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDate={(v) => { setFromDate(v); setPage(1) }}
+          onToDate={(v) => { setToDate(v); setPage(1) }}
+          onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
+        />
+      </div>
+
+      <div className="mb-6 mt-4 flex max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}

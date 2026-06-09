@@ -9,10 +9,8 @@ import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/ho
 
 const STATUS_OPTIONS: Array<{ value: ExceptionStatus; label: string }> = [
   { value: 'OPEN', label: 'Open' },
-  { value: 'ACKNOWLEDGED', label: 'Acknowledged' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'RESOLVED', label: 'Resolved' },
-  { value: 'CLOSED', label: 'Closed' },
 ]
 
 const SEVERITY_COLOR: Record<string, string> = {
@@ -24,10 +22,8 @@ const SEVERITY_COLOR: Record<string, string> = {
 
 const STATUS_COLOR: Record<string, string> = {
   OPEN: 'bg-red-100 text-red-700',
-  ACKNOWLEDGED: 'bg-blue-100 text-blue-700',
   IN_PROGRESS: 'bg-amber-100 text-amber-700',
   RESOLVED: 'bg-green-100 text-green-700',
-  CLOSED: 'bg-gray-100 text-gray-600',
 }
 
 function formatDateTime(iso: string) {

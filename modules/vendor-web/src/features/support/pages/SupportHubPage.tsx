@@ -1,22 +1,21 @@
 import { useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { formatDateTime } from '@vendor/lib/date-utils'
 
 const PAGE_SIZE = 6
 
-const STATE_FILTERS: Array<'ALL' | ExceptionStatus> = ['ALL', 'OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
+const STATE_FILTERS: Array<'ALL' | ExceptionStatus> = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED']
 const STATUS_ORDER: Record<ExceptionStatus, number> = {
   OPEN: 0,
-  ACKNOWLEDGED: 1,
-  IN_PROGRESS: 2,
-  RESOLVED: 3,
-  CLOSED: 4,
+  IN_PROGRESS: 1,
+  RESOLVED: 2,
 }
 const SEVERITY_ORDER: Record<ExceptionRecord['severity'], number> = {
   CRITICAL: 0,
@@ -32,6 +31,9 @@ export default function SupportHubPage() {
   const exceptions = useAppStore((state) => state.exceptions)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | ExceptionStatus>('ALL')
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
 
   const filteredExceptions = useMemo(() => {
@@ -44,7 +46,9 @@ export default function SupportHubPage() {
               value.toLowerCase().includes(query),
             )
           : true
-        return matchesStatus && matchesSearch
+        const created = (item.createdAt ?? '').slice(0, 10)
+        const matchesDate = (!fromDate || created >= fromDate) && (!toDate || created <= toDate)
+        return matchesStatus && matchesSearch && matchesDate
       })
       .sort((a, b) => {
         const severityDiff = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
@@ -53,16 +57,16 @@ export default function SupportHubPage() {
         if (statusDiff !== 0) return statusDiff
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       })
-  }, [exceptions, search, statusFilter])
+  }, [exceptions, search, statusFilter, fromDate, toDate])
 
   const totalPages = Math.max(1, Math.ceil(filteredExceptions.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pageItems = filteredExceptions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const openCount = exceptions.filter((item) => item.status === 'OPEN').length
-  const activeCount = exceptions.filter((item) => item.status === 'ACKNOWLEDGED' || item.status === 'IN_PROGRESS').length
-  const resolvedCount = exceptions.filter((item) => item.status === 'RESOLVED' || item.status === 'CLOSED').length
-  const breachedCount = exceptions.filter((item) => item.severity === 'CRITICAL' && item.status !== 'CLOSED').length
+  const activeCount = exceptions.filter((item) => item.status === 'IN_PROGRESS').length
+  const resolvedCount = exceptions.filter((item) => item.status === 'RESOLVED').length
+  const breachedCount = exceptions.filter((item) => item.severity === 'CRITICAL' && item.status !== 'RESOLVED').length
 
   return (
     <div className="space-y-6">
@@ -76,7 +80,7 @@ export default function SupportHubPage() {
       <div className="grid gap-4 md:grid-cols-4">
         {[
           { label: 'Open', value: openCount, note: 'Newly reported or waiting to be handled.' },
-          { label: 'Active', value: activeCount, note: 'Acknowledged or in progress cases.' },
+          { label: 'Active', value: activeCount, note: 'Cases currently in progress.' },
           { label: 'Resolved', value: resolvedCount, note: 'Completed exceptions kept for history.' },
           { label: 'Critical', value: breachedCount, note: 'Top severity items surface first automatically.' },
         ].map((item) => (
@@ -88,30 +92,27 @@ export default function SupportHubPage() {
         ))}
       </div>
 
+      <PageFilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Search exception, booking, route, driver"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
+      />
+
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-text">Exception Workspace</h3>
             <p className="mt-1 text-sm text-gray-500">Create, track, and resolve booking-linked incidents from one table.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search exception, booking, route, driver"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:bg-white sm:w-[300px]"
-              />
-            </div>
-            <Button variant="outline" onClick={() => navigate('/vendor/report-exception')}>
-              Report Exception
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => navigate('/vendor/report-exception')}>
+            Report Exception
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">

@@ -21,6 +21,10 @@ import type {
   Vehicle as VendorVehicle,
 } from "@vendor/types";
 
+// Vendor has 2h from when an indent is sent to accept/reject it. After that the
+// indent lapses and disappears from the vendor portal (tenant assigns manually).
+const INDENT_SLA_MS = 2 * 60 * 60 * 1000;
+
 // ── Booking status → Vendor Portal trip status ───────────────────────────────
 // A booking carries a vendor only from VEHICLE_ASSIGNED onward (assignment time).
 // Granular map so the vendor sees the booking walk through Assigned → Loading →
@@ -212,12 +216,21 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       booking.vehicleTypeId ? typeLabelById.get(booking.vehicleTypeId) ?? "—" : "—";
 
     // 1) Incoming Indents — PENDING indents addressed to this vendor.
-    const myPendingIndents = vendorIndents.filter((i) => i.vendorId === vendorId && i.status === "PENDING");
+    // SLA = 2h from when the indent was sent. Once it lapses the indent
+    // disappears from the vendor portal entirely; the booking falls back to the
+    // tenant team to assign a vehicle manually.
+    const now = Date.now();
+    const myPendingIndents = vendorIndents.filter(
+      (i) =>
+        i.vendorId === vendorId &&
+        i.status === "PENDING" &&
+        Date.parse(i.sentAt) + INDENT_SLA_MS > now,
+    );
     const bookingIndents: VendorIndent[] = myPendingIndents
       .map((indent) => {
         const booking = bookingById.get(indent.bookingId);
         if (!booking) return null;
-        return toVendorIndent(booking, customerNameById.get(booking.customerId) ?? "Customer", vtLabel(booking));
+        return toVendorIndent(booking, customerNameById.get(booking.customerId) ?? "Customer", vtLabel(booking), indent.sentAt);
       })
       .filter((value): value is VendorIndent => value !== null);
 
@@ -409,6 +422,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       pdfUrl: r.pdfUrl,
       tripReferences: r.tripReferences,
       createdAt: r.createdAt,
+      statusUpdatedAt: r.statusUpdatedAt ?? r.createdAt,
     }));
     const vendorDisputes: VendorDispute[] = myInvoiceRecords
       .filter((r) => r.dispute)
@@ -426,6 +440,40 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       }));
 
     const vendorRec = vendorId ? getTenantVendorById(vendorId) : null;
+
+    // Invoice-document profile the vendor PDF reads — sourced entirely from the
+    // tenant-configured vendor master record (company, GST/PAN, address, bank,
+    // terms, logo). Nothing is hardcoded in the portal.
+    const invoiceProfile = vendorRec
+      ? {
+          companyName: vendorRec.name,
+          companyInfo: {
+            tradingName: vendorRec.name,
+            legalName: vendorRec.legalName ?? vendorRec.name,
+            registeredAddress: parseVendorAddress(vendorRec.address),
+            gstin: vendorRec.gstin ?? vendorRec.gstNumber ?? "",
+            pan: vendorRec.pan ?? "",
+            primaryContact: {
+              name: vendorRec.contactPerson ?? "",
+              phone: vendorRec.phone ?? vendorRec.contactNumber ?? "",
+              email: vendorRec.email ?? "",
+            },
+            serviceRegions: vendorRec.serviceableLocations ?? [],
+            supportedVehicleTypes: vendorRec.supportedVehicleTypes ?? [],
+          },
+          bank: {
+            bankName: vendorRec.bankName ?? "",
+            branch: vendorRec.branch ?? "",
+            accountNumber: vendorRec.accountNumber ?? "",
+            ifscCode: vendorRec.ifscCode ?? "",
+            accountType: vendorRec.accountType ?? "CURRENT",
+          },
+          terms: vendorRec.invoiceTerms ?? [],
+          logoUrl: vendorRec.logoUrl,
+          status: vendorRec.status,
+        }
+      : null;
+
     const submitInvoice = (payload: VendorInvoiceSubmitPayload) => {
       if (!vendorId) return;
       const now = new Date().toISOString();
@@ -448,6 +496,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
         tripReferences: payload.tripReferences,
         billingPeriod: payload.billingPeriod,
         createdAt: now,
+        statusUpdatedAt: now,
       });
     };
 
@@ -456,6 +505,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       tenantName,
       vendorId,
       vendorName,
+      invoiceProfile,
       vehicles,
       drivers,
       addVehicle,
@@ -495,6 +545,22 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
 }
 
 // ── Mapping helpers ──────────────────────────────────────────────────────────
+// The vendor master stores address as a single comma-delimited string; the
+// invoice PDF wants {street, city, state, pincode}. Best-effort split: pincode
+// is the 6-digit token, state/city are the last two remaining parts.
+function parseVendorAddress(address?: string): { street: string; city: string; state: string; pincode: string } {
+  const raw = (address ?? "").trim();
+  const pincode = raw.match(/\b(\d{6})\b/)?.[1] ?? "";
+  const parts = raw
+    .split(",")
+    .map((part) => part.replace(/\b\d{6}\b/, "").trim())
+    .filter(Boolean);
+  const state = parts.at(-1) ?? "";
+  const city = parts.length >= 2 ? parts.at(-2)! : "";
+  const street = parts.length > 2 ? parts.slice(0, -2).join(", ") : parts[0] ?? raw;
+  return { street, city, state, pincode };
+}
+
 function toVendorVehicle(vehicle: TenantVehicle, typeLabel: string): VendorVehicle {
   return {
     id: vehicle.id,
@@ -625,7 +691,12 @@ function laneOf(booking: BookingRecord): VendorLaneDetails {
   };
 }
 
-function toVendorIndent(booking: BookingRecord, customerName: string, vehicleTypeLabel: string): VendorIndent {
+function toVendorIndent(
+  booking: BookingRecord,
+  customerName: string,
+  vehicleTypeLabel: string,
+  sentAt: string,
+): VendorIndent {
   return {
     id: booking.bookingId,
     contractId: booking.id,
@@ -634,9 +705,10 @@ function toVendorIndent(booking: BookingRecord, customerName: string, vehicleTyp
     loadDetails: { commodity: "Cargo", weightKg: (booking.weight ?? 0) * 1000, volumeCbm: 0 },
     vehicleTypeRequired: vehicleTypeLabel,
     reportingDateTime: booking.pickupDate ?? booking.createdAt,
-    slaDeadline: booking.pickupDate ?? booking.createdAt,
+    // SLA to respond = 2h from when the indent was sent to the vendor.
+    slaDeadline: new Date(Date.parse(sentAt) + INDENT_SLA_MS).toISOString(),
     status: "PENDING",
-    createdAt: booking.createdAt,
+    createdAt: sentAt,
   };
 }
 
@@ -651,6 +723,8 @@ function toVendorTrip(
   buyingRateFallback = 0,
 ): VendorTrip {
   const assignment = booking.assignment ?? null;
+  // Driver-submitted expenses approved on the booking — surfaced to the vendor.
+  const approvedExpenseItems = (booking.expenses ?? []).filter((expense) => expense.status === "Approved");
   return {
     id: booking.bookingId,
     contractId: booking.id,
@@ -668,5 +742,17 @@ function toVendorTrip(
     freightRate: assignment?.vendorFreight ?? buyingRateFallback ?? 0,
     isInvoiced: booking.isInvoiced ?? false,
     createdAt: booking.createdAt,
+    expenses: approvedExpenseItems.map((expense) => ({
+      id: expense.id,
+      label: expense.label,
+      amount: expense.amount,
+      expenseType: expense.expenseType,
+      paymentMode: expense.paymentMode,
+      paidBy: expense.paidBy,
+      status: expense.status,
+      dateTime: expense.dateTime,
+    })),
+    approvedExpenses: approvedExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
+    advance: booking.shipmentDocuments?.lr?.advance ?? 0,
   };
 }

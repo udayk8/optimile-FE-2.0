@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
+import { computeGst, stateCodeOf } from "@shared-utils";
 import { ACCESSORIAL_LIBRARY, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
 import { useReceivables, type ARInvoice, type ARTrip, type LedgerExpense } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
@@ -12,6 +13,7 @@ import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMat
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
 import RateCardPanel from "@finance/components/RateCardPanel";
+import MarginSummary from "@finance/components/MarginSummary";
 import InvoiceDocument from "@finance/components/InvoiceDocument";
 import PodDocument from "@finance/components/PodDocument";
 import { downloadElementAsPdf } from "@finance/lib/pdf";
@@ -39,6 +41,10 @@ const STAGE_TONE: Record<string, any> = {
 const WORKFLOW_STEPS = ["Draft", "Submitted", "Client approval", "Ledger"];
 const stepIndex = (s: string) => (s === "draft" || s === "correction" ? 0 : s === "submitted" ? 1 : s === "approved" ? 3 : 2);
 
+/* Standard freight GST rate (%). The IGST vs CGST+SGST split is decided by place
+   of supply via computeGst, not hardcoded. */
+const AR_GST_RATE_PCT = 18;
+
 /* Aggregator letterhead for the printable draft (BRD step: review & submit). */
 const SELLER = {
   name: OPTIMILE_BILL_TO.name,
@@ -60,19 +66,29 @@ function toInvoiceDoc(inv: ARInvoice) {
   const loading = inv.accessorials.filter((a) => a.code === "LUL").reduce((s, a) => s + a.rate, 0) + expLoading;
   const other = inv.accessorials.filter((a) => a.code !== "DET" && a.code !== "LUL").reduce((s, a) => s + a.rate, 0) + expOther;
   const [origin, destination] = inv.lane.split("→").map((s) => s.trim());
-  const taxableValue = inv.invoiced;
-  const igst = Math.round(taxableValue * 0.18);
-  const total = taxableValue + igst;
+  // GST split by place of supply: supplier = aggregator GSTIN state, place of
+  // supply = customer GSTIN state. Falls back to inter-state (IGST) when the
+  // customer GSTIN is unknown (standalone mock invoices).
+  const tax = computeGst({
+    taxableValue: inv.invoiced,
+    ratePct: AR_GST_RATE_PCT,
+    supplierStateCode: stateCodeOf(SELLER.gstin),
+    placeOfSupplyStateCode: stateCodeOf(inv.customerGstin),
+  });
   return {
     invoice: {
       invoiceNo: inv.id, billDate: inv.date, dueDate: inv.due ?? "On approval", terms: inv.terms,
       bookingId: inv.tripId, lrNo: "—", qty: 1, shippingDate: inv.date, deliveryDate: inv.date,
       truckNo: inv.truck, origin, destination,
       lineItems: { freight: inv.base, advance: 0, detention, loading, other, freightCost: inv.invoiced },
-      taxableValue, igstPct: 18, igst, cgst: 0, sgst: 0, total,
-      amountInWords: `${fmtINR(total)} only`,
+      taxableValue: tax.taxableValue,
+      igstPct: tax.igstPct, igst: tax.igst,
+      cgstPct: tax.cgstPct, cgst: tax.cgst,
+      sgstPct: tax.sgstPct, sgst: tax.sgst,
+      total: tax.total,
+      amountInWords: `${fmtINR(tax.total)} only`,
     },
-    billTo: { name: inv.client, address: "—", gstin: "—", customerCode: "—" },
+    billTo: { name: inv.client, address: "—", gstin: inv.customerGstin ?? "—", customerCode: "—" },
   };
 }
 
@@ -231,8 +247,10 @@ function previewInvoiceFromDrops(drops: ARTrip[]): ARInvoice {
 }
 
 function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
-  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision } = useReceivables();
+  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision, recordPayment } = useReceivables();
   const { addDispute } = useDisputes();
+  const paid = inv.paymentStatus === "paid";
+  const markPaid = () => { recordPayment?.(inv.id); toast(`Payment recorded for ${inv.id} — credit released`); };
   const [adding, setAdding] = useState(false);
   const [preview, setPreview] = useState(false);
   const [dl, setDl] = useState(false);
@@ -299,6 +317,7 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
             {inv.flagged && (
               <Pill tone="red">Variance {inv.variancePct > 0 ? "+" : ""}{inv.variancePct.toFixed(1)}% vs contract</Pill>
             )}
+            {paid && <Pill tone="green">Paid</Pill>}
           </div>
           <p className="mt-1 text-sm text-slate-500">{inv.client} · {inv.lane} · {inv.truck} {inv.tripId && <>· trip {inv.tripId}</>}</p>
         </div>
@@ -322,6 +341,9 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
       {/* Contract rate card behind this invoice's `contracted` baseline — shown for
           contract / spot bookings so the client sees what the rate was matched on. */}
       {inv.rateCard && <RateCardPanel rateCard={inv.rateCard} commercialType={inv.commercialType} />}
+
+      {/* 3PL profit on this invoice — selling (customer) vs buying (vendor) freight. */}
+      <MarginSummary selling={inv.sellingFreight} buying={inv.buyingFreight} margin={inv.margin} />
 
       {podTrips.length > 1 ? (
         /* Consolidated invoice — show expenses grouped per booking. */
@@ -460,6 +482,20 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
         )}
         {inv.stage === "disputed" && (
           <div className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle size={16} />Disputed — tracked on the Disputes page.</div>
+        )}
+        {/* Customer payment (AR) — records the receipt so the client's credit
+            utilisation is released (BRD 3.5). Available on bridged invoices. */}
+        {recordPayment && !editable && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            {paid ? (
+              <span className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} />Payment received{inv.paidAt ? ` on ${inv.paidAt.slice(0, 10)}` : ""} — credit released.</span>
+            ) : (
+              <>
+                <span className="text-sm text-slate-500">Once the customer settles this invoice, record the receipt to free up their credit limit.</span>
+                <Btn onClick={markPaid}><Check size={14} />Mark payment received</Btn>
+              </>
+            )}
+          </div>
         )}
       </Card>
 
@@ -650,7 +686,8 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
 
   const customers = buildCustomers(trips);
-  const working = invoices.filter((i) => i.stage !== "approved");
+  // Drafts & in-progress = not yet approved and not yet paid.
+  const working = invoices.filter((i) => i.stage !== "approved" && i.paymentStatus !== "paid");
   const c = cust ? customers.find((x) => x.customer === cust) : null;
 
   // ---------- Customer drill: all bookings for one customer + KPIs + bill ----------

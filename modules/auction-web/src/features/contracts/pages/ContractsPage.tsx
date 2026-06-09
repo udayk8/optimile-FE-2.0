@@ -121,19 +121,6 @@ export default function ContractsPage() {
       },
       { key: 'vendor', header: 'Vendor', render: (contract) => <span className="text-sm text-[#0F172A]">{contract.vendorName}</span> },
       {
-        key: 'type',
-        header: 'Type',
-        render: (contract) => (
-          <span
-            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              contract.contractType === 'SPOT' ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-700'
-            }`}
-          >
-            {contract.contractType === 'SPOT' ? 'Spot · One-time' : contract.contractType === 'LOT' ? 'Lot' : 'Bulk'}
-          </span>
-        ),
-      },
-      {
         key: 'origin',
         header: 'Source',
         render: (contract) => (
@@ -183,7 +170,7 @@ export default function ContractsPage() {
         header: 'Allocation',
         render: (contract) => (
           <span className="text-sm text-[#0F172A]">
-            {contract.allocationRank} · {contract.volumeAllocationPercent}%
+            {contract.contractType === 'SPOT' ? '—' : `${contract.allocationRank} · ${contract.volumeAllocationPercent}%`}
           </span>
         ),
       },

@@ -142,6 +142,7 @@ import type {
   TenantVendorRateCard,
   TenantVendorRateCardInput,
 } from "@/types/vendor";
+import { deriveVendorStatus } from "@/types/vendor";
 import type {
   PlatformAuditEvent,
   PlatformModule,
@@ -255,6 +256,8 @@ interface MockStoreValue {
     buyingRate?: number | null,
     /** Booking object when it may not be in the store yet (fresh spot booking). */
     knownBooking?: BookingRecord,
+    /** Dispatcher's remark — required when targeting a higher-rate (non-L1) vendor. */
+    reason?: string | null,
   ) => BookingVendorIndent[];
   respondBookingVendorIndent: (
     indentId: string,
@@ -268,6 +271,16 @@ interface MockStoreValue {
   actionTenantBookingVehicleReplacement: (bookingId: string, input: BookingVehicleReplacementVendorActionInput) => BookingRecord;
   listTenantInvoices: (tenantId: string) => TenantInvoiceRecord[];
   createTenantInvoice: (input: TenantInvoiceRecord) => TenantInvoiceRecord;
+  // AR lifecycle: persist the invoice stage (submit / approve / dispute / correction)
+  // so finance decisions stick in embedded mode. BRD 4.x.
+  setTenantInvoiceStage: (
+    invoiceId: string,
+    stage: NonNullable<TenantInvoiceRecord["stage"]>,
+    opts?: { approvedAt?: string; dueDate?: string },
+  ) => void;
+  // Record a customer payment against an AR invoice (marks it paid so it leaves
+  // the customer's live credit utilisation). BRD 3.5.
+  recordTenantInvoicePayment: (invoiceId: string, opts?: { at?: string }) => void;
   // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
   listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
   vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
@@ -640,7 +653,8 @@ const BOOKING_VENDOR_INDENTS_KEY = "optimile.tenant.bookingVendorIndents";
 // contain these tenants (e.g. lost to a cache clear), we merge the seed
 // entries in without disturbing anything else.
 // v8: bl001 vendor rate card seed rows added (vendor detail rate card grid).
-const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v8";
+// v9: bl001 Bengaluru→Coimbatore customer + vendor rate cards (all PER_MT) added.
+const DEMO_REHYDRATION_KEY = "optimile.platform.demoTenantsRehydrated.v9";
 const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-cargo", "tenant-bl001"] as const;
 
 // Manual vendor-contract seed for the Bluedart vendors — the shared
@@ -648,12 +662,12 @@ const DEMO_TENANT_IDS = ["tenant-easylane", "tenant-nippon01", "tenant-easylane-
 // Vendor Portal read. Idempotent by contractId; runs every boot.
 const VENDOR_CONTRACTS_SEED_KEY = "optimile.vendor-contracts";
 const SEED_VENDOR_CONTRACTS = [
-  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "32FT", rate: 48000, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "20FT", rate: 1650, rateType: "PER_MT", months: 6 },
-  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "32FT", rate: 21500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "32FT", rate: 54, rateType: "PER_KM", months: 12 },
-  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "32FT", rate: 47500, rateType: "PER_TRIP", months: 6 },
-  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "LCV", rate: 1450, rateType: "PER_MT", months: 12 },
+  { contractId: "VC-SEED-MAHESH-1", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Delhi", vehicleType: "MGV", rate: 48000, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-MAHESH-2", vendorId: "tenant-vendor-hh8uo8c", vendorName: "Mahesh Transport", tenantId: "tenant-bl001", originCity: "Bengaluru", destinationCity: "Chennai", vehicleType: "MGV", rate: 1650, rateType: "PER_MT", months: 6 },
+  { contractId: "VC-SEED-ABC-1", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Delhi", destinationCity: "Lucknow", vehicleType: "MGV", rate: 21500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-ABC-2", vendorId: "tenant-vendor-nqup09r", vendorName: "ABC transport", tenantId: "tenant-bl001", originCity: "Mumbai", destinationCity: "Bengaluru", vehicleType: "MGV", rate: 54, rateType: "PER_KM", months: 12 },
+  { contractId: "VC-SEED-VRL-1", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Pune", destinationCity: "Jaipur", vehicleType: "MGV", rate: 47500, rateType: "PER_TRIP", months: 6 },
+  { contractId: "VC-SEED-VRL-2", vendorId: "tenant-vendor-af8xr8p", vendorName: "VRL transports", tenantId: "tenant-bl001", originCity: "Ahmedabad", destinationCity: "Surat", vehicleType: "MGV", rate: 1450, rateType: "PER_MT", months: 12 },
 ];
 
 function seedVendorContracts(): void {
@@ -897,7 +911,14 @@ function ensureDemoTenantsRehydrated(): void {
 // plain add-missing merge would leave duplicates. This pass REPLACES every
 // bl001-tenant row in each seed-managed collection with the seed snapshot.
 // Gated by its own version key so it runs once and never clobbers later edits.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v1";
+// v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
+// v3: 3 vendors get configured GST rates (Mahesh 10 / ABC 12 / VRL 18).
+// v4: 3 vendors get bank details + logo + invoice terms (for the invoice PDF).
+// v5: 2nd customer (Ultratech, Bengaluru->Hyderabad) + addresses + customer &
+//     vendor rate cards for that lane.
+// v6: driver expenses seeded on a completed booking (vendor expense tab/column).
+// v7: LR advance seeded on that booking (vendor advance column, info-only).
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v7";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
@@ -4528,6 +4549,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           code: normalizedCode || undefined,
           gstin: input.gstin?.trim().toUpperCase() || input.gstNumber?.trim().toUpperCase() || undefined,
           gstNumber: input.gstNumber?.trim() || undefined,
+          gstRate: input.gstRate,
           pan: input.pan?.trim().toUpperCase() || undefined,
           address: input.address?.trim() || undefined,
           vendorType: input.vendorType?.trim() || undefined,
@@ -4537,10 +4559,21 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           email: input.email?.trim().toLowerCase() || undefined,
           serviceableLocations: Array.from(new Set((input.serviceableLocations ?? []).filter(Boolean))),
           supportedVehicleTypes: Array.from(new Set((input.supportedVehicleTypes ?? []).filter(Boolean))),
-          status: input.status,
+          bankName: input.bankName?.trim() || undefined,
+          branch: input.branch?.trim() || undefined,
+          accountNumber: input.accountNumber?.trim() || undefined,
+          ifscCode: input.ifscCode?.trim().toUpperCase() || undefined,
+          accountType: input.accountType,
+          logoUrl: input.logoUrl?.trim() || undefined,
+          invoiceTerms: (input.invoiceTerms ?? []).map((t) => t.trim()).filter(Boolean),
+          rateMatchingConfig: input.rateMatchingConfig,
+          status: "onboarding_incomplete",
           createdAt: now,
           updatedAt: now,
         };
+        // Status is always derived from invoice-profile completeness (unless the
+        // tenant explicitly deactivates the vendor).
+        created.status = deriveVendorStatus(created, input.status);
         setTenantVendors((current) => [created, ...current]);
         return created;
       },
@@ -4606,8 +4639,18 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             updates.supportedVehicleTypes !== undefined
               ? Array.from(new Set(updates.supportedVehicleTypes.filter(Boolean)))
               : existing.supportedVehicleTypes,
+          ifscCode:
+            updates.ifscCode !== undefined ? updates.ifscCode.trim().toUpperCase() || undefined : existing.ifscCode,
+          logoUrl:
+            updates.logoUrl !== undefined ? updates.logoUrl.trim() || undefined : existing.logoUrl,
+          invoiceTerms:
+            updates.invoiceTerms !== undefined
+              ? updates.invoiceTerms.map((t) => t.trim()).filter(Boolean)
+              : existing.invoiceTerms,
           updatedAt: new Date().toISOString(),
         };
+        // Re-derive status from completeness on every edit (manual deactivate wins).
+        updated.status = deriveVendorStatus(updated, updates.status ?? existing.status);
         setTenantVendors((current) =>
           current.map((item) => (item.id === tenantVendorId ? updated : item)),
         );
@@ -5264,7 +5307,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       listBookingVendorIndents: (tenantId) =>
         bookingVendorIndents.filter((indent) => indent.tenantId === tenantId),
 
-      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate, knownBooking) => {
+      sendBookingVendorIndent: (bookingId, actor, lrPlaceId, lrPlaceName, vendorId, buyingRate, knownBooking, reason) => {
         const booking = knownBooking ?? tenantBookings.find((item) => item.id === bookingId);
         if (!booking) throw new Error("Booking not found.");
         if (booking.status !== "PENDING_ASSIGNMENT") {
@@ -5306,6 +5349,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           sentAt: now,
           respondedAt: null,
           rejectedReason: null,
+          indentReason: reason?.trim() ? reason.trim() : null,
           lrModeForVendorAssignment: "AUTO",
           lrPlaceId: lrPlaceId ?? null,
           lrPlaceName: lrPlaceName ?? null,
@@ -5327,7 +5371,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
                       note: spotVendorId
                         ? `Indent sent to ${created[0]?.vendorName ?? "spot-contract vendor"} (spot contract ${booking.spotContract?.contractId ?? ""} @ ₹${booking.spotContract?.rate?.toLocaleString("en-IN") ?? ""})`
                         : created.length === 1
-                          ? `Indent sent to ${created[0].vendorName}`
+                          ? `Indent sent to ${created[0].vendorName}${reason?.trim() ? ` — Reason: ${reason.trim()}` : ""}`
                           : `Indent sent to ${created.length} vendor(s)`,
                     },
                   ],
@@ -5585,6 +5629,18 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               type: "SYSTEM_REMARK",
               message: `Assigned ${input.vehicleLabel} to ${input.driverName} under ${input.vendorName}.`,
             },
+            // Manual assignment deviates from the default L1/lowest contract — log why.
+            ...(input.manualAssignmentReason
+              ? [
+                  {
+                    id: `booking-remark-reason-${Date.now()}`,
+                    timestamp,
+                    actor: input.actor,
+                    type: "SYSTEM_REMARK" as const,
+                    message: `Manual assignment — reason: ${input.manualAssignmentReason}`,
+                  },
+                ]
+              : []),
           ],
         };
         setTenantBookings((current) => current.map((item) => (item.id === bookingId ? updated : item)));
@@ -6172,6 +6228,30 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         setTenantInvoices((current) => [input, ...current]);
         return input;
       },
+      setTenantInvoiceStage: (invoiceId, stage, opts) => {
+        setTenantInvoices((current) =>
+          current.map((inv) =>
+            inv.invoiceId === invoiceId
+              ? {
+                  ...inv,
+                  stage,
+                  approvedAt: opts?.approvedAt ?? (stage === "approved" ? new Date().toISOString() : inv.approvedAt ?? null),
+                  dueDate: opts?.dueDate ?? inv.dueDate ?? null,
+                }
+              : inv,
+          ),
+        );
+      },
+      recordTenantInvoicePayment: (invoiceId, opts) => {
+        const at = opts?.at ?? new Date().toISOString();
+        setTenantInvoices((current) =>
+          current.map((inv) =>
+            inv.invoiceId === invoiceId
+              ? { ...inv, paymentStatus: "paid", paidAt: at, paidAmount: inv.total }
+              : inv,
+          ),
+        );
+      },
       // ---- Vendor (AP) invoice lifecycle ----------------------------------
       listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),
       vendorSubmitInvoice: (input) => {
@@ -6182,7 +6262,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         setTenantVendorInvoices((current) =>
           current.map((inv) =>
             inv.id === invoiceId && (inv.status === "PENDING" || inv.status === "DISPUTED")
-              ? { ...inv, status: "APPROVED", dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
+              ? { ...inv, status: "APPROVED", statusUpdatedAt: new Date().toISOString(), dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
               : inv,
           ),
         ),
@@ -6194,6 +6274,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             return {
               ...inv,
               status: "DISPUTED",
+              statusUpdatedAt: now,
               dispute: {
                 reason,
                 status: "OPEN",
@@ -6213,6 +6294,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             return {
               ...inv,
               status: "RESUBMISSION_REQUIRED",
+              statusUpdatedAt: now,
               dispute: inv.dispute
                 ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: message?.trim() || "Resubmission required. Please create a corrected invoice.", createdAt: now }] }
                 : inv.dispute,
@@ -6229,6 +6311,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               ...inv,
               status: "CLOSED",
               closeReason: "REJECTED",
+              statusUpdatedAt: now,
               dispute: inv.dispute
                 ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: reason?.trim() || "Invoice rejected by finance.", createdAt: now }] }
                 : inv.dispute,
@@ -6266,6 +6349,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           invoiceNumber: newNumber,
           invoiceDate: now.slice(0, 10),
           createdAt: now,
+          statusUpdatedAt: now,
           lineItems,
           subtotal,
           gstAmount,
@@ -6279,7 +6363,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         };
         setTenantVendorInvoices((current) => [
           newInvoice,
-          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, supersededByInvoiceId: newNumber } : inv)),
+          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, statusUpdatedAt: now, supersededByInvoiceId: newNumber } : inv)),
         ]);
         return newInvoice;
       },
@@ -6776,6 +6860,11 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               ? updates.vendorId ?? existing.vendorId ?? null
               : null,
           chassisNo: updates.chassisNo ?? existing.chassisNo,
+          trackingType: updates.trackingType ?? existing.trackingType,
+          gpsDeviceId:
+            (updates.trackingType ?? existing.trackingType) === "GPS_DEVICE"
+              ? updates.gpsDeviceId ?? existing.gpsDeviceId ?? null
+              : null,
           insurance: updates.insurance ?? existing.insurance,
           fitness: updates.fitness ?? existing.fitness,
           puc: updates.puc ?? existing.puc,
@@ -7469,10 +7558,9 @@ function validateVehicleInput(
   if (!tenantVehicleTypes.some((item) => item.id === vehicle.vehicleTypeId && item.status === "active")) {
     throw new Error("Select an active vehicle type.");
   }
-  if (vehicle.ownershipType === "VENDOR") {
-    if (!vehicle.vendorId) {
-      throw new Error("Vendor is required for vendor-owned vehicles.");
-    }
+  // Vendor link is no longer picked during onboarding (details + compliance
+  // only), so it is optional. When a vendorId IS set, it must be an active vendor.
+  if (vehicle.ownershipType === "VENDOR" && vehicle.vendorId) {
     const vendor = tenantVendors.find((item) => item.id === vehicle.vendorId && item.status === "active");
     if (!vendor) {
       throw new Error("Select an active vendor for this vehicle.");

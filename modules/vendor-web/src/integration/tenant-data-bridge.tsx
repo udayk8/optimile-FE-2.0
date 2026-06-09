@@ -1,5 +1,20 @@
 import { createContext, useContext, type PropsWithChildren } from 'react'
-import type { Driver, Indent, Trip, Vehicle, Invoice, Dispute, InvoiceLineItem } from '@vendor/types'
+import type { Driver, Indent, Trip, Vehicle, Invoice, Dispute, InvoiceLineItem, CompanyInfo, BankDetails } from '@vendor/types'
+
+/**
+ * Invoice-document profile the tenant configures for this vendor at onboarding
+ * (company, GST/PAN, address, bank, terms, logo). The vendor's invoice PDF
+ * reads everything from here — nothing is hardcoded in the portal.
+ */
+export interface VendorInvoiceProfile {
+  companyName: string
+  companyInfo: CompanyInfo
+  bank: BankDetails
+  terms: string[]
+  logoUrl?: string
+  /** active = fully onboarded; onboarding_incomplete = mandatory data missing. */
+  status: 'active' | 'onboarding_incomplete' | 'inactive'
+}
 
 /** Payload the vendor portal sends when generating an invoice (embedded mode). */
 export interface VendorInvoiceSubmitPayload {
@@ -72,6 +87,10 @@ export interface TenantDataBridge {
   tenantName: string | null
   vendorId: string | null
   vendorName: string | null
+
+  /** Invoice-document profile (company/bank/terms/logo) the tenant configured
+   *  for this vendor. null when the vendor record can't be resolved. */
+  invoiceProfile: VendorInvoiceProfile | null
 
   // Fleet — vendor-scoped reads + writes against shared tenant master data.
   vehicles: Vehicle[]

@@ -297,6 +297,23 @@ export interface Trip {
   freightRate: number
   isInvoiced: boolean
   createdAt: string
+  /** Driver-submitted expenses approved on the booking (cross-module). */
+  expenses?: TripExpense[]
+  /** Sum of approved expenses — surfaced on the bookings list + invoice. */
+  approvedExpenses?: number
+  /** Advance paid on the booking LR — informational only (never reduces totals). */
+  advance?: number
+}
+
+export interface TripExpense {
+  id: string
+  label: string
+  amount: number
+  expenseType?: string
+  paymentMode?: string
+  paidBy?: string
+  status?: 'Pending' | 'Approved' | 'Rejected'
+  dateTime?: string
 }
 
 export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'LR_COPY' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'
@@ -446,6 +463,12 @@ export interface Invoice {
   lineItems: InvoiceLineItem[]
   subtotal: number
   gstAmount: number
+  // GST split by place of supply (vendor state vs buyer state). Inter-state
+  // populates igst; intra-state populates cgst+sgst. Optional for back-compat;
+  // gstAmount remains the combined tax = igst + cgst + sgst.
+  igst?: number
+  cgst?: number
+  sgst?: number
   grandTotal: number
   status: InvoiceStatus
   closeReason?: InvoiceCloseReason
@@ -456,6 +479,8 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
+  /** When the invoice status was last changed (approve/dispute/resubmit/reject). */
+  statusUpdatedAt?: string
   nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
 }
 
@@ -605,7 +630,7 @@ export interface NBFCApplication {
 }
 
 export type ExceptionSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type ExceptionStatus = 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+export type ExceptionStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
 export type ExceptionIssueType = 'Breakdown' | 'Delay' | 'Accident' | 'Route deviation' | 'Cargo issue'
 
 export interface ExceptionTimelineEntry {

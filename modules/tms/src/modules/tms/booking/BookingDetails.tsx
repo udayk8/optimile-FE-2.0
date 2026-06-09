@@ -1066,38 +1066,30 @@ export function BookingDetailsPage() {
       return;
     }
 
-    // Search the selected vendor's contract using its OWN config (same engine
-    // as customers) and auto-fill the buying freight + margin.
+    // Contract mode: the dispatcher picks a specific contract row (which sets the
+    // rate/freight directly), so skip the single auto-match here.
+    if (assignMethod === "CONTRACT") return;
+
+    // Manual mode: search the selected vendor's contract using its OWN config,
+    // restricted to the booking's rate type, and auto-fill the buying freight.
     const vendorRateCards = adminSources.vendorRateCardMap.get(vendorId) ?? [];
     const config = normalizeRateMatchingConfig(vendorMap.get(vendorId)?.rateMatchingConfig);
-    const candidateRateTypes: Array<"PER_MT" | "PER_KM" | "PER_TRIP"> = [
-      bookingRecord.pricing.rateType,
-      "PER_MT",
-      "PER_TRIP",
-      "PER_KM",
-    ].filter((value, index, array) => array.indexOf(value) === index) as Array<"PER_MT" | "PER_KM" | "PER_TRIP">;
-
-    const matchedRateCard =
-      candidateRateTypes
-        .map((rateType) =>
-          validateVendorRateCard(
-            {
-              bookingDate: bookingRecord.pickupDate ?? null,
-              rateMatchingConfig: config,
-              fromCity: assignSourceAddress?.city ?? null,
-              toCity: assignDestinationAddress?.city ?? null,
-              fromLocation: assignSourceAddress?.addressName ?? null,
-              toLocation: assignDestinationAddress?.addressName ?? null,
-              fromPincode: assignSourceAddress?.pincode ?? null,
-              toPincode: assignDestinationAddress?.pincode ?? null,
-              vehicleType: assignVehicleTypeCode,
-              material: assignMaterialCode,
-              rateType,
-            },
-            vendorRateCards,
-          ),
-        )
-        .find(Boolean) ?? null;
+    const matchedRateCard = validateVendorRateCard(
+      {
+        bookingDate: bookingRecord.pickupDate ?? null,
+        rateMatchingConfig: config,
+        fromCity: assignSourceAddress?.city ?? null,
+        toCity: assignDestinationAddress?.city ?? null,
+        fromLocation: assignSourceAddress?.addressName ?? null,
+        toLocation: assignDestinationAddress?.addressName ?? null,
+        fromPincode: assignSourceAddress?.pincode ?? null,
+        toPincode: assignDestinationAddress?.pincode ?? null,
+        vehicleType: assignVehicleTypeCode,
+        material: assignMaterialCode,
+        rateType: bookingRecord.pricing.rateType,
+      },
+      vendorRateCards,
+    );
 
     if (!matchedRateCard) {
       setVendorFreightSource("MANUAL");
@@ -1123,7 +1115,7 @@ export function BookingDetailsPage() {
       `${matchedRateCard.rateType} @ ${(getVendorRateCardUnitRate(matchedRateCard) ?? 0).toLocaleString()}`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminSources.vendorRateCardMap, bookingRecord, vendorId]);
+  }, [adminSources.vendorRateCardMap, bookingRecord, vendorId, assignMethod]);
 
   function resetRemarkDialog() {
     setRemarkDeliveryId(null);
@@ -3265,8 +3257,21 @@ export function BookingDetailsPage() {
             <div className="md:col-span-2">
               <VendorContractComparison
                 entries={vendorComparison}
-                selectedVendorId={vendorId}
-                onSelect={(id) => { setVendorId(id); setVehicleId(""); setDriverId(""); }}
+                selectedRateCardId={matchedVendorRateCardId}
+                onSelect={(id, rateCardId) => {
+                  setVendorId(id);
+                  setVehicleId("");
+                  setDriverId("");
+                  const entry = vendorComparison.find((item) => item.rateCardId === rateCardId);
+                  if (entry) {
+                    setVendorFreight(String(entry.vendorFreight));
+                    setVendorFreightSource("RATE_CARD");
+                    setVendorRateWarning("");
+                    setMatchedVendorRateCardId(entry.rateCardId);
+                    setMatchedVendorRateType(entry.rateType);
+                    setBuyingRateLabel(`${entry.rateType} @ ${entry.buyingRate.toLocaleString()} · ${entry.source}`);
+                  }
+                }}
                 header={{
                   route: `${assignSourceAddress?.city ?? "-"} → ${assignDestinationAddress?.city ?? "-"}`,
                   customerFreight,

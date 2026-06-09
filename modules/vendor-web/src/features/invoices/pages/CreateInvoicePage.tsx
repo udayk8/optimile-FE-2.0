@@ -10,30 +10,37 @@ import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { useVendorInvoiceProfile } from '@vendor/integration/useVendorInvoiceProfile'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
-import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
+import { useVendorInvoices, invoicedTripIds } from '@vendor/integration/useVendorInvoices'
+import { useVendorGstRate } from '@vendor/integration/useVendorGstRate'
 import type { Invoice } from '@vendor/types'
 
 type Step = 'select' | 'review'
 
 const PAGE_SIZE = 5
-const GST_RATE = 12
 const CUSTOMER_ADDRESS =
   '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
   const { trips } = useVendorBookings()
-  const { generateInvoice } = useVendorInvoices()
+  const { generateInvoice, invoices } = useVendorInvoices()
+  // Vendor's GST rate, configured by the tenant admin at onboarding (cross-module).
+  const GST_RATE = useVendorGstRate()
   const [step, setStep] = useState<Step>('select')
   const [page, setPage] = useState(1)
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
 
+  // A booking is eligible to bill once it is COMPLETED with a freight value and
+  // no active invoice already covers it. Raising an invoice removes the booking
+  // here; the invoice being CLOSED brings it back. Derived from the invoice
+  // list so the two stay consistent.
+  const lockedTripIds = useMemo(() => invoicedTripIds(invoices), [invoices])
   const eligibleTrips = useMemo(
-    () => trips.filter((trip) => trip.status === 'COMPLETED' && !trip.isInvoiced && trip.freightRate > 0),
-    [trips],
+    () => trips.filter((trip) => trip.status === 'COMPLETED' && !lockedTripIds.has(trip.id) && trip.freightRate > 0),
+    [trips, lockedTripIds],
   )
 
   const eligibleTripIds = useMemo(() => eligibleTrips.map((trip) => trip.id), [eligibleTrips])
@@ -52,11 +59,11 @@ export default function CreateInvoicePage() {
       grandTotal: subtotal + gstAmount,
       bookingCount: selectedTrips.length,
     }
-  }, [selectedTrips])
+  }, [selectedTrips, GST_RATE])
 
   const bridge = useTenantBridge()
   const { getBookingDetail } = useVendorBookings()
-  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
 
@@ -78,11 +85,12 @@ export default function CreateInvoicePage() {
         freightCharge: trip.freightRate || 0,
         lineTotal: trip.freightRate || 0,
       })),
-      vendorGstin: '29AABCF1234M1ZP',
+      // Preview only — the submitted invoice's GSTINs + GST split are set in the store.
+      vendorGstin: invoiceProfile.companyInfo.gstin,
       customerGstin: '27AABCU9603R1ZM',
       createdAt: now,
     } as unknown as Invoice
-  }, [selectedTrips, totals])
+  }, [selectedTrips, totals, invoiceProfile])
 
   const totalPages = Math.max(1, Math.ceil(eligibleTrips.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -90,10 +98,17 @@ export default function CreateInvoicePage() {
   const selectedOnPage = pagedTrips.filter((trip) => selectedTripIds.includes(trip.id)).length
   const allOnPageSelected = pagedTrips.length > 0 && selectedOnPage === pagedTrips.length
 
+  // Cap at 5 bookings per invoice so the document fits a single A4 page.
+  const MAX_INVOICE_TRIPS = 5
   const toggleTrip = (tripId: string) => {
-    setSelectedTripIds((prev) =>
-      prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId],
-    )
+    setSelectedTripIds((prev) => {
+      if (prev.includes(tripId)) return prev.filter((id) => id !== tripId)
+      if (prev.length >= MAX_INVOICE_TRIPS) {
+        window.alert(`You can invoice up to ${MAX_INVOICE_TRIPS} bookings together (A4 page limit).`)
+        return prev
+      }
+      return [...prev, tripId]
+    })
   }
 
   const togglePageSelection = () => {
@@ -102,7 +117,13 @@ export default function CreateInvoicePage() {
       if (allOnPageSelected) {
         pagedTrips.forEach((trip) => current.delete(trip.id))
       } else {
-        pagedTrips.forEach((trip) => current.add(trip.id))
+        for (const trip of pagedTrips) {
+          if (current.size >= MAX_INVOICE_TRIPS) break
+          current.add(trip.id)
+        }
+        if (current.size >= MAX_INVOICE_TRIPS) {
+          window.alert(`You can invoice up to ${MAX_INVOICE_TRIPS} bookings together (A4 page limit).`)
+        }
       }
       return Array.from(current)
     })
@@ -203,6 +224,8 @@ export default function CreateInvoicePage() {
                       <th className="px-5 py-3 font-bold">Route</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold text-right">Freight</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
+                      <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Line total</th>
                     </tr>
                   </thead>
@@ -241,6 +264,12 @@ export default function CreateInvoicePage() {
                           </td>
                           <td className="px-5 py-4 text-right font-medium text-emerald-600">
                             <CurrencyDisplay amount={trip.freightRate} />
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-text">
+                            <CurrencyDisplay amount={trip.advance ?? 0} />
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-text">
+                            <CurrencyDisplay amount={trip.approvedExpenses ?? 0} />
                           </td>
                           <td className="px-5 py-4 text-right font-semibold text-text">
                             <CurrencyDisplay amount={lineTotal} />
@@ -339,15 +368,6 @@ export default function CreateInvoicePage() {
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 p-6">
-              <Button variant="outline" onClick={() => setStep('select')}>
-                Back to selection
-              </Button>
-              <Button onClick={handleSubmit}>
-                Submit invoice
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
           </div>
 
           <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-900 p-6 text-white shadow-sm">
@@ -397,9 +417,11 @@ export default function CreateInvoicePage() {
               <InvoicePdfDocument
                 invoice={draftInvoice}
                 trips={selectedTrips}
-                companyName={companyName}
-                companyInfo={MOCK_COMPANY_INFO}
-                bank={MOCK_BANK}
+                companyName={invoiceProfile.companyName}
+                companyInfo={invoiceProfile.companyInfo}
+                bank={invoiceProfile.bank}
+                terms={invoiceProfile.terms}
+                logoUrl={invoiceProfile.logoUrl}
                 customerName={customerName}
                 customerAddress={CUSTOMER_ADDRESS}
                 getLrNumber={getLrNumber}

@@ -27,7 +27,7 @@ export default function ReportExceptionPage() {
   const [description, setDescription] = useState('Vehicle needs immediate assistance due to an operational incident.')
   const [submissionError, setSubmissionError] = useState('')
   const [exitConfirmOpen, setExitConfirmOpen] = useState(false)
-  const [evidence, setEvidence] = useState('GPS capture, photo evidence')
+  const [photos, setPhotos] = useState<string[]>([])
 
   const selected = useMemo(() => BOOKINGS.find((item) => item.id === bookingId) ?? BOOKINGS[0], [bookingId])
 
@@ -48,10 +48,7 @@ export default function ReportExceptionPage() {
       issueType,
       severity,
       description: description.trim(),
-      evidence: evidence
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
+      evidence: photos,
     })
     navigate('/vendor/exceptions')
   }
@@ -143,15 +140,26 @@ export default function ReportExceptionPage() {
           />
         </label>
 
-        <label className="block space-y-2">
-          <div className="text-sm font-semibold text-text">Evidence</div>
+        <div className="block space-y-2">
+          <div className="text-sm font-semibold text-text">Photos</div>
           <input
-            value={evidence}
-            onChange={(e) => setEvidence(e.target.value)}
-            placeholder="Comma-separated notes like GPS capture, photo, call recording"
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-primary focus:bg-white"
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e) => setPhotos(Array.from(e.target.files ?? []).map((file) => file.name))}
+            className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none file:mr-4 file:rounded-lg file:border-0 file:bg-primary/10 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary hover:file:bg-primary/20 focus:border-primary focus:bg-white"
           />
-        </label>
+          {photos.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm text-gray-600">
+              {photos.map((name) => (
+                <li key={name} className="flex items-center gap-2">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {submissionError && <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{submissionError}</div>}
 

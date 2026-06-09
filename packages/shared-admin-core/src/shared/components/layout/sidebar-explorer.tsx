@@ -220,7 +220,7 @@ export function SidebarExplorer({
   // `collapsed` is the PINNED state, toggled by the button and persisted.
   // `hoverExpanded` is a transient peek when the mouse is over a pinned-collapsed
   // sidebar. The effective (visible) state is `isCollapsed`.
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const isCollapsed = collapsed && !hoverExpanded;
@@ -245,7 +245,7 @@ export function SidebarExplorer({
         collapsed?: boolean;
         expandedNodes?: Record<string, boolean>;
       };
-      setCollapsed(parsed.collapsed ?? true);
+      setCollapsed(parsed.collapsed ?? false);
       setExpandedNodes(parsed.expandedNodes ?? {});
     } catch {
       // Ignore invalid persisted sidebar state.
@@ -336,7 +336,7 @@ export function SidebarExplorer({
       }}
       onMouseLeave={() => setHoverExpanded(false)}
       className={cn(
-        "hidden shrink-0 border-r border-border/70 bg-gradient-to-b from-slate-50/92 via-white to-slate-50/88 transition-all duration-200 lg:flex lg:flex-col",
+        "sticky top-0 hidden h-screen shrink-0 border-r border-border/70 bg-gradient-to-b from-slate-50/92 via-white to-slate-50/88 transition-all duration-200 lg:flex lg:flex-col",
         isCollapsed ? "w-[74px]" : "w-[272px]",
       )}
     >
