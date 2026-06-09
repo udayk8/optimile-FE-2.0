@@ -726,8 +726,13 @@ function toVendorTrip(
   buyingRateFallback = 0,
 ): VendorTrip {
   const assignment = booking.assignment ?? null;
-  // Driver-submitted expenses approved on the booking — surfaced to the vendor.
-  const approvedExpenseItems = (booking.expenses ?? []).filter((expense) => expense.status === "Approved");
+  // Driver-submitted items approved on the booking. "Advance" is a special
+  // approved type surfaced separately (info-only); the rest are true expenses.
+  const isAdvance = (e: { expenseType?: string; label?: string }) =>
+    /advance/i.test(`${e.expenseType ?? ""} ${e.label ?? ""}`);
+  const approvedItems = (booking.expenses ?? []).filter((expense) => expense.status === "Approved");
+  const approvedExpenseItems = approvedItems.filter((e) => !isAdvance(e));
+  const approvedAdvance = approvedItems.filter(isAdvance).reduce((sum, e) => sum + (e.amount || 0), 0);
   return {
     id: booking.bookingId,
     contractId: booking.id,
@@ -756,6 +761,7 @@ function toVendorTrip(
       dateTime: expense.dateTime,
     })),
     approvedExpenses: approvedExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
-    advance: booking.shipmentDocuments?.lr?.advance ?? 0,
+    // Advance via the same approval flow as expenses; fall back to the LR advance.
+    advance: approvedAdvance || (booking.shipmentDocuments?.lr?.advance ?? 0),
   };
 }

@@ -2668,9 +2668,10 @@ export const bl001Bookings = [
     "status": "COMPLETED",
     "opsRemark": null,
     "expenses": [
-      { "id": "exp-bl001-0008-1", "label": "Diesel top-up", "amount": 4200, "expenseType": "Fuel", "paymentMode": "UPI", "paidBy": "Driver", "status": "Approved", "dateTime": "2026-06-02T10:30:00.000Z", "createdAt": "2026-06-02T10:30:00.000Z", "createdBy": "Driver" },
-      { "id": "exp-bl001-0008-2", "label": "Toll charges", "amount": 1850, "expenseType": "Toll", "paymentMode": "Cash", "paidBy": "Driver", "status": "Approved", "dateTime": "2026-06-02T14:10:00.000Z", "createdAt": "2026-06-02T14:10:00.000Z", "createdBy": "Driver" },
-      { "id": "exp-bl001-0008-3", "label": "Unloading labour", "amount": 900, "expenseType": "Loading/Unloading", "paymentMode": "Cash", "paidBy": "Driver", "status": "Pending", "dateTime": "2026-06-03T09:00:00.000Z", "createdAt": "2026-06-03T09:00:00.000Z", "createdBy": "Driver" }
+      { "id": "exp-bl001-0008-adv", "label": "Trip advance", "amount": 12000, "expenseType": "Advance", "paymentMode": "Bank Transfer", "paidBy": "Company", "status": "Approved", "dateTime": "2026-06-02T08:00:00.000Z", "createdAt": "2026-06-02T08:00:00.000Z", "createdBy": "Ops" },
+      { "id": "exp-bl001-0008-1", "label": "Diesel top-up", "amount": 4200, "expenseType": "Other", "paymentMode": "UPI", "paidBy": "Driver", "status": "Approved", "dateTime": "2026-06-02T10:30:00.000Z", "createdAt": "2026-06-02T10:30:00.000Z", "createdBy": "Driver" },
+      { "id": "exp-bl001-0008-2", "label": "Detention charge", "amount": 1850, "expenseType": "Detention charge", "paymentMode": "Cash", "paidBy": "Driver", "status": "Approved", "dateTime": "2026-06-02T14:10:00.000Z", "createdAt": "2026-06-02T14:10:00.000Z", "createdBy": "Driver" },
+      { "id": "exp-bl001-0008-3", "label": "Unloading labour", "amount": 900, "expenseType": "Unloading charge", "paymentMode": "Cash", "paidBy": "Driver", "status": "Approved", "dateTime": "2026-06-03T09:00:00.000Z", "createdAt": "2026-06-03T09:00:00.000Z", "createdBy": "Driver" }
     ],
     "pod": {
       "podDocument": "invoice.pdf",

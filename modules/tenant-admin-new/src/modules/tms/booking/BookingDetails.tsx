@@ -166,6 +166,7 @@ const VEHICLE_REPLACEMENT_REASON_OPTIONS: Array<{ value: BookingVehicleReplaceme
 ];
 
 const BOOKING_EXPENSE_TYPES = [
+  "Advance",
   "Toll charge",
   "Loading charge",
   "Unloading charge",
