@@ -131,7 +131,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         <table className="w-full table-fixed border-t-2 text-[10px]" style={{ borderColor: BLUE }}>
           <thead>
             <tr className="text-white" style={{ backgroundColor: BLUE }}>
-              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Vehicle No', 'LR No', 'Freight Cost', 'Advance', 'Detention Charges', 'Loading & Unloading', 'Others', 'Total Cost'].map((h) => (
+              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Vehicle No', 'LR No', 'Freight Cost', 'Advance', 'Detention Charges', 'Loading and Unloading Charges', 'Others', 'Total Cost'].map((h) => (
                 <th key={h} className="border px-1.5 py-2 text-center font-bold" style={{ borderColor: '#C7CBEF' }}>{h}</th>
               ))}
             </tr>

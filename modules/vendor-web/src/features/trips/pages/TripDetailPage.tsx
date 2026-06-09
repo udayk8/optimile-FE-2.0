@@ -21,7 +21,7 @@ import type { Trip, TripDocument } from '@vendor/types'
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
 type DetailTab = 'freight' | 'expense' | 'advance' | 'documents'
 
-const EXPENSE_TYPES = ['Toll charge', 'Loading charge', 'Unloading charge', 'Detention charge', 'Parking charge', 'Driver allowance', 'Weighment charge', 'Other']
+const EXPENSE_TYPES = ['Toll charge', 'Loading and Unloading Charges', 'Detention Charges', 'Parking charge', 'Driver allowance', 'Weighment charge', 'Other']
 const PAID_BY_OPTIONS = ['Driver', 'Vendor', 'Company', 'Self']
 const PAYMENT_MODES = ['UPI', 'NEFT', 'Cash', 'Cheque']
 
