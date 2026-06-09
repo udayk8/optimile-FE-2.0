@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useCustomerBridge } from '../integration/customer-data-bridge'
-import { ProtectedRoute, useAuth } from '@shared-auth'
+import { ProtectedRoute } from '@shared-auth'
 import {
   BarChart3,
   Bell,
@@ -22,6 +22,8 @@ import '../styles/global.css'
 import type { CustomerSection } from '../shared/customer-types'
 import { BOOKINGS } from '../shared/mock-data'
 import { useCustomerBookings } from '../hooks/useCustomerBookings'
+import { useCustomerAuth } from '../hooks/useCustomerAuth'
+import { useCustomerLogout } from '../hooks/useCustomerLogout'
 import { useTrackingDetail } from '../hooks/useTrackingDetail'
 import type { DetailTab } from '../shared/customer-types'
 import OverviewSection from '../sections/OverviewSection'
@@ -30,27 +32,6 @@ import { CreateBookingSection } from '../sections/CreateBookingSection'
 import { TrackingSection } from '../sections/TrackingSection'
 import { FinanceSection } from '../sections/FinanceSection'
 import { ReportsSection } from '../sections/ReportsSection'
-
-// ─── Session identity ─────────────────────────────────────────────────────────
-
-const SESSION_CONTEXT_KEY = 'optimile.session.context'
-
-type PortalCustomerIdentity = { customerId?: string; customerName?: string; phone?: string }
-
-function readPortalCustomerIdentity(): PortalCustomerIdentity | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(SESSION_CONTEXT_KEY)
-    if (!raw) return null
-    const session = JSON.parse(raw) as {
-      loginType?: string; customerId?: string; customerName?: string; phone?: string
-    }
-    if (session?.loginType !== 'CUSTOMER') return null
-    return { customerId: session.customerId, customerName: session.customerName, phone: session.phone }
-  } catch {
-    return null
-  }
-}
 
 // ─── Nav items — order: Overview → Create → Bookings → Track → Finance → Reports ──
 
@@ -109,9 +90,9 @@ function EmptyBookingsState({ onCreateBooking }: { onCreateBooking: () => void }
 // ─── Shell ────────────────────────────────────────────────────────────────────
 
 export function CustomerDashboardShell({ embedded = false }: { embedded?: boolean } = {}) {
-  const { user, logout } = useAuth()
+  const { user, customer: portalCustomer } = useCustomerAuth()
+  const logout           = useCustomerLogout()
   const bridge           = useCustomerBridge()
-  const portalCustomer   = useMemo(() => readPortalCustomerIdentity(), [])
   const displayName      = bridge?.customerName ?? portalCustomer?.customerName ?? user?.name ?? 'Customer Booking Desk'
   const displayRole      = bridge || portalCustomer ? 'Customer' : user?.role ?? 'CBD'
 
@@ -464,7 +445,7 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                   <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                     <button
                       type="button"
-                      onClick={() => { setUserMenuOpen(false); logout?.() }}
+                      onClick={() => { setUserMenuOpen(false); logout() }}
                       className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm text-gray-700 transition hover:bg-gray-50"
                     >
                       <LogOut className="h-4 w-4 text-gray-400" />
