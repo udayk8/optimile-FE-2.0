@@ -77,21 +77,6 @@ export default function SupportHubPage() {
         icon={<AlertTriangle className="h-6 w-6 text-primary" />}
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
-        {[
-          { label: 'Open', value: openCount, note: 'Newly reported or waiting to be handled.' },
-          { label: 'Active', value: activeCount, note: 'Cases currently in progress.' },
-          { label: 'Resolved', value: resolvedCount, note: 'Completed exceptions kept for history.' },
-          { label: 'Critical', value: breachedCount, note: 'Top severity items surface first automatically.' },
-        ].map((item) => (
-          <div key={item.label} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">{item.label}</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{item.value}</div>
-            <div className="mt-2 text-sm text-gray-500">{item.note}</div>
-          </div>
-        ))}
-      </div>
-
       <PageFilterBar
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1) }}

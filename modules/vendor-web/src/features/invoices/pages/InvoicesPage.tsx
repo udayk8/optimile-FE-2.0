@@ -229,23 +229,23 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
-        <HeroCard
-          eyebrow="FINANCE"
-          title="Invoices"
-          subtitle="Track the normal invoice flow, respond to disputes, and resubmit corrections from one workspace."
-          icon={<CreditCard className="h-5 w-5 text-primary" />}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-gray-400" />
-          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
-          <span className="text-xs text-gray-400">to</span>
-          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
-          {(fromDate || toDate) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setInvoicePage(1) }}>Clear</Button>
-          )}
-        </div>
-      </div>
+      <HeroCard
+        eyebrow="FINANCE"
+        title="Invoices"
+        subtitle="Track the normal invoice flow, respond to disputes, and resubmit corrections from one workspace."
+        icon={<CreditCard className="h-5 w-5 text-primary" />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-gray-400" />
+            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+            <span className="text-xs text-gray-400">to</span>
+            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setInvoicePage(1) }} className="h-10 w-[150px] rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary" />
+            {(fromDate || toDate) && (
+              <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setInvoicePage(1) }}>Clear</Button>
+            )}
+          </div>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

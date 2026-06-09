@@ -110,10 +110,6 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
               ))}
             </select>
           </div>
-
-          <div className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800">
-            LR will be generated automatically by {lrAuthorityName} after vehicle assignment.
-          </div>
         </div>
 
         <DialogFooter>

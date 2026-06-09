@@ -11,6 +11,7 @@ import { useAppStore } from '@vendor/stores/app.store'
 import { formatLaneDisplay } from '@shared-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices, invoicedTripIds } from '@vendor/integration/useVendorInvoices'
+import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -20,8 +21,13 @@ export default function DashboardPage() {
   const { indents: vendorIndents, trips: vendorTrips } = useVendorBookings()
   const { invoices } = useVendorInvoices()
   const auctions = useAppStore(state => state.auctions)
-  const vehicles = useAppStore(state => state.vehicles)
-  const drivers = useAppStore(state => state.drivers)
+  // Fleet for compliance comes from the cross-module bridge when embedded (the
+  // vendor's real tenant fleet); standalone falls back to the local store.
+  const bridge = useTenantBridge()
+  const storeVehicles = useAppStore(state => state.vehicles)
+  const storeDrivers = useAppStore(state => state.drivers)
+  const vehicles = bridge?.vehicles ?? storeVehicles
+  const drivers = bridge?.drivers ?? storeDrivers
   const pendingIndents = vendorIndents.filter(i => i.status === 'PENDING')
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
@@ -30,7 +36,7 @@ export default function DashboardPage() {
   const uninvoicedBookings = vendorTrips.filter(t => t.status === 'COMPLETED' && !lockedTripIds.has(t.id) && t.freightRate > 0)
   const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0), 0)
 
-  const activeBookings = vendorTrips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
+  const inTransitBookings = vendorTrips.filter(t => ['IN_TRANSIT', 'DESTINATION_REACHED'].includes(t.status) && !t.exceptionFlag)
   
   const nonCompliantVehicles = vehicles.filter(v => v.complianceStatus !== 'COMPLIANT')
   const nonCompliantDrivers = drivers.filter(d => d.complianceStatus !== 'COMPLIANT')
@@ -135,16 +141,16 @@ export default function DashboardPage() {
            </div>
         </KPICard>
 
-        {/* Active Bookings */}
+        {/* In Transit Bookings */}
         <KPICard
-          title="Active Bookings"
-          value={activeBookings.length}
-          insight="Currently in execution"
+          title="In Transit Bookings"
+          value={inTransitBookings.length}
+          insight="Currently in transit"
           icon={<Truck className="h-4 w-4 text-primary" />}
-          onClick={() => navigate('/vendor/bookings?tab=active')}
+          onClick={() => navigate('/vendor/bookings?tab=in-transit')}
         >
            <div className="mt-3 space-y-2 px-1">
-              {activeBookings.slice(0, 2).map((booking) => (
+              {inTransitBookings.slice(0, 2).map((booking) => (
                 <div key={booking.id} className="text-xs text-gray-600">
                   <div className="flex items-center justify-between gap-4">
                     <span className="min-w-0 flex-1 truncate font-medium text-text">{booking.laneDetails.origin.city} &rarr; {booking.laneDetails.destination.city}</span>
