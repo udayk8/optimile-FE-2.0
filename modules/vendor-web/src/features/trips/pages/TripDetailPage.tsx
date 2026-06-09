@@ -19,7 +19,7 @@ import { ArrowLeft, CheckCircle, Download, ExternalLink, FileText, MapPin, Packa
 import type { Trip, TripDocument } from '@vendor/types'
 
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
-type DetailTab = 'freight' | 'expense' | 'documents'
+type DetailTab = 'freight' | 'expense' | 'advance' | 'documents'
 
 function getBookingMode(pathname: string) {
   const rawMode = pathname.split('/')[3]
@@ -88,7 +88,13 @@ export default function TripDetailPage() {
     trip && (IN_TRANSIT_STATES.includes(trip.status) || trip.status === 'POD_PENDING' || trip.status === 'COMPLETED' || trip.exceptionFlag),
   )
   const tripExpenses = trip?.expenses ?? []
-  const visibleTabs: DetailTab[] = ['freight', ...(showExpenseTab ? (['expense'] as DetailTab[]) : []), 'documents']
+  const tripAdvances = trip?.advanceItems ?? []
+  const visibleTabs: DetailTab[] = [
+    'freight',
+    ...(showExpenseTab ? (['expense'] as DetailTab[]) : []),
+    ...(showExpenseTab ? (['advance'] as DetailTab[]) : []),
+    'documents',
+  ]
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   // Mock/demo bookings have no shared-booking record, so build the same
@@ -264,6 +270,7 @@ export default function TripDetailPage() {
           >
             {tab === 'freight' && 'Freight details'}
             {tab === 'expense' && 'Expenses'}
+            {tab === 'advance' && 'Advance'}
             {tab === 'documents' && 'Documents'}
           </button>
         ))}
@@ -282,14 +289,6 @@ export default function TripDetailPage() {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex items-center gap-2 text-sm text-gray-500"><MapPin className="h-4 w-4" /> Lane</div>
                   <div className="mt-2 font-bold text-text">{booking?.laneDetails.origin.city} → {booking?.laneDetails.destination.city}</div>
-                </div>
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-500"><Package className="h-4 w-4" /> Load / Vehicle</div>
-                  <div className="mt-2 font-bold text-text">
-                    {indent
-                      ? `${indent.loadDetails.commodity}, ${indent.loadDetails.weightKg / 1000}T`
-                      : `${trip?.assignedVehicle.type} / ${trip?.assignedDriver.name}`}
-                  </div>
                 </div>
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                   <div className="flex items-center gap-2 text-sm text-gray-500"><CalendarRange className="h-4 w-4" /> Reporting / Delivery</div>
@@ -338,6 +337,39 @@ export default function TripDetailPage() {
                     <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
                       <span className="font-semibold text-text">Total Approved Expenses</span>
                       <span className="font-bold text-text"><CurrencyDisplay amount={trip?.approvedExpenses ?? 0} /></span>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {effectiveDetailTab === 'advance' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" /> Advance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tripAdvances.length === 0 ? (
+                  <EmptyState title="No advance recorded for this booking" />
+                ) : (
+                  <>
+                    {tripAdvances.map((adv) => (
+                      <div key={adv.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div>
+                          <div className="font-semibold text-text">{adv.label || 'Advance'}</div>
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            {[adv.paymentMode, adv.paidBy && `Paid by ${adv.paidBy}`, adv.dateTime && formatDate(adv.dateTime)].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        <div className="font-bold text-text"><CurrencyDisplay amount={adv.amount} /></div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
+                      <span className="font-semibold text-text">Total Advance</span>
+                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.advance ?? 0} /></span>
                     </div>
                   </>
                 )}

@@ -733,6 +733,12 @@ function toVendorTrip(
   const approvedItems = (booking.expenses ?? []).filter((expense) => expense.status === "Approved");
   const approvedExpenseItems = approvedItems.filter((e) => !isAdvance(e));
   const approvedAdvance = approvedItems.filter(isAdvance).reduce((sum, e) => sum + (e.amount || 0), 0);
+  // Delivery date: POD capture/upload time, else the COMPLETED/ARRIVED status event.
+  const deliveredEvent = [...(booking.statusTimeline ?? [])]
+    .reverse()
+    .find((event) => event.status === "COMPLETED" || event.status === "ARRIVED");
+  const deliveredDate =
+    booking.pod?.capturedAt ?? booking.pod?.podUploadedAt ?? deliveredEvent?.timestamp ?? undefined;
   return {
     id: booking.bookingId,
     contractId: booking.id,
@@ -750,6 +756,8 @@ function toVendorTrip(
     freightRate: assignment?.vendorFreight ?? buyingRateFallback ?? 0,
     isInvoiced: booking.isInvoiced ?? false,
     createdAt: booking.createdAt,
+    deliveredDate,
+    podStatus: booking.pod?.podUploaded ? "CONFIRMED" : undefined,
     expenses: approvedExpenseItems.map((expense) => ({
       id: expense.id,
       label: expense.label,
@@ -763,5 +771,15 @@ function toVendorTrip(
     approvedExpenses: approvedExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
     // Advance via the same approval flow as expenses; fall back to the LR advance.
     advance: approvedAdvance || (booking.shipmentDocuments?.lr?.advance ?? 0),
+    advanceItems: approvedItems.filter(isAdvance).map((expense) => ({
+      id: expense.id,
+      label: expense.label,
+      amount: expense.amount,
+      expenseType: expense.expenseType,
+      paymentMode: expense.paymentMode,
+      paidBy: expense.paidBy,
+      status: expense.status,
+      dateTime: expense.dateTime,
+    })),
   };
 }
