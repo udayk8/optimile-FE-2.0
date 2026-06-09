@@ -49,8 +49,11 @@ export function VendorContractComparison({
   const recommended = new Set(recommendedRateCardIds);
   const money = (value: number) => `Rs ${Math.round(value).toLocaleString()}`;
 
-  // Inline remark state, keyed by rate card row.
+  // Inline remark state, keyed by rate card row. `remarkByRow` is the live draft
+  // being typed; `savedRemarkByRow` is the committed remark (only a SAVED remark
+  // counts — typing alone does not enable Send Indent for higher-rate vendors).
   const [remarkByRow, setRemarkByRow] = useState<Record<string, string>>({});
+  const [savedRemarkByRow, setSavedRemarkByRow] = useState<Record<string, string>>({});
   const [openRow, setOpenRow] = useState<string | null>(null);
 
   // Vendor, Source, Volume, Est. Trips, Trips Left, Rate Type, Buying Rate,
@@ -90,9 +93,12 @@ export function VendorContractComparison({
               {entries.map((entry) => {
                 const isMuted = muted.has(entry.vendorId);
                 const isRecommended = recommended.has(entry.rateCardId);
-                const remark = remarkByRow[entry.rateCardId] ?? "";
-                const hasRemark = remark.trim().length > 0;
-                // L1 rows: remark optional → always sendable. Others: need a remark.
+                const savedRemark = savedRemarkByRow[entry.rateCardId] ?? "";
+                const hasRemark = savedRemark.trim().length > 0;
+                // Draft seeds from the saved remark when editing.
+                const draft = remarkByRow[entry.rateCardId] ?? savedRemark;
+                // L1 rows: remark optional → always sendable. Others: need a SAVED
+                // remark (typing alone is not enough — they must click Save).
                 const sendDisabled = enableRemark && !isRecommended && !hasRemark;
                 const isOpen = openRow === entry.rateCardId;
                 return (
@@ -137,7 +143,11 @@ export function VendorContractComparison({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => setOpenRow(isOpen ? null : entry.rateCardId)}
+                                onClick={() => {
+                                  // Seed the draft from the saved remark when opening.
+                                  setRemarkByRow((current) => ({ ...current, [entry.rateCardId]: current[entry.rateCardId] ?? savedRemark }))
+                                  setOpenRow(isOpen ? null : entry.rateCardId)
+                                }}
                               >
                                 {hasRemark ? "View Remark" : "Add Remark"}
                               </Button>
@@ -146,8 +156,8 @@ export function VendorContractComparison({
                               size="sm"
                               variant="outline"
                               disabled={sendDisabled}
-                              title={sendDisabled ? "Add a remark to send the indent to this higher-rate vendor" : undefined}
-                              onClick={() => onSelect(entry.vendorId, entry.rateCardId, remark.trim() || undefined)}
+                              title={sendDisabled ? "Add and save a remark to send the indent to this higher-rate vendor" : undefined}
+                              onClick={() => onSelect(entry.vendorId, entry.rateCardId, savedRemark.trim() || undefined)}
                             >
                               {isMuted ? "Resend" : actionLabel}
                             </Button>
@@ -162,7 +172,7 @@ export function VendorContractComparison({
                             Remark{isRecommended ? " (optional)" : " (required for higher-rate vendor)"}
                           </label>
                           <textarea
-                            value={remark}
+                            value={draft}
                             onChange={(event) =>
                               setRemarkByRow((current) => ({ ...current, [entry.rateCardId]: event.target.value }))
                             }
@@ -175,6 +185,22 @@ export function VendorContractComparison({
                             }
                             className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
                           />
+                          <div className="mt-2 flex items-center justify-end gap-2">
+                            {hasRemark ? <span className="mr-auto text-[11px] font-medium text-emerald-600">Saved</span> : null}
+                            <Button size="sm" variant="ghost" onClick={() => { setRemarkByRow((current) => ({ ...current, [entry.rateCardId]: savedRemark })); setOpenRow(null) }}>
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={draft.trim().length === 0}
+                              onClick={() => {
+                                setSavedRemarkByRow((current) => ({ ...current, [entry.rateCardId]: draft.trim() }))
+                                setOpenRow(null)
+                              }}
+                            >
+                              Save Remark
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ) : null}
