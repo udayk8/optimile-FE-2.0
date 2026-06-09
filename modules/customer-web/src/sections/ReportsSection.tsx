@@ -351,7 +351,7 @@ export function ReportsSection({ bookings, onGoToBookings, onViewFinance }: Prop
     'consignee-report': [
       { label: 'Consignees', value: String(CONSIGNEE_ANALYTICS.length) },
       { label: 'Best OTD',   value: p.bestConsignee ? `${p.bestConsignee.otd}%` : '—', accent: 'text-success' },
-      { label: 'Delivered',  value: String(p.deliveredCount) },
+      { label: 'Completed',  value: String(p.deliveredCount) },
     ],
     'freight-spend': [
       { label: 'Total',      value: currency(p.totalFrt) },

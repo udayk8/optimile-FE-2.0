@@ -123,7 +123,7 @@ export const BOOKINGS: Booking[] = [
     weight: 12.4,
     material: 'Steel coils',
     quantity: '14 coils',
-    eta: 'Delivered',
+    eta: 'Completed',
     bookingDate: '2026-05-29 10:10',
     createdBy: 'ERP',
     freight: 38200,

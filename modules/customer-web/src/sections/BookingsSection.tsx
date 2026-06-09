@@ -43,7 +43,7 @@ const STATUS_CFG: Record<BookingStatus, StatusCfg> = {
   IN_TRANSIT:            { label: 'In Transit',   badge: 'bg-primary/10 text-primary',      stripe: 'bg-primary',     pulse: false },
   IN_TRANSIT_DELAYED:    { label: 'Delayed',      badge: 'bg-orange-100 text-orange-700',   stripe: 'bg-orange-500',  pulse: true  },
   IN_TRANSIT_EXCEPTION:  { label: 'Attention',    badge: 'bg-red-100 text-danger',          stripe: 'bg-danger',      pulse: true  },
-  DELIVERED:             { label: 'Delivered',    badge: 'bg-emerald-100 text-emerald-700', stripe: 'bg-emerald-500', pulse: false },
+  DELIVERED:             { label: 'Completed',    badge: 'bg-emerald-100 text-emerald-700', stripe: 'bg-emerald-500', pulse: false },
   CANCELLED:             { label: 'Cancelled',    badge: 'bg-gray-100 text-gray-400',       stripe: 'bg-gray-200',    pulse: false },
 }
 
@@ -347,8 +347,8 @@ const STATUS_CHIPS: FilterChip[] = [
   { value: 'all',        label: 'All'            },
   { value: 'active',     label: 'In Transit'     },
   { value: 'pending',    label: 'Pending'        },
-  { value: 'exceptions', label: 'Needs Attention'},
-  { value: 'completed',  label: 'Delivered'      },
+  { value: 'exceptions', label: 'Exception'      },
+  { value: 'completed',  label: 'Completed'      },
   { value: 'cancelled',  label: 'Cancelled'      },
 ]
 

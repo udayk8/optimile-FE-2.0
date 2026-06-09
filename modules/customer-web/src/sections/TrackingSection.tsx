@@ -219,7 +219,7 @@ function RouteVisualization({ booking }: { booking: Booking }) {
 
   const barColor = isException ? 'bg-danger/70' : isDelayed ? 'bg-warning' : 'bg-primary'
   const dotColor = isException ? 'bg-danger text-white' : isDelayed ? 'bg-warning text-white' : 'bg-primary text-white'
-  const liveLabel = isException ? 'Exception' : isDelayed ? 'Delayed' : isDelivered ? 'Delivered' : 'Live'
+  const liveLabel = isException ? 'Exception' : isDelayed ? 'Delayed' : isDelivered ? 'Completed' : 'Live'
   const liveDot   = isException ? 'bg-danger' : isDelayed ? 'bg-warning animate-pulse' : isDelivered ? 'bg-success' : 'bg-success animate-pulse'
 
   return (

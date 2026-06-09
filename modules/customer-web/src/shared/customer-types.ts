@@ -22,7 +22,7 @@ export const STATUS_META: Record<BookingStatus, StatusMeta> = {
   IN_TRANSIT: { label: 'In Transit', description: 'Goods loaded and en route.', badge: 'default', action: 'Track, View ETA' },
   IN_TRANSIT_DELAYED: { label: 'Delayed', description: 'ETA has slipped by more than 2 hours.', badge: 'destructive', action: 'Track, View revised ETA' },
   IN_TRANSIT_EXCEPTION: { label: 'Exception', description: 'Operational issue reported.', badge: 'destructive', action: 'View exception' },
-  DELIVERED: { label: 'Delivered', description: 'Delivery confirmed with ePOD.', badge: 'success', action: 'View ePOD, Download LR' },
+  DELIVERED: { label: 'Completed', description: 'Delivery confirmed with ePOD.', badge: 'success', action: 'View ePOD, Download LR' },
   CANCELLED: { label: 'Cancelled', description: 'Booking cancelled with reason.', badge: 'outline', action: 'View reason' },
 }
 
