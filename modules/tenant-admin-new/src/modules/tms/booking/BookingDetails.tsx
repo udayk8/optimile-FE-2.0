@@ -54,7 +54,6 @@ import type {
   BookingDestinationChangeRequest,
   BookingExpenseRecord,
   BookingExpensePaymentMode,
-  BookingExpenseStatus,
   BookingPodSnapshot,
   BookingVehicleReplacementHistoryRecord,
   BookingVehicleReplacementInput,
@@ -166,8 +165,14 @@ const VEHICLE_REPLACEMENT_REASON_OPTIONS: Array<{ value: BookingVehicleReplaceme
 ];
 
 const BOOKING_EXPENSE_TYPES = [
-  "Loading and Unloading Charges",
-  "Detention Charges",
+  "Toll charge",
+  "Loading charge",
+  "Unloading charge",
+  "Detention charge",
+  "Parking charge",
+  "Driver allowance",
+  "Weighment charge",
+  "Other",
 ];
 const BOOKING_ADVANCE_TYPE = "Advance";
 const BOOKING_EXPENSE_PAID_BY = ["Driver", "Vendor", "Company", "Self"];
@@ -1828,7 +1833,7 @@ export function BookingDetailsPage() {
 
   function openAddModal(mode: "expense" | "advance") {
     setExpenseMode(mode);
-    setExpenseType(mode === "advance" ? BOOKING_ADVANCE_TYPE : "Loading and Unloading Charges");
+    setExpenseType(mode === "advance" ? BOOKING_ADVANCE_TYPE : "Toll charge");
     setExpenseAmount("");
     setExpenseBillFile("");
     setExpenseNotes("");
@@ -1856,7 +1861,9 @@ export function BookingDetailsPage() {
       paidBy: expensePaidBy,
       billReceiptFile: expenseBillFile.trim(),
       notes: expenseNotes.trim() || undefined,
-      status: "Pending",
+      // No separate approval step — items are recorded as Approved so they flow
+      // straight to the vendor portal / invoice.
+      status: "Approved",
     };
     updateBooking(bookingRecord.id, {
       expenses: [...(bookingRecord.expenses ?? []), nextExpense],
@@ -1864,7 +1871,7 @@ export function BookingDetailsPage() {
     setExpenseAmount("");
     setExpenseBillFile("");
     setExpenseNotes("");
-    setExpenseType("Loading and Unloading Charges");
+    setExpenseType("Toll charge");
     setExpensePaymentMode("UPI");
     setExpensePaidBy("Driver");
     setExpenseModalOpen(false);
@@ -1874,14 +1881,6 @@ export function BookingDetailsPage() {
     /advance/i.test(`${e.expenseType ?? ""} ${e.label ?? ""}`);
   const expenseItems = (bookingRecord.expenses ?? []).filter((e) => !isAdvanceItem(e));
   const advanceItems = (bookingRecord.expenses ?? []).filter(isAdvanceItem);
-
-  function setExpenseStatus(expenseId: string, status: BookingExpenseStatus) {
-    updateBooking(bookingRecord.id, {
-      expenses: (bookingRecord.expenses ?? []).map((expense) =>
-        expense.id === expenseId ? { ...expense, status } : expense,
-      ),
-    });
-  }
 
   function saveDeliveryPod(deliveryId: string) {
     const form = podForms[deliveryId];
@@ -2871,12 +2870,6 @@ export function BookingDetailsPage() {
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-1.5">
                               <Button size="sm" variant="outline" onClick={() => setExpenseViewId(expense.id)}>View</Button>
-                              {bookingRecord.status !== "COMPLETED" && (expense.status ?? "Pending") === "Pending" ? (
-                                <>
-                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Approved")}>Approve</Button>
-                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Rejected")}>Reject</Button>
-                                </>
-                              ) : null}
                             </div>
                           </td>
                         </tr>
@@ -2932,12 +2925,6 @@ export function BookingDetailsPage() {
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-1.5">
                               <Button size="sm" variant="outline" onClick={() => setExpenseViewId(expense.id)}>View</Button>
-                              {bookingRecord.status !== "COMPLETED" && (expense.status ?? "Pending") === "Pending" ? (
-                                <>
-                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Approved")}>Approve</Button>
-                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Rejected")}>Reject</Button>
-                                </>
-                              ) : null}
                             </div>
                           </td>
                         </tr>
