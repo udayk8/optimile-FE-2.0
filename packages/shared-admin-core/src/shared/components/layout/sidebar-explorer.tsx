@@ -327,14 +327,7 @@ export function SidebarExplorer({
 
   return (
     <aside
-      onMouseEnter={() => {
-        // Peek-expand only while pinned-collapsed; never overrides a pinned-open
-        // sidebar.
-        if (collapsed) {
-          setHoverExpanded(true);
-        }
-      }}
-      onMouseLeave={() => setHoverExpanded(false)}
+      // Collapse/expand is controlled ONLY by the toggle button — no hover peek.
       className={cn(
         "sticky top-0 hidden h-screen shrink-0 border-r border-border/70 bg-gradient-to-b from-slate-50/92 via-white to-slate-50/88 transition-all duration-200 lg:flex lg:flex-col",
         isCollapsed ? "w-[74px]" : "w-[272px]",
