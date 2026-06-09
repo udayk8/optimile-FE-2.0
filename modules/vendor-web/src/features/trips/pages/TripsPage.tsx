@@ -241,11 +241,14 @@ export default function TripsPage() {
   const fPending = pendingAllocation.filter((i) =>
     matches(i.id, i.laneDetails.origin.city, i.laneDetails.destination.city, i.status),
   )
-  const fAssignment = assignmentBookings.filter(
-    (t) =>
-      matches(t.id, t.laneDetails.origin.city, t.laneDetails.destination.city, t.status, t.assignedVehicle.registrationNumber, t.assignedDriver.name) &&
-      dateOk(t.createdAt, true),
-  )
+  const fAssignment = assignmentBookings
+    .filter(
+      (t) =>
+        matches(t.id, t.laneDetails.origin.city, t.laneDetails.destination.city, t.status, t.assignedVehicle.registrationNumber, t.assignedDriver.name) &&
+        dateOk(t.createdAt, true),
+    )
+    // ACCEPTED bookings (no vehicle/driver assigned yet) always surface at the top.
+    .sort((a, b) => (a.status === 'ACCEPTED' ? 0 : 1) - (b.status === 'ACCEPTED' ? 0 : 1))
   const fInTransit = inTransitBookings.filter(
     (t) =>
       matches(t.id, t.laneDetails.origin.city, t.laneDetails.destination.city, t.status, t.assignedVehicle.registrationNumber, t.assignedDriver.name) &&

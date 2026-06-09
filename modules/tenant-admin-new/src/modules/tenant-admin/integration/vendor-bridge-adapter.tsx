@@ -373,10 +373,9 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
           ].filter((n): n is string => Boolean(n)),
         ),
       );
-      const documents = [
-        ...lrNumbers.map((lr, i) => ({ id: `lr-${i}`, title: `LR ${lr}`, fileName: `lr-${lr}.pdf`, url: `/docs/lr-${lr}.pdf` })),
-        ...(booking.documents ?? []).map((d) => ({ id: d.id, title: d.type, fileName: d.fileName, url: `/docs/${d.fileName}` })),
-      ];
+      // Only documents actually uploaded to the booking — no synthesized LR
+      // placeholders (LR numbers still surface via lrNumbers separately).
+      const documents = (booking.documents ?? []).map((d) => ({ id: d.id, title: d.type, fileName: d.fileName, url: `/docs/${d.fileName}` }));
       const lane = laneOf(booking);
       const a = booking.assignment ?? null;
       // 3PL rule: the vendor only ever sees their OWN buying rate — never the

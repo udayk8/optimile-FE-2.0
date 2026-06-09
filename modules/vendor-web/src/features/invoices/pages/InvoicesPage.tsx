@@ -226,6 +226,8 @@ export default function InvoicesPage() {
   const invoiceTotalPages = Math.max(1, Math.ceil(invoicesForTab.length / invoicePageSize))
   const safePage = Math.min(invoicePage, invoiceTotalPages)
   const pagedInvoices = invoicesForTab.slice((safePage - 1) * invoicePageSize, safePage * invoicePageSize)
+  // Dispute column is irrelevant on pending / approved / paid invoices.
+  const showDisputeCol = !['pending', 'approved', 'paid'].includes(activeTab)
 
   return (
     <div className="space-y-6">
@@ -333,7 +335,7 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
+                  {showDisputeCol && <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -381,22 +383,24 @@ export default function InvoicesPage() {
                           </Button>
                         </div>
                       </td>
-                      <td className="p-4">
-                        {dispute ? (
-                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                            <StatusBadge status={dispute.status} />
-                            {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
-                            {invoice.status === 'DISPUTED' ? (
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
-                                <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
-                                Open Thread
-                              </Button>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
-                      </td>
+                      {showDisputeCol && (
+                        <td className="p-4">
+                          {dispute ? (
+                            <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                              <StatusBadge status={dispute.status} />
+                              {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
+                              {invoice.status === 'DISPUTED' ? (
+                                <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
+                                  <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
+                                  Open Thread
+                                </Button>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">-</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

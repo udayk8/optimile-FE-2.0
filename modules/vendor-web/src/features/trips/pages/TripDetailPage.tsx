@@ -37,7 +37,7 @@ export default function TripDetailPage() {
   // Source bookings from the cross-module bridge when embedded (trips are
   // synthesized from shared bookings, not in the local app.store), else fall
   // back to app.store standalone.
-  const { indents, trips, acceptIndent, declineIndent, getBookingDetail } = useVendorBookings()
+  const { indents, trips, acceptIndent, declineIndent, getBookingDetail, isBridgeRecord } = useVendorBookings()
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
 
@@ -76,6 +76,9 @@ export default function TripDetailPage() {
   const POST_ACCEPT_STATUSES: Trip['status'][] = ['ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED']
   const tripDocs = booking && 'documents' in booking ? trip?.documents ?? [] : []
   const docs = (() => {
+    // Cross-module bookings: show only documents actually uploaded to the booking
+    // — never the synthesized LR/E-way/Invoice placeholders.
+    if (isBridgeRecord(id)) return tripDocs
     if (!trip || !POST_ACCEPT_STATUSES.includes(trip.status)) return tripDocs
     const haveType = new Set(tripDocs.map((d) => d.type))
     const defaults: TripDocument[] = []
