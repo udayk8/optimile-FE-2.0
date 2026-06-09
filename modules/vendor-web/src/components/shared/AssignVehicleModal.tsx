@@ -34,21 +34,9 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
       : indent?.vehicleTypeRequired
   const expectedVehicleType = rawExpectedType && rawExpectedType !== '—' ? rawExpectedType : null
 
-  // Vehicles/drivers already tied to a live booking (assigned but not yet
-  // completed/cancelled) are Occupied and must not be assignable again.
-  const occupiedVehicleIds = new Set(
-    trips.filter((t) => !['COMPLETED', 'CANCELLED'].includes(t.status) && t.id !== tripId && t.assignedVehicle?.id).map((t) => t.assignedVehicle.id),
-  )
-  const occupiedDriverIds = new Set(
-    trips.filter((t) => !['COMPLETED', 'CANCELLED'].includes(t.status) && t.id !== tripId && t.assignedDriver?.id).map((t) => t.assignedDriver.id),
-  )
-  // Only Active + Compliant + Available (not occupied) vehicles/drivers can be assigned.
-  const availableVehicles = vehicles.filter(
-    (v) => v.operationalStatus === 'ACTIVE' && v.complianceStatus === 'COMPLIANT' && !occupiedVehicleIds.has(v.id),
-  )
-  const availableDrivers = drivers.filter(
-    (d) => d.currentStatus === 'ACTIVE' && d.complianceStatus === 'COMPLIANT' && !occupiedDriverIds.has(d.id),
-  )
+  // Only Active + Compliant vehicles/drivers can be assigned.
+  const availableVehicles = vehicles.filter((v) => v.operationalStatus === 'ACTIVE' && v.complianceStatus === 'COMPLIANT')
+  const availableDrivers = drivers.filter((d) => d.currentStatus === 'ACTIVE' && d.complianceStatus === 'COMPLIANT')
 
   const handleAssign = () => {
     if (!selectedVehicle || !selectedDriver) return

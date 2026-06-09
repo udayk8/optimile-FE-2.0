@@ -6,7 +6,6 @@ import { Button } from '@vendor/components/ui/button'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { formatDate } from '@vendor/lib/date-utils'
 import { useFleetData } from '@vendor/integration/useFleetData'
-import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { AddVehicleModal } from '@vendor/components/shared/AddVehicleModal'
 import { AddDriverModal } from '@vendor/components/shared/AddDriverModal'
 import type { Driver, Vehicle } from '@vendor/types'
@@ -24,14 +23,6 @@ function ComplianceIcon({ status }: { status: string }) {
   if (status === 'COMPLIANT') return <ShieldCheck className="h-4 w-4 text-success" />
   if (status === 'EXPIRING_SOON') return <AlertTriangle className="h-4 w-4 text-warning" />
   return <ShieldX className="h-4 w-4 text-danger" />
-}
-
-function AvailabilityBadge({ occupied }: { occupied: boolean }) {
-  return occupied ? (
-    <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">Occupied</span>
-  ) : (
-    <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">Available</span>
-  )
 }
 
 function ToggleSwitch({ active, onToggle }: { active: boolean; onToggle: () => void }) {
@@ -62,16 +53,6 @@ export default function FleetPage() {
   const params = useParams()
   const activeTab = getFleetTab(location.pathname)
   const { vehicles, drivers, updateVehicle, updateDriver } = useFleetData()
-  const { trips } = useVendorBookings()
-  // A vehicle/driver is Occupied while tied to a live (not completed/cancelled) booking.
-  const occupiedVehicleIds = useMemo(
-    () => new Set(trips.filter((t) => !['COMPLETED', 'CANCELLED'].includes(t.status) && t.assignedVehicle?.id).map((t) => t.assignedVehicle.id)),
-    [trips],
-  )
-  const occupiedDriverIds = useMemo(
-    () => new Set(trips.filter((t) => !['COMPLETED', 'CANCELLED'].includes(t.status) && t.assignedDriver?.id).map((t) => t.assignedDriver.id)),
-    [trips],
-  )
 
   const [isAddVehicleOpen, setIsAddVehicleOpen] = useState(false)
   const [isAddDriverOpen, setIsAddDriverOpen] = useState(false)
@@ -212,7 +193,6 @@ export default function FleetPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Vehicle</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Availability</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                 </tr>
               </thead>
@@ -262,9 +242,6 @@ export default function FleetPage() {
                           : 'No docs'}
                       </div>
                     </td>
-                    <td className="p-4 align-top">
-                      <AvailabilityBadge occupied={occupiedVehicleIds.has(vehicle.id)} />
-                    </td>
                     <td className="p-4 align-top text-right">
                       <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/fleet/vehicles/${vehicle.id}`)}>
                         <Edit3 className="mr-2 h-4 w-4" /> Edit
@@ -288,7 +265,6 @@ export default function FleetPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">License</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Compliance</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Availability</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                 </tr>
               </thead>
@@ -350,9 +326,6 @@ export default function FleetPage() {
                           ? `${driver.complianceDocuments.length} doc${driver.complianceDocuments.length !== 1 ? 's' : ''}`
                           : 'No docs'}
                       </div>
-                    </td>
-                    <td className="p-4 align-top">
-                      <AvailabilityBadge occupied={occupiedDriverIds.has(driver.id)} />
                     </td>
                     <td className="p-4 align-top text-right">
                       <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/fleet/drivers/${driver.id}`)}>
