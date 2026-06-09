@@ -4,6 +4,7 @@ import { PageHero } from '@shared-ui/page-hero'
 import { Button } from '@shared-ui/button'
 import { Input } from '@shared-ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@vendor/components/ui/dialog'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import type { CustomerLedgerEntryType, PaymentKind } from '@vendor/types'
@@ -123,14 +124,16 @@ export default function PaymentsPage() {
         action={<Button variant="outline" onClick={openModal}><Plus className="h-4 w-4" />Record Payment</Button>}
       />
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <Input value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }} placeholder="Search invoice no…" className="w-[220px]" />
-        <Input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} className="w-[160px]" />
-        <Input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} className="w-[160px]" />
-        {(fromDate || toDate || searchText) && (
-          <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setPage(1) }}>Clear</Button>
-        )}
-      </div>
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setPage(1) }}
+        searchPlaceholder="Search invoice no…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
+      />
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">

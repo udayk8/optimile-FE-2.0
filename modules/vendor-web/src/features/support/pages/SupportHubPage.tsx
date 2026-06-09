@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import { ExceptionRecord, ExceptionStatus } from '@vendor/types'
-import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { formatDateTime } from '@vendor/lib/date-utils'
@@ -91,30 +92,27 @@ export default function SupportHubPage() {
         ))}
       </div>
 
+      <PageFilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Search exception, booking, route, driver"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
+      />
+
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-text">Exception Workspace</h3>
             <p className="mt-1 text-sm text-gray-500">Create, track, and resolve booking-linked incidents from one table.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search exception, booking, route, driver"
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-primary focus:bg-white sm:w-[300px]"
-              />
-            </div>
-            <Button variant="outline" onClick={() => navigate('/vendor/report-exception')}>
-              Report Exception
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => navigate('/vendor/report-exception')}>
+            Report Exception
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-6 py-4">
@@ -133,16 +131,6 @@ export default function SupportHubPage() {
                 {item === 'ALL' ? 'All' : statusLabel(item)}
               </button>
             ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-              className="h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-primary focus:bg-white" />
-            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-              className="h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-primary focus:bg-white" />
-            {(fromDate || toDate) && (
-              <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
-                className="h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
-            )}
           </div>
         </div>
 

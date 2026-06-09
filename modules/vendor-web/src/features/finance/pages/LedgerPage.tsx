@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { CalendarDays, Download, FileSpreadsheet } from 'lucide-react'
+import { Download, FileSpreadsheet } from 'lucide-react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
-import { Input } from '@vendor/components/ui/input'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { useAppStore } from '@vendor/stores/app.store'
 import type { LedgerEntry, LedgerType } from '@vendor/types'
 
@@ -112,10 +112,6 @@ export default function LedgerPage() {
   const safePage = Math.min(page, totalPages)
   const pagedEntries = tabEntries.slice((safePage - 1) * 10, safePage * 10)
 
-  const handleRangeChange = (setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
-    setPage(1)
-    setter(event.target.value)
-  }
 
   const handleExport = () => {
     const fileName = `${activeTab === 'CUSTOMER' ? 'customer' : 'nbfc'}-ledger_${fromDate}_${toDate}.csv`
@@ -146,31 +142,13 @@ export default function LedgerPage() {
     <div className="space-y-6">
       <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 px-6 py-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-stretch xl:justify-between">
-            <div className="flex min-h-[176px] flex-1 items-center rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
-              <HeroCard
-                eyebrow="FINANCE"
-                title="Transaction Ledger"
-                subtitle="Customer ledger tracks receivable (Dr) across invoices."
-                icon={<FileSpreadsheet className="h-6 w-6 text-primary" />}
-              />
-            </div>
-
-            <div className="flex min-h-[176px] w-full flex-col justify-between rounded-2xl border border-gray-200 bg-white px-5 py-5 shadow-sm xl:max-w-[380px]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <CalendarDays className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="text-sm font-semibold text-text">Date Filter</div>
-                  <div className="text-xs text-gray-500">Select range for table and export</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 pt-4">
-                <Input value={fromDate} onChange={handleRangeChange(setFromDate)} type="date" />
-                <Input value={toDate} onChange={handleRangeChange(setToDate)} type="date" />
-              </div>
-            </div>
+          <div className="flex items-center rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
+            <HeroCard
+              eyebrow="FINANCE"
+              title="Transaction Ledger"
+              subtitle="Customer ledger tracks receivable (Dr) across invoices."
+              icon={<FileSpreadsheet className="h-6 w-6 text-primary" />}
+            />
           </div>
         </div>
 
@@ -198,6 +176,17 @@ export default function LedgerPage() {
         </div>
       </div>
 
+      <PageFilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1) }}
+        searchPlaceholder="Search type, description, reference"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
+      />
+
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -222,13 +211,6 @@ export default function LedgerPage() {
                 <option key={invoiceId} value={invoiceId}>{invoiceId}</option>
               ))}
             </select>
-
-            <Input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Search type, description, reference"
-              className="max-w-[320px]"
-            />
           </div>
         </div>
 

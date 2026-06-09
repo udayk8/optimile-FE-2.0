@@ -3,6 +3,7 @@ import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/ho
 import { useMemo, useState } from 'react'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Button } from '@vendor/components/ui/button'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { SLACountdown } from '@vendor/components/shared/SLACountdown'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -102,18 +103,17 @@ export default function SourcingPage() {
         icon={<Search className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <input type="text" value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }}
-          placeholder="Search auction id / customer…"
-          className="h-9 w-64 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-        <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-        <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-        {(fromDate || toDate || searchText) && (
-          <button onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setPage(1) }}
-            className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
-        )}
+      <div className="mt-6">
+        <PageFilterBar
+          search={searchText}
+          onSearch={(v) => { setSearchText(v); setPage(1) }}
+          searchPlaceholder="Search auction id / customer…"
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDate={(v) => { setFromDate(v); setPage(1) }}
+          onToDate={(v) => { setToDate(v); setPage(1) }}
+          onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
+        />
       </div>
 
       <div className="mb-6 mt-4 flex max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">

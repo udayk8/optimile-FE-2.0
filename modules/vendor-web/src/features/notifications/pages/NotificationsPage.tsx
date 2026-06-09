@@ -4,6 +4,7 @@ import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
 import { Badge } from '@vendor/components/ui/badge'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { PageHero } from '@shared-ui/page-hero'
 import { formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
@@ -88,20 +89,16 @@ export default function NotificationsPage() {
         }
       />
 
-      {/* Search + date filter (unapplied by default) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <input type="text" value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }}
-          placeholder="Search notifications…"
-          className="h-9 w-64 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary" />
-        <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary" />
-        <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary" />
-        {(fromDate || toDate || searchText) && (
-          <button onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setPage(1) }}
-            className="h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
-        )}
-      </div>
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setPage(1) }}
+        searchPlaceholder="Search notifications…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setPage(1) }}
+        onToDate={(v) => { setToDate(v); setPage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setPage(1) }}
+      />
 
       {/* Type filter chips */}
       <div className="flex flex-wrap gap-2">

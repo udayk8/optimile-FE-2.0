@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { ChangeEvent } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useModuleNavigate as useNavigate } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { Card, CardContent } from '@vendor/components/ui/card'
 import { Button } from '@vendor/components/ui/button'
-import { Input } from '@vendor/components/ui/input'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
 import { CurrencyDisplay } from '@vendor/components/shared/CurrencyDisplay'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
@@ -17,7 +16,7 @@ import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useAppStore } from '@vendor/stores/app.store'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
 import { useVendorInvoiceProfile, type VendorInvoiceProfileData } from '@vendor/integration/useVendorInvoiceProfile'
-import { CalendarDays, CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
+import { CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
 import type { Dispute, Invoice, InvoiceLineItem, Trip } from '@vendor/types'
 
 const CUSTOMER_ADDRESS =
@@ -250,38 +249,16 @@ export default function InvoicesPage() {
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <CalendarDays className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-text">Date Filter</div>
-            <div className="text-xs text-gray-500">Filter invoices by created-on date</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input value={searchText} onChange={(e: ChangeEvent<HTMLInputElement>) => { setSearchText(e.target.value); setInvoicePage(1) }} placeholder="Search invoice no / status…" className="w-[220px]" />
-          <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setFromDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
-          <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setToDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
-          {(fromDate || toDate || searchText) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setInvoicePage(1) }}>
-              Clear
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-text">Invoice Workspace</h3>
-          <p className="mt-1 text-sm text-gray-500">Tabs separate pending reviews, approvals, disputes, resubmissions, and closed invoices.</p>
-        </div>
-        <Button onClick={() => navigate('/vendor/invoices/create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Invoice
-        </Button>
-      </div>
+      <PageFilterBar
+        search={searchText}
+        onSearch={(v) => { setSearchText(v); setInvoicePage(1) }}
+        searchPlaceholder="Search invoice no / status…"
+        fromDate={fromDate}
+        toDate={toDate}
+        onFromDate={(v) => { setFromDate(v); setInvoicePage(1) }}
+        onToDate={(v) => { setToDate(v); setInvoicePage(1) }}
+        onClear={() => { setSearchText(''); setFromDate(''); setToDate(''); setInvoicePage(1) }}
+      />
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
@@ -308,6 +285,13 @@ export default function InvoicesPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={() => navigate('/vendor/invoices/create')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Invoice
+        </Button>
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">

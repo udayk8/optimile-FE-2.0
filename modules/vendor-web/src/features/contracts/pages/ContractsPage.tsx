@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { HeroCard } from '@vendor/components/cards/HeroCard'
 import { StatusBadge } from '@vendor/components/shared/StatusBadge'
+import { PageFilterBar } from '@vendor/components/shared/PageFilterBar'
 import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useAppStore } from '@vendor/stores/app.store'
@@ -91,27 +92,25 @@ export default function ContractsPage() {
         ))}
       </div>
 
-      <div className="mt-6 mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
-          {STATUS_FILTERS.map((f) => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="text" placeholder="Search by ID or lane..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="h-10 w-60 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
-          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
-            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-          {(fromDate || toDate) && (
-            <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
-              className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
-          )}
-        </div>
+      <div className="mt-6 mb-3 flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+        {STATUS_FILTERS.map((f) => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${statusFilter === f.value ? 'bg-white text-text shadow-sm' : 'text-gray-600 hover:text-primary'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      <div className="mb-6">
+        <PageFilterBar
+          search={search}
+          onSearch={(v) => { setSearch(v); setPage(1) }}
+          searchPlaceholder="Search by ID or lane..."
+          fromDate={fromDate}
+          toDate={toDate}
+          onFromDate={(v) => { setFromDate(v); setPage(1) }}
+          onToDate={(v) => { setToDate(v); setPage(1) }}
+          onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
+        />
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
