@@ -753,5 +753,6 @@ function toVendorTrip(
       dateTime: expense.dateTime,
     })),
     approvedExpenses: approvedExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
+    advance: booking.shipmentDocuments?.lr?.advance ?? 0,
   };
 }

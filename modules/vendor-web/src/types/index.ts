@@ -301,6 +301,8 @@ export interface Trip {
   expenses?: TripExpense[]
   /** Sum of approved expenses — surfaced on the bookings list + invoice. */
   approvedExpenses?: number
+  /** Advance paid on the booking LR — informational only (never reduces totals). */
+  advance?: number
 }
 
 export interface TripExpense {

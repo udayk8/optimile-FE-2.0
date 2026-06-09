@@ -98,10 +98,17 @@ export default function CreateInvoicePage() {
   const selectedOnPage = pagedTrips.filter((trip) => selectedTripIds.includes(trip.id)).length
   const allOnPageSelected = pagedTrips.length > 0 && selectedOnPage === pagedTrips.length
 
+  // Cap at 5 bookings per invoice so the document fits a single A4 page.
+  const MAX_INVOICE_TRIPS = 5
   const toggleTrip = (tripId: string) => {
-    setSelectedTripIds((prev) =>
-      prev.includes(tripId) ? prev.filter((id) => id !== tripId) : [...prev, tripId],
-    )
+    setSelectedTripIds((prev) => {
+      if (prev.includes(tripId)) return prev.filter((id) => id !== tripId)
+      if (prev.length >= MAX_INVOICE_TRIPS) {
+        window.alert(`You can invoice up to ${MAX_INVOICE_TRIPS} bookings together (A4 page limit).`)
+        return prev
+      }
+      return [...prev, tripId]
+    })
   }
 
   const togglePageSelection = () => {
@@ -110,7 +117,13 @@ export default function CreateInvoicePage() {
       if (allOnPageSelected) {
         pagedTrips.forEach((trip) => current.delete(trip.id))
       } else {
-        pagedTrips.forEach((trip) => current.add(trip.id))
+        for (const trip of pagedTrips) {
+          if (current.size >= MAX_INVOICE_TRIPS) break
+          current.add(trip.id)
+        }
+        if (current.size >= MAX_INVOICE_TRIPS) {
+          window.alert(`You can invoice up to ${MAX_INVOICE_TRIPS} bookings together (A4 page limit).`)
+        }
       }
       return Array.from(current)
     })
@@ -211,6 +224,7 @@ export default function CreateInvoicePage() {
                       <th className="px-5 py-3 font-bold">Route</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold text-right">Freight</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Line total</th>
                     </tr>
@@ -250,6 +264,9 @@ export default function CreateInvoicePage() {
                           </td>
                           <td className="px-5 py-4 text-right font-medium text-emerald-600">
                             <CurrencyDisplay amount={trip.freightRate} />
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-text">
+                            <CurrencyDisplay amount={trip.advance ?? 0} />
                           </td>
                           <td className="px-5 py-4 text-right text-sm text-text">
                             <CurrencyDisplay amount={trip.approvedExpenses ?? 0} />
@@ -350,15 +367,6 @@ export default function CreateInvoicePage() {
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 p-6">
-              <Button variant="outline" onClick={() => setStep('select')}>
-                Back to selection
-              </Button>
-              <Button onClick={handleSubmit}>
-                Submit invoice
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
             </div>
           </div>
 

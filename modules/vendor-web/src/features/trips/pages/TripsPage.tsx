@@ -499,6 +499,7 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle</th>
                       <th className="px-5 py-3 font-bold">Driver</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
@@ -518,6 +519,7 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
+                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.approvedExpenses ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/in-transit/${trip.id}`)}>View Details</Button>
@@ -549,6 +551,7 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
                     </tr>
@@ -562,6 +565,7 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
+                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.approvedExpenses ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <div className="inline-flex items-center gap-2">
@@ -604,6 +608,7 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Freight</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
@@ -618,6 +623,7 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                         <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
+                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.approvedExpenses ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/completed/${trip.id}`)}>View Details</Button>
@@ -694,6 +700,7 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Issue</th>
                       <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle / Driver</th>
+                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
                     </tr>
@@ -726,6 +733,7 @@ export default function TripsPage() {
                           <div>{trip.assignedVehicle.registrationNumber}</div>
                           <div className="text-xs text-gray-500">{trip.assignedDriver.name}</div>
                         </td>
+                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.approvedExpenses ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <div className="inline-flex items-center gap-2">

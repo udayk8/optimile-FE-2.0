@@ -3005,7 +3005,7 @@ export const bl001Bookings = [
         "generatedAt": "2026-06-03T12:22:45.011Z",
         "viewMode": "COMBINED",
         "extraCharges": 0,
-        "advance": 0
+        "advance": 12000
       }
     }
   },

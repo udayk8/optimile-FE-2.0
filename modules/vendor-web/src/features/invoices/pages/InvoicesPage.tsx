@@ -337,12 +337,12 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created On</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Last Update</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Cost</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Final Amount</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -361,22 +361,6 @@ export default function InvoicesPage() {
                         {invoice.status === 'CLOSED' && invoice.closeReason ? (
                           <p className="mt-1 text-xs text-gray-400">{CLOSE_REASON_LABEL[invoice.closeReason]}</p>
                         ) : null}
-                      </td>
-                      <td className="p-4">
-                        {dispute ? (
-                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
-                            <StatusBadge status={dispute.status} />
-                            {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
-                            {invoice.status === 'DISPUTED' ? (
-                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
-                                <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
-                                Open Thread
-                              </Button>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">-</span>
-                        )}
                       </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
                       <td className="p-4 text-right">
@@ -406,6 +390,22 @@ export default function InvoicesPage() {
                             <Download className="h-4 w-4" />
                           </Button>
                         </div>
+                      </td>
+                      <td className="p-4">
+                        {dispute ? (
+                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                            <StatusBadge status={dispute.status} />
+                            {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
+                            {invoice.status === 'DISPUTED' ? (
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
+                                <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
+                                Open Thread
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   )
