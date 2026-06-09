@@ -11,7 +11,7 @@ import { EmptyState } from '@vendor/components/shared/EmptyState'
 import { formatDate, formatDateTime } from '@vendor/lib/date-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
-import { Truck, Package, CheckCircle, XCircle, Route, Upload, Wrench } from 'lucide-react'
+import { Truck, Package, CheckCircle, XCircle, Route, Wrench } from 'lucide-react'
 import { AssignVehicleModal } from '@vendor/components/shared/AssignVehicleModal'
 import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
@@ -36,7 +36,6 @@ type BookingsTab =
   | 'rejected'
 
 const BOOKING_TABS: BookingsTab[] = [
-  'all',
   'pending-allocation',
   'assignment',
   'in-transit',
@@ -227,34 +226,6 @@ export default function TripsPage() {
               : 'assignment'
     return `/vendor/bookings/${seg}/${trip.id}`
   }
-  const allRows = useMemo(
-    () => [
-      ...indents.map((indent) => ({
-        id: indent.id,
-        status: indent.status,
-        originCity: indent.laneDetails.origin.city,
-        destinationCity: indent.laneDetails.destination.city,
-        pickup: indent.reportingDateTime,
-        lastUpdate: indent.createdAt,
-        createdAt: indent.createdAt,
-        detailsPath:
-          indent.status === 'DECLINED' ? `/vendor/bookings/rejected/${indent.id}` : `/vendor/bookings/new/${indent.id}`,
-      })),
-      ...trips.map((trip) => ({
-        id: trip.id,
-        status: trip.status,
-        originCity: trip.laneDetails.origin.city,
-        destinationCity: trip.laneDetails.destination.city,
-        pickup: pickupOfTrip(trip),
-        lastUpdate: lastUpdateTime(trip),
-        createdAt: trip.createdAt,
-        detailsPath: detailPathForTrip(trip),
-      })),
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [indents, trips],
-  )
-
   // ── Search + date filtering ──
   const q = search.trim().toLowerCase()
   const matches = (...vals: (string | undefined | null)[]) =>
@@ -267,7 +238,6 @@ export default function TripsPage() {
   }
   const pageSlice = <T,>(rows: T[]): T[] => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const fAll = allRows.filter((r) => matches(r.id, r.originCity, r.destinationCity, r.status) && dateOk(r.createdAt, true))
   const fPending = pendingAllocation.filter((i) =>
     matches(i.id, i.laneDetails.origin.city, i.laneDetails.destination.city, i.status),
   )
@@ -303,7 +273,6 @@ export default function TripsPage() {
   )
 
   const tabs: { key: BookingsTab; label: string; count: number }[] = [
-    { key: 'all', label: 'All', count: fAll.length },
     { key: 'pending-allocation', label: 'Pending Allocation', count: fPending.length },
     { key: 'assignment', label: 'Assignment', count: fAssignment.length },
     { key: 'in-transit', label: 'In Transit', count: fInTransit.length },
@@ -351,50 +320,6 @@ export default function TripsPage() {
           ))}
         </div>
       </div>
-
-      {activeTab === 'all' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          {fAll.length === 0 ? (
-            <div className="p-8"><EmptyState icon={<Package className="h-12 w-12" />} title="No bookings" /></div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1100px] text-left">
-                  <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                    <tr>
-                      <th className="px-5 py-3 font-bold">Status</th>
-                      <th className="px-5 py-3 font-bold">Booking</th>
-                      <th className="px-5 py-3 font-bold">Customer</th>
-                      <th className="px-5 py-3 font-bold">Source</th>
-                      <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
-                      <th className="px-5 py-3 font-bold text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {pageSlice(fAll).map((row) => (
-                      <tr key={row.id} className={rowClass(row.id)}>
-                        <td className="px-5 py-4"><StatusBadge status={row.status} /></td>
-                        <td className="px-5 py-4"><div className="font-mono text-sm font-semibold">{row.id}</div></td>
-                        <td className="px-5 py-4 text-sm text-text">{customerFor(row.id)}</td>
-                        <td className="px-5 py-4 text-sm text-text">{row.originCity}</td>
-                        <td className="px-5 py-4 text-sm text-text">{row.destinationCity}</td>
-                        <td className="px-5 py-4 text-sm text-text">{row.pickup ? formatDateTime(row.pickup) : '—'}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(row.lastUpdate)}</td>
-                        <td className="px-5 py-4 text-right">
-                          <Button size="sm" variant="outline" onClick={() => navigate(row.detailsPath)}>View Details</Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pager total={fAll.length} page={page} setPage={setPage} />
-            </>
-          )}
-        </div>
-      )}
 
       {activeTab === 'pending-allocation' && (
         <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -466,7 +391,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Pickup Date &amp; Time</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle</th>
                       <th className="px-5 py-3 font-bold">Driver</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
@@ -481,7 +405,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{booking.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{(() => { const p = pickupOfTrip(booking); return p ? formatDateTime(p) : '—' })()}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.assignedVehicle.registrationNumber}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.assignedDriver.name}</td>
                         <td className="px-5 py-4 text-right">
@@ -520,7 +443,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle</th>
                       <th className="px-5 py-3 font-bold">Driver</th>
                       <th className="px-5 py-3 font-bold text-right">Advance</th>
@@ -540,7 +462,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{customerFor(trip.id, trip.indentId)}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
@@ -574,7 +495,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
                     </tr>
@@ -588,20 +508,9 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-text hover:bg-gray-50">
-                              <Upload className="h-3.5 w-3.5" /> Upload POD
-                              <input type="file" accept="image/*,application/pdf" className="sr-only" onChange={(e) => {
-                                const file = e.target.files?.[0]
-                                if (file) window.alert(`POD document "${file.name}" uploaded for ${trip.id}`)
-                                e.target.value = ''
-                              }} />
-                            </label>
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>View Details</Button>
-                          </div>
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>View Details</Button>
                         </td>
                       </tr>
                     ))}
@@ -630,7 +539,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Freight</th>
                       <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
@@ -645,7 +553,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
                         <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
@@ -679,7 +586,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Invoice ID</th>
                       <th className="px-5 py-3 font-bold">Freight</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
                   </thead>
@@ -693,7 +599,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 font-mono text-sm font-semibold text-primary">{invoiceByTripId.get(trip.id) ?? '—'}</td>
                         <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => navigate(detailPathForTrip(trip))}>View Details</Button>
                         </td>
@@ -724,7 +629,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Issue</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Vehicle / Driver</th>
                       <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
@@ -754,7 +658,6 @@ export default function TripsPage() {
                             <span className="text-sm text-gray-500">—</span>
                           )}
                         </td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                         <td className="px-5 py-4 text-sm text-text">
                           <div>{trip.assignedVehicle.registrationNumber}</div>
                           <div className="text-xs text-gray-500">{trip.assignedDriver.name}</div>
@@ -794,7 +697,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Stage</th>
                       <th className="px-5 py-3 font-bold">Cancelled By</th>
                       <th className="px-5 py-3 font-bold">Reason</th>
@@ -809,7 +711,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{customerFor(booking.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.cancelledBy}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
@@ -842,7 +743,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Last Update</th>
                       <th className="px-5 py-3 font-bold">Stage</th>
                       <th className="px-5 py-3 font-bold">Rejected By</th>
                       <th className="px-5 py-3 font-bold">Reason</th>
@@ -857,7 +757,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{customerFor(booking.id)}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
-                        <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.rejectedBy}</td>
                         <td className="px-5 py-4 text-sm text-text">{booking.reason}</td>
