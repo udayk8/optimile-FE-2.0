@@ -575,6 +575,7 @@ export const useAppStore = create<AppState>((set) => ({
         pdfUrl: `/invoices/${generatedInvoiceNumber}.pdf`,
         tripReferences: selectedTrips.map((trip) => trip.id),
         createdAt: invoiceDate,
+        statusUpdatedAt: invoiceDate,
       } as unknown as Invoice
 
       // Mark only the actually-billed trips as invoiced
@@ -1062,7 +1063,7 @@ export const useAppStore = create<AppState>((set) => ({
           newInvoice,
           ...state.invoices.map((inv) =>
             inv.id === oldInvoiceId
-              ? { ...inv, status: 'CLOSED' as const, closeReason: 'SUPERSEDED' as const, supersededByInvoiceId: newInvoiceNumber }
+              ? { ...inv, status: 'CLOSED' as const, closeReason: 'SUPERSEDED' as const, statusUpdatedAt: new Date().toISOString(), supersededByInvoiceId: newInvoiceNumber }
               : inv
           ),
         ],
@@ -1095,7 +1096,7 @@ export const useAppStore = create<AppState>((set) => ({
       return {
         invoices: state.invoices.map((inv) =>
           inv.id === invoiceId && (inv.status === 'PENDING' || inv.status === 'DISPUTED')
-            ? { ...inv, status: 'APPROVED' as const }
+            ? { ...inv, status: 'APPROVED' as const, statusUpdatedAt: new Date().toISOString() }
             : inv
         ),
         disputes: state.disputes.map((d) =>
@@ -1158,7 +1159,7 @@ export const useAppStore = create<AppState>((set) => ({
             messages: [{ id: `dmsg-${num}-1`, sender: 'FINANCE', message: reason, createdAt: nowIso }],
           }
       return {
-        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'DISPUTED' as const } : inv)),
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'DISPUTED' as const, statusUpdatedAt: nowIso } : inv)),
         disputes: existing
           ? state.disputes.map((d) => (d.invoiceId === invoiceId ? dispute : d))
           : [dispute, ...state.disputes],
@@ -1171,7 +1172,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (!invoice || invoice.status !== 'DISPUTED') return state
       const timestamp = new Date().toISOString()
       return {
-        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'RESUBMISSION_REQUIRED' as const } : inv)),
+        invoices: state.invoices.map((inv) => (inv.id === invoiceId ? { ...inv, status: 'RESUBMISSION_REQUIRED' as const, statusUpdatedAt: timestamp } : inv)),
         disputes: state.disputes.map((d) =>
           d.invoiceId === invoiceId && d.status === 'OPEN'
             ? {
@@ -1200,7 +1201,7 @@ export const useAppStore = create<AppState>((set) => ({
       const timestamp = new Date().toISOString()
       return {
         invoices: state.invoices.map((inv) =>
-          inv.id === invoiceId ? { ...inv, status: 'CLOSED' as const, closeReason: 'REJECTED' as const } : inv
+          inv.id === invoiceId ? { ...inv, status: 'CLOSED' as const, closeReason: 'REJECTED' as const, statusUpdatedAt: timestamp } : inv
         ),
         disputes: state.disputes.map((d) =>
           d.invoiceId === invoiceId && d.status === 'OPEN'

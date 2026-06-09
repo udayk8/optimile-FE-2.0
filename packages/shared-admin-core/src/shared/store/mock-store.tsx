@@ -6260,7 +6260,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         setTenantVendorInvoices((current) =>
           current.map((inv) =>
             inv.id === invoiceId && (inv.status === "PENDING" || inv.status === "DISPUTED")
-              ? { ...inv, status: "APPROVED", dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
+              ? { ...inv, status: "APPROVED", statusUpdatedAt: new Date().toISOString(), dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" } : inv.dispute }
               : inv,
           ),
         ),
@@ -6272,6 +6272,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             return {
               ...inv,
               status: "DISPUTED",
+              statusUpdatedAt: now,
               dispute: {
                 reason,
                 status: "OPEN",
@@ -6291,6 +6292,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             return {
               ...inv,
               status: "RESUBMISSION_REQUIRED",
+              statusUpdatedAt: now,
               dispute: inv.dispute
                 ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: message?.trim() || "Resubmission required. Please create a corrected invoice.", createdAt: now }] }
                 : inv.dispute,
@@ -6307,6 +6309,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               ...inv,
               status: "CLOSED",
               closeReason: "REJECTED",
+              statusUpdatedAt: now,
               dispute: inv.dispute
                 ? { ...inv.dispute, status: "CLOSED", messages: [...msgs, { id: `dmsg-${invoiceId}-${msgs.length + 1}`, sender: "FINANCE", message: reason?.trim() || "Invoice rejected by finance.", createdAt: now }] }
                 : inv.dispute,
@@ -6344,6 +6347,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           invoiceNumber: newNumber,
           invoiceDate: now.slice(0, 10),
           createdAt: now,
+          statusUpdatedAt: now,
           lineItems,
           subtotal,
           gstAmount,
@@ -6357,7 +6361,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
         };
         setTenantVendorInvoices((current) => [
           newInvoice,
-          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, supersededByInvoiceId: newNumber } : inv)),
+          ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, statusUpdatedAt: now, supersededByInvoiceId: newNumber } : inv)),
         ]);
         return newInvoice;
       },

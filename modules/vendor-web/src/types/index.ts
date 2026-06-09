@@ -462,6 +462,8 @@ export interface Invoice {
   pdfUrl: string
   tripReferences?: string[]
   createdAt: string
+  /** When the invoice status was last changed (approve/dispute/resubmit/reject). */
+  statusUpdatedAt?: string
   nbfcDiscountingStatus?: 'NOT_SUBMITTED' | 'SUBMITTED' | 'APPROVED' | 'DISBURSED' | 'REJECTED'
 }
 

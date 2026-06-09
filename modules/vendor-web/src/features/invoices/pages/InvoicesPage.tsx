@@ -169,12 +169,11 @@ export default function InvoicesPage() {
     return invoices
       .filter((invoice) => {
         if (activeTab !== 'all' && tabForInvoice(invoice, paidInvoiceIds) !== activeTab) return false
-        // Compare date-only portion — invoiceDate may carry a time suffix from
-        // the finance bridge, which would break a raw string compare at the
-        // range boundaries.
-        const invDate = (invoice.invoiceDate ?? '').slice(0, 10)
-        if (fromDate && invDate < fromDate) return false
-        if (toDate && invDate > toDate) return false
+        // Filter on the created-on date (date-only portion — createdAt carries a
+        // time suffix that would break a raw string compare at the boundaries).
+        const createdOn = (invoice.createdAt ?? '').slice(0, 10)
+        if (fromDate && createdOn < fromDate) return false
+        if (toDate && createdOn > toDate) return false
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -248,17 +247,6 @@ export default function InvoicesPage() {
         icon={<CreditCard className="h-5 w-5 text-primary" />}
       />
 
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-text">Invoice Workspace</h3>
-          <p className="mt-1 text-sm text-gray-500">Tabs separate pending reviews, approvals, disputes, resubmissions, and closed invoices.</p>
-        </div>
-        <Button onClick={() => navigate('/vendor/invoices/create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Invoice
-        </Button>
-      </div>
-
       <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -266,7 +254,7 @@ export default function InvoicesPage() {
           </div>
           <div>
             <div className="text-sm font-semibold text-text">Date Filter</div>
-            <div className="text-xs text-gray-500">Filter invoices by invoice date</div>
+            <div className="text-xs text-gray-500">Filter invoices by created-on date</div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -278,6 +266,17 @@ export default function InvoicesPage() {
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-text">Invoice Workspace</h3>
+          <p className="mt-1 text-sm text-gray-500">Tabs separate pending reviews, approvals, disputes, resubmissions, and closed invoices.</p>
+        </div>
+        <Button onClick={() => navigate('/vendor/invoices/create')}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Invoice
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -345,6 +344,7 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created On</th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Last Update</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
@@ -362,6 +362,7 @@ export default function InvoicesPage() {
                       <td className="p-4 font-mono font-semibold">{invoice.invoiceNumber || invoice.id}</td>
                       <td className="p-4">{formatDate(invoice.invoiceDate)}</td>
                       <td className="p-4">{formatDateTime(invoice.createdAt)}</td>
+                      <td className="p-4">{formatDateTime(invoice.statusUpdatedAt ?? invoice.createdAt)}</td>
                       <td className="p-4">
                         <StatusBadge status={paidInvoiceIds.has(invoice.id) ? 'PAID' : invoice.status} />
                         {invoice.status === 'CLOSED' && invoice.closeReason ? (

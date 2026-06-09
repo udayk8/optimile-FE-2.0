@@ -178,31 +178,26 @@ export default function LedgerPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="grid gap-3 border-b border-gray-100 bg-gray-50/70 px-6 py-5 sm:grid-cols-2 md:grid-cols-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Invoices Pending Payment</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.customerPendingInvoices}</div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight text-text">{summary.customerPendingInvoices}</div>
             <div className="mt-2 text-xs text-gray-500">Invoices with an outstanding customer balance.</div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Total Amount Paid</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-emerald-600">₹{summary.totalAmountPaid.toLocaleString('en-IN')}</div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">₹{summary.totalAmountPaid.toLocaleString('en-IN')}</div>
             <div className="mt-2 text-xs text-gray-500">Total customer payments collected across all invoices.</div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Customer Pending</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.customerPending.toLocaleString('en-IN')} Dr</div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight text-text">₹{summary.customerPending.toLocaleString('en-IN')} Dr</div>
             <div className="mt-2 text-xs text-gray-500">Amount customer still owes across invoices.</div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-gray-500">TDS Deducted (Selected Range)</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.tdsDeducted.toLocaleString('en-IN')}</div>
+            <div className="mt-2 text-2xl font-semibold tracking-tight text-text">₹{summary.tdsDeducted.toLocaleString('en-IN')}</div>
             <div className="mt-2 text-xs text-gray-500">Total TDS posted in current date filter.</div>
-          </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <div className="text-sm font-medium text-gray-500">Customer Settled Invoices</div>
-            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.customerSettledInvoices}</div>
-            <div className="mt-2 text-xs text-gray-500">Invoices with zero customer pending balance.</div>
           </div>
         </div>
       </div>

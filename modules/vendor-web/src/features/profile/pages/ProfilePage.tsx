@@ -157,14 +157,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div>
-              <h4 className="mb-2 text-base font-bold text-text">Service Details</h4>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Service Regions</label><Input value={companyForm.serviceRegions} onChange={(e) => setCompanyForm((prev) => ({ ...prev, serviceRegions: e.target.value }))} className="mt-1" /></div>
-                <div><label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Supported Vehicle Types</label><Input value={companyForm.supportedVehicleTypes} onChange={(e) => setCompanyForm((prev) => ({ ...prev, supportedVehicleTypes: e.target.value }))} className="mt-1" /></div>
-              </div>
-            </div>
-
             <Button onClick={saveCompany}><Save className="mr-1 h-4 w-4" /> Save Changes</Button>
           </CardContent>
         </Card>

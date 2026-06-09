@@ -84,9 +84,6 @@ export default function InvoiceDetailPage() {
             <Button variant="outline" onClick={handleDownload} disabled={downloading}>
               <Download className="mr-2 h-4 w-4" /> {downloading ? 'Preparing…' : 'Download PDF'}
             </Button>
-            <Button variant="outline" onClick={() => navigate('/vendor/invoices')}>
-              <ReceiptText className="mr-2 h-4 w-4" /> Back to list
-            </Button>
           </div>
         }
       />
@@ -219,8 +216,6 @@ export default function InvoiceDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div><span className="text-gray-500">Vendor GSTIN: </span>{invoice.vendorGstin}</div>
-              <div><span className="text-gray-500">Customer GSTIN: </span>{invoice.customerGstin}</div>
-              <div><span className="text-gray-500">PDF URL: </span>{invoice.pdfUrl}</div>
               <div><span className="text-gray-500">Status: </span><StatusBadge status={invoice.status} /></div>
             </CardContent>
           </Card>

@@ -45,7 +45,9 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 }
 
 export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(function InvoicePdfDocument(
-  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, logoUrl, terms, getLrNumber },
+  // logoUrl is still accepted (configured at onboarding) but intentionally not
+  // rendered on the PDF for now.
+  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, terms, getLrNumber },
   ref,
 ) {
   const declarationLines = terms && terms.length > 0 ? terms : DEFAULT_TERMS
@@ -84,10 +86,6 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         {/* ── Header: company block + invoice meta ── */}
         <div className="flex">
           <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={`${companyName} logo`} className="mb-2 h-12 w-auto object-contain" />
-            ) : null}
             <h1 className="text-2xl font-extrabold tracking-tight">{companyName}</h1>
             <p className="mt-1 text-[11px] text-gray-700">
               {addr.street}, {addr.city}, {addr.state} – {addr.pincode}
@@ -217,10 +215,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
               <div className="flex"><span className="w-44 text-gray-500">Make all Cheques payable to:</span><span className="font-semibold">{companyName}</span></div>
             </div>
           </div>
-          <div className="flex w-1/2 flex-col justify-between p-4 text-[11px]">
-            <p className="text-right">For <span className="font-bold">{companyName}</span></p>
-            <p className="text-right text-gray-500">(Authorised Signatory)</p>
-          </div>
+          <div className="flex w-1/2 flex-col justify-between p-4 text-[11px]" />
         </div>
 
         {/* ── Declaration ── */}

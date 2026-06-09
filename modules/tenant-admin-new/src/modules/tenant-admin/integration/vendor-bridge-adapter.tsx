@@ -422,6 +422,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       pdfUrl: r.pdfUrl,
       tripReferences: r.tripReferences,
       createdAt: r.createdAt,
+      statusUpdatedAt: r.statusUpdatedAt ?? r.createdAt,
     }));
     const vendorDisputes: VendorDispute[] = myInvoiceRecords
       .filter((r) => r.dispute)
@@ -495,6 +496,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
         tripReferences: payload.tripReferences,
         billingPeriod: payload.billingPeriod,
         createdAt: now,
+        statusUpdatedAt: now,
       });
     };
 

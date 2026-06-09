@@ -57,5 +57,7 @@ export interface TenantVendorInvoiceRecord {
   tripReferences: string[];
   billingPeriod?: { from: string; to: string };
   createdAt: string;
+  /** When the invoice status was last changed (approve/dispute/resubmit/reject). */
+  statusUpdatedAt?: string;
   dispute?: TenantVendorInvoiceDispute;
 }
