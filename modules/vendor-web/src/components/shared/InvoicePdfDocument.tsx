@@ -112,24 +112,18 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           </div>
         </div>
 
-        {/* ── Bill to / client details ── */}
-        <div className="flex border-t-2" style={{ borderColor: BLUE }}>
-          <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
-            <p className="text-[11px] font-semibold text-gray-500">BILL TO :</p>
-            <p className="mt-1 text-base font-extrabold">{customerName}</p>
-            <p className="mt-1 text-[11px] leading-relaxed text-gray-700">{customerAddress}</p>
-          </div>
-          <div className="w-1/2 p-4 text-center">
-            <p className="text-[12px] font-bold" style={{ color: BLUE }}>CLIENT DETAILS</p>
-            <p className="mt-1 text-[11px] font-semibold text-gray-700">GSTIN: {invoice.customerGstin}</p>
-          </div>
+        {/* ── Bill to ── */}
+        <div className="border-t-2 p-4" style={{ borderColor: BLUE }}>
+          <p className="text-[11px] font-semibold text-gray-500">BILL TO :</p>
+          <p className="mt-1 text-base font-extrabold">{customerName}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-gray-700">{customerAddress}</p>
         </div>
 
         {/* ── Line items ── */}
         <table className="w-full border-t-2 text-[10px]" style={{ borderColor: BLUE }}>
           <thead>
             <tr className="text-white" style={{ backgroundColor: BLUE }}>
-              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Truck No', 'Origin', 'Destination', 'LR No', 'Qty', 'Freight', 'Advance', 'Detention', 'Loading & Unloading', 'Other', 'Freight Cost'].map((h) => (
+              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Truck No', 'Origin', 'Destination', 'LR No', 'Freight', 'Advance', 'Detention', 'Loading & Unloading', 'Other', 'Freight Cost'].map((h) => (
                 <th key={h} className="border px-1.5 py-2 text-center font-bold" style={{ borderColor: '#C7CBEF' }}>{h}</th>
               ))}
             </tr>
@@ -147,7 +141,6 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.laneDetails.origin.city ?? '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.laneDetails.destination.city ?? '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>1</td>
                   <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
@@ -160,7 +153,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
             {/* filler rows so short invoices still look like the printed form */}
             {Array.from({ length: Math.max(0, 3 - invoice.lineItems.length) }).map((_, i) => (
               <tr key={`filler-${i}`}>
-                {Array.from({ length: 15 }).map((__, j) => (
+                {Array.from({ length: 14 }).map((__, j) => (
                   <td key={j} className="border px-1.5 py-3" style={{ borderColor: '#C7CBEF' }}>&nbsp;</td>
                 ))}
               </tr>
