@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@auction/hooks/useModuleRoute'
 import { toast } from 'sonner'
 import * as ExcelJS from 'exceljs'
-import { CheckCircle2, Lock, Upload } from 'lucide-react'
+import { CheckCircle2, Download, Lock, Upload } from 'lucide-react'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { ExitConfirmDialog } from '@auction/components/shared/ExitConfirmDialog'
 import { Button } from '@auction/components/ui/button'
@@ -117,8 +117,31 @@ function makeDefaultLane(type: AuctionType, cities?: { originCity: string; desti
   }
 }
 
+// A fresh lane with EMPTY cities — the dispatcher picks origin/destination from
+// the address-book dropdowns (no hardcoded default lane is shown).
+function makeEmptyLane(type: AuctionType): DraftLane {
+  return makeDefaultLane(type, { originCity: '', destinationCity: '' })
+}
+
 function laneTemplateHeaders() {
   return ['originCity', 'destinationCity', 'vehicleType', 'capacityMt', 'rateUnit', 'ceilingRate', 'estimatedTrips', 'allocationMode', 'l1', 'l2', 'l3']
+}
+
+// Build + download the LOT lane bulk-upload template.
+async function downloadLaneTemplate() {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('Lanes')
+  ws.addRow(laneTemplateHeaders())
+  ws.addRow(['Mumbai', 'Delhi', '20 MT Open Body', '20', 'PER_TRIP', '10000', '300', 'SPLIT', '60', '30', '10'])
+  const buf = await wb.xlsx.writeBuffer()
+  const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'Optimile_Auction_Lane_Template.xlsx'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 function normalizeText(value: unknown) { return String(value ?? '').trim() }
@@ -154,7 +177,7 @@ export default function AuctionCreatePage() {
 
   const [title, setTitle] = useState('Spot | Lane Auction | Mumbai - Delhi')
   const [auctionRegion, setAuctionRegion] = useState('North India')
-  const [lanes, setLanes] = useState<DraftLane[]>([makeDefaultLane('SPOT')])
+  const [lanes, setLanes] = useState<DraftLane[]>([])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
   const [importFileName, setImportFileName] = useState('')
@@ -168,15 +191,20 @@ export default function AuctionCreatePage() {
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
     setAuctionRegion('North India')
-    setLanes([makeDefaultLane(effectiveType)])
+    setLanes([])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
   }, [effectiveType])
 
+  // SPOT/BULK: exactly one lane. LOT: many (manual or Excel).
+  const canAddLane = effectiveType === 'LOT' || lanes.length === 0
   const addLane = () => {
-    if (effectiveType !== 'LOT') return
-    setLanes((current) => [...current, makeDefaultLane('LOT')])
+    if (!effectiveType) return
+    setLanes((current) => {
+      if (effectiveType !== 'LOT' && current.length >= 1) return current
+      return [...current, makeEmptyLane(effectiveType)]
+    })
   }
 
   const updateLane = (index: number, field: keyof DraftLane, value: string) => {
@@ -528,6 +556,9 @@ export default function AuctionCreatePage() {
                             <input type="file" accept=".xlsx,.xls" className="hidden"
                               onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleLaneFileImport(f) }} />
                           </label>
+                          <Button type="button" variant="outline" size="sm" onClick={() => { void downloadLaneTemplate() }}>
+                            <Download className="mr-2 h-4 w-4" /> Download Template
+                          </Button>
                           {importFileName && (
                             <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm">
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -546,13 +577,23 @@ export default function AuctionCreatePage() {
                     </div>
                   )}
 
+                  {/* SPOT/BULK: single lane added on demand (no default lane shown). */}
+                  {effectiveType !== 'LOT' && (
+                    <div className="flex items-center gap-3">
+                      <Button type="button" variant="outline" onClick={addLane} disabled={!canAddLane}>Add Lane</Button>
+                      <p className="text-xs text-[#64748B]">
+                        {lanes.length === 0 ? 'Add a lane to configure this auction.' : `${effectiveType === 'SPOT' ? 'Spot' : 'Bulk'} auctions have a single lane.`}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Lane forms */}
                   {laneImportMode === 'EXCEL' && lanes.length > 0 ? (
                     <div className="rounded-2xl border border-[#E5E7EB] bg-white shadow-sm overflow-x-auto">
                       <table className="w-full min-w-[900px] text-left">
                         <thead className="bg-gray-50 text-xs uppercase tracking-wide text-[#64748B]">
                           <tr>
-                            {['#', 'Lane', 'Vehicle', 'Cap (MT)', 'Rate Unit', 'Ceiling ₹', 'Est. Trips', 'Alloc.', 'L1%', 'L2%', 'L3%'].map(h => (
+                            {['#', 'Origin → Destination', 'Vehicle', 'Cap (MT)', 'Rate Unit', 'Ceiling ₹', 'Est. Trips', 'Alloc.', 'L1%', 'L2%', 'L3%'].map(h => (
                               <th key={h} className="px-4 py-3 font-bold">{h}</th>
                             ))}
                           </tr>
@@ -582,7 +623,7 @@ export default function AuctionCreatePage() {
                         <div key={`lane-config-${index}`} className="rounded-xl border border-[#E5E7EB] p-4">
                           <div className="mb-4 flex items-center justify-between">
                             <p className="text-sm font-semibold text-[#0F172A]">
-                              {effectiveType === 'SPOT' ? 'Lane' : effectiveType === 'BULK' ? 'Lane' : `Lane ${index + 1}`}
+                              {effectiveType === 'LOT' ? `Route ${index + 1}` : 'Route'}
                             </p>
                             {effectiveType === 'LOT' && lanes.length > 1 && (
                               <Button type="button" variant="outline" size="sm"
@@ -594,28 +635,33 @@ export default function AuctionCreatePage() {
 
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div>
-                              <label className="mb-1 block text-sm font-medium text-[#334155]">Lane</label>
-<div className="grid gap-2 sm:grid-cols-2">
-                                <select
-                                  value={lane.originCity}
-                                  onChange={(event) => updateLaneCity(index, 'originCity', event.target.value)}
-                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                                >
-                                  <option value="">Origin city</option>
-                                  {tenantCities.map((city) => (
-                                    <option key={city} value={city}>{city}</option>
-                                  ))}
-                                </select>
-                                <select
-                                  value={lane.destinationCity}
-                                  onChange={(event) => updateLaneCity(index, 'destinationCity', event.target.value)}
-                                  className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                                >
-                                  <option value="">Destination city</option>
-                                  {tenantCities.map((city) => (
-                                    <option key={city} value={city}>{city}</option>
-                                  ))}
-                                </select>
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div>
+                                  <label className="mb-1 block text-sm font-medium text-[#334155]">Origin City</label>
+                                  <select
+                                    value={lane.originCity}
+                                    onChange={(event) => updateLaneCity(index, 'originCity', event.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                  >
+                                    <option value="">Select origin city</option>
+                                    {tenantCities.map((city) => (
+                                      <option key={city} value={city}>{city}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="mb-1 block text-sm font-medium text-[#334155]">Destination City</label>
+                                  <select
+                                    value={lane.destinationCity}
+                                    onChange={(event) => updateLaneCity(index, 'destinationCity', event.target.value)}
+                                    className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                  >
+                                    <option value="">Select destination city</option>
+                                    {tenantCities.map((city) => (
+                                      <option key={city} value={city}>{city}</option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
                               {tenantCities.length === 0 ? (
                                 <p className="mt-1 text-xs text-red-600">

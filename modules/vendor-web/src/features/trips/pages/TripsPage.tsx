@@ -80,7 +80,7 @@ function getBookingsTab(pathname: string, search: string): BookingsTab {
   if (pathTab) return pathTab
 
   const searchTab = resolveTab(new URLSearchParams(search).get('tab'))
-  return searchTab ?? 'all'
+  return searchTab ?? 'pending-allocation'
 }
 
 function BookingCard({ title, count, active, onClick }: { title: string; count: number; active: boolean; onClick: () => void }) {
