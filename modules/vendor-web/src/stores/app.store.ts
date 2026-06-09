@@ -236,8 +236,11 @@ function buildFullData(): VendorDataCollections {
   }
 }
 
-function buildDataForVendor(vendorName?: string): VendorDataCollections {
-  return isBlankVendor(vendorName) ? { ...EMPTY_DATA } : buildFullData()
+function buildDataForVendor(_vendorName?: string): VendorDataCollections {
+  // Vendor portal shows ONLY cross-module (bridge) data — no hardcoded local
+  // demo collections. Every vendor starts with an empty local store; bridge
+  // bookings/invoices/fleet/ledger flow in via the integration hooks.
+  return { ...EMPTY_DATA }
 }
 
 const INITIAL_NBFC_APPLICATIONS: NBFCApplication[] = [

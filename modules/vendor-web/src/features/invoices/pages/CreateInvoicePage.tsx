@@ -258,7 +258,6 @@ export default function CreateInvoicePage() {
                             <div className="font-mono text-sm font-semibold text-text">{trip.id}</div>
                             <div className="mt-1 flex flex-wrap gap-2">
                               <StatusBadge status={trip.status} />
-                              {trip.podStatus && <StatusBadge status={trip.podStatus} />}
                             </div>
                           </td>
                           <td className="px-5 py-4 text-sm text-text">

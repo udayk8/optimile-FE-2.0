@@ -57,9 +57,6 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
   // Aggregate charges (approved expenses) and advance across the invoice's trips.
   const totalCharges = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.approvedExpenses ?? 0), 0)
   const totalAdvance = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.advance ?? 0), 0)
-  // Final = freight + charges + GST; advance is netted off at the end.
-  const totalInvoiceValue = invoice.grandTotal + totalCharges
-  const netPayable = totalInvoiceValue - totalAdvance
 
   const lrFor = (tripId: string): string => {
     const bridgeLr = getLrNumber?.(tripId)
@@ -85,9 +82,16 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     invoice.igst != null || invoice.cgst != null
       ? (invoice.igst ?? 0) > 0
       : !(supplierState && buyerState && supplierState === buyerState)
-  const cgstAmt = invoice.cgst ?? (interState ? 0 : Math.round(invoice.gstAmount / 2))
-  const sgstAmt = invoice.sgst ?? (interState ? 0 : invoice.gstAmount - Math.round(invoice.gstAmount / 2))
-  const igstAmt = invoice.igst ?? (interState ? invoice.gstAmount : 0)
+  // Charges (detention/loading/others) are taxable too, so the taxable value =
+  // freight + charges and GST is charged on the whole "Total Cost".
+  const taxableValue = invoice.subtotal + totalCharges
+  const gstAmount = Math.round(taxableValue * (gstRate / 100))
+  const cgstAmt = interState ? 0 : Math.round(gstAmount / 2)
+  const sgstAmt = interState ? 0 : gstAmount - Math.round(gstAmount / 2)
+  const igstAmt = interState ? gstAmount : 0
+  // Total = taxable (freight + charges) + GST; advance netted off at the end.
+  const totalInvoiceValue = taxableValue + gstAmount
+  const netPayable = totalInvoiceValue - totalAdvance
   const addr = companyInfo.registeredAddress
 
   return (
@@ -177,12 +181,8 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           </div>
           <div className="w-1/2 text-[11px]">
             <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
-              <span className="text-gray-700">Freight (Taxable Value)</span>
-              <span className="font-semibold">{inr(invoice.subtotal)}</span>
-            </div>
-            <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
-              <span className="text-gray-700">Charges (Detention / Loading &amp; Unloading / Others)</span>
-              <span className="font-semibold">{inr(totalCharges)}</span>
+              <span className="text-gray-700">Total Cost (Taxable Value)</span>
+              <span className="font-semibold">{inr(taxableValue)}</span>
             </div>
             {interState ? (
               <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
