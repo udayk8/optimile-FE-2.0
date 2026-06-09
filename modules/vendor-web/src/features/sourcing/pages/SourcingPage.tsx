@@ -86,12 +86,24 @@ export default function SourcingPage() {
   const currentPage = Math.min(page, totalPages)
   const pagedAuctions = displayedAuctions.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
+  // Tab count badges reflect the active date + search filter (across all tabs).
+  const filteredForCounts = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return auctions.filter((auction) => {
+      const created = ((auction as { createdAt?: string }).createdAt ?? '').slice(0, 10)
+      if (fromDate && created < fromDate) return false
+      if (toDate && created > toDate) return false
+      if (q && ![auction.id, (auction as { customerName?: string }).customerName].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+      return true
+    })
+  }, [auctions, fromDate, toDate, searchText])
+
   const tabs: { key: SourcingTab; label: string; icon: React.ReactNode; count: number }[] = [
-    { key: 'ALL', label: 'All', icon: <Gavel className="h-4 w-4" />, count: auctions.length },
-    { key: 'UPCOMING', label: 'Upcoming', icon: <Clock className="h-4 w-4" />, count: auctions.filter((a) => a.state === 'UPCOMING').length },
-    { key: 'LIVE', label: 'Live', icon: <Zap className="h-4 w-4" />, count: auctions.filter((a) => a.state === 'LIVE').length },
-    { key: 'ENDED', label: 'Ended', icon: <Package className="h-4 w-4" />, count: auctions.filter((a) => ENDING_STATES.includes(a.state)).length },
-    { key: 'CANCELLED', label: 'Cancelled', icon: <Search className="h-4 w-4" />, count: auctions.filter((a) => a.state === 'CANCELLED').length },
+    { key: 'ALL', label: 'All', icon: <Gavel className="h-4 w-4" />, count: filteredForCounts.length },
+    { key: 'UPCOMING', label: 'Upcoming', icon: <Clock className="h-4 w-4" />, count: filteredForCounts.filter((a) => a.state === 'UPCOMING').length },
+    { key: 'LIVE', label: 'Live', icon: <Zap className="h-4 w-4" />, count: filteredForCounts.filter((a) => a.state === 'LIVE').length },
+    { key: 'ENDED', label: 'Ended', icon: <Package className="h-4 w-4" />, count: filteredForCounts.filter((a) => ENDING_STATES.includes(a.state)).length },
+    { key: 'CANCELLED', label: 'Cancelled', icon: <Search className="h-4 w-4" />, count: filteredForCounts.filter((a) => a.state === 'CANCELLED').length },
   ]
 
   return (
