@@ -504,6 +504,35 @@ Important:
 
 - modal is the only place where the visual weight is allowed to increase more sharply
 
+### Profile / read-only identity popup
+
+A compact, read-only popup used for "View Profile"-style identity panels (e.g. the
+tenant-admin profile menu). Portaled to `document.body` so it centers over the whole
+screen regardless of an ancestor's `transform`/`overflow`. Dismiss via ✕, backdrop
+click, or Escape; move focus into the dialog on open and restore it to the trigger on
+close (`role="dialog"` + `aria-modal="true"`).
+
+Structure and classes:
+
+- overlay: `fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4` (no backdrop blur)
+- card: `w-full max-w-sm overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl`
+- header (white): `border-b border-gray-200 px-5 py-4`
+  - avatar: `size-12 rounded-full bg-primary/10 text-primary` + `font-bold`
+  - name: `text-[15px] font-bold text-text`
+  - role/identity badge: `rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/20`
+- detail rows (`<dl className="space-y-3.5">`, label left / value right on one line):
+  - label: `text-[11px] font-semibold uppercase tracking-wide text-gray-500`
+  - value: `text-[13px] font-semibold text-text`
+- status: semantic badge — active `bg-success/10 text-success ring-1 ring-success/20`, neutral `bg-gray-100 text-gray-600 ring-1 ring-gray-200`, sized `text-[11px] font-bold`
+- footer: `border-t border-gray-200 px-5 py-3`, right-aligned buttons `h-9 rounded-lg px-4 text-[13px] font-semibold` — Close = `ghost`, secondary action (e.g. Logout) = `secondary`/`outline`
+
+Compact type scale (intentional, reusable):
+
+- This dense popup runs one step below the standard §6 data scale: label `text-[11px]`
+  (vs `text-xs`) and value `text-[13px] font-semibold` (vs `text-sm font-bold`).
+- Use this compact scale for similar small read-only popups. Keep the larger §6 scale
+  for full pages, detail views, and primary surfaces — don't shrink those to match.
+
 ## 16. Navigation, Tabs, And Breadcrumbs
 
 ### Breadcrumbs
