@@ -334,7 +334,7 @@ export function SidebarExplorer({
       )}
     >
       <div className="border-b border-border/75 bg-white/55 px-4 py-4 backdrop-blur-xl">
-        <div className="flex items-start justify-between gap-3">
+        <div className={cn("flex items-start gap-3", isCollapsed ? "justify-center" : "justify-between")}>
           {!isCollapsed ? (
             <div>
               <div className="inline-flex rounded-full border border-primary/10 bg-primary/[0.08] px-2 py-1 text-[11px] uppercase tracking-[0.24em] text-primary">
@@ -343,11 +343,7 @@ export function SidebarExplorer({
               <h2 className="mt-2 text-[19px] font-semibold leading-tight tracking-[-0.01em]">{title}</h2>
               <p className="mt-1 max-w-[26ch] whitespace-pre-line text-[14px] leading-5 text-muted-foreground">{subtitle}</p>
             </div>
-          ) : (
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-primary/10 bg-primary/[0.08] text-primary">
-              <FolderTree className="size-5" />
-            </div>
-          )}
+          ) : null}
           <button
             type="button"
             onClick={() => {

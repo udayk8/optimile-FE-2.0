@@ -338,9 +338,7 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Last Update</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Cost</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Final Amount</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                 </tr>
@@ -363,12 +361,6 @@ export default function InvoicesPage() {
                         ) : null}
                       </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
-                      <td className="p-4 text-right">
-                        <CurrencyDisplay amount={invoice.subtotal + expense} />
-                      </td>
-                      <td className="p-4 text-right text-gray-600">
-                        <CurrencyDisplay amount={invoice.gstAmount} />
-                      </td>
                       <td className="p-4 text-right">
                         <CurrencyDisplay amount={invoice.grandTotal + expense} className="font-semibold" />
                       </td>

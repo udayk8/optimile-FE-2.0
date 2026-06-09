@@ -66,9 +66,12 @@ export function useVendorInvoices(): VendorInvoicesData {
       disputes: [...bridge.vendorDisputes, ...storeDisputes.filter((d) => !bridgeDisputeIds.has(d.id))],
       generateInvoice: (payload) => {
         const gstRate = payload.gstRate ?? 12
+        // Eligibility (no active vendor invoice on the trip) is enforced by the
+        // Create Invoice page. The booking's `isInvoiced` flag reflects CUSTOMER
+        // (AR) invoicing and must NOT block the vendor's own (AP) invoice.
         const selected = payload.tripIds
           .map((id) => trips.find((t) => t.id === id))
-          .filter((t): t is NonNullable<typeof t> => Boolean(t && t.status === 'COMPLETED' && !t.isInvoiced))
+          .filter((t): t is NonNullable<typeof t> => Boolean(t && t.status === 'COMPLETED'))
         if (selected.length === 0) return
         const lineItems: InvoiceLineItem[] = selected.map((t) => ({
           tripId: t.id,
