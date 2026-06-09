@@ -451,13 +451,19 @@ function loadSeededState<T>(key: string, seed: T) {
 }
 
 function normalizeStoredPlatformTenants(storedTenants: TenantRecord[]) {
-  return storedTenants.map((tenant) => ({
-    ...tenant,
-    tenantType: tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL",
-    customerPortalEnabled: tenant.customerPortalEnabled ?? false,
-    assignmentMode: tenant.assignmentMode ?? getDefaultAssignmentMode(tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL"),
-    commercialMode: tenant.commercialMode ?? getDefaultCommercialMode(tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL"),
-  }));
+  return storedTenants.map((tenant) => {
+    // Merge any new seed-defined fields that may not exist in old localStorage records.
+    const seedRecord = mockPlatformTenants.find((s) => s.id === tenant.id);
+    return {
+      ...tenant,
+      tenantType: tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL",
+      customerPortalEnabled: tenant.customerPortalEnabled ?? false,
+      assignmentMode: tenant.assignmentMode ?? getDefaultAssignmentMode(tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL"),
+      commercialMode: tenant.commercialMode ?? getDefaultCommercialMode(tenant.tenantType ?? "LOGISTICS_PROVIDER_3PL"),
+      // Forward-fill new feature flags from seed so localStorage-cached tenants pick them up.
+      erpBookingEnabled: tenant.erpBookingEnabled ?? seedRecord?.erpBookingEnabled ?? false,
+    };
+  });
 }
 
 function normalizeStoredRoles(

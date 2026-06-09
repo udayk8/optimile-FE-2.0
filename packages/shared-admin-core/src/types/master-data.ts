@@ -2,6 +2,15 @@ export interface TenantVehicleType {
   id: string;
   tenantId: string;
   typeCode: string;
+  typeName?: string;
+  bodyType?: string;
+  wheels?: string;
+  capacityValue?: string;
+  capacityUnit?: string;
+  length?: string;
+  width?: string;
+  height?: string;
+  dimensionUnit?: string;
   capacity: string;
   dimensions: string;
   status: "active" | "inactive";
@@ -11,6 +20,15 @@ export interface TenantVehicleType {
 
 export interface TenantVehicleTypeInput {
   typeCode: string;
+  typeName?: string;
+  bodyType?: string;
+  wheels?: string;
+  capacityValue?: string;
+  capacityUnit?: string;
+  length?: string;
+  width?: string;
+  height?: string;
+  dimensionUnit?: string;
   capacity: string;
   dimensions: string;
   status: "active" | "inactive";

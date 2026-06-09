@@ -901,36 +901,21 @@ export function TenantManualLrOperationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="LR"
-        title="Manual LR"
-        description=""
-      />
-      <div className="rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <span><span className="font-medium">User:</span> {currentUser?.name ?? "—"}</span>
-          <span><span className="font-medium">Role:</span> {currentRole?.name ?? access.activeRole?.name ?? "No role"}</span>
-          <span><span className="font-medium">Active place:</span> {activeOrgUnit?.name ?? "Not selected"}</span>
-          <span>
-            <span className="font-medium">Parent:</span>{" "}
-            {parentOrgUnit?.name ?? (activeOrgUnit ? "Company Root" : "—")}
-          </span>
-          <span>
-            <span className="font-medium">Children:</span>{" "}
-            {childOrgUnits.length
-              ? `${childOrgUnits.length} place${childOrgUnits.length === 1 ? "" : "s"}`
-              : "—"}
-          </span>
-          <span><span className="font-medium">Visible LR:</span> {availablePools.length}</span>
-          <div className="min-w-[220px]">
-            <Select value={activeOrgUnit?.id ?? ""} onChange={(event) => setActiveOrgUnit(event.target.value || null)}>
-              <option value="">{availableActiveOrgUnits.length > 1 ? "Select active place" : activeOrgUnit?.name ?? "No place"}</option>
-              {availableActiveOrgUnits.map((option) => (
-                <option key={option.id} value={option.id}>{option.name}</option>
-              ))}
-            </Select>
-          </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h1 className="text-[14px] font-semibold text-slate-900">Manual LR</h1>
+          <p className="text-[11px] text-slate-500">
+            {currentUser?.name ?? "—"} · {currentRole?.name ?? access.activeRole?.name ?? "No role"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={activeOrgUnit?.id ?? ""} onChange={(event) => setActiveOrgUnit(event.target.value || null)} className="h-8 text-[12px]">
+            <option value="">{availableActiveOrgUnits.length > 1 ? "Select active place" : activeOrgUnit?.name ?? "No place"}</option>
+            {availableActiveOrgUnits.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </Select>
         </div>
       </div>
 
@@ -946,17 +931,18 @@ export function TenantManualLrOperationsPage() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <TenantSummaryCard label="Total LR stock" value={String(allManualPools.length)} helper="Manual LR numbers in this tenant config" />
-        <TenantSummaryCard label="Available" value={String(availablePools.length)} helper={activeOrgUnit ? `Visible for ${activeOrgUnit.name}` : "Select active place"} />
-        <TenantSummaryCard label="Pending approvals" value={String(relevantRequests.filter((request) => request.status === "PENDING").length)} helper="Open LR requests waiting for action" />
-        <TenantSummaryCard label="Consumed" value={String(consumedPools.length)} helper="Already linked to booking assignments" />
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 shadow-sm text-[12px]">
+        <LrStat label="Total" value={String(allManualPools.length)} />
+        <LrStat label="Available" value={String(availablePools.length)} tone="green" />
+        <LrStat label="Consumed" value={String(consumedPools.length)} tone="slate" />
+        <LrStat label="Pending Approvals" value={String(relevantRequests.filter((r) => r.status === "PENDING").length)} tone={relevantRequests.filter((r) => r.status === "PENDING").length > 0 ? "amber" : "slate"} />
+        {activeOrgUnit ? <span className="text-slate-400">Place: <span className="font-semibold text-slate-700">{activeOrgUnit.name}</span></span> : null}
       </div>
 
       {childAllocationSummary.length ? (
         <TenantPanel
-          title="Allocated to child places"
-          description={`Per-child stock owned by ${activeOrgUnit?.name ?? "this place"}. Counts refresh after every approve / allocate / transfer / consume.`}
+          title={`Allocated to child places${activeOrgUnit ? ` — ${activeOrgUnit.name}` : ""}`}
+          description=""
         >
           <div className="overflow-x-auto rounded-2xl border">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -997,7 +983,7 @@ export function TenantManualLrOperationsPage() {
           <Tabs tabs={visibleTabs.map((tab) => tab.label)} active={selectedTab?.label ?? ""} onChange={(tabLabel) => setActiveTab(visibleTabs.find((tab) => tab.label === tabLabel)?.key ?? "dashboard")} />
 
           {selectedTab?.key === "dashboard" ? (
-            <TenantPanel title="Manual LR Dashboard" description="Low stock, pending approvals, recent usage, and operational context for the current place scope.">
+            <TenantPanel title="Manual LR Dashboard" description="">
               <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
                 <div className="space-y-4">
                   <InfoList
@@ -1807,5 +1793,16 @@ function RecentAuditPanel({
         )}
       </div>
     </div>
+  );
+}
+
+
+function LrStat({ label, value, tone = "slate" }: { label: string; value: string; tone?: "green" | "amber" | "slate" }) {
+  const colors = tone === "green" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : "text-slate-700";
+  return (
+    <span className="flex items-baseline gap-1">
+      <span className={`text-[15px] font-bold ${colors}`}>{value}</span>
+      <span className="text-[11px] text-slate-500">{label}</span>
+    </span>
   );
 }

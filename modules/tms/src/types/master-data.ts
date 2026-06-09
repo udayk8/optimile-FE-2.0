@@ -27,6 +27,10 @@ export interface TenantMaterial {
   conversionValue?: number | null;
   mappedCustomerIds: string[];
   status: "active" | "inactive";
+  /** Optional sub-brands under this material (e.g. OPC, PPC, White Cement). */
+  subBrands?: string[];
+  /** HSN code for this material. */
+  hsnCode?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +44,8 @@ export interface TenantMaterialInput {
   conversionValue?: number | null;
   mappedCustomerIds: string[];
   status: "active" | "inactive";
+  subBrands?: string[];
+  hsnCode?: string | null;
 }
 
 export type TenantUOMCategory = "QUANTITY" | "WEIGHT";

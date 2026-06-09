@@ -196,6 +196,7 @@ export function BookingDetailsPage() {
   const { sendBookingVendorIndent, listBookingVendorIndents, cancelBookingVendorIndent } = useMockStore();
   const [assignmentOpen, setAssignmentOpen] = useState(false);
   const [reassignmentOpen, setReassignmentOpen] = useState(false);
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [breakdownActionOpen, setBreakdownActionOpen] = useState(false);
   const [vehicleReplacementOpen, setVehicleReplacementOpen] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -1963,16 +1964,27 @@ export function BookingDetailsPage() {
         title={bookingRecord.bookingId}
         subtitle={`${customer?.name ?? "-"} · ${sourceAddress?.city ?? "-"} → ${destinationAddress?.city ?? "-"}`}
         summary={
-          <BookingSummaryStrip
-            items={[
-              { label: "Status", value: bookingRecord.status === "POD_PENDING" && allDeliveryPodsCaptured ? <Badge variant="success">POD UPLOADED</Badge> : <BookingStatusBadge status={bookingRecord.status} /> },
-              { label: "Customer", value: customer?.name ?? "-" },
-              { label: "Vehicle", value: assignedVehicle?.registrationNumber ?? "Not assigned" },
-              { label: "Driver", value: assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned" },
-              { label: "Vendor", value: assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet" },
-              { label: "Freight", value: `Rs ${customerFreight.toLocaleString()}` },
-            ]}
-          />
+          <div className="space-y-2">
+            <BookingSummaryStrip
+              items={[
+                { label: "Status", value: bookingRecord.status === "POD_PENDING" && allDeliveryPodsCaptured ? <Badge variant="success">POD UPLOADED</Badge> : <BookingStatusBadge status={bookingRecord.status} /> },
+                { label: "Customer", value: customer?.name ?? "-" },
+                { label: "Vehicle", value: assignedVehicle?.registrationNumber ?? "Not assigned" },
+                { label: "Driver", value: assignedDriver?.name ?? bookingRecord.assignment?.driverName ?? "Not assigned" },
+                { label: "Vendor", value: assignedVendor?.name ?? bookingRecord.assignment?.vendorName ?? "Own Fleet" },
+                { label: "Freight", value: `Rs ${customerFreight.toLocaleString()}` },
+              ]}
+            />
+            {(bookingRecord.deliveries ?? []).length > 0 ? (
+              <DeliveryChipRow
+                deliveries={bookingRecord.deliveries ?? []}
+                isErp={bookingRecord.bookingSource === "ERP"}
+                addressMap={addressMap}
+                materialMap={materialMap}
+                onViewAll={() => setDeliveryModalOpen(true)}
+              />
+            ) : null}
+          </div>
         }
         actions={
           <div className="flex flex-wrap gap-1.5">
@@ -3789,6 +3801,228 @@ export function BookingDetailsPage() {
         </div>
       </section>
       ) : null}
+
+      {/* Deliveries detail modal — read-only, no action buttons */}
+      <Dialog
+        open={deliveryModalOpen}
+        onOpenChange={setDeliveryModalOpen}
+        title={`Deliveries (${(bookingRecord.deliveries ?? []).length})`}
+        description={`${bookingRecord.bookingId} · ${customer?.name ?? "-"} · read-only`}
+        footer={<div className="flex justify-end"><Button variant="outline" onClick={() => setDeliveryModalOpen(false)}>Close</Button></div>}
+      >
+        <DeliveryDetailCards
+          deliveries={bookingRecord.deliveries ?? []}
+          isErp={bookingRecord.bookingSource === "ERP"}
+          addressMap={addressMap}
+          materialMap={materialMap}
+          shipmentDocuments={shipmentDocuments}
+          calculatedFreight={bookingRecord.pricing.calculatedFreight}
+          pickupDate={bookingRecord.pickupDate}
+          pickupTime={bookingRecord.pickupTime}
+        />
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Compact Delivery Chip Row — lives in the header summary area ─────────────
+
+function DeliveryChipRow({
+  deliveries,
+  isErp,
+  addressMap,
+  materialMap,
+  onViewAll,
+}: {
+  deliveries: import("@/modules/tms/booking/types").BookingDeliveryRecord[];
+  isErp: boolean;
+  addressMap: Map<string, import("@/types/customer").TenantCustomerAddress>;
+  materialMap: Map<string, { materialCode: string; name?: string }>;
+  onViewAll: () => void;
+}) {
+  if (deliveries.length === 0) return null;
+
+  const MAX_CHIPS = 3;
+  const visibleChips = deliveries.slice(0, MAX_CHIPS);
+  const overflow = deliveries.length - MAX_CHIPS;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mr-1">
+        {deliveries.length === 1 ? "Delivery" : `Deliveries (${deliveries.length})`}
+      </span>
+      {visibleChips.map((delivery) => {
+        const origin = addressMap.get(delivery.originAddressId);
+        const dest = addressMap.get(delivery.destinationAddressId ?? "");
+        const originCity = origin?.city ?? delivery.originCity ?? "—";
+        const destCity = dest?.city ?? delivery.destinationCity ?? "—";
+        const mat = delivery.materialId ? materialMap.get(delivery.materialId) : null;
+        const matCode = mat?.materialCode ?? mat?.name ?? null;
+        const soLabel = isErp && delivery.trackingId && !delivery.trackingId.startsWith("TRK-")
+          ? delivery.trackingId
+          : null;
+
+        return (
+          <button
+            key={delivery.id}
+            type="button"
+            onClick={onViewAll}
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+          >
+            <span className="font-bold text-slate-900">D{delivery.deliveryNo}</span>
+            {soLabel ? <span className="font-semibold text-violet-700">{soLabel}</span> : null}
+            <span className="text-slate-500">{originCity}→{destCity}</span>
+            {matCode ? <span className="text-slate-500">{matCode}</span> : null}
+            {delivery.weight ? <span className="font-medium text-slate-700">{delivery.weight}{delivery.weightUom ?? "MT"}</span> : null}
+          </button>
+        );
+      })}
+      {overflow > 0 ? (
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center rounded-full border border-dashed border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 hover:border-slate-400 hover:text-slate-700"
+        >
+          +{overflow} more
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={onViewAll}
+        className="text-[11px] font-semibold text-sky-600 hover:underline ml-1"
+      >
+        View All →
+      </button>
+    </div>
+  );
+}
+
+// ─── Delivery Detail Cards (inside modal) — read-only, mirrors delivery workspace ──
+
+function DeliveryDetailCards({
+  deliveries,
+  isErp,
+  addressMap,
+  materialMap,
+  shipmentDocuments,
+  calculatedFreight,
+  pickupDate,
+  pickupTime,
+}: {
+  deliveries: import("@/modules/tms/booking/types").BookingDeliveryRecord[];
+  isErp: boolean;
+  addressMap: Map<string, import("@/types/customer").TenantCustomerAddress>;
+  materialMap: Map<string, { materialCode: string; name?: string }>;
+  shipmentDocuments: import("@/modules/tms/booking/types").BookingShipmentDocuments;
+  calculatedFreight: number;
+  pickupDate?: string | null;
+  pickupTime?: string | null;
+}) {
+  if (deliveries.length === 0) return <p className="text-sm text-slate-500">No deliveries.</p>;
+
+  return (
+    <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+      {deliveries.map((delivery) => {
+        const origin = addressMap.get(delivery.originAddressId);
+        const dest = delivery.destinationAddressId ? addressMap.get(delivery.destinationAddressId) : null;
+        const mat = delivery.materialId ? materialMap.get(delivery.materialId) : null;
+        const deliveryDocs = shipmentDocuments.deliveries.find((d) => d.deliveryId === delivery.id);
+        const freight = deliveryDocs?.freightRate ?? shipmentDocuments.totalFreightRate ?? calculatedFreight;
+        const invoices = deliveryDocs?.invoices ?? [];
+        const consigneeName =
+          dest?.consigneeName?.trim() ||
+          invoices[0]?.consigneeName?.trim() ||
+          dest?.addressName?.trim() ||
+          delivery.destinationCity ||
+          "—";
+        const consigneeAddr =
+          dest?.fullAddress ||
+          [dest?.addressLine1, dest?.addressLine2, dest?.city, dest?.state, dest?.pincode].filter(Boolean).join(", ") ||
+          delivery.destinationCity || "—";
+        const soLabel = isErp && delivery.trackingId && !delivery.trackingId.startsWith("TRK-")
+          ? delivery.trackingId : null;
+        const invoiceFileNames = invoices.map((inv) => inv.fileName).filter(Boolean);
+
+        return (
+          <div key={delivery.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+            {/* Delivery header */}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[14px] font-semibold text-slate-900">Delivery {delivery.deliveryNo}</span>
+                <span className="text-slate-300">•</span>
+                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                  delivery.status === "COMPLETED" ? "bg-emerald-100 text-emerald-700" :
+                  delivery.status === "IN_TRANSIT" ? "bg-sky-100 text-sky-700" :
+                  "bg-slate-100 text-slate-600"
+                }`}>
+                  {delivery.status.replace(/_/g, " ")}
+                </span>
+                {soLabel ? (
+                  <span className="rounded bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">{soLabel}</span>
+                ) : (
+                  delivery.trackingId ? <span className="text-[11px] text-slate-400">{delivery.trackingId}</span> : null
+                )}
+              </div>
+              {freight > 0 ? (
+                <div className="text-right">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Delivery Freight</p>
+                  <p className="text-[15px] font-bold text-slate-900">₹{Math.round(freight).toLocaleString()}</p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Detail grid */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 py-3 sm:grid-cols-3">
+              <DRow label="Origin" value={origin?.addressName ?? origin?.city ?? delivery.originCity ?? "—"} />
+              <DRow label="Destination" value={dest?.addressName ?? dest?.city ?? delivery.destinationCity ?? "—"} />
+              <DRow label="Consignee Name" value={consigneeName} />
+              {consigneeAddr !== consigneeName ? (
+                <div className="col-span-2 sm:col-span-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Consignee Full Address</p>
+                  <p className="mt-0.5 text-[12px] text-slate-700 leading-relaxed">{consigneeAddr}</p>
+                </div>
+              ) : null}
+              <DRow label="Material" value={mat?.materialCode ?? mat?.name ?? "—"} />
+              <DRow label="Quantity" value={delivery.quantity ? `${delivery.quantity} ${delivery.uom ?? ""}`.trim() : "—"} />
+              <DRow label="Weight" value={delivery.weight ? `${delivery.weight} ${delivery.weightUom ?? "MT"}`.trim() : "—"} />
+              {pickupDate ? (
+                <DRow label="Pickup Date & Time" value={pickupTime ? `${pickupDate} ${pickupTime}` : pickupDate} />
+              ) : null}
+              {delivery.distanceKm != null ? (
+                <DRow label="Approx Trip Distance" value={`${delivery.distanceKm.toFixed(2)} km`} />
+              ) : null}
+              {delivery.unloadingNotes ? (
+                <div className="col-span-2 sm:col-span-3">
+                  <DRow label="Notes" value={delivery.unloadingNotes} />
+                </div>
+              ) : null}
+              {delivery.lrNumber ? <DRow label="LR Number" value={delivery.lrNumber} /> : null}
+              {delivery.eta ? <DRow label="ETA" value={delivery.eta} /> : null}
+            </div>
+
+            {/* Trip documents */}
+            {invoiceFileNames.length > 0 ? (
+              <div className="border-t border-slate-100 px-4 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">Trip Documents</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {invoiceFileNames.map((fileName, i) => (
+                    <span key={i} className="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">{fileName}</span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-0.5 text-[12px] font-medium text-slate-800">{value}</p>
     </div>
   );
 }

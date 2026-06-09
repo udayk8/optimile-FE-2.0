@@ -1,3 +1,62 @@
+export type BookingSource = "WEB" | "MOBILE" | "ERP";
+
+export type ErpOrderStatus = "PENDING" | "MERGED" | "CANCELLED";
+
+export interface ErpOrderRecord {
+  id: string;
+  tenantId: string;
+  salesOrderNumber: string;
+  erpReferenceNumber: string;
+  externalBookingNumber?: string | null;
+  erpCustomerCode?: string | null;
+  erpPlantCode?: string | null;
+  sourceSystem: string;
+  integrationStatus: ErpIntegrationStatus;
+  customerId: string;
+  materialId?: string | null;
+  quantity: number;
+  uom: string;
+  weight: number;
+  weightUom: string;
+  vehicleTypeId?: string | null;
+  originCity: string;
+  originAddressId?: string | null;
+  destinationCity: string;
+  destinationAddressId?: string | null;
+  consignorName?: string | null;
+  consignorAddress?: string | null;
+  consignorGstin?: string | null;
+  consigneeName?: string | null;
+  consigneeAddress?: string | null;
+  consigneeGstin?: string | null;
+  opsRemark?: string | null;
+  pickupDateTime?: string | null;
+  status: ErpOrderStatus;
+  mergedBookingId?: string | null;
+  mergedBookingDisplayId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export type ErpIntegrationStatus = "MOCK" | "PENDING" | "SYNCED" | "FAILED";
+
+export interface ErpReferenceSnapshot {
+  erpReferenceNumber?: string | null;
+  salesOrderNumber?: string | null;
+  externalBookingNumber?: string | null;
+  erpCustomerCode?: string | null;
+  erpPlantCode?: string | null;
+  sourceSystem?: string | null;
+  integrationStatus: ErpIntegrationStatus;
+  consignorName?: string | null;
+  consignorAddress?: string | null;
+  consignorGstin?: string | null;
+  consigneeName?: string | null;
+  consigneeAddress?: string | null;
+  consigneeGstin?: string | null;
+}
+
 export type BookingStatus =
   | "DRAFT"
   | "PENDING_RATE_APPROVAL"
@@ -678,6 +737,8 @@ export interface BookingRecord {
   id: string;
   bookingId: string;
   tenantId: string;
+  bookingSource?: BookingSource;
+  erpReference?: ErpReferenceSnapshot | null;
   modeOfTransport?: BookingModeOfTransport;
   numberOfDeliveries?: number;
   customerId: string;
@@ -743,6 +804,8 @@ export interface BookingRecord {
 }
 
 export interface BookingInput {
+  bookingSource?: BookingSource;
+  erpReference?: ErpReferenceSnapshot | null;
   modeOfTransport?: BookingModeOfTransport;
   numberOfDeliveries?: number;
   customerId: string;

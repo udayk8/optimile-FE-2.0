@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import { CircleCheckBig, Printer, RadioTower, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleCheckBig, Printer, RadioTower, TriangleAlert } from "lucide-react";
 import { DataTable } from "@/shared/components/common/data-table";
 import { PageHeader } from "@/shared/components/common/page-header";
 import { TenantSummaryCard } from "@/modules/tenant-admin/components/tenant-primitives";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
+import { Input } from "@/shared/components/ui/input";
 import { Tabs } from "@/shared/components/ui/tabs";
 import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRouteContext";
 import { useSessionContext } from "@/shared/auth/session-context";
@@ -97,105 +98,125 @@ export function LiveTrackingPlaceholderPage() {
   );
 }
 
+const POD_PAGE_SIZE = 8;
+
 export function PODCompletedPage() {
   const navigate = useNavigate();
   const { tenant } = useTenantRouteContext();
-  const access = useTenantAccess("/tenant/:tenantId/bookings/invoicing");
-  const { data: bookings, transitionBooking } = useTenantBookings(tenant.id);
-  const { data: invoices } = useTenantFinance(tenant.id);
+  const { data: bookings } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
-  const customerMap = buildCustomerLookup(adminSources.customers);
-  const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
-  const invoicingBookings = bookings.filter((booking) =>
-    ["POD_PENDING", "COMPLETED", "INVOICED"].includes(getPrimaryBookingStatus(booking.status)),
+  const customerMap = useMemo(() => buildCustomerLookup(adminSources.customers), [adminSources.customers]);
+  const addressMap = useMemo(
+    () => buildAddressLookup(Array.from(adminSources.customerAddressMap.values()).flat()),
+    [adminSources.customerAddressMap],
   );
-  const completedBookings = invoicingBookings.filter((booking) => getPrimaryBookingStatus(booking.status) === "COMPLETED");
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
-  function toggleBookingSelection(bookingId: string) {
-    setSelectedBookingIds((current) =>
-      current.includes(bookingId) ? current.filter((id) => id !== bookingId) : [...current, bookingId],
-    );
-  }
+  const podBookings = useMemo(
+    () => bookings.filter((b) => getPrimaryBookingStatus(b.status) === "POD_PENDING"),
+    [bookings],
+  );
 
-  function generateInvoices() {
-    completedBookings
-      .filter((booking) => selectedBookingIds.includes(booking.id))
-      .forEach((booking) => {
-        transitionBooking(booking.id, {
-          status: "INVOICED",
-          actor: "Finance",
-          note: "Generated from invoicing screen.",
-        });
-      });
-    setSelectedBookingIds([]);
-  }
+  const filteredPod = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return podBookings;
+    return podBookings.filter((b) => {
+      const cust = customerMap.get(b.customerId);
+      return `${b.bookingId} ${cust?.name ?? ""}`.toLowerCase().includes(q);
+    });
+  }, [podBookings, search, customerMap]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPod.length / POD_PAGE_SIZE));
+  const pagedPod = filteredPod.slice((currentPage - 1) * POD_PAGE_SIZE, currentPage * POD_PAGE_SIZE);
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow="TMS"
-        title="Invoicing Screen"
-        description="Finance workspace for selecting completed bookings and moving them to invoiced."
-        action={
-          access.can("BOOKING_INVOICING", "GENERATE_INVOICE") ? (
-            <Button onClick={generateInvoices} disabled={!selectedBookingIds.length}>
-              Generate Invoice
-            </Button>
-          ) : null
-        }
-      />
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <TenantSummaryCard label="POD Pending" value={String(invoicingBookings.filter((booking) => getPrimaryBookingStatus(booking.status) === "POD_PENDING").length)} helper="Physical delivery done, POD pending" />
-        <TenantSummaryCard label="Completed" value={String(invoicingBookings.filter((booking) => getPrimaryBookingStatus(booking.status) === "COMPLETED").length)} helper="POD complete, ready for finance invoice" />
-        <TenantSummaryCard label="Invoiced" value={String(invoicingBookings.filter((booking) => getPrimaryBookingStatus(booking.status) === "INVOICED").length)} helper="Moved to finance closure" />
-        <TenantSummaryCard label="Paid" value={String(bookings.filter((booking) => booking.status === "PAID").length)} helper="Commercially closed" />
-        <TenantSummaryCard label="POD Complete" value={String(invoicingBookings.filter((booking) => (booking.deliveries ?? []).every((delivery) => Boolean(delivery.pod?.capturedAt))).length)} helper="All delivery PODs saved" />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-[14px] font-semibold text-slate-900">POD Pending</h1>
+        <span className="text-[12px] text-slate-500">{filteredPod.length} bookings</span>
       </div>
 
-      <DataTable
-        title="Finance Selection Board"
-        description="Select completed bookings for invoicing, or open a booking to inspect POD details."
-        headers={["Select", "Booking", "Customer", "Status", "Invoice ID", "Invoiced", "POD Progress", "e-Sign", "Action"]}
-        rows={invoicingBookings.map((booking) => {
-          const deliveryCount = booking.deliveries?.length ?? 0;
-          const completedCount = (booking.deliveries ?? []).filter((delivery) => Boolean(delivery.pod?.capturedAt)).length;
-          const primaryStatus = getPrimaryBookingStatus(booking.status);
-          const selectable = primaryStatus === "COMPLETED";
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-sm">
+        <Input
+          value={search}
+          onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }}
+          placeholder="Search booking or customer"
+          className="h-8 min-w-[180px] flex-1 text-[12px]"
+        />
+        {search ? (
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setCurrentPage(1); }} className="h-8 text-[12px]">Clear</Button>
+        ) : null}
+      </div>
 
-          return [
-            <div key={`${booking.id}-select`} onClick={(event) => event.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={selectedBookingIds.includes(booking.id)}
-                disabled={!selectable}
-                onChange={() => toggleBookingSelection(booking.id)}
-              />
-            </div>,
-            booking.bookingId,
-            customerMap.get(booking.customerId)?.name ?? "Unknown customer",
-            <BookingStatusBadge key={`${booking.id}-status`} status={booking.status} />,
-            booking.invoiceId ?? "-",
-            booking.isInvoiced ? "Yes" : "No",
-            deliveryCount ? `${completedCount}/${deliveryCount} deliveries` : booking.pod?.capturedAt ? "Completed" : "Pending",
-            booking.pod?.eSignRequested || (booking.deliveries ?? []).some((delivery) => delivery.pod?.eSignRequested) ? "Requested" : "Ready",
-            <div key={`${booking.id}-actions`} onClick={(event) => event.stopPropagation()} className="flex gap-2">
-              <Button asChild size="sm" variant="ghost">
-                <Link to={`/tenant/${tenant.id}/bookings/${booking.id}`}>Open</Link>
+      <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="space-y-1.5">
+          {pagedPod.length ? (
+            pagedPod.map((booking) => {
+              const customerName = customerMap.get(booking.customerId)?.name ?? "—";
+              const srcAddr = addressMap.get(booking.sourceAddressId);
+              const dstAddr = addressMap.get(booking.destinationAddressId);
+              const origin = srcAddr?.city ?? srcAddr?.addressName ?? "—";
+              const dest = dstAddr?.city ?? dstAddr?.addressName ?? "—";
+              const deliveryCount = booking.deliveries?.length ?? 0;
+              const podDoneCount = (booking.deliveries ?? []).filter((d) => Boolean(d.pod?.capturedAt)).length;
+              const podDone = deliveryCount > 0 ? podDoneCount === deliveryCount : Boolean(booking.pod?.capturedAt);
+              const podLabel = deliveryCount > 0 ? `${podDoneCount}/${deliveryCount}` : booking.pod?.capturedAt ? "Done" : "Pending";
+              const lrNumber = booking.assignment?.lrNumber ?? booking.shipmentDocuments?.lr?.number ?? "—";
+
+              return (
+                <button
+                  key={booking.id}
+                  type="button"
+                  onClick={() => navigate(`/tenant/${tenant.id}/bookings/${booking.id}`)}
+                  className="grid w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-[12px] transition hover:border-slate-400 hover:bg-slate-50 lg:grid-cols-[130px_minmax(0,1.3fr)_minmax(0,0.9fr)_80px_110px_auto]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{booking.bookingId}</p>
+                    <p className="mt-0.5 truncate text-[10.5px] text-slate-500">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{customerName}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-slate-500">{origin} → {dest}</p>
+                    <p className="mt-0.5 text-[10.5px] text-slate-400">Rs {booking.pricing.calculatedFreight.toLocaleString()}</p>
+                  </div>
+                  <div className="min-w-0 text-[11px] text-slate-600">
+                    <p className="truncate text-slate-400">LR: {lrNumber}</p>
+                    <p className="truncate text-slate-400">Vehicle: {booking.assignment?.vehicleLabel ?? "—"}</p>
+                  </div>
+                  <div>
+                    <Badge variant={podDone ? "success" : "warning"}>{podLabel}</Badge>
+                  </div>
+                  <div><BookingStatusBadge status={booking.status} /></div>
+                  <div className="flex items-center justify-end">
+                    <span className="text-[11px] font-semibold text-sky-600 hover:text-sky-800">Upload POD →</span>
+                  </div>
+                </button>
+              );
+            })
+          ) : (
+            <div className="rounded-md border border-dashed bg-slate-50/40 px-4 py-8 text-center">
+              <p className="text-[13px] font-semibold text-slate-800">No POD pending bookings</p>
+            </div>
+          )}
+        </div>
+
+        {totalPages > 1 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-[12px]">
+            <p className="text-slate-600">
+              {(currentPage - 1) * POD_PAGE_SIZE + 1}–{Math.min(currentPage * POD_PAGE_SIZE, filteredPod.length)} of {filteredPod.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="size-4" />Previous
               </Button>
-              {booking.invoiceId && invoices.some((invoice) => invoice.invoiceId === booking.invoiceId) ? (
-                access.can("BOOKING_INVOICING", "VIEW_INVOICE") ? (
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to={`/tenant/${tenant.id}/finance/invoice/${booking.invoiceId}`}>View Invoice</Link>
-                  </Button>
-                ) : null
-              ) : null}
-            </div>,
-          ];
-        })}
-        onRowClick={(rowIndex) => navigate(`/tenant/${tenant.id}/bookings/${invoicingBookings[rowIndex].id}`)}
-        emptyMessage="No completed or invoiced bookings are available yet."
-      />
+              <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+                Next<ChevronRight className="size-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

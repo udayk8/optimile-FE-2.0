@@ -194,8 +194,8 @@ export function TenantAutoLrOperationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader eyebrow="Operations" title="Auto LR" description="" />
+    <div className="space-y-3">
+      <h1 className="text-[14px] font-semibold text-slate-900">Auto LR</h1>
       {message ? <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div> : null}
 
       <div className="flex flex-wrap gap-2">
@@ -213,11 +213,11 @@ export function TenantAutoLrOperationsPage() {
 
       {activeTab === "governance" ? (
         <TenantPanel title="Governance" description="">
-          <div className="grid gap-3 lg:grid-cols-4">
-            <TenantSummaryCard label="Workspace" value={activeOrgUnit?.name ?? "Tenant / Company Level"} />
-            <TenantSummaryCard label="Current Level" value={currentLevel?.name ?? "Tenant / Company Level"} />
-            <TenantSummaryCard label="Child Level" value={childLevel?.name ?? "No child"} />
-            <TenantSummaryCard label="Resolved Pattern" value={runtimePreview?.formatPreview ?? buildManualLrPreview(activeFormat ?? autoConfig)} />
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
+            <AutoLrKV label="Workspace" value={activeOrgUnit?.name ?? "Tenant / Company Level"} />
+            <AutoLrKV label="Current Level" value={currentLevel?.name ?? "Tenant / Company Level"} />
+            <AutoLrKV label="Child Level" value={childLevel?.name ?? "No child"} />
+            <AutoLrKV label="Resolved Pattern" value={runtimePreview?.formatPreview ?? buildManualLrPreview(activeFormat ?? autoConfig)} mono />
           </div>
         </TenantPanel>
       ) : null}
@@ -237,23 +237,11 @@ export function TenantAutoLrOperationsPage() {
 
       {activeTab === "allocation" ? (
         <TenantPanel title="Allocation Rights" description="">
-          <div className="grid gap-3 lg:grid-cols-4">
-            <TenantSummaryCard
-              label={`${currentLevel?.name ?? "Current level"} generate`}
-              value={currentRule?.canConsumeParentLr ? "Yes" : "No"}
-            />
-            <TenantSummaryCard
-              label={`${childLevel?.name ?? "Child level"} generate`}
-              value={childRule?.parentCanGenerateLr ? "Allowed" : "Blocked"}
-            />
-            <TenantSummaryCard
-              label={`${childLevel?.name ?? "Child level"} request`}
-              value={childRule?.childCanRequestLr ? "Allowed" : "Blocked"}
-            />
-            <TenantSummaryCard
-              label={`${childLevel?.name ?? "Child level"} approval`}
-              value={childRule?.canApproveChildRequests ? "Required" : "Direct"}
-            />
+          <div className="flex flex-wrap gap-x-6 gap-y-2 text-[12px]">
+            <AutoLrKV label={`${currentLevel?.name ?? "Current level"} generate`} value={currentRule?.canConsumeParentLr ? "Yes" : "No"} />
+            <AutoLrKV label={`${childLevel?.name ?? "Child level"} generate`} value={childRule?.parentCanGenerateLr ? "Allowed" : "Blocked"} />
+            <AutoLrKV label={`${childLevel?.name ?? "Child level"} request`} value={childRule?.childCanRequestLr ? "Allowed" : "Blocked"} />
+            <AutoLrKV label={`${childLevel?.name ?? "Child level"} approval`} value={childRule?.canApproveChildRequests ? "Required" : "Direct"} />
           </div>
         </TenantPanel>
       ) : null}
@@ -464,5 +452,15 @@ function AutoRequestTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+
+function AutoLrKV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <span className="flex flex-col">
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+      <span className={`text-[12px] font-semibold text-slate-900 ${mono ? "font-mono" : ""}`}>{value}</span>
+    </span>
   );
 }

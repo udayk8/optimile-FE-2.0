@@ -18,7 +18,7 @@ import {
   buildMaterialLookup,
 } from "@/modules/tms/booking/services/booking-selectors";
 import { areAllDeliveryPodsCaptured, getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
-import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
+import type { BookingRecord, BookingSource, BookingStatus } from "@/modules/tms/booking/types";
 import type { TenantCustomerAddress } from "@/types/customer";
 
 const pipelineColumns: Array<{
@@ -80,11 +80,20 @@ export function BookingListPage() {
   const { tenant } = useTenantRouteContext();
   const access = useTenantAccess();
   const canCreateBooking = access.hasFeaturePermission("TMS", "CREATE_BOOKING", "create");
+
+  // Redirect ERP pipeline URL to the dedicated ERP Bookings page so users
+  // who bookmark /bookings?pipeline=erp land on the right screen.
+  const pipelineParam = searchParams.get("pipeline");
+  if (pipelineParam === "erp") {
+    navigate(`/tenant/${tenant.id}/bookings/erp`, { replace: true });
+    return null;
+  }
   const { data: bookings } = useTenantBookings(tenant.id);
   const adminSources = useBookingAdminSources(tenant.id);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -180,6 +189,9 @@ export function BookingListPage() {
       if (customerFilter !== "all" && booking.customerId !== customerFilter) {
         return false;
       }
+      if (sourceFilter !== "all" && (booking.bookingSource ?? "WEB") !== sourceFilter) {
+        return false;
+      }
       if (dateFrom && booking.createdAt.slice(0, 10) < dateFrom) {
         return false;
       }
@@ -188,13 +200,17 @@ export function BookingListPage() {
       }
       return true;
     });
-  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search]);
+  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search, sourceFilter]);
 
   const pipelineGroups = useMemo(
     () =>
       pipelineColumns.map((column) => {
         const columnBookings = baseFilteredBookings
-          .filter((booking) => column.statuses.includes(getPrimaryBookingStatus(booking.status)))
+          .filter((booking) =>
+            column.key === "erp"
+              ? booking.bookingSource === "ERP"
+              : column.statuses.includes(getPrimaryBookingStatus(booking.status)),
+          )
           .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
         return {
@@ -247,7 +263,7 @@ export function BookingListPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, customerFilter, dateFrom, dateTo, selectedPipelineKey]);
+  }, [search, statusFilter, customerFilter, sourceFilter, dateFrom, dateTo, selectedPipelineKey]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -348,21 +364,30 @@ export function BookingListPage() {
             />
           )}
         </div>
-        {canCreateBooking ? (
-          <Button asChild size="sm">
-            <Link to={`/tenant/${tenant.id}/bookings/create`}>
-              <Plus className="size-4" />
-              Create Booking
-            </Link>
-          </Button>
-        ) : (
-          <span title="Permission not granted — ask your Tenant Admin to enable Create Booking" className="inline-block">
-            <Button size="sm" disabled aria-disabled="true">
-              <Plus className="size-4" />
-              Create Booking
+        <div className="flex items-center gap-2">
+          {canCreateBooking ? (
+            <Button asChild size="sm" variant="outline">
+              <Link to={`/tenant/${tenant.id}/bookings/erp`}>
+                ERP Orders →
+              </Link>
             </Button>
-          </span>
-        )}
+          ) : null}
+          {canCreateBooking ? (
+            <Button asChild size="sm">
+              <Link to={`/tenant/${tenant.id}/bookings/create`}>
+                <Plus className="size-4" />
+                Create Booking
+              </Link>
+            </Button>
+          ) : (
+            <span title="Permission not granted — ask your Tenant Admin to enable Create Booking" className="inline-block">
+              <Button size="sm" disabled aria-disabled="true">
+                <Plus className="size-4" />
+                Create Booking
+              </Button>
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Horizontal sliding pipeline board. Idle cards = soft slate border;
@@ -385,6 +410,10 @@ export function BookingListPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (column.key === "erp") {
+                          navigate(`/tenant/${tenant.id}/bookings/erp`);
+                          return;
+                        }
                         setSelectedPipelineKey(column.key);
                         setStatusFilter("all");
                       }}
@@ -423,6 +452,10 @@ export function BookingListPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (column.key === "erp") {
+                          navigate(`/tenant/${tenant.id}/bookings/erp`);
+                          return;
+                        }
                         setSelectedPipelineKey(column.key);
                         setStatusFilter("all");
                         setSearchParams((current) => {
@@ -481,6 +514,16 @@ export function BookingListPage() {
             </option>
           ))}
         </Select>
+        <Select
+          value={sourceFilter}
+          onChange={(event) => setSourceFilter(event.target.value)}
+          className="h-8 w-auto min-w-[100px] text-[12px]"
+        >
+          <option value="all">All sources</option>
+          <option value="WEB">Web</option>
+          <option value="MOBILE">Mobile</option>
+          <option value="ERP">ERP</option>
+        </Select>
         <Input
           type="date"
           value={dateFrom}
@@ -500,6 +543,7 @@ export function BookingListPage() {
             setSearch("");
             setStatusFilter("all");
             setCustomerFilter("all");
+            setSourceFilter("all");
             setDateFrom("");
             setDateTo("");
           }}
@@ -709,6 +753,7 @@ function BookingSummaryRow({
         <div className="mt-0.5 flex flex-wrap gap-1">
           {hasRevisionPending ? <Badge variant="warning">EDITED</Badge> : null}
           {!hasRevisionPending && isRevised ? <Badge variant="accent">REVISED</Badge> : null}
+          {booking.bookingSource ? <BookingSourceBadge source={booking.bookingSource} /> : null}
         </div>
       </div>
 
@@ -933,6 +978,14 @@ function getPipelineTone(key: string) {
         viewAllActive: "bg-zinc-700 text-white",
       };
     case "erp":
+      return {
+        cardBg: "bg-violet-50",
+        headline: "text-violet-800",
+        countChip: "bg-violet-200 text-violet-900",
+        ring: "ring-violet-300",
+        viewAll: "border border-violet-200 bg-white text-violet-800 hover:bg-violet-100",
+        viewAllActive: "bg-violet-600 text-white",
+      };
     default:
       return {
         cardBg: "bg-slate-50",
@@ -943,4 +996,26 @@ function getPipelineTone(key: string) {
         viewAllActive: "bg-slate-900 text-white",
       };
   }
+}
+
+function BookingSourceBadge({ source }: { source: BookingSource }) {
+  if (source === "ERP") {
+    return (
+      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
+        ERP
+      </span>
+    );
+  }
+  if (source === "MOBILE") {
+    return (
+      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-sky-100 text-sky-700 border border-sky-200">
+        MOBILE
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+      WEB
+    </span>
+  );
 }

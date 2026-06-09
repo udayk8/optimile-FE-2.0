@@ -20,7 +20,7 @@ import {
   buildDriverLookup,
 } from "@/modules/tms/booking/services/booking-selectors";
 import { getPrimaryBookingStatus } from "@/modules/tms/booking/services/booking-engine";
-import type { BookingRecord, BookingStatus } from "@/modules/tms/booking/types";
+import type { BookingRecord, BookingSource, BookingStatus } from "@/modules/tms/booking/types";
 
 const pipelineColumns: Array<{
   key: string;
@@ -56,6 +56,7 @@ export function BookingListPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [customerFilter, setCustomerFilter] = useState("all");
+  const [sourceFilter, setSourceFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [selectedPipelineKey, setSelectedPipelineKey] = useState(searchParams.get("pipeline") ?? "assignment");
@@ -98,6 +99,9 @@ export function BookingListPage() {
       if (customerFilter !== "all" && booking.customerId !== customerFilter) {
         return false;
       }
+      if (sourceFilter !== "all" && (booking.bookingSource ?? "WEB") !== sourceFilter) {
+        return false;
+      }
       if (dateFrom && booking.createdAt.slice(0, 10) < dateFrom) {
         return false;
       }
@@ -106,13 +110,17 @@ export function BookingListPage() {
       }
       return true;
     });
-  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search]);
+  }, [addressMap, bookings, customerFilter, customerMap, dateFrom, dateTo, search, sourceFilter]);
 
   const pipelineGroups = useMemo(
     () =>
       pipelineColumns.map((column) => {
         const columnBookings = baseFilteredBookings
-          .filter((booking) => column.statuses.includes(getPrimaryBookingStatus(booking.status)))
+          .filter((booking) =>
+            column.key === "erp"
+              ? booking.bookingSource === "ERP"
+              : column.statuses.includes(getPrimaryBookingStatus(booking.status)),
+          )
           .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
         return {
@@ -146,7 +154,7 @@ export function BookingListPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, statusFilter, customerFilter, dateFrom, dateTo, selectedPipelineKey]);
+  }, [search, statusFilter, customerFilter, sourceFilter, dateFrom, dateTo, selectedPipelineKey]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -272,6 +280,12 @@ export function BookingListPage() {
                 </option>
               ))}
             </Select>
+            <Select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+              <option value="all">All sources</option>
+              <option value="WEB">Web</option>
+              <option value="MOBILE">Mobile</option>
+              <option value="ERP">ERP</option>
+            </Select>
             <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
             <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
           </>
@@ -362,8 +376,11 @@ function CompactBookingRow({
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{booking.bookingId}</p>
         <p className="mt-1 truncate text-xs text-muted-foreground">{new Date(booking.createdAt).toLocaleDateString()}</p>
-        {hasRevisionPending ? <Badge variant="warning">EDITED BOOKING</Badge> : null}
-        {!hasRevisionPending && isRevised ? <Badge variant="accent">DESTINATION REVISED</Badge> : null}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {hasRevisionPending ? <Badge variant="warning">EDITED BOOKING</Badge> : null}
+          {!hasRevisionPending && isRevised ? <Badge variant="accent">DESTINATION REVISED</Badge> : null}
+          {booking.bookingSource ? <BookingSourceBadge source={booking.bookingSource} /> : null}
+        </div>
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{customerName}</p>
@@ -420,9 +437,33 @@ function getPipelineColumnClass(columnKey: string) {
       return "bg-gradient-to-b from-rose-100/95 to-orange-50/75";
     case "cancelled":
       return "bg-gradient-to-b from-rose-100/95 to-pink-50/75";
+    case "erp":
+      return "bg-gradient-to-b from-violet-100/95 to-purple-50/75";
     default:
       return "bg-background/95";
   }
+}
+
+function BookingSourceBadge({ source }: { source: BookingSource }) {
+  if (source === "ERP") {
+    return (
+      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
+        ERP
+      </span>
+    );
+  }
+  if (source === "MOBILE") {
+    return (
+      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-sky-100 text-sky-700 border border-sky-200">
+        MOBILE
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-slate-100 text-slate-600 border border-slate-200">
+      WEB
+    </span>
+  );
 }
 
 

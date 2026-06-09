@@ -819,8 +819,7 @@ export function TenantCustomersPage() {
               <PreferencesStep
                 form={form}
                 setForm={setForm}
-                quantityUOMOptions={quantityUOMOptions}
-                weightUOMOptions={weightUOMOptions}
+                tenantId={tenant.id}
               />
             ) : null}
           </div>
@@ -1287,8 +1286,7 @@ export function TenantCustomerDetailPage() {
             <PreferencesStep
               form={detailForm}
               setForm={setDetailForm}
-              quantityUOMOptions={quantityUOMOptions}
-              weightUOMOptions={weightUOMOptions}
+              tenantId={tenant.id}
             />
           </div>
         ) : null}
@@ -2795,51 +2793,16 @@ function CreditBillingStep({
   form: TenantCustomerInput;
   setForm: React.Dispatch<React.SetStateAction<TenantCustomerInput>>;
 }) {
-  const creditLimit = form.creditLimit ?? 100000;
-  const outstanding = form.currentOutstanding ?? 0;
-  const utilization = creditLimit > 0 ? (outstanding / creditLimit) * 100 : 0;
-
-  // Credit & Billing — minimal set. The previous version had three "Display
-  // Section / Input Fields / Tax & Finance" headings that wasted space and a
-  // mojibake'd ₹ in the labels. Now: one row of inputs + one row of utility
-  // summaries + a compact GST/TDS strip.
   return (
     <div className="space-y-4">
-      <SectionBlock title="Credit">
-        <div className="grid items-end gap-3 md:grid-cols-4">
+      <SectionBlock title="Credit & Billing">
+        <div className="grid items-end gap-3 md:grid-cols-2">
           <Field label="Credit Limit (₹)">
             <Input type="number" value={String(form.creditLimit ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditLimit: Number(event.target.value || 0) }))} />
           </Field>
           <Field label="Credit Days">
             <Input type="number" value={String(form.creditDays ?? "")} onChange={(event) => setForm((current) => ({ ...current, creditDays: Number(event.target.value || 0) }))} />
           </Field>
-          <Field label="Outstanding (₹)">
-            <Input type="number" value={String(form.currentOutstanding ?? "")} onChange={(event) => setForm((current) => ({ ...current, currentOutstanding: Number(event.target.value || 0) }))} />
-          </Field>
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Utilization</label>
-            <div className="rounded-lg border bg-muted/20 px-3 py-2 text-sm font-semibold">
-              {utilization.toFixed(1)}% <span className="text-[11px] font-normal text-muted-foreground">({formatCurrency(outstanding)} / {formatCurrency(creditLimit)})</span>
-            </div>
-          </div>
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Tax & Invoicing">
-        <div className="grid items-end gap-3 md:grid-cols-3">
-          <Field label="GST Charge Type">
-            <Select value={form.gstChargeType ?? "Forward Charge (12% GST on Transport)"} onChange={(event) => setForm((current) => ({ ...current, gstChargeType: event.target.value }))}>
-              <option value="Forward Charge (12% GST on Transport)">Forward Charge (12% GST on Transport)</option>
-              <option value="Reverse Charge">Reverse Charge</option>
-            </Select>
-          </Field>
-          <Field label="Invoice Format">
-            <Input value={form.invoiceFormat ?? ""} onChange={(event) => setForm((current) => ({ ...current, invoiceFormat: event.target.value }))} />
-          </Field>
-          <label className="flex h-[42px] cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/10 px-3">
-            <span className="text-sm font-medium">TDS applicable</span>
-            <Switch checked={Boolean(form.tdsApplicable)} onCheckedChange={(checked) => setForm((current) => ({ ...current, tdsApplicable: checked }))} />
-          </label>
         </div>
       </SectionBlock>
     </div>
@@ -2860,14 +2823,15 @@ function ContractsPlaceholderStep() {
 function PreferencesStep({
   form,
   setForm,
-  quantityUOMOptions,
-  weightUOMOptions,
+  tenantId,
 }: {
   form: TenantCustomerInput;
   setForm: React.Dispatch<React.SetStateAction<TenantCustomerInput>>;
-  quantityUOMOptions: string[];
-  weightUOMOptions: string[];
+  tenantId: string;
 }) {
+  const { data: vehicleTypeData } = useTenantVehicleTypes(tenantId);
+  const activeVehicleTypes = vehicleTypeData.map((vt) => vt.typeCode);
+
   function toggleVehicle(vehicleType: string) {
     setForm((current) => ({
       ...current,
@@ -2877,50 +2841,6 @@ function PreferencesStep({
     }));
   }
 
-  function updateOverride(
-    overrideId: string,
-    field: keyof CustomerUOMOverride,
-    value: string | number,
-  ) {
-    setForm((current) => ({
-      ...current,
-      uomOverrides: (current.uomOverrides ?? []).map((override) =>
-        override.id === overrideId
-          ? normalizeCustomerUOMOverrideDraft({
-              ...override,
-              [field]: value,
-            } as CustomerUOMOverride)
-          : normalizeCustomerUOMOverrideDraft(override),
-      ),
-    }));
-  }
-
-  function addOverride() {
-    setForm((current) => ({
-      ...current,
-      uomOverrides: [
-        ...(current.uomOverrides ?? []),
-        {
-          id: `draft-uom-override-${Math.random().toString(36).slice(2, 9)}`,
-          quantityUOM: quantityUOMOptions[0] ?? "",
-          weightUOM: weightUOMOptions[0] ?? "",
-          conversionValue: 0,
-          status: "active",
-        },
-      ],
-    }));
-  }
-
-  function deleteOverride(overrideId: string) {
-    setForm((current) => ({
-      ...current,
-      uomOverrides: (current.uomOverrides ?? []).filter((override) => override.id !== overrideId),
-    }));
-  }
-
-  // RATE CALCULATION STRATEGY: booking searches on this subset of the rate card
-  // structure. The available checkboxes come from the structure (Contracts →
-  // Configure Rate Card); selecting nothing means "match on all columns".
   const rateStructure = resolveCustomerRateMatchingConfig(form);
   const rateStrategy = resolveCustomerRateCalculationStrategy(form);
   function toggleStrategyDimension(key: RateMatchingFieldKey) {
@@ -2930,11 +2850,8 @@ function PreferencesStep({
     } else {
       selected.add(key);
     }
-    // Keep at least one dimension and preserve the structure's canonical order.
     const next = rateStructure.filter((item) => selected.has(item));
-    if (!next.length) {
-      return;
-    }
+    if (!next.length) return;
     setForm((current) => ({ ...current, rateCalculationStrategy: next }));
   }
 
@@ -2954,23 +2871,14 @@ function PreferencesStep({
               <label
                 key={key}
                 className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                  checked
-                    ? "border-primary/40 bg-primary/5 font-medium"
-                    : "bg-background/80 hover:border-primary/20"
+                  checked ? "border-primary/40 bg-primary/5 font-medium" : "bg-background/80 hover:border-primary/20"
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={checked}
-                  onChange={() => toggleStrategyDimension(key)}
-                />
+                <input type="checkbox" className="mt-0.5" checked={checked} onChange={() => toggleStrategyDimension(key)} />
                 <span>
                   {field?.label ?? key}
                   {field?.description ? (
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {field.description}
-                    </span>
+                    <span className="block text-xs font-normal text-muted-foreground">{field.description}</span>
                   ) : null}
                 </span>
               </label>
@@ -2984,124 +2892,30 @@ function PreferencesStep({
       </SectionBlock>
 
       <SectionBlock title="Vehicle Preferences">
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {vehicleTypeOptions.map((vehicleType) => (
-            <label
-              key={vehicleType}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                form.preferredVehicleTypes?.includes(vehicleType)
-                  ? "border-primary/40 bg-primary/5 font-medium"
-                  : "bg-background/80 hover:border-primary/20"
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={form.preferredVehicleTypes?.includes(vehicleType) ?? false}
-                onChange={() => toggleVehicle(vehicleType)}
-              />
-              {vehicleType}
-            </label>
-          ))}
-        </div>
-      </SectionBlock>
-
-      <SectionBlock title="Communication & Payment">
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Communication Channel">
-            <Select value={form.communicationChannel ?? "Email"} onChange={(event) => setForm((current) => ({ ...current, communicationChannel: event.target.value }))}>
-              <option value="Email">Email</option>
-              <option value="Phone">Phone</option>
-              <option value="WhatsApp">WhatsApp</option>
-            </Select>
-          </Field>
-          <Field label="Default Payment Mode">
-            <Select value={form.defaultPaymentMode ?? "Bank Transfer"} onChange={(event) => setForm((current) => ({ ...current, defaultPaymentMode: event.target.value }))}>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Cheque">Cheque</option>
-              <option value="UPI">UPI</option>
-            </Select>
-          </Field>
-        </div>
-        <label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-muted/10 px-3 py-2">
-          <span className="text-sm font-medium">Allow Auto-Booking (API)</span>
-          <Switch checked={Boolean(form.allowAutoBooking)} onCheckedChange={(checked) => setForm((current) => ({ ...current, allowAutoBooking: checked }))} />
-        </label>
-      </SectionBlock>
-
-      <details className="rounded-2xl border border-border/70 bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Customer UOM Overrides</summary>
-        <div className="space-y-3 border-t px-4 py-3">
-          <div className="flex justify-end">
-            <Button size="sm" variant="outline" onClick={addOverride} disabled={!quantityUOMOptions.length || !weightUOMOptions.length}>
-              + Add UOM Override
-            </Button>
+        {activeVehicleTypes.length ? (
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {activeVehicleTypes.map((vehicleType) => (
+              <label
+                key={vehicleType}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                  form.preferredVehicleTypes?.includes(vehicleType)
+                    ? "border-primary/40 bg-primary/5 font-medium"
+                    : "bg-background/80 hover:border-primary/20"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.preferredVehicleTypes?.includes(vehicleType) ?? false}
+                  onChange={() => toggleVehicle(vehicleType)}
+                />
+                {vehicleType}
+              </label>
+            ))}
           </div>
-
-          {(form.uomOverrides ?? []).length ? (
-            <div className="overflow-x-auto rounded-2xl border">
-              <table className="min-w-full divide-y divide-border text-sm">
-                <thead className="bg-muted/20">
-                  <tr className="text-left text-muted-foreground">
-                    <th className="px-3 py-3 font-medium">Quantity UOM</th>
-                    <th className="px-3 py-3 font-medium">Weight UOM</th>
-                    <th className="px-3 py-3 font-medium">Conversion</th>
-                    <th className="px-3 py-3 font-medium">Status</th>
-                    <th className="px-3 py-3 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/70">
-                  {(form.uomOverrides ?? []).map((override) => (
-                    <tr key={override.id}>
-                      <td className="px-3 py-3">
-                        <Select value={override.quantityUOM} onChange={(event) => updateOverride(override.id, "quantityUOM", event.target.value)}>
-                          <option value="">Select quantity UOM</option>
-                          {quantityUOMOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </Select>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Select value={override.weightUOM} onChange={(event) => updateOverride(override.id, "weightUOM", event.target.value)}>
-                          <option value="">Select weight UOM</option>
-                          {weightUOMOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </Select>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.0001"
-                          value={override.conversionValue ? String(override.conversionValue) : ""}
-                          onChange={(event) => updateOverride(override.id, "conversionValue", Number(event.target.value))}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <Select value={override.status ?? "active"} onChange={(event) => updateOverride(override.id, "status", event.target.value)}>
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                        </Select>
-                      </td>
-                      <td className="px-3 py-3">
-                        <Button size="sm" variant="ghost" onClick={() => deleteOverride(override.id)}>
-                          Delete
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">No overrides — booking uses the tenant default UOM mapping.</p>
-          )}
-        </div>
-      </details>
+        ) : (
+          <p className="text-sm text-muted-foreground">No vehicle types configured. Add vehicle types in Administration → Vehicle Types.</p>
+        )}
+      </SectionBlock>
     </div>
   );
 }
@@ -3132,6 +2946,9 @@ function TenantCustomerContractsSection({
   // columns is a separate choice (Preferences → Rate Calculation Strategy).
   const config = normalizeRateMatchingConfig(rateMatchingConfig);
   const columns = getRateMatchingColumns(config);
+  // Vehicle Type is now a fixed column — filter it from dimension set so it
+  // isn't rendered twice (once dynamic, once fixed).
+  const dimensionColumns = columns.filter((c) => c.field !== "vehicleType");
 
   // Dimension dropdowns reuse existing tenant master data where it exists.
   const { data: vehicleTypeData } = useTenantVehicleTypes(tenantId);
@@ -3167,6 +2984,9 @@ function TenantCustomerContractsSection({
   // add-rate form, template and upload validation for this customer.
   const [configOpen, setConfigOpen] = useState(false);
   const [draftConfig, setDraftConfig] = useState<RateMatchingConfig>(config);
+  const [showUnderloadRate, setShowUnderloadRate] = useState(true);
+  const [showOverloadRate, setShowOverloadRate] = useState(true);
+  const [draftPricing, setDraftPricing] = useState({ underloadRate: true, overloadRate: true });
   function toggleDraftConfig(key: RateMatchingFieldKey) {
     setDraftConfig((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
@@ -3174,6 +2994,7 @@ function TenantCustomerContractsSection({
   }
   function openConfig() {
     setDraftConfig(config);
+    setDraftPricing({ underloadRate: showUnderloadRate, overloadRate: showOverloadRate });
     setConfigOpen(true);
   }
   function saveConfig() {
@@ -3181,6 +3002,8 @@ function TenantCustomerContractsSection({
       return;
     }
     onConfigChange?.(normalizeRateMatchingConfig(draftConfig));
+    setShowUnderloadRate(draftPricing.underloadRate);
+    setShowOverloadRate(draftPricing.overloadRate);
     setConfigOpen(false);
   }
 
@@ -3242,13 +3065,9 @@ function TenantCustomerContractsSection({
     const readField = (field: RateCardDimensionField) =>
       ((form as Record<string, string>)[field] ?? "").trim();
 
-    // Validate only the configured dimension columns.
-    for (const column of columns) {
+    // Validate origin/destination dimension columns only.
+    for (const column of dimensionColumns) {
       const value = readField(column.field);
-      // Vehicle Type is mandatory only for Per Trip; optional for other rate types.
-      if (column.field === "vehicleType" && form.rateType !== "PER_TRIP") {
-        continue;
-      }
       if (column.field === "sourcePincode" || column.field === "destinationPincode") {
         if (!/^\d{6}$/.test(value)) {
           setError(`${column.label} must be a 6-digit number.`);
@@ -3267,9 +3086,12 @@ function TenantCustomerContractsSection({
     }
 
     // Persist only the configured dimensions; unconfigured ones stay empty.
-    const configuredFields = new Set(columns.map((column) => column.field));
+    const configuredFields = new Set(dimensionColumns.map((column) => column.field));
     const dim = (field: RateCardDimensionField) =>
       configuredFields.has(field) ? readField(field) || undefined : undefined;
+
+    const underloadRate = Number(form.underloadRate) > 0 ? Number(form.underloadRate) : rate;
+    const overloadRate = form.overloadRate && Number(form.overloadRate) > 0 ? Number(form.overloadRate) : null;
 
     const payload: TenantCustomerRateCardInput = {
       fromCity: dim("fromCity"),
@@ -3279,19 +3101,19 @@ function TenantCustomerContractsSection({
       sourcePincode: dim("sourcePincode") ?? "",
       destinationPincode: dim("destinationPincode") ?? "",
       rateType: form.rateType,
-      vehicleType: dim("vehicleType") ?? null,
+      vehicleType: form.vehicleType?.trim() || null,
       material: dim("material"),
       serviceType: dim("serviceType"),
       weightSlab: dim("weightSlab"),
       quantitySlab: dim("quantitySlab"),
       customerGroup: dim("customerGroup"),
       uom: dim("uom"),
-      // A single Rate drives the value side; mirror it to the legacy rate
-      // fields the booking engine reads.
-      underloadRate: rate,
-      overloadRate: null,
-      baseRate: rate,
-      rate,
+      underloadRate,
+      overloadRate,
+      baseRate: underloadRate,
+      rate: underloadRate,
+      effectiveFromDate: form.effectiveFromDate || undefined,
+      effectiveToDate: form.effectiveToDate || undefined,
       status: editingRateCard?.status ?? "active",
     };
 
@@ -3304,7 +3126,16 @@ function TenantCustomerContractsSection({
   }
 
   function downloadTemplate() {
-    downloadRateCardTemplateWorkbook(getRateCardTemplateColumns(config));
+    downloadRateCardTemplateWorkbook([
+      ...dimensionColumns.map((c) => c.label),
+      "Vehicle Type",
+      "Rate Type",
+      "Rate",
+      "Underload Rate",
+      "Overload Rate",
+      "Start Date",
+      "End Date",
+    ]);
   }
 
   async function handleUpload(file: File | null) {
@@ -3431,19 +3262,31 @@ function TenantCustomerContractsSection({
         title="Rate Card Preview"
         description="Rate rows for this customer."
         headers={[
-          ...columns.map((column) => column.label),
+          ...dimensionColumns.map((column) => column.label),
+          "Vehicle Type",
           "Rate Type",
           "Rate",
+          ...(showUnderloadRate ? ["Underload Rate"] : []),
+          ...(showOverloadRate ? ["Overload Rate"] : []),
+          "Start Date",
+          "End Date",
+          "Type",
           "Actions",
         ]}
         rows={filteredRateCards.map((rateCard) => [
-          ...columns.map((column, columnIndex) => (
+          ...dimensionColumns.map((column, columnIndex) => (
             <span key={`${rateCard.id}-dim-${columnIndex}`} className="font-medium">
               {readRateCardColumnValue(rateCard, column.field)}
             </span>
           )),
-          <Badge key={`${rateCard.id}-type`} variant="outline">{formatRateType(rateCard.rateType)}</Badge>,
-          `${(rateCard.rate ?? rateCard.underloadRate ?? rateCard.baseRate ?? 0).toLocaleString()}`,
+          rateCard.vehicleType || "—",
+          <Badge key={`${rateCard.id}-rate-type`} variant="outline">{formatRateType(rateCard.rateType)}</Badge>,
+          `${(rateCard.underloadRate ?? rateCard.rate ?? rateCard.baseRate ?? 0).toLocaleString()}`,
+          ...(showUnderloadRate ? [rateCard.underloadRate != null ? rateCard.underloadRate.toLocaleString() : "—"] : []),
+          ...(showOverloadRate ? [rateCard.overloadRate != null ? rateCard.overloadRate.toLocaleString() : "—"] : []),
+          rateCard.effectiveFromDate || "—",
+          rateCard.effectiveToDate || "—",
+          <Badge key={`${rateCard.id}-status`} variant={rateCard.status === "active" ? "success" : "warning"}>{rateCard.status}</Badge>,
           <div key={`${rateCard.id}-actions`} className="flex flex-wrap gap-2">
             <Button size="sm" variant="ghost" onClick={() => openEdit(rateCard)}>Edit</Button>
             <Button size="sm" variant="outline" onClick={() => onDelete(rateCard.id)}>Delete</Button>
@@ -3479,17 +3322,14 @@ function TenantCustomerContractsSection({
               <option value="PER_TRIP">Per Trip</option>
             </Select>
           </Field>
-          {/* Dimension fields are driven by the customer's rate matching configuration. */}
-          {columns.map((column) => {
+          {/* Origin/destination dimension fields driven by the rate matching configuration. */}
+          {dimensionColumns.map((column) => {
             const value = (form as Record<string, string>)[column.field] ?? "";
             const options = selectOptionsByField[column.field];
             const setValue = (next: string) =>
               setForm((current) => ({ ...current, [column.field]: next }));
-            // Vehicle Type is only mandatory for Per Trip; optional otherwise.
-            const vehicleOptional = column.field === "vehicleType" && form.rateType !== "PER_TRIP";
-            const labelText = vehicleOptional ? `${column.label} (optional)` : `${column.label} *`;
             return (
-              <Field key={column.field} label={labelText}>
+              <Field key={column.field} label={`${column.label} *`}>
                 {options ? (
                   <Select value={value} onChange={(event) => setValue(event.target.value)}>
                     <option value="">Select {column.label}</option>
@@ -3510,12 +3350,61 @@ function TenantCustomerContractsSection({
               </Field>
             );
           })}
+          {/* Vehicle Type — fixed column, always shown. */}
+          <Field label="Vehicle Type">
+            <Select
+              value={form.vehicleType}
+              onChange={(event) => setForm((current) => ({ ...current, vehicleType: event.target.value }))}
+            >
+              <option value="">Select Vehicle Type</option>
+              {form.vehicleType && !selectOptionsByField.vehicleType?.includes(form.vehicleType) ? (
+                <option value={form.vehicleType}>{form.vehicleType}</option>
+              ) : null}
+              {(selectOptionsByField.vehicleType ?? []).map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </Select>
+          </Field>
           <Field label="Rate *">
             <Input
               type="number"
               value={form.rate}
               onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))}
               placeholder="18000"
+            />
+          </Field>
+          {showUnderloadRate ? (
+            <Field label="Underload Rate">
+              <Input
+                type="number"
+                value={form.underloadRate}
+                onChange={(event) => setForm((current) => ({ ...current, underloadRate: event.target.value }))}
+                placeholder="16000"
+              />
+            </Field>
+          ) : null}
+          {showOverloadRate ? (
+            <Field label="Overload Rate">
+              <Input
+                type="number"
+                value={form.overloadRate}
+                onChange={(event) => setForm((current) => ({ ...current, overloadRate: event.target.value }))}
+                placeholder="20000"
+              />
+            </Field>
+          ) : null}
+          <Field label="Start Date">
+            <Input
+              type="date"
+              value={form.effectiveFromDate}
+              onChange={(event) => setForm((current) => ({ ...current, effectiveFromDate: event.target.value }))}
+            />
+          </Field>
+          <Field label="End Date">
+            <Input
+              type="date"
+              value={form.effectiveToDate}
+              onChange={(event) => setForm((current) => ({ ...current, effectiveToDate: event.target.value }))}
             />
           </Field>
         </div>
@@ -3542,16 +3431,39 @@ function TenantCustomerContractsSection({
             selected={draftConfig}
             onToggle={toggleDraftConfig}
           />
-          <RateCardConfigGroup
-            title="Additional parameters"
-            hint="Optional dimensions that further narrow the rate."
-            keys={["VEHICLE_TYPE", "MATERIAL", "SERVICE_TYPE", "WEIGHT_SLAB", "QUANTITY_SLAB"]}
-            selected={draftConfig}
-            onToggle={toggleDraftConfig}
-          />
           {!draftConfig.length ? (
             <p className="text-sm text-rose-600">Select at least one parameter.</p>
           ) : null}
+          <div>
+            <p className="text-sm font-semibold">Additional fields</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Optional pricing columns shown in the grid and form.</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  { key: "underloadRate", label: "Underload Rate" },
+                  { key: "overloadRate", label: "Overload Rate" },
+                ] as const
+              ).map(({ key, label }) => {
+                const checked = draftPricing[key];
+                return (
+                  <label
+                    key={key}
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                      checked ? "border-primary/40 bg-primary/5 font-medium" : "bg-background/80 hover:border-primary/20"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={checked}
+                      onChange={() => setDraftPricing((p) => ({ ...p, [key]: !p[key] }))}
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </Dialog>
     </div>

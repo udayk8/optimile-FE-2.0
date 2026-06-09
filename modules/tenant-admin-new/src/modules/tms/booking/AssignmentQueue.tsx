@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { DataTable } from "@/shared/components/common/data-table";
-import { PageHeader } from "@/shared/components/common/page-header";
-import { TenantSummaryCard } from "@/modules/tenant-admin/components/tenant-primitives";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog } from "@/shared/components/ui/dialog";
@@ -27,6 +25,7 @@ import {
 } from "@/modules/tms/booking/services/booking-engine";
 import { normalizeRateMatchingConfig } from "@/shared/lib/rate-matching-config";
 import {
+  buildAddressLookup,
   buildCustomerLookup,
   buildVendorLookup,
   buildVehicleLookup,
@@ -36,6 +35,7 @@ import {
 } from "@/modules/tms/booking/services/booking-selectors";
 
 const OWN_FLEET_VENDOR = "__OWN_FLEET__";
+const QUEUE_PAGE_SIZE = 8;
 
 export function AssignmentQueuePage() {
   const { tenant } = useTenantRouteContext();
@@ -73,6 +73,8 @@ export function AssignmentQueuePage() {
   const [buyingRateLabel, setBuyingRateLabel] = useState<string | null>(null);
   const [preferredLrNumber, setPreferredLrNumber] = useState("");
   const [selectedLrMode, setSelectedLrMode] = useState<"MANUAL" | "PRE_GENERATED" | "AUTO">("MANUAL");
+  const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const assigningBooking = queue.find((booking) => booking.id === assigningBookingId) ?? null;
   const selectedVehicle = vehicleId ? vehicleMap.get(vehicleId) ?? null : null;
@@ -147,6 +149,20 @@ export function AssignmentQueuePage() {
     availableDrivers.length,
   ]);
   const marginPercent = calculateMarginPercent(customerFreight, Number(vendorFreight || 0));
+  const addressMap = useMemo(
+    () => buildAddressLookup(Array.from(adminSources.customerAddressMap.values()).flat()),
+    [adminSources.customerAddressMap],
+  );
+  const filteredQueue = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return queue;
+    return queue.filter((b) => {
+      const cust = customerMap.get(b.customerId);
+      return `${b.bookingId} ${cust?.name ?? ""}`.toLowerCase().includes(q);
+    });
+  }, [queue, search, customerMap]);
+  const totalQueuePages = Math.max(1, Math.ceil(filteredQueue.length / QUEUE_PAGE_SIZE));
+  const pagedQueue = filteredQueue.slice((currentPage - 1) * QUEUE_PAGE_SIZE, currentPage * QUEUE_PAGE_SIZE);
 
   // Shared booking payload used for BOTH the auto-fill effect and the Contract
   // Vendor comparison — source/dest, vehicle type, material, weight, distance.
@@ -451,90 +467,115 @@ export function AssignmentQueuePage() {
   }
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        eyebrow="TMS"
-        title="Assignment Queue"
-        description={`${getAssignmentModeLabel(tenant.assignmentMode)} with ${getCommercialModeLabel(tenant.commercialMode)} controls before loading starts.`}
-      />
-
-      <div className="grid gap-3 md:grid-cols-3">
-        <TenantSummaryCard label="Pending" value={String(queue.length)} helper="Bookings waiting for assignment" />
-        <TenantSummaryCard label="Vehicles" value={String(adminSources.vehicles.filter((vehicle) => vehicle.isActive).length)} helper="Active own and vendor vehicles" />
-        <TenantSummaryCard label="Drivers" value={String(adminSources.drivers.filter((driver) => driver.isActive).length)} helper="Active driver master records" />
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-[14px] font-semibold text-slate-900">Booking Assignment</h1>
+        <span className="text-[12px] text-slate-500">{filteredQueue.length} pending</span>
       </div>
 
-      <DataTable
-        title="Assignment Queue"
-        description={tenant.assignmentMode === "AUTO_VENDOR_FLOW" ? "Direct-customer workflow supports faster vendor assignment while keeping selling-side freight visible." : "3PL workflow keeps vendor notification controlled until commercial review, buying-rate validation, and assignment confirmation are complete."}
-        headers={["Booking", "Customer", "Service", "Commercial", "Selling Freight", "Status", "Actions"]}
-        rows={queue.map((booking) => {
-          const bookingIndents = indents.filter((indent) => indent.bookingId === booking.id);
-          const pendingIndentCount = bookingIndents.filter((indent) => indent.status === "PENDING").length;
-          const winnerIndent = bookingIndents.find((indent) => indent.isWinner);
-          const hasVehicle = Boolean(booking.assignment?.vehicleId);
-          return [
-          <div key={`${booking.id}-booking`} className="space-y-1">
-            <div>{booking.bookingId}</div>
-            {(booking.destinationChangeRequests ?? []).some((request) => ["SUBMITTED", "UNDER_REVIEW", "APPROVED"].includes(request.status)) ? (
-              <Badge variant="warning">EDITED BOOKING</Badge>
-            ) : (booking.deliveries ?? []).some((delivery) => (delivery.revisions?.length ?? 0) > 0) ? (
-              <Badge variant="accent">DESTINATION REVISED</Badge>
-            ) : null}
-          </div>,
-          customerMap.get(booking.customerId)?.name ?? "Unknown customer",
-          booking.serviceType,
-          booking.commercialType,
-          `Rs ${booking.pricing.calculatedFreight.toLocaleString()}`,
-          <BookingStatusBadge key={`${booking.id}-status`} status={booking.status} />,
-          <div key={`${booking.id}-actions`} className="flex flex-wrap items-center gap-2">
-            {access.can("ASSIGNMENT_QUEUE", "ASSIGN_VEHICLE") || access.can("ASSIGNMENT_QUEUE", "ASSIGN_VENDOR") ? (
-              <Button size="sm" onClick={() => setAssigningBookingId(booking.id)}>
-                Assign Vehicle
+      <div className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1.5 shadow-sm">
+        <Input
+          value={search}
+          onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }}
+          placeholder="Search booking or customer"
+          className="h-8 min-w-[180px] flex-1 text-[12px]"
+        />
+        {search ? (
+          <Button size="sm" variant="ghost" onClick={() => { setSearch(""); setCurrentPage(1); }} className="h-8 text-[12px]">Clear</Button>
+        ) : null}
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="space-y-1.5">
+          {pagedQueue.length ? (
+            pagedQueue.map((booking) => {
+              const bookingIndents = indents.filter((indent) => indent.bookingId === booking.id);
+              const pendingIndentCount = bookingIndents.filter((indent) => indent.status === "PENDING").length;
+              const winnerIndent = bookingIndents.find((indent) => indent.isWinner);
+              const hasVehicle = Boolean(booking.assignment?.vehicleId);
+              const customerName = customerMap.get(booking.customerId)?.name ?? "—";
+              const srcAddr = addressMap.get(booking.sourceAddressId);
+              const dstAddr = addressMap.get(booking.destinationAddressId);
+              const origin = srcAddr?.city ?? srcAddr?.addressName ?? "—";
+              const dest = dstAddr?.city ?? dstAddr?.addressName ?? "—";
+              return (
+                <div
+                  key={booking.id}
+                  className="grid items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-[12px] lg:grid-cols-[130px_minmax(0,1.3fr)_minmax(0,0.9fr)_110px_auto]"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{booking.bookingId}</p>
+                    <p className="mt-0.5 truncate text-[10.5px] text-slate-500">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">{customerName}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-slate-500">{origin} → {dest}</p>
+                    <p className="mt-0.5 text-[10.5px] text-slate-400">Rs {booking.pricing.calculatedFreight.toLocaleString()}</p>
+                  </div>
+                  <div className="min-w-0 text-[11px] text-slate-600">
+                    {winnerIndent ? (
+                      <Badge variant={hasVehicle ? "success" : "warning"}>
+                        {hasVehicle ? "Assigned" : "Vendor accepted"}
+                      </Badge>
+                    ) : pendingIndentCount > 0 ? (
+                      <Badge variant="accent">{pendingIndentCount} notified</Badge>
+                    ) : <span className="text-slate-400">No indent sent</span>}
+                  </div>
+                  <div><BookingStatusBadge status={booking.status} /></div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(access.can("ASSIGNMENT_QUEUE", "ASSIGN_VEHICLE") || access.can("ASSIGNMENT_QUEUE", "ASSIGN_VENDOR")) ? (
+                      <Button size="sm" onClick={() => setAssigningBookingId(booking.id)}>Assign</Button>
+                    ) : null}
+                    {pendingIndentCount === 0 && !winnerIndent ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          try {
+                            sendBookingVendorIndent(
+                              booking.id,
+                              session.actorName || "Dispatcher",
+                              activeLrOrgUnitId || null,
+                              activeLrOrgUnit?.name ?? null,
+                            );
+                          } catch (error) {
+                            window.alert((error as Error).message);
+                          }
+                        }}
+                      >
+                        Indent
+                      </Button>
+                    ) : null}
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to={`/tenant/${tenant.id}/bookings/${booking.id}`}>View</Link>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-md border border-dashed bg-slate-50/40 px-4 py-8 text-center">
+              <p className="text-[13px] font-semibold text-slate-800">No bookings pending assignment</p>
+            </div>
+          )}
+        </div>
+
+        {totalQueuePages > 1 ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 text-[12px]">
+            <p className="text-slate-600">
+              {(currentPage - 1) * QUEUE_PAGE_SIZE + 1}–{Math.min(currentPage * QUEUE_PAGE_SIZE, filteredQueue.length)} of {filteredQueue.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="size-4" />Previous
               </Button>
-            ) : null}
-            {pendingIndentCount === 0 && !winnerIndent ? (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  try {
-                    // Vendor assignment is Auto-LR-only, generated from the booking
-                    // owner's (sender's) active place — captured here.
-                    sendBookingVendorIndent(
-                      booking.id,
-                      session.actorName || "Dispatcher",
-                      activeLrOrgUnitId || null,
-                      activeLrOrgUnit?.name ?? null,
-                    );
-                  } catch (error) {
-                    window.alert((error as Error).message);
-                  }
-                }}
-              >
-                Send Indent to Vendors
+              <Button variant="outline" size="sm" disabled={currentPage === totalQueuePages} onClick={() => setCurrentPage((p) => Math.min(totalQueuePages, p + 1))}>
+                Next<ChevronRight className="size-4" />
               </Button>
-            ) : null}
-            {pendingIndentCount > 0 && !winnerIndent ? (
-              <Badge variant="accent">
-                Indent sent · {pendingIndentCount} notified · Auto LR{bookingIndents[0]?.lrPlaceName ? ` @ ${bookingIndents[0].lrPlaceName}` : ""}
-              </Badge>
-            ) : null}
-            {winnerIndent ? (
-              <Badge variant={hasVehicle ? "success" : "warning"}>
-                {hasVehicle
-                  ? `Assigned · ${winnerIndent.vendorName}`
-                  : `Accepted · ${winnerIndent.vendorName} · vehicle pending · Auto LR${winnerIndent.lrPlaceName ? ` @ ${winnerIndent.lrPlaceName}` : ""}`}
-              </Badge>
-            ) : null}
-            <Button asChild size="sm" variant="ghost">
-              <Link to={`/tenant/${tenant.id}/bookings/${booking.id}`}>View</Link>
-            </Button>
-          </div>,
-          ];
-        })}
-        emptyMessage="No bookings are waiting for assignment."
-      />
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <Dialog
         open={Boolean(assigningBooking)}

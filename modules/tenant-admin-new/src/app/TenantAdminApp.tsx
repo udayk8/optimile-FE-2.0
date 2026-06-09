@@ -34,10 +34,6 @@ const TenantRolesPage = lazy(() => import('../modules/tenant-admin/pages/shared/
 const TenantSettingsPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantSettingsPage })))
 const TenantUsersPage = lazy(() => import('../modules/tenant-admin/pages/shared/tenant-placeholder-pages').then((m) => ({ default: m.TenantUsersPage })))
 const BookingSetupOverviewPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.BookingSetupOverviewPage })))
-const TenantAddressBookPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantAddressBookPage })))
-const TenantAssignmentRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantAssignmentRulesPage })))
-const TenantDocumentRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantDocumentRulesPage })))
-const TenantPodRulesPage = lazy(() => import('../modules/tenant-admin/pages/booking-setup/booking-setup-pages').then((m) => ({ default: m.TenantPodRulesPage })))
 import { PermissionGate } from '@/modules/tenant-admin/components/permission-gate'
 const ShipmentDocumentsListPage = lazy(() => import('../modules/tenant-admin/pages/booking-stubs/booking-stub-pages').then((m) => ({ default: m.ShipmentDocumentsListPage })))
 const BookingReportsPage = lazy(() => import('../modules/operations-dashboard/pages/operations-head-dashboard-page').then((m) => ({ default: m.BookingReportsPage })))
@@ -49,6 +45,8 @@ const BookingReportDetailPage = lazy(() => import('../modules/operations-dashboa
 // visited. The Suspense boundary lives in TenantLayout (keeps the shell up).
 const BookingListPage = lazy(() => import('../modules/tms/booking/BookingList').then((m) => ({ default: m.BookingListPage })))
 const CreateBookingPage = lazy(() => import('../modules/tms/booking/CreateBooking').then((m) => ({ default: m.CreateBookingPage })))
+const ErpBookingListPage = lazy(() => import('../modules/tms/booking/ErpBookingPages').then((m) => ({ default: m.ErpBookingListPage })))
+const CreateErpBookingPage = lazy(() => import('../modules/tms/booking/ErpBookingPages').then((m) => ({ default: m.CreateErpBookingPage })))
 const BookingDetailsPage = lazy(() => import('../modules/tms/booking/BookingDetails').then((m) => ({ default: m.BookingDetailsPage })))
 const BookingDocumentsPage = lazy(() => import('../modules/tms/booking/BookingDocumentsPage').then((m) => ({ default: m.BookingDocumentsPage })))
 const BookingLRViewPage = lazy(() => import('../modules/tms/booking/BookingLRView').then((m) => ({ default: m.BookingLRViewPage })))
@@ -172,6 +170,8 @@ function TenantAdminRoutes({
           <Route path="lr-config" element={<PermissionGate moduleCode="TMS" featureCode="LR_CONFIGURATION"><TenantLRConfigPage /></PermissionGate>} />
           <Route path="lr" element={<PermissionGate moduleCode="TMS" featureCode="LR_MANAGEMENT"><TenantLrOperationsPage /></PermissionGate>} />
           <Route path="bookings" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingListPage /></PermissionGate>} />
+          <Route path="bookings/erp" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><ErpBookingListPage /></PermissionGate>} />
+          <Route path="bookings/erp/create" element={<PermissionGate moduleCode="TMS" featureCode="CREATE_BOOKING" action="create"><CreateErpBookingPage /></PermissionGate>} />
           <Route path="bookings/create" element={<PermissionGate moduleCode="TMS" featureCode="CREATE_BOOKING" action="create"><CreateBookingPage /></PermissionGate>} />
           <Route path="bookings/rate-approval" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_ASSIGNMENT"><RateApprovalQueuePage /></PermissionGate>} />
           <Route path="bookings/assignment" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_ASSIGNMENT"><AssignmentQueuePage /></PermissionGate>} />
@@ -192,10 +192,6 @@ function TenantAdminRoutes({
           <Route path="finance/*" element={<PermissionGate moduleCode="FINANCE" featureCode="FINANCE_DASHBOARD"><FinanceEmbeddedApp /></PermissionGate>} />
           <Route path="modules" element={<TenantModulesPage />} />
           <Route path="booking-setup" element={<PermissionGate moduleCode="TMS" featureCode="BOOKING_DASHBOARD"><BookingSetupOverviewPage /></PermissionGate>} />
-          <Route path="address-book" element={<PermissionGate moduleCode="TMS" featureCode="ADDRESS_BOOK"><TenantAddressBookPage /></PermissionGate>} />
-          <Route path="assignment-rules" element={<PermissionGate moduleCode="TMS" featureCode="ASSIGNMENT_RULES"><TenantAssignmentRulesPage /></PermissionGate>} />
-          <Route path="document-rules" element={<PermissionGate moduleCode="TMS" featureCode="DOCUMENT_RULES"><TenantDocumentRulesPage /></PermissionGate>} />
-          <Route path="pod-rules" element={<PermissionGate moduleCode="TMS" featureCode="POD_RULES"><TenantPodRulesPage /></PermissionGate>} />
           <Route path="audit-logs" element={<TenantAuditLogsPage />} />
           <Route path="settings" element={<TenantSettingsPage />} />
         </Route>

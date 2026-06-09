@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Button } from "@/shared/components/ui/button";
 import type { VendorComparisonEntry } from "@/modules/tms/booking/services/booking-selectors";
 
@@ -15,6 +16,7 @@ export function VendorContractComparison({
   actionLabel = "Select",
   mutedVendorIds = [],
   header,
+  deliverySummarySlot,
 }: {
   entries: VendorComparisonEntry[];
   selectedVendorId: string;
@@ -26,6 +28,8 @@ export function VendorContractComparison({
   /** Vendors to grey out (e.g. already rejected); their action reads "Resend". */
   mutedVendorIds?: string[];
   header: { route: string; customerFreight: number; vehicleType: string; material: string };
+  /** Optional compact delivery summary rendered between the header block and the vendor table. */
+  deliverySummarySlot?: ReactNode;
 }) {
   const muted = new Set(mutedVendorIds);
   const money = (value: number) => `Rs ${Math.round(value).toLocaleString()}`;
@@ -38,6 +42,8 @@ export function VendorContractComparison({
         <Summary label="Material" value={header.material || "-"} />
         <Summary label="Matched Vendors" value={String(entries.length)} />
       </div>
+
+      {deliverySummarySlot ?? null}
 
       {entries.length ? (
         <div className="overflow-x-auto rounded-xl border">

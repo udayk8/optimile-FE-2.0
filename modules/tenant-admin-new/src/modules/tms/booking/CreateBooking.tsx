@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/shared/components/common/page-header";
 import { BookingPageHeader } from "./components/BookingPageHeader";
 import { TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
@@ -41,6 +41,8 @@ import type {
   BookingCommercialType,
   BookingInput,
   BookingServiceType,
+  BookingSource,
+  ErpReferenceSnapshot,
 } from "@/modules/tms/booking/types";
 import type {
   CustomerAddressTag,
@@ -122,10 +124,42 @@ const initialDraft: BookingDraft = {
 
 const PRICING_WEIGHT_UOM = "MT";
 
+const ERP_MOCK_DATASETS = [
+  {
+    customerCode: "ACC",
+    salesOrderNumber: "SO-10001",
+    erpReferenceNumber: "ERP-SO-10001",
+    material: "CEMENT",
+    quantity: "100",
+    uom: "BAG",
+    weight: "5",
+    weightUom: "MT",
+    originCity: "Bengaluru",
+    destinationCity: "Chennai",
+    freight: "12000",
+    opsRemark: "ERP Sales Order SO-10001 — ACC Cement, Bengaluru to Chennai.",
+  },
+  {
+    customerCode: "ULT",
+    salesOrderNumber: "SO-10002",
+    erpReferenceNumber: "ERP-SO-10002",
+    material: "STEEL",
+    quantity: "50",
+    uom: "MT",
+    weight: "50",
+    weightUom: "MT",
+    originCity: "Pune",
+    destinationCity: "Mumbai",
+    freight: "8500",
+    opsRemark: "ERP Sales Order SO-10002 — Steel coils, Pune to Mumbai.",
+  },
+];
+
 export function CreateBookingPage({
   lockedCustomerId,
   createdByLabel,
   onAfterSubmit,
+  bookingSource,
 }: {
   /** When set (Customer Portal embed), the customer is fixed and the selector is hidden. */
   lockedCustomerId?: string;
@@ -133,10 +167,16 @@ export function CreateBookingPage({
   createdByLabel?: string;
   /** Called after a successful create instead of navigating to the internal detail page. */
   onAfterSubmit?: (bookingId: string) => void;
+  /** Booking source — ERP sets source=ERP and enables mock data generation. */
+  bookingSource?: BookingSource;
 } = {}) {
   const navigate = useNavigate();
   const { bookingId } = useParams();
+  const [searchParams] = useSearchParams();
   const { tenant } = useTenantRouteContext();
+  const effectiveSource: BookingSource =
+    bookingSource ?? (searchParams.get("source") === "erp" ? "ERP" : "WEB");
+  const isErpBooking = effectiveSource === "ERP";
   const access = useTenantAccess();
   const isEditMode = Boolean(bookingId);
   // Customer Portal embeds this page with a fixed (logged-in) customer; such
@@ -160,6 +200,12 @@ export function CreateBookingPage({
   );
   const [addressDialogError, setAddressDialogError] = useState("");
   const [addressSavePending, setAddressSavePending] = useState(false);
+  const [erpReference, setErpReference] = useState<ErpReferenceSnapshot>({
+    erpReferenceNumber: "",
+    salesOrderNumber: "",
+    externalBookingNumber: null,
+    integrationStatus: "MOCK",
+  });
 
   const editingBooking = bookingId ? getBookingById(normalizeBookingId(bookingId)) : null;
 
@@ -633,6 +679,16 @@ export function CreateBookingPage({
     const lastDelivery = deliveries[deliveries.length - 1] ?? firstDelivery;
 
     return {
+      bookingSource: effectiveSource,
+      erpReference:
+        isErpBooking
+          ? {
+              erpReferenceNumber: erpReference.erpReferenceNumber?.trim() || null,
+              salesOrderNumber: erpReference.salesOrderNumber?.trim() || null,
+              externalBookingNumber: erpReference.externalBookingNumber ?? null,
+              integrationStatus: "MOCK",
+            }
+          : null,
       modeOfTransport: draft.modeOfTransport,
       numberOfDeliveries: deliveryCount,
       customerId: draft.customerId,
@@ -734,6 +790,35 @@ export function CreateBookingPage({
     };
   }
 
+  function applyMockErpData() {
+    const dataset = ERP_MOCK_DATASETS[Math.floor(Math.random() * ERP_MOCK_DATASETS.length)];
+    setErpReference({
+      erpReferenceNumber: dataset.erpReferenceNumber,
+      salesOrderNumber: dataset.salesOrderNumber,
+      externalBookingNumber: null,
+      integrationStatus: "MOCK",
+    });
+    setDraft((current) => ({
+      ...current,
+      commercialType: "SPOT",
+      enteredRate: dataset.freight,
+      opsRemark: dataset.opsRemark,
+      deliveries: current.deliveries.map((delivery, index) =>
+        index === 0
+          ? {
+              ...delivery,
+              originCity: dataset.originCity,
+              destinationCity: dataset.destinationCity,
+              weight: dataset.weight,
+              weightUom: dataset.weightUom,
+              quantity: dataset.quantity,
+              uom: dataset.uom,
+            }
+          : delivery,
+      ),
+    }));
+  }
+
   function persistBooking(statusOverride: BookingInput["status"], validateAll: boolean) {
     if (validateAll) {
       const validationError = validateForSubmit();
@@ -808,13 +893,62 @@ export function CreateBookingPage({
       <BookingPageHeader
         backTo={`/tenant/${tenant.id}/bookings`}
         backLabel="Bookings"
-        title={isEditMode ? "Edit Booking" : "Create Booking"}
-        subtitle="Fast, operations-first booking flow."
+        title={isEditMode ? "Edit Booking" : isErpBooking ? "Create ERP Booking" : "Create Booking"}
+        subtitle={isErpBooking ? "ERP-sourced booking — mock data auto-fill available." : "Fast, operations-first booking flow."}
       />
 
       {error ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
+        </div>
+      ) : null}
+
+      {/* ERP BOOKING — source banner + reference fields + mock data generator */}
+      {isErpBooking && !isEditMode ? (
+        <div className="rounded-xl border border-violet-300 bg-violet-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-violet-200 text-violet-800">
+                  ERP
+                </span>
+                <p className="text-sm font-semibold text-violet-900">ERP Booking</p>
+              </div>
+              <p className="mt-1 text-xs text-violet-700">
+                All fields are editable. The booking will be created with Source = ERP and follow the normal booking lifecycle.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={applyMockErpData}
+              className="border-violet-300 bg-white text-violet-700 hover:bg-violet-100"
+            >
+              Generate Mock ERP Data
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Field label="ERP Reference Number">
+              <Input
+                value={erpReference.erpReferenceNumber ?? ""}
+                onChange={(event) => setErpReference((current) => ({ ...current, erpReferenceNumber: event.target.value }))}
+                placeholder="ERP-SO-10001"
+              />
+            </Field>
+            <Field label="Sales Order Number">
+              <Input
+                value={erpReference.salesOrderNumber ?? ""}
+                onChange={(event) => setErpReference((current) => ({ ...current, salesOrderNumber: event.target.value }))}
+                placeholder="SO-10001"
+              />
+            </Field>
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-violet-600">
+            <span className="font-semibold">Integration Status:</span>
+            <span className="rounded bg-violet-100 px-2 py-0.5 font-mono text-violet-700">MOCK</span>
+            <span>· No backend sync active</span>
+          </div>
         </div>
       ) : null}
 

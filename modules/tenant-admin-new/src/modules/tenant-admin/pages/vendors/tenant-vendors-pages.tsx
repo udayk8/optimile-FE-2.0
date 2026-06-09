@@ -570,6 +570,8 @@ const VENDOR_RATE_CARD_FORM_INIT: Record<string, string> & { rateType: TenantVen
   customerGroup: "",
   uom: "",
   rate: "",
+  underloadRate: "",
+  overloadRate: "",
   effectiveFromDate: "",
   effectiveToDate: "",
   rateType: "PER_TRIP",
@@ -672,6 +674,8 @@ function VendorRateFormDialog({
   selectOptionsByField,
   initial,
   onSave,
+  showUnderloadRate = true,
+  showOverloadRate = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -681,6 +685,8 @@ function VendorRateFormDialog({
   selectOptionsByField: Partial<Record<RateCardDimensionField, string[]>>;
   initial?: Partial<TenantVendorRateCard> | null;
   onSave: (payload: TenantVendorRateCardInput) => void;
+  showUnderloadRate?: boolean;
+  showOverloadRate?: boolean;
 }) {
   const [form, setForm] = useState(VENDOR_RATE_CARD_FORM_INIT);
   const [error, setError] = useState("");
@@ -703,6 +709,8 @@ function VendorRateFormDialog({
       customerGroup: initial?.customerGroup ?? "",
       uom: initial?.uom ?? "",
       rate: initial ? String(initial.buyingRate ?? initial.underloadRate ?? initial.rate ?? "") : "",
+      underloadRate: initial?.underloadRate != null ? String(initial.underloadRate) : "",
+      overloadRate: initial?.overloadRate != null ? String(initial.overloadRate) : "",
       effectiveFromDate: initial?.effectiveFromDate ?? "",
       effectiveToDate: initial?.effectiveToDate ?? "",
       rateType: initial?.rateType ?? "PER_TRIP",
@@ -715,8 +723,6 @@ function VendorRateFormDialog({
     const readField = (field: RateCardDimensionField) => (form[field] ?? "").trim();
     for (const column of columns) {
       const value = readField(column.field);
-      // Vehicle Type is mandatory only for Per Trip; optional otherwise.
-      if (column.field === "vehicleType" && form.rateType !== "PER_TRIP") continue;
       if (column.field === "sourcePincode" || column.field === "destinationPincode") {
         if (!/^\d{6}$/.test(value)) {
           setError(`${column.label} must be a 6-digit number.`);
@@ -745,6 +751,8 @@ function VendorRateFormDialog({
     const configuredFields = new Set(columns.map((column) => column.field));
     const dim = (field: RateCardDimensionField) =>
       configuredFields.has(field) ? readField(field) || undefined : undefined;
+    const underloadRate = Number(form.underloadRate) > 0 ? Number(form.underloadRate) : rate;
+    const overloadRate = form.overloadRate && Number(form.overloadRate) > 0 ? Number(form.overloadRate) : null;
     onSave({
       fromCity: dim("fromCity"),
       toCity: dim("toCity"),
@@ -755,17 +763,17 @@ function VendorRateFormDialog({
       effectiveFromDate: form.effectiveFromDate || undefined,
       effectiveToDate: form.effectiveToDate || undefined,
       rateType: form.rateType,
-      vehicleType: dim("vehicleType") ?? null,
+      vehicleType: form.vehicleType?.trim() || null,
       material: dim("material"),
       serviceType: dim("serviceType"),
       weightSlab: dim("weightSlab"),
       quantitySlab: dim("quantitySlab"),
       customerGroup: dim("customerGroup"),
       uom: dim("uom"),
-      buyingRate: rate,
-      underloadRate: rate,
-      overloadRate: null,
-      rate,
+      buyingRate: underloadRate,
+      underloadRate,
+      overloadRate,
+      rate: underloadRate,
       status: "active",
     });
     onOpenChange(false);
@@ -817,9 +825,44 @@ function VendorRateFormDialog({
             </VendorField>
           );
         })}
+        {/* Vehicle Type — fixed column, always shown. */}
+        <VendorField label="Vehicle Type">
+          <Select
+            value={form.vehicleType}
+            onChange={(event) => setForm((current) => ({ ...current, vehicleType: event.target.value }))}
+          >
+            <option value="">Select Vehicle Type</option>
+            {form.vehicleType && !selectOptionsByField.vehicleType?.includes(form.vehicleType) ? (
+              <option value={form.vehicleType}>{form.vehicleType}</option>
+            ) : null}
+            {(selectOptionsByField.vehicleType ?? []).map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </Select>
+        </VendorField>
         <VendorField label="Rate *">
           <Input type="number" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} placeholder="16000" />
         </VendorField>
+        {showUnderloadRate ? (
+          <VendorField label="Underload Rate">
+            <Input
+              type="number"
+              value={form.underloadRate}
+              onChange={(event) => setForm((current) => ({ ...current, underloadRate: event.target.value }))}
+              placeholder="14000"
+            />
+          </VendorField>
+        ) : null}
+        {showOverloadRate ? (
+          <VendorField label="Overload Rate">
+            <Input
+              type="number"
+              value={form.overloadRate}
+              onChange={(event) => setForm((current) => ({ ...current, overloadRate: event.target.value }))}
+              placeholder="18000"
+            />
+          </VendorField>
+        ) : null}
         <VendorField label="Start Date *">
           <Input
             type="date"
@@ -851,6 +894,8 @@ function TenantVendorRateCardSection({
   const vendorRecord = getTenantVendorById(vendor.id);
   const config = normalizeRateMatchingConfig(vendorRecord?.rateMatchingConfig);
   const columns = getRateMatchingColumns(config);
+  // Vehicle Type is a fixed column — exclude it from the dimension set.
+  const dimensionColumns = columns.filter((c) => c.field !== "vehicleType");
   const rateCards = listRateCards(vendor.id);
 
   // BULK/LOT auction wins surface here as read-only rate card rows — winning a
@@ -873,6 +918,9 @@ function TenantVendorRateCardSection({
 
   const [configOpen, setConfigOpen] = useState(false);
   const [draftConfig, setDraftConfig] = useState<RateMatchingConfig>(config);
+  const [showUnderloadRate, setShowUnderloadRate] = useState(true);
+  const [showOverloadRate, setShowOverloadRate] = useState(true);
+  const [draftPricing, setDraftPricing] = useState({ underloadRate: true, overloadRate: true });
   function toggleDraftConfig(key: RateMatchingFieldKey) {
     setDraftConfig((current) =>
       current.includes(key) ? current.filter((item) => item !== key) : [...current, key],
@@ -880,11 +928,14 @@ function TenantVendorRateCardSection({
   }
   function openConfig() {
     setDraftConfig(config);
+    setDraftPricing({ underloadRate: showUnderloadRate, overloadRate: showOverloadRate });
     setConfigOpen(true);
   }
   function saveConfig() {
     if (!draftConfig.length) return;
     updateTenantVendor(vendor.id, { rateMatchingConfig: normalizeRateMatchingConfig(draftConfig) });
+    setShowUnderloadRate(draftPricing.underloadRate);
+    setShowOverloadRate(draftPricing.overloadRate);
     setConfigOpen(false);
     onMessage("Vendor rate card structure updated.");
   }
@@ -1037,10 +1088,22 @@ function TenantVendorRateCardSection({
       <DataTable
         title="Vendor Rate Card"
         description="Buying-rate rows for this vendor — manually configured rates plus BULK/LOT auction wins."
-        headers={[...columns.map((column) => column.label), "Rate Type", "Rate", "Volume", "Start Date", "End Date", "Type", "Actions"]}
+        headers={[
+          ...dimensionColumns.map((column) => column.label),
+          "Vehicle Type",
+          "Volume",
+          "Rate Type",
+          "Rate",
+          ...(showUnderloadRate ? ["Underload Rate"] : []),
+          ...(showOverloadRate ? ["Overload Rate"] : []),
+          "Start Date",
+          "End Date",
+          "Type",
+          "Actions",
+        ]}
         rows={[
           ...filteredRateCards.map((rateCard) => [
-            ...columns.map((column, columnIndex) => (
+            ...dimensionColumns.map((column, columnIndex) => (
               <span key={`${rateCard.id}-dim-${columnIndex}`} className="font-medium">
                 {(() => {
                   const value = (rateCard as unknown as Record<string, unknown>)[column.field];
@@ -1048,9 +1111,12 @@ function TenantVendorRateCardSection({
                 })()}
               </span>
             )),
-            <Badge key={`${rateCard.id}-type`} variant="outline">{formatVendorRateType(rateCard.rateType)}</Badge>,
-            `${(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0).toLocaleString()}`,
+            rateCard.vehicleType || "—",
             "100%",
+            <Badge key={`${rateCard.id}-rate-type`} variant="outline">{formatVendorRateType(rateCard.rateType)}</Badge>,
+            `${(rateCard.buyingRate ?? rateCard.underloadRate ?? rateCard.rate ?? 0).toLocaleString()}`,
+            ...(showUnderloadRate ? [rateCard.underloadRate != null ? rateCard.underloadRate.toLocaleString() : "—"] : []),
+            ...(showOverloadRate ? [rateCard.overloadRate != null ? rateCard.overloadRate.toLocaleString() : "—"] : []),
             rateCard.effectiveFromDate || "—",
             rateCard.effectiveToDate || "—",
             <Badge key={`${rateCard.id}-kind`} variant="secondary">Manual</Badge>,
@@ -1059,20 +1125,22 @@ function TenantVendorRateCardSection({
               <Button size="sm" variant="outline" onClick={() => { deleteRateCard(rateCard.id); onMessage("Vendor rate removed."); }}>Delete</Button>
             </div>,
           ]),
-          // Auction-won BULK/LOT contract rows — read only; the auction award
-          // owns the rate, validity window, and L1/L2/L3 volume split.
+          // Auction-won BULK/LOT contract rows — read only.
           ...filteredAuctionContracts.map((contract) => [
-            ...columns.map((column, columnIndex) => (
+            ...dimensionColumns.map((column, columnIndex) => (
               <span key={`${contract.contractId}-dim-${columnIndex}`} className="font-medium">
                 {auctionDimensionValue(column.field, contract) || "-"}
               </span>
             )),
-            <Badge key={`${contract.contractId}-rate-type`} variant="outline">{formatVendorRateType(contract.rateType)}</Badge>,
-            contract.rate.toLocaleString(),
+            contract.vehicleType || "—",
             <span key={`${contract.contractId}-volume`}>
               {contract.volumeAllocationPercent ?? 100}%
               {contract.allocationRank ? <span className="ml-1 text-xs text-muted-foreground">({contract.allocationRank})</span> : null}
             </span>,
+            <Badge key={`${contract.contractId}-rate-type`} variant="outline">{formatVendorRateType(contract.rateType)}</Badge>,
+            contract.rate.toLocaleString(),
+            ...(showUnderloadRate ? ["—"] : []),
+            ...(showOverloadRate ? ["—"] : []),
             contract.startDate,
             contract.endDate,
             <Badge key={`${contract.contractId}-kind`} variant="outline">
@@ -1092,10 +1160,12 @@ function TenantVendorRateCardSection({
         onOpenChange={setOpen}
         title={editingId ? "Edit Vendor Rate" : "Add Vendor Rate"}
         saveLabel={editingId ? "Save Changes" : "Save Rate"}
-        columns={columns}
+        columns={dimensionColumns}
         selectOptionsByField={selectOptionsByField}
         initial={editingRateCard}
         onSave={handleSave}
+        showUnderloadRate={showUnderloadRate}
+        showOverloadRate={showOverloadRate}
       />
 
       <Dialog
@@ -1119,14 +1189,37 @@ function TenantVendorRateCardSection({
             selected={draftConfig}
             onToggle={toggleDraftConfig}
           />
-          <VendorRateCardConfigGroup
-            title="Additional parameters"
-            hint="Optional dimensions that further narrow the rate."
-            keys={["VEHICLE_TYPE", "MATERIAL", "SERVICE_TYPE", "WEIGHT_SLAB", "QUANTITY_SLAB"]}
-            selected={draftConfig}
-            onToggle={toggleDraftConfig}
-          />
           {!draftConfig.length ? <p className="text-sm text-rose-600">Select at least one parameter.</p> : null}
+          <div>
+            <p className="text-sm font-semibold">Additional fields</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Optional pricing columns shown in the grid and form.</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  { key: "underloadRate", label: "Underload Rate" },
+                  { key: "overloadRate", label: "Overload Rate" },
+                ] as const
+              ).map(({ key, label }) => {
+                const checked = draftPricing[key];
+                return (
+                  <label
+                    key={key}
+                    className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                      checked ? "border-primary/40 bg-primary/5 font-medium" : "bg-background/80 hover:border-primary/20"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={checked}
+                      onChange={() => setDraftPricing((p) => ({ ...p, [key]: !p[key] }))}
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
           <p className="rounded-lg bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
             Booking will match this vendor using:{" "}
             <span className="font-medium text-foreground">{describeRateMatchingConfig(draftConfig.length ? draftConfig : config)}</span>

@@ -40,6 +40,7 @@ export interface TenantRecord {
   status: "active" | "trial" | "paused";
   tenantType: TenantType;
   customerPortalEnabled: boolean;
+  erpBookingEnabled?: boolean;
   assignmentMode: TenantAssignmentMode;
   commercialMode: TenantCommercialMode;
   enabledModuleCodes: string[];

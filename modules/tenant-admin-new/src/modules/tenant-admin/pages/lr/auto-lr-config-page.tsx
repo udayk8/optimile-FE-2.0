@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { PageHeader } from "@/shared/components/common/page-header";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Select } from "@/shared/components/ui/select";
-import { TenantPanel } from "@/modules/tenant-admin/components/tenant-primitives";
 import { useSessionContext } from "@/shared/auth/session-context";
 import { useTenantAccess } from "@/modules/tenant-admin/hooks/useTenantAccess";
 import { useTenantLRConfigs } from "@/modules/tenant-admin/hooks/useTenantMasterData";
@@ -54,9 +52,6 @@ export function TenantAutoLRConfigPage() {
   const access = useTenantAccess();
   const { data: users } = useTenantUsers(tenant.id);
   const { data: hierarchyLevels } = useTenantOrgTypes(tenant.id);
-  // Operational hierarchy is tenant-defined. Use the first level the Tenant
-  // Admin created (e.g. "Central") as the LR root authority — there is no
-  // synthetic "Tenant / Company Level" above it.
   const orderedLevels = useMemo(
     () => [...hierarchyLevels].sort((a, b) => a.order - b.order),
     [hierarchyLevels],
@@ -78,9 +73,7 @@ export function TenantAutoLRConfigPage() {
     [session.actorName, users],
   );
   const activeGovernanceOrgUnit = useMemo(() => {
-    if (!currentUser?.orgUnitIds?.length) {
-      return null;
-    }
+    if (!currentUser?.orgUnitIds?.length) return null;
     return (
       orgUnits.find((orgUnit) => orgUnit.id === session.activeTenantOrgUnitId && currentUser.orgUnitIds.includes(orgUnit.id)) ??
       orgUnits.find((orgUnit) => currentUser.orgUnitIds.includes(orgUnit.id)) ??
@@ -90,66 +83,35 @@ export function TenantAutoLRConfigPage() {
   const currentGovernanceLevel = activeGovernanceOrgUnit
     ? hierarchyLevelMap.get(activeGovernanceOrgUnit.hierarchyLevelId) ?? null
     : null;
-  const currentLevelOriginRule =
-    currentGovernanceLevel
-      ? autoConfig?.childGovernanceRules?.find((rule) => rule.childLevelId === currentGovernanceLevel.id) ?? null
-      : null;
   const [form, setForm] = useState<AutoConfigForm>(() => buildAutoFormState(autoConfig));
-  useEffect(() => {
-    setForm(buildAutoFormState(autoConfig));
-  }, [autoConfig]);
+  useEffect(() => { setForm(buildAutoFormState(autoConfig)); }, [autoConfig]);
 
   const availableTargetLevels = useMemo(() => {
-    const sortedActiveLevels = hierarchyLevels.filter((level) => level.active).sort((a, b) => a.order - b.order);
-    if (!sortedActiveLevels.length) {
-      return [];
-    }
-    // Company Root sits above Level 1, so every business level is a valid
-    // distribution target when no workspace is bound. Mirrors manual-lr.
-    if (!currentGovernanceLevel) {
-      return sortedActiveLevels;
-    }
-    const authorityOrder = currentGovernanceLevel.order;
-    return sortedActiveLevels.filter((level) => level.order > authorityOrder);
+    const sorted = hierarchyLevels.filter((level) => level.active).sort((a, b) => a.order - b.order);
+    if (!sorted.length) return [];
+    if (!currentGovernanceLevel) return sorted;
+    return sorted.filter((level) => level.order > currentGovernanceLevel.order);
   }, [currentGovernanceLevel, hierarchyLevels]);
+
   const managedTargetLevel =
     form.scopeType === "HIERARCHY"
-      ? hierarchyLevels.find((level) => level.id === form.ownershipLevelId) ??
-        availableTargetLevels[0] ??
-        null
+      ? hierarchyLevels.find((level) => level.id === form.ownershipLevelId) ?? availableTargetLevels[0] ?? null
       : null;
   const managedTargetLevelId = managedTargetLevel?.id ?? "";
   const childLevelLabel = managedTargetLevel?.name ?? "Child level";
-  // Mirrors manual-lr-config-page.tsx: when no workspace is bound, the
-  // user is editing from Company Root context. Pure label flip — runtime
-  // (scopeType="TENANT") is unchanged. Flipping currentLevelLabel at the
-  // source propagates "Company Root" to every "X management / X can do"
-  // label downstream instead of leaking "Region".
   const isAtCompanyRoot = !currentGovernanceLevel;
-  const currentLevelLabel = isAtCompanyRoot
-    ? "Company Root"
-    : (currentGovernanceLevel?.name ?? tenantRootLevelName);
+  const currentLevelLabel = isAtCompanyRoot ? "Company Root" : (currentGovernanceLevel?.name ?? tenantRootLevelName);
   const currentScopeLabel = activeGovernanceOrgUnit
     ? `${activeGovernanceOrgUnit.name} (${currentLevelLabel})`
-    : isAtCompanyRoot
-      ? tenant.name
-      : tenantRootLevelName;
-  const userScopedLevels = useMemo(() => {
-    const authorityOrder = currentGovernanceLevel?.order ?? orderedLevels[0]?.order ?? 0;
-    return orderedLevels.filter((level) => level.order >= authorityOrder);
-  }, [currentGovernanceLevel, orderedLevels]);
+    : isAtCompanyRoot ? tenant.name : tenantRootLevelName;
   const managedChildRule =
     form.childGovernanceRules.find((rule) => rule.childLevelId === managedTargetLevelId) ?? null;
 
   useEffect(() => {
-    if (!managedTargetLevelId) {
-      return;
-    }
+    if (!managedTargetLevelId) return;
     setForm((current) => {
       const existing = current.childGovernanceRules.find((rule) => rule.childLevelId === managedTargetLevelId);
-      if (existing) {
-        return current;
-      }
+      if (existing) return current;
       return {
         ...current,
         childGovernanceRules: [
@@ -189,14 +151,11 @@ export function TenantAutoLRConfigPage() {
     [activeGovernanceOrgUnit, managedTargetLevelId, orgUnits],
   );
   const currentFormat = resolveManualLrFormatForOrgUnit(
-    {
-      ...buildAutoLrConfigInput(autoConfig),
-      ...form,
-      lrType: "AUTO",
-    } as never,
+    { ...buildAutoLrConfigInput(autoConfig), ...form, lrType: "AUTO" } as never,
     activeGovernanceOrgUnit?.id ?? null,
     orgUnits,
   );
+  const currentFormatPreview = buildManualLrPreview(currentFormat);
   const runtimePreview = autoConfig
     ? buildAutoLrRuntimePreview({
         config: autoConfig,
@@ -205,13 +164,7 @@ export function TenantAutoLRConfigPage() {
         generatedRecords: store.lrs.filter((record) => record.configId === autoConfig.id),
       })
     : null;
-  const CHILD_MODE_LABEL: Record<ManualLRChildFormatMode, string> = {
-    GLOBAL_PARENT_FORMAT: "Uses parent format",
-    PARENT_PREFIX_CHILD_SUFFIX: "Parent prefix + child code",
-    FULL_CHILD_FORMAT: "Independent child format",
-  };
-  // Sets the per-place child code (PARENT_PREFIX_CHILD_SUFFIX) / child prefix
-  // (FULL_CHILD_FORMAT) via the shared placeFormatOverrides the resolver reads.
+
   const setPlaceCode = (orgUnitId: string, prefix: string) =>
     setForm((current) => {
       const overrides = current.placeFormatOverrides ?? [];
@@ -223,6 +176,7 @@ export function TenantAutoLRConfigPage() {
           : [...overrides, { orgUnitId, prefix }],
       };
     });
+
   const previewForOrgUnit = (orgUnitId: string) =>
     buildManualLrPreview(
       resolveManualLrFormatForOrgUnit(
@@ -246,188 +200,171 @@ export function TenantAutoLRConfigPage() {
       status: form.status,
     };
     try {
-      if (autoConfig) {
-        updateLRConfig(autoConfig.id, payload);
-        setMessage("Auto LR configuration updated.");
-      } else {
-        createLRConfig(payload);
-        setMessage("Auto LR configuration created.");
-      }
+      if (autoConfig) { updateLRConfig(autoConfig.id, payload); setMessage("Auto LR configuration updated."); }
+      else { createLRConfig(payload); setMessage("Auto LR configuration created."); }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Auto LR configuration could not be saved.");
     }
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        eyebrow="Administration"
-        title="Auto LR Configuration"
-        description="Runtime sequence-generation governance."
-        action={<Button onClick={saveConfig} disabled={!canEdit}>Save Auto LR Config</Button>}
-      />
-      {message ? <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div> : null}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-[14px] font-semibold text-slate-900">Auto LR</h1>
+        <Button size="sm" onClick={saveConfig} disabled={!canEdit}>Save</Button>
+      </div>
 
-      <TenantPanel title="Auto LR Governance" description="">
-        {/* Same Company Root anchor as the manual page — UI only; the
-            runtime authority chain still starts at the first business
-            level (Level 1) of the configured hierarchy. */}
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-indigo-100 bg-indigo-50/50 px-3 py-2 text-[12px]">
-          <span className="inline-flex items-center rounded-md bg-indigo-100 px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] text-indigo-700">
-            Company Root
-          </span>
-          <span className="text-slate-700">{tenant.name}</span>
-          <span className="text-slate-400">↳</span>
-          <span className="text-slate-600">{tenantRootLevelName} and below</span>
+      {message ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div>
+      ) : null}
+
+      {/* Step 1 — LR Number Format */}
+      <SectionCard step={1} title="LR Number Format">
+        <div className="flex flex-wrap items-end gap-4">
+          <Field label="Prefix">
+            <Input value={form.prefix} onChange={(event) => setForm((current) => ({ ...current, prefix: event.target.value }))} disabled={!canEdit} />
+          </Field>
+          <Field label="Pad">
+            <Input type="number" min={1} max={10} value={String(form.zeroPaddingLength)} onChange={(event) => setForm((current) => ({ ...current, zeroPaddingLength: Math.max(1, Number(event.target.value || 1)) }))} disabled={!canEdit} />
+          </Field>
+          <div className="mb-0.5 font-mono text-base font-bold text-slate-900">{currentFormatPreview}</div>
         </div>
-        <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="grid gap-3">
-            <div className="grid gap-2 sm:grid-cols-3">
-              <CompactCard
-                label="Root Authority"
-                value={isAtCompanyRoot ? `Company Root — ${tenant.name}` : currentLevelLabel}
-              />
-              <CompactCard label="Workspace" value={currentScopeLabel} />
-              <CompactCard label="Preview" value={buildManualLrPreview(currentFormat)} mono />
-            </div>
-            {currentGovernanceLevel && currentGovernanceLevel.order > (orderedLevels[0]?.order ?? 0) ? (
-              <CompactCard label="Inherited From" value={orderedLevels[0]?.name ?? "Root"} />
-            ) : null}
-            <div className="grid gap-2 sm:grid-cols-[1.1fr_0.9fr]">
-              <Field label="Distribute LR Control">
-                <Select
-                  value={form.scopeType === "TENANT" ? "TENANT" : managedTargetLevelId}
-                  onChange={(event) => setForm((current) => ({
-                    ...current,
-                    scopeType: event.target.value === "TENANT" ? "TENANT" : "HIERARCHY",
-                    ownershipLevelId: event.target.value === "TENANT" ? "" : event.target.value,
-                  }))}
-                  disabled={!canEdit}
-                >
-                  <option value="TENANT">
-                    {isAtCompanyRoot
-                      || (currentGovernanceLevel && currentGovernanceLevel.order === (orderedLevels[0]?.order ?? 0))
-                      ? `Company Root only (${tenant.name})`
-                      : `${currentLevelLabel} only`}
-                  </option>
-                  {availableTargetLevels.map((level) => <option key={level.id} value={level.id}>Down to {level.name}</option>)}
-                </Select>
-              </Field>
-              <CompactCard
-                label="Flow"
-                value={buildLrFlowLabel(
-                  userScopedLevels,
-                  form.scopeType === "TENANT" ? "" : managedTargetLevelId,
-                  isAtCompanyRoot ? `Company Root (${tenant.name})` : currentLevelLabel,
-                  isAtCompanyRoot,
-                )}
-              />
-            </div>
-            {managedChildRule ? (
-              <>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <SmallBlock title={`${currentLevelLabel} can do`}>
-                    <ToggleChip label="Generate at runtime" active={managedChildRule.parentCanGenerateLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { parentCanGenerateLr: !managedChildRule.parentCanGenerateLr })} disabled={!canEdit} />
-                    <ToggleChip label="Approve child requests" active={managedChildRule.canApproveChildRequests} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { canApproveChildRequests: !managedChildRule.canApproveChildRequests })} disabled={!canEdit} />
-                  </SmallBlock>
-                  <SmallBlock title={`${childLevelLabel} can do`}>
-                    <ToggleChip label="Request generation rights" active={managedChildRule.childCanRequestLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { childCanRequestLr: !managedChildRule.childCanRequestLr })} disabled={!canEdit} />
-                    <ToggleChip label="Generate during assignment" active={managedChildRule.childCanConsumeLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { childCanConsumeLr: !managedChildRule.childCanConsumeLr })} disabled={!canEdit} />
-                    <ToggleChip label="Configure next level" active={managedChildRule.canDelegateChildGovernance} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { canDelegateChildGovernance: !managedChildRule.canDelegateChildGovernance })} disabled={!canEdit} />
-                  </SmallBlock>
-                </div>
-                <div className="grid gap-2 md:grid-cols-3">
-                  {buildAutoChildStrategyCards(childLevelLabel).map((card) => (
-                    <label key={card.mode} className={`rounded-xl border px-3 py-3 ${managedChildRule.formatMode === card.mode ? "border-sky-300 bg-sky-50" : "bg-white"}`}>
-                      <div className="text-sm font-medium text-slate-950">{card.title}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{card.description}</div>
-                      <div className="mt-2 rounded-lg border bg-white/80 px-2.5 py-1.5 font-mono text-[11px]">{card.example}</div>
-                      <div className="mt-2">
-                        <input
-                          type="radio"
-                          checked={managedChildRule.formatMode === card.mode}
-                          onChange={() => patchRule(setForm, managedChildRule.childLevelId, {
-                            formatMode: card.mode,
-                            inheritParentFormat: card.mode !== "FULL_CHILD_FORMAT",
-                            canDefineChildFormat: card.mode !== "GLOBAL_PARENT_FORMAT",
-                          })}
-                          disabled={!canEdit}
-                        />
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" || managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? (
-                  <div className="mt-3 rounded-xl border bg-white p-3">
-                    <div className="text-sm font-semibold">
-                      {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? `${childLevelLabel} code per place` : `${childLevelLabel} prefix per place`}
-                    </div>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX"
-                        ? "Appended to the parent prefix at runtime (e.g. parent ELAUTO + code SOUTH)."
-                        : "Each place uses its own independent prefix."}
-                    </p>
-                    {ownershipOrgUnits.length ? (
-                      <div className="mt-3 grid gap-2">
-                        {ownershipOrgUnits.map((unit) => {
-                          const override = (form.placeFormatOverrides ?? []).find((item) => item.orgUnitId === unit.id);
-                          return (
-                            <div key={unit.id} className="grid items-center gap-2 md:grid-cols-[1fr_150px_1fr]">
-                              <div className="text-sm text-slate-700">{unit.name}</div>
-                              <Input
-                                value={override?.prefix ?? ""}
-                                placeholder={unit.name.toUpperCase().replace(/[^A-Z0-9]/g, "")}
-                                onChange={(event) => setPlaceCode(unit.id, event.target.value.toUpperCase())}
-                                disabled={!canEdit}
-                              />
-                              <div className="rounded-lg border bg-slate-50 px-2.5 py-1.5 font-mono text-[11px]">{previewForOrgUnit(unit.id)}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="mt-2 text-xs text-muted-foreground">No child places under the selected scope.</p>
-                    )}
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-          </div>
-          <div className="rounded-xl border bg-slate-50/80 p-3">
-            <div className="text-sm font-semibold">Auto LR Sequence Rules</div>
-            <div className="mt-3 grid gap-2">
-              <Field label="Prefix">
-                <Input value={form.prefix} onChange={(event) => setForm((current) => ({ ...current, prefix: event.target.value }))} disabled={!canEdit} />
-              </Field>
-              <div className="grid gap-2 grid-cols-3">
-                <Field label="Year">
-                  <Select value={form.yearFormat} onChange={(event) => setForm((current) => ({ ...current, yearFormat: event.target.value as AutoConfigForm["yearFormat"] }))} disabled={!canEdit}>
-                    <option value="NONE">None</option>
-                    <option value="YYYY">YYYY</option>
-                    <option value="YY">YY</option>
-                  </Select>
-                </Field>
-                <Field label="Sep">
-                  <Input value={form.numberSeparator} onChange={(event) => setForm((current) => ({ ...current, numberSeparator: event.target.value || "-" }))} disabled={!canEdit} />
-                </Field>
-                <Field label="Pad">
-                  <Input type="number" min={1} max={10} value={String(form.zeroPaddingLength)} onChange={(event) => setForm((current) => ({ ...current, zeroPaddingLength: Math.max(1, Number(event.target.value || 1)) }))} disabled={!canEdit} />
-                </Field>
+      </SectionCard>
+
+      {/* Step 2 — Who controls LR? */}
+      <SectionCard step={2} title="Who controls LR?">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <ScopeOption
+            active={form.scopeType === "TENANT"}
+            title="Company Root only"
+            description={`${tenant.name} generates all LR numbers`}
+            onClick={() => setForm((current) => ({ ...current, scopeType: "TENANT", ownershipLevelId: "" }))}
+            disabled={!canEdit}
+          />
+          {availableTargetLevels.map((level) => (
+            <ScopeOption
+              key={level.id}
+              active={form.scopeType === "HIERARCHY" && managedTargetLevelId === level.id}
+              title={`Down to ${level.name}`}
+              description={`Each ${level.name} generates own LR at runtime`}
+              onClick={() => setForm((current) => ({ ...current, scopeType: "HIERARCHY", ownershipLevelId: level.id }))}
+              disabled={!canEdit}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      {/* Step 3 — Governance (only when distributed) */}
+      {form.scopeType === "HIERARCHY" && managedChildRule ? (
+        <SectionCard step={3} title={`Governance — ${currentLevelLabel} → ${childLevelLabel}`}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border bg-slate-50 px-3 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">{currentLevelLabel}</div>
+              <div className="flex flex-wrap gap-1.5">
+                <ToggleChip label="Generate" active={managedChildRule.parentCanGenerateLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { parentCanGenerateLr: !managedChildRule.parentCanGenerateLr })} disabled={!canEdit} />
+                <ToggleChip label="Approve Requests" active={managedChildRule.canApproveChildRequests} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { canApproveChildRequests: !managedChildRule.canApproveChildRequests })} disabled={!canEdit} />
               </div>
-              <div className="rounded-lg border bg-white px-3 py-2 font-mono text-sm">{buildManualLrPreview(currentFormat)}</div>
+            </div>
+            <div className="rounded-lg border bg-slate-50 px-3 py-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">{childLevelLabel}</div>
+              <div className="flex flex-wrap gap-1.5">
+                <ToggleChip label="Request" active={managedChildRule.childCanRequestLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { childCanRequestLr: !managedChildRule.childCanRequestLr })} disabled={!canEdit} />
+                <ToggleChip label="Use" active={managedChildRule.childCanConsumeLr} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { childCanConsumeLr: !managedChildRule.childCanConsumeLr })} disabled={!canEdit} />
+                <ToggleChip label="Manage Child" active={managedChildRule.canDelegateChildGovernance} onClick={() => patchRule(setForm, managedChildRule.childLevelId, { canDelegateChildGovernance: !managedChildRule.canDelegateChildGovernance })} disabled={!canEdit} />
+              </div>
             </div>
           </div>
-        </div>
-      </TenantPanel>
+        </SectionCard>
+      ) : null}
 
-      <TenantPanel title="Auto LR Runtime Preview" description="">
-        <div className="grid gap-3 lg:grid-cols-2">
-          <CompactCard label="Current Assignment Context" value={currentScopeLabel} />
-          <CompactCard label="Resolved Auto LR Pattern" value={runtimePreview?.formatPreview ?? buildManualLrPreview(currentFormat)} mono />
-          <CompactCard label="Next Generated Number" value={runtimePreview?.nextNumber ?? buildManualLrPreview(currentFormat)} mono />
-          <CompactCard label="Child Format Mode" value={managedChildRule ? CHILD_MODE_LABEL[managedChildRule.formatMode] : "No child rule configured"} />
+      {/* Step 4 — Format Strategy (only when distributed) */}
+      {form.scopeType === "HIERARCHY" && managedChildRule ? (
+        <SectionCard step={4} title={`Format for ${childLevelLabel}`}>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {buildAutoChildStrategyCards(childLevelLabel).map((card) => (
+              <label
+                key={card.mode}
+                className={`cursor-pointer rounded-xl border px-3 py-3 ${managedChildRule.formatMode === card.mode ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
+              >
+                <div className="text-sm font-semibold text-slate-950">{card.title}</div>
+                <div className="mt-2 rounded-lg border bg-white/80 px-2.5 py-1.5 font-mono text-[11px]">{card.example}</div>
+                <div className="mt-2">
+                  <input
+                    type="radio"
+                    checked={managedChildRule.formatMode === card.mode}
+                    onChange={() => patchRule(setForm, managedChildRule.childLevelId, {
+                      formatMode: card.mode,
+                      inheritParentFormat: card.mode !== "FULL_CHILD_FORMAT",
+                      canDefineChildFormat: card.mode !== "GLOBAL_PARENT_FORMAT",
+                    })}
+                    disabled={!canEdit}
+                  />
+                </div>
+              </label>
+            ))}
+          </div>
+          {managedChildRule.formatMode === "GLOBAL_PARENT_FORMAT" ? (
+            <div className="mt-2 rounded-lg border border-dashed bg-slate-50/60 px-3 py-2 text-[12px] text-slate-400">
+              All {childLevelLabel} places use <span className="font-mono font-semibold text-slate-700">{currentFormatPreview}</span>
+            </div>
+          ) : null}
+        </SectionCard>
+      ) : null}
+
+      {/* Step 5 — Place Codes (only when Parent+Code or Independent) */}
+      {form.scopeType === "HIERARCHY" && managedChildRule && (managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" || managedChildRule.formatMode === "FULL_CHILD_FORMAT") ? (
+        <SectionCard step={5} title={`Place Codes — ${childLevelLabel}`}>
+          {!ownershipOrgUnits.length ? (
+            <div className="rounded-lg border border-dashed bg-slate-50/60 px-3 py-2 text-[12px] text-slate-400">
+              No places found at the {childLevelLabel} level.
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              <div className="hidden md:grid gap-2 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground md:grid-cols-[1fr_140px_1fr]">
+                <div>Place</div>
+                <div>{managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? "Code" : "Prefix"}</div>
+                <div>Preview</div>
+              </div>
+              {ownershipOrgUnits.map((unit) => {
+                const override = (form.placeFormatOverrides ?? []).find((item) => item.orgUnitId === unit.id);
+                return (
+                  <div key={unit.id} className="grid items-end gap-2 rounded-xl border bg-white p-3 md:grid-cols-[1fr_140px_1fr]">
+                    <div className="text-sm font-semibold text-slate-950">{unit.name}</div>
+                    <Field label={managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? "Code" : "Prefix"}>
+                      <Input
+                        value={override?.prefix ?? ""}
+                        placeholder={unit.name.toUpperCase().replace(/[^A-Z0-9]/g, "")}
+                        onChange={(event) => setPlaceCode(unit.id, event.target.value.toUpperCase())}
+                        disabled={!canEdit}
+                      />
+                    </Field>
+                    <div className="flex items-end pb-1 font-mono text-sm font-semibold text-slate-900">{previewForOrgUnit(unit.id)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
+
+      {/* Runtime Preview — always visible */}
+      <div className="rounded-xl border bg-slate-50/60 px-4 py-3">
+        <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Runtime Preview</div>
+        <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-[12px]">
+          <span className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Context</span>
+            <span className="font-semibold text-slate-900">{currentScopeLabel}</span>
+          </span>
+          <span className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Pattern</span>
+            <span className="font-mono font-semibold text-slate-900">{runtimePreview?.formatPreview ?? currentFormatPreview}</span>
+          </span>
+          <span className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Next</span>
+            <span className="font-mono font-semibold text-slate-900">{runtimePreview?.nextNumber ?? currentFormatPreview}</span>
+          </span>
         </div>
-      </TenantPanel>
+      </div>
     </div>
   );
 }
@@ -484,62 +421,46 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function CompactCard({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div className="rounded-xl border bg-slate-50/80 px-3 py-2">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-sm font-semibold text-slate-950 ${mono ? "font-mono" : ""}`}>{value}</div>
-    </div>
-  );
-}
-
-function SmallBlock({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="rounded-xl border bg-white px-3 py-3">
-      <div className="text-xs uppercase tracking-[0.08em] text-muted-foreground">{title}</div>
-      <div className="mt-2 flex flex-wrap gap-2">{children}</div>
-    </div>
-  );
-}
-
-function ToggleChip({
-  label,
-  active,
-  onClick,
-  disabled,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  disabled: boolean;
-}) {
+function ToggleChip({ label, active, onClick, disabled }: { label: string; active: boolean; onClick: () => void; disabled: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border px-3 py-1.5 text-xs ${active ? "border-sky-300 bg-sky-100 text-sky-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}
+      className={`rounded-full border px-3 py-1.5 text-xs transition ${active ? "border-sky-300 bg-sky-100 text-sky-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}
     >
       {label}
     </button>
   );
 }
 
-function buildLrFlowLabel(
-  levels: Array<{ id: string; name: string; order: number }>,
-  targetLevelId: string,
-  rootName: string,
-  rootIsAbove = false,
-): string {
-  // See manual-lr-config-page.tsx for the rootIsAbove rationale —
-  // mirrors that implementation so both LR pages render the same chain.
-  const sorted = [...levels].sort((a, b) => a.order - b.order);
-  if (!targetLevelId || !sorted.length) return `${rootName} only`;
-  const targetIndex = sorted.findIndex((level) => level.id === targetLevelId);
-  if (targetIndex < 0) return `${rootName} only`;
-  if (rootIsAbove) {
-    return [rootName, ...sorted.slice(0, targetIndex + 1).map((level) => level.name)].join(" → ");
-  }
-  if (targetIndex === 0) return `${rootName} only`;
-  return [rootName, ...sorted.slice(1, targetIndex + 1).map((level) => level.name)].join(" → ");
+function SectionCard({ step, title, children }: { step: number; title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">{step}</span>
+        <span className="text-sm font-semibold text-slate-900">{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ScopeOption({ active, title, description, onClick, disabled }: { active: boolean; title: string; description: string; onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${active ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
+    >
+      <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition ${active ? "border-sky-500 bg-sky-500" : "border-slate-300"}`}>
+        {active ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
+      </span>
+      <div>
+        <div className="text-sm font-semibold text-slate-900">{title}</div>
+        <div className="text-xs text-slate-500">{description}</div>
+      </div>
+    </button>
+  );
 }

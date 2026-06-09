@@ -47,6 +47,25 @@ import type {
   TenantVehicleType,
 } from "@/types/master-data";
 
+const BODY_TYPES = ["Open Body", "Closed Body", "Container", "Trailer", "Flatbed", "Tanker", "Tipper", "Refrigerated", "Bulker"] as const;
+const WHEEL_OPTIONS = ["4 Wheeler", "6 Wheeler", "8 Wheeler", "10 Wheeler", "12 Wheeler", "14 Wheeler", "16 Wheeler", "18 Wheeler", "22 Wheeler", "Multi Axle"] as const;
+const CAPACITY_UNITS = ["KG", "MT", "TON"] as const;
+const DIMENSION_UNITS = ["FT", "M"] as const;
+
+const EMPTY_VEHICLE_FORM = {
+  typeCode: "",
+  typeName: "",
+  bodyType: "",
+  wheels: "",
+  capacityValue: "",
+  capacityUnit: "MT" as string,
+  length: "",
+  width: "",
+  height: "",
+  dimensionUnit: "FT" as string,
+  status: "active" as TenantVehicleType["status"],
+};
+
 export function TenantVehicleTypesPage() {
   const { tenantId, tenant } = useTenantRouteContext();
   const { data: vehicleTypes, createVehicleType, updateVehicleType } = useTenantVehicleTypes(tenantId);
@@ -55,37 +74,24 @@ export function TenantVehicleTypesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState({
-    typeCode: "",
-    capacity: "",
-    dimensions: "",
-    status: "active" as TenantVehicleType["status"],
-  });
+  const [form, setForm] = useState(EMPTY_VEHICLE_FORM);
 
   const enabledModuleCodes = getAccessibleModuleCodes(tenant.enabledModuleCodes, modules);
   const availableForTenant = enabledModuleCodes.some((moduleCode) => ["TMS", "FLEET"].includes(moduleCode));
   const duplicateCode = vehicleTypes.some(
-    (item) =>
-      item.id !== editingId && item.typeCode.trim().toUpperCase() === form.typeCode.trim().toUpperCase(),
+    (item) => item.id !== editingId && item.typeCode.trim().toUpperCase() === form.typeCode.trim().toUpperCase(),
   );
   const filteredVehicleTypes = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return vehicleTypes;
-    }
+    if (!normalizedSearch) return vehicleTypes;
     return vehicleTypes.filter((item) =>
-      `${item.typeCode} ${item.capacity} ${item.dimensions}`.toLowerCase().includes(normalizedSearch),
+      `${item.typeCode} ${item.typeName ?? ""} ${item.bodyType ?? ""} ${item.wheels ?? ""} ${item.capacity} ${item.dimensions}`.toLowerCase().includes(normalizedSearch),
     );
   }, [search, vehicleTypes]);
 
   function openCreate() {
     setEditingId(null);
-    setForm({
-      typeCode: "",
-      capacity: "",
-      dimensions: "",
-      status: "active",
-    });
+    setForm(EMPTY_VEHICLE_FORM);
     setOpen(true);
   }
 
@@ -93,26 +99,50 @@ export function TenantVehicleTypesPage() {
     setEditingId(vehicleType.id);
     setForm({
       typeCode: vehicleType.typeCode,
-      capacity: vehicleType.capacity,
-      dimensions: vehicleType.dimensions,
+      typeName: vehicleType.typeName ?? "",
+      bodyType: vehicleType.bodyType ?? "",
+      wheels: vehicleType.wheels ?? "",
+      capacityValue: vehicleType.capacityValue ?? "",
+      capacityUnit: vehicleType.capacityUnit ?? "MT",
+      length: vehicleType.length ?? "",
+      width: vehicleType.width ?? "",
+      height: vehicleType.height ?? "",
+      dimensionUnit: vehicleType.dimensionUnit ?? "FT",
       status: vehicleType.status,
     });
     setOpen(true);
   }
 
   function saveVehicleType() {
-    if (!form.typeCode.trim() || !form.capacity.trim() || !form.dimensions.trim()) {
-      setMessage("Enter the type code, capacity, and dimensions.");
+    if (!form.typeCode.trim() || !form.typeName.trim() || !form.bodyType || !form.wheels) {
+      setMessage("Vehicle Type Code, Name, Body Type and Wheels are required.");
       return;
     }
-
+    const capacity = form.capacityValue ? `${form.capacityValue} ${form.capacityUnit}` : "";
+    const dims = [form.length, form.width, form.height].filter(Boolean);
+    const dimensions = dims.length === 3 ? `${dims.join(" x ")} ${form.dimensionUnit}` : dims.join(" x ");
     try {
+      const payload = {
+        typeCode: form.typeCode.trim().toUpperCase(),
+        typeName: form.typeName.trim(),
+        bodyType: form.bodyType,
+        wheels: form.wheels,
+        capacityValue: form.capacityValue,
+        capacityUnit: form.capacityUnit,
+        length: form.length,
+        width: form.width,
+        height: form.height,
+        dimensionUnit: form.dimensionUnit,
+        capacity,
+        dimensions,
+        status: form.status,
+      };
       if (editingId) {
-        updateVehicleType(editingId, form);
-        setMessage("Vehicle type updated and persisted.");
+        updateVehicleType(editingId, payload);
+        setMessage("Vehicle type updated.");
       } else {
-        createVehicleType(form);
-        setMessage("Vehicle type created and persisted.");
+        createVehicleType(payload);
+        setMessage("Vehicle type created.");
       }
       setOpen(false);
     } catch (error) {
@@ -123,9 +153,8 @@ export function TenantVehicleTypesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Tenant Admin"
+        eyebrow="Administration"
         title="Vehicle Types"
-        description="Maintain tenant vehicle-type masters used by booking, fleet, and rate-card flows."
         action={
           <Button onClick={openCreate} disabled={!availableForTenant}>
             Add Vehicle Type
@@ -139,45 +168,34 @@ export function TenantVehicleTypesPage() {
         disabledMessage="Vehicle types stay visible here, but create and edit actions are disabled until TMS or Fleet is enabled for this tenant."
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <TenantSummaryCard label="Vehicle types" value={String(vehicleTypes.length)} helper="Tenant-scoped master records" />
-        <TenantSummaryCard label="Active" value={String(vehicleTypes.filter((item) => item.status === "active").length)} helper="Currently usable types" />
-        <TenantSummaryCard label="Enabled modules" value={enabledModuleCodes.filter((item) => ["TMS", "FLEET"].includes(item)).join(", ") || "None"} helper="Relevant operational modules" />
-      </div>
-
       {message ? <StatusBanner message={message} /> : null}
 
       <TenantFilterBar
         searchValue={search}
-        searchPlaceholder="Search vehicle types by code, capacity, or dimensions"
+        searchPlaceholder="Search by code, name, body type, or wheels"
         onSearchChange={setSearch}
-        trailing={<div className="text-sm text-muted-foreground">{filteredVehicleTypes.length} records shown</div>}
+        trailing={<div className="text-sm text-muted-foreground">{filteredVehicleTypes.length} records</div>}
       />
 
       {filteredVehicleTypes.length ? (
         <DataTable
-          title="Vehicle type master"
-          description="Same local-storage persistence model as the rest of the tenant administration workspace."
-          headers={["Type code", "Capacity", "Dimensions", "Status", "Actions"]}
+          title="Vehicle Types"
+          headers={["Type Code", "Vehicle Name", "Body Type", "Wheels", "Capacity", "Dimensions", "Status", "Updated", "Actions"]}
           rows={filteredVehicleTypes.map((item) => [
-            <div key={`${item.id}-code`} className="min-w-[140px]">
-              <p className="font-medium">{item.typeCode}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Updated {new Date(item.updatedAt).toLocaleDateString()}</p>
-            </div>,
-            item.capacity,
-            item.dimensions,
-            <Badge key={`${item.id}-status`} variant={item.status === "active" ? "success" : "warning"}>
-              {item.status}
-            </Badge>,
-            <Button key={`${item.id}-edit`} size="sm" variant="ghost" onClick={() => openEdit(item)} disabled={!availableForTenant}>
-              Edit
-            </Button>,
+            <span key={`${item.id}-code`} className="font-semibold">{item.typeCode}</span>,
+            item.typeName || "—",
+            item.bodyType || "—",
+            item.wheels || "—",
+            item.capacity || "—",
+            item.dimensions || "—",
+            <Badge key={`${item.id}-status`} variant={item.status === "active" ? "success" : "warning"}>{item.status}</Badge>,
+            new Date(item.updatedAt).toLocaleDateString(),
+            <Button key={`${item.id}-edit`} size="sm" variant="ghost" onClick={() => openEdit(item)} disabled={!availableForTenant}>Edit</Button>,
           ])}
         />
       ) : (
         <TenantEmptyState
           title="No vehicle types found"
-          description="Create the first tenant vehicle type to support booking, fleet, and rate-card references."
           action={availableForTenant ? <Button onClick={openCreate}>Add Vehicle Type</Button> : null}
         />
       )}
@@ -185,27 +203,64 @@ export function TenantVehicleTypesPage() {
       <Dialog
         open={open}
         onOpenChange={setOpen}
-        title={editingId ? "Edit vehicle type" : "Add vehicle type"}
-        description="Use the existing tenant form rhythm. Unique hints are advisory only in this frontend-only workspace."
+        title={editingId ? "Edit Vehicle Type" : "Add Vehicle Type"}
         footer={
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button onClick={saveVehicleType} disabled={!availableForTenant}>
-              {editingId ? "Save Changes" : "Create Vehicle Type"}
+              {editingId ? "Save Changes" : "Create"}
             </Button>
           </div>
         }
       >
         <div className="grid gap-4">
-          <Field label="Type code" helper="Required. Use the tenant naming convention already used in rate cards.">
-            <Input value={form.typeCode} onChange={(event) => setForm((current) => ({ ...current, typeCode: event.target.value }))} />
+          {duplicateCode ? <ValidationHint text="A vehicle type with this code already exists." /> : null}
+          <Field label="Vehicle Type Code *">
+            <Input
+              value={form.typeCode}
+              onChange={(event) => setForm((current) => ({ ...current, typeCode: event.target.value }))}
+              placeholder="HGV"
+            />
           </Field>
-          {duplicateCode ? <ValidationHint text="A vehicle type with this code already exists. This is a non-blocking frontend hint." /> : null}
+          <Field label="Vehicle Type Name *">
+            <Input
+              value={form.typeName}
+              onChange={(event) => setForm((current) => ({ ...current, typeName: event.target.value }))}
+              placeholder="Heavy Goods Vehicle"
+            />
+          </Field>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Capacity" helper="Required. Example: 9 MT">
-              <Input value={form.capacity} onChange={(event) => setForm((current) => ({ ...current, capacity: event.target.value }))} />
+            <Field label="Body Type *">
+              <Select value={form.bodyType} onChange={(event) => setForm((current) => ({ ...current, bodyType: event.target.value }))}>
+                <option value="">Select body type</option>
+                {BODY_TYPES.map((bt) => <option key={bt} value={bt}>{bt}</option>)}
+              </Select>
+            </Field>
+            <Field label="Wheels *">
+              <datalist id="wheels-suggestions">
+                {WHEEL_OPTIONS.map((w) => <option key={w} value={w} />)}
+              </datalist>
+              <Input
+                value={form.wheels}
+                onChange={(event) => setForm((current) => ({ ...current, wheels: event.target.value }))}
+                placeholder="e.g. 10 Wheeler"
+                list="wheels-suggestions"
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Capacity">
+              <Input
+                type="number"
+                value={form.capacityValue}
+                onChange={(event) => setForm((current) => ({ ...current, capacityValue: event.target.value }))}
+                placeholder="9"
+              />
+            </Field>
+            <Field label="Unit">
+              <Select value={form.capacityUnit} onChange={(event) => setForm((current) => ({ ...current, capacityUnit: event.target.value }))}>
+                {CAPACITY_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </Select>
             </Field>
             <Field label="Status">
               <Select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as TenantVehicleType["status"] }))}>
@@ -214,9 +269,22 @@ export function TenantVehicleTypesPage() {
               </Select>
             </Field>
           </div>
-          <Field label="Dimensions" helper="Required. Example: 32 x 8 x 8 ft">
-            <Input value={form.dimensions} onChange={(event) => setForm((current) => ({ ...current, dimensions: event.target.value }))} />
-          </Field>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Field label="Length">
+              <Input value={form.length} onChange={(event) => setForm((current) => ({ ...current, length: event.target.value }))} placeholder="32" />
+            </Field>
+            <Field label="Width">
+              <Input value={form.width} onChange={(event) => setForm((current) => ({ ...current, width: event.target.value }))} placeholder="8" />
+            </Field>
+            <Field label="Height">
+              <Input value={form.height} onChange={(event) => setForm((current) => ({ ...current, height: event.target.value }))} placeholder="8" />
+            </Field>
+            <Field label="Unit">
+              <Select value={form.dimensionUnit} onChange={(event) => setForm((current) => ({ ...current, dimensionUnit: event.target.value }))}>
+                {DIMENSION_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </Select>
+            </Field>
+          </div>
         </div>
       </Dialog>
     </div>
@@ -224,86 +292,91 @@ export function TenantVehicleTypesPage() {
 }
 
 export function TenantMaterialsPage() {
-  const { tenantId, tenant } = useTenantRouteContext();
+  const { tenantId } = useTenantRouteContext();
   const { data: materials, createMaterial, updateMaterial } = useTenantMaterials(tenantId);
   const { definitions: uomDefinitions } = useTenantUOMConfigurations(tenantId);
   const { data: customers } = useTenantCustomers(tenantId);
-  const { data: modules } = usePlatformModules();
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
+  const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
-  const [previewCustomerId, setPreviewCustomerId] = useState(customers[0]?.id ?? "");
+  const [subBrandInput, setSubBrandInput] = useState("");
   const [form, setForm] = useState({
-    materialCode: "",
     description: "",
+    hsnCode: "",
     uom: "",
-    defaultWeightUOM: "KG",
+    defaultWeightUOM: "MT",
     conversionValue: "",
+    subBrands: [] as string[],
     mappedCustomerIds: [] as string[],
     status: "active" as TenantMaterial["status"],
   });
 
-  const enabledModuleCodes = getAccessibleModuleCodes(tenant.enabledModuleCodes, modules);
-  const availableForTenant = enabledModuleCodes.includes("TMS");
   const quantityUOMOptions = Array.from(
     new Set([
       ...uomDefinitions
-        .filter((definition) => definition.category === "QUANTITY" && definition.status === "active")
-        .map((definition) => definition.code),
+        .filter((d) => d.category === "QUANTITY" && d.status === "active")
+        .map((d) => d.code),
       form.uom.trim().toUpperCase(),
     ].filter(Boolean)),
   );
-  const customerMap = new Map(customers.map((customer) => [customer.id, customer]));
-  const duplicateCode = materials.some(
-    (item) =>
-      item.id !== editingId &&
-      item.materialCode.trim().toUpperCase() === form.materialCode.trim().toUpperCase(),
+  const weightUOMOptions = Array.from(
+    new Set([
+      ...uomDefinitions
+        .filter((d) => d.category === "WEIGHT" && d.status === "active")
+        .map((d) => d.code),
+      form.defaultWeightUOM.trim().toUpperCase(),
+    ].filter(Boolean)),
   );
+  const customerMap = new Map(customers.map((c) => [c.id, c]));
+
   const filteredMaterials = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return materials;
-    }
+    const q = search.trim().toLowerCase();
+    if (!q) return materials;
     return materials.filter((item) =>
-      `${item.materialCode} ${item.description} ${item.uom} ${item.defaultWeightUOM ?? ""} ${item.conversionValue ?? ""}`.toLowerCase().includes(normalizedSearch),
+      `${item.description} ${item.materialCode} ${item.uom} ${item.defaultWeightUOM ?? ""} ${(item.subBrands ?? []).join(" ")} ${item.hsnCode ?? ""}`.toLowerCase().includes(q),
     );
   }, [materials, search]);
-  const previewMaterials = previewCustomerId
-    ? materials.filter((item) => item.mappedCustomerIds.includes(previewCustomerId))
-    : [];
 
-  function toggleCustomer(customerId: string) {
-    setForm((current) => ({
-      ...current,
-      mappedCustomerIds: current.mappedCustomerIds.includes(customerId)
-        ? current.mappedCustomerIds.filter((item) => item !== customerId)
-        : [...current.mappedCustomerIds, customerId],
+  function toggleCustomer(id: string) {
+    setForm((c) => ({
+      ...c,
+      mappedCustomerIds: c.mappedCustomerIds.includes(id)
+        ? c.mappedCustomerIds.filter((x) => x !== id)
+        : [...c.mappedCustomerIds, id],
     }));
+  }
+
+  function addSubBrand() {
+    const val = subBrandInput.trim();
+    if (!val || form.subBrands.includes(val)) { setSubBrandInput(""); return; }
+    setForm((c) => ({ ...c, subBrands: [...c.subBrands, val] }));
+    setSubBrandInput("");
+  }
+
+  function removeSubBrand(brand: string) {
+    setForm((c) => ({ ...c, subBrands: c.subBrands.filter((b) => b !== brand) }));
   }
 
   function openCreate() {
     setEditingId(null);
-    setForm({
-      materialCode: "",
-      description: "",
-      uom: "",
-      defaultWeightUOM: "KG",
-      conversionValue: "",
-      mappedCustomerIds: [],
-      status: "active",
-    });
+    setFormError("");
+    setSubBrandInput("");
+    setForm({ description: "", hsnCode: "", uom: "", defaultWeightUOM: "MT", conversionValue: "", subBrands: [], mappedCustomerIds: [], status: "active" });
     setOpen(true);
   }
 
   function openEdit(material: TenantMaterial) {
     setEditingId(material.id);
+    setFormError("");
+    setSubBrandInput("");
     setForm({
-      materialCode: material.materialCode,
       description: material.description,
+      hsnCode: material.hsnCode ?? "",
       uom: material.quantityUOM ?? material.uom,
-      defaultWeightUOM: material.defaultWeightUOM ?? "KG",
+      defaultWeightUOM: material.defaultWeightUOM ?? "MT",
       conversionValue: material.conversionValue != null ? String(material.conversionValue) : "",
+      subBrands: material.subBrands ?? [],
       mappedCustomerIds: material.mappedCustomerIds,
       status: material.status,
     });
@@ -311,235 +384,242 @@ export function TenantMaterialsPage() {
   }
 
   function saveMaterial() {
-    if (!form.materialCode.trim() || !form.description.trim() || !form.uom.trim() || !form.defaultWeightUOM.trim()) {
-      setMessage("Enter material code, description, quantity UOM, and weight UOM.");
-      return;
-    }
+    if (!form.description.trim()) { setFormError("Material Name is required."); return; }
+    if (!form.uom.trim()) { setFormError("Quantity UOM is required."); return; }
+    if (!form.defaultWeightUOM.trim()) { setFormError("Weight UOM is required."); return; }
     const conversionValue = Number(form.conversionValue);
-    if (!Number.isFinite(conversionValue) || conversionValue <= 0) {
-      setMessage("Enter valid conversion mapping.");
-      return;
+    if (!Number.isFinite(conversionValue) || conversionValue <= 0) { setFormError("Enter a valid conversion value (e.g. 0.05 for 1 BAG = 0.05 MT)."); return; }
+    setFormError("");
+    // materialCode is kept for backward compat — auto-derived from name.
+    const autoCode = form.description.trim().toUpperCase().replace(/\s+/g, "_").slice(0, 20);
+    const payload = {
+      materialCode: autoCode,
+      description: form.description.trim(),
+      hsnCode: form.hsnCode.trim() || null,
+      uom: form.uom,
+      quantityUOM: form.uom,
+      defaultWeightUOM: form.defaultWeightUOM,
+      conversionValue,
+      subBrands: form.subBrands,
+      mappedCustomerIds: form.mappedCustomerIds,
+      status: form.status,
+    };
+    if (editingId) {
+      updateMaterial(editingId, payload);
+    } else {
+      createMaterial(payload);
     }
-
-    try {
-      const payload = {
-        ...form,
-        quantityUOM: form.uom,
-        defaultWeightUOM: form.defaultWeightUOM,
-        conversionValue,
-      };
-      if (editingId) {
-        updateMaterial(editingId, payload);
-        setMessage("Material updated and persisted.");
-      } else {
-        createMaterial(payload);
-        setMessage("Material created and persisted.");
-      }
-      setOpen(false);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Material could not be saved.");
-    }
+    setOpen(false);
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Tenant Admin"
+        eyebrow="Master Data"
         title="Material Master"
-        description="Maintain centrally managed tenant materials and map them to one or more customers."
-        action={
-          <Button onClick={openCreate} disabled={!availableForTenant}>
-            Add Material
-          </Button>
-        }
+        description="Materials, sub-brands, UOM, and conversion mapping."
+        action={<Button onClick={openCreate}>Add Material</Button>}
       />
-
-      <MasterDataAccessBanner
-        enabledModuleCodes={enabledModuleCodes}
-        requiredModules={["TMS"]}
-        disabledMessage="Material master stays visible here, but create and edit actions are disabled until TMS is enabled for this tenant."
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <TenantSummaryCard label="Materials" value={String(materials.length)} helper="Tenant master-data records" />
-        <TenantSummaryCard label="Mapped customers" value={String(new Set(materials.flatMap((item) => item.mappedCustomerIds)).size)} helper="Customers already linked to materials" />
-        <TenantSummaryCard label="Booking preview" value={previewMaterials.length ? `${previewMaterials.length} shown` : "No mapping"} helper="UI-only filtered material simulation" />
-      </div>
-
-      {message ? <StatusBanner message={message} /> : null}
 
       <TenantFilterBar
         searchValue={search}
-        searchPlaceholder="Search materials by code, quantity UOM, weight UOM, or mapping"
+        searchPlaceholder="Search by name, sub-brand, UOM, HSN…"
         onSearchChange={setSearch}
-        trailing={<div className="text-sm text-muted-foreground">{filteredMaterials.length} records shown</div>}
+        trailing={<span className="text-sm text-muted-foreground">{filteredMaterials.length} materials</span>}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        {filteredMaterials.length ? (
-          <DataTable
-            title="Material master"
-            description="Materials stay centrally maintained here and are filtered by customer mapping in downstream booking UI."
-            headers={["Material", "Quantity UOM", "Weight UOM", "Mapping", "Mapped customers", "Status", "Actions"]}
-            rows={filteredMaterials.map((item) => [
-              <div key={`${item.id}-material`} className="min-w-[180px]">
-                <p className="font-medium">{item.materialCode}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-              </div>,
-              <Badge key={`${item.id}-uom`} variant="outline">
-                {item.quantityUOM ?? item.uom}
-              </Badge>,
-              <Badge key={`${item.id}-weight-uom`} variant="accent">
-                {item.defaultWeightUOM ?? "KG"}
-              </Badge>,
-              <span key={`${item.id}-mapping`} className="text-sm text-muted-foreground">
-                1 {item.quantityUOM ?? item.uom} = {item.conversionValue ?? 0} {item.defaultWeightUOM ?? "KG"}
-              </span>,
-              <div key={`${item.id}-customers`} className="flex flex-wrap gap-1.5">
-                {item.mappedCustomerIds.length ? (
-                  item.mappedCustomerIds.map((customerId) => (
-                    <Badge key={`${item.id}-${customerId}`} variant="accent">
-                      {customerMap.get(customerId)?.name ?? customerId}
-                    </Badge>
+      {filteredMaterials.length ? (
+        <DataTable
+          title=""
+          description=""
+          headers={["Material Name", "Sub-Brands", "Qty UOM", "Weight UOM", "Conversion", "Mapped Customers", "Status", "Actions"]}
+          rows={filteredMaterials.map((item) => [
+            // Material Name
+            <div key={`${item.id}-name`} className="min-w-[140px]">
+              <p className="font-semibold text-slate-900">{item.description}</p>
+              {item.hsnCode ? <p className="text-[11px] text-slate-400">HSN: {item.hsnCode}</p> : null}
+            </div>,
+            // Sub-Brands
+            <div key={`${item.id}-sb`} className="flex flex-wrap gap-1 min-w-[120px]">
+              {(item.subBrands ?? []).length > 0
+                ? (item.subBrands ?? []).map((sb) => (
+                    <span key={sb} className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700">{sb}</span>
                   ))
-                ) : (
-                  <Badge variant="warning">No customer mapping</Badge>
-                )}
-              </div>,
-              <Badge key={`${item.id}-status`} variant={item.status === "active" ? "success" : "warning"}>
-                {item.status}
-              </Badge>,
-              <Button key={`${item.id}-edit`} size="sm" variant="ghost" onClick={() => openEdit(item)} disabled={!availableForTenant}>
-                Edit
-              </Button>,
-            ])}
-          />
-        ) : (
-          <TenantEmptyState
-            title="No materials found"
-            description="Create the first material master record and map it to one or more customers."
-            action={availableForTenant ? <Button onClick={openCreate}>Add Material</Button> : null}
-          />
-        )}
-
-        <TenantPanel
-          title="Booking material preview"
-          description="UI-only simulation of the material filtering rule described in the BRD."
-        >
-          <div className="space-y-4">
-            <Field label="Customer">
-              <Select value={previewCustomerId} onChange={(event) => setPreviewCustomerId(event.target.value)}>
-                <option value="">Select customer</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <div className="rounded-2xl border bg-muted/20 p-4">
-              <p className="text-sm font-medium">Materials shown for booking</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {previewMaterials.length ? (
-                  previewMaterials.map((material) => (
-                    <Badge key={material.id} variant="accent">
-                      {material.materialCode}
-                    </Badge>
+                : <span className="text-[11px] text-slate-400">—</span>}
+            </div>,
+            // Qty UOM
+            <Badge key={`${item.id}-uom`} variant="outline">{item.quantityUOM ?? item.uom}</Badge>,
+            // Weight UOM
+            <Badge key={`${item.id}-wuom`} variant="accent">{item.defaultWeightUOM ?? "KG"}</Badge>,
+            // Conversion
+            <span key={`${item.id}-conv`} className="text-sm text-slate-600">
+              1 {item.quantityUOM ?? item.uom} = {item.conversionValue ?? 0} {item.defaultWeightUOM ?? "KG"}
+            </span>,
+            // Mapped Customers
+            <div key={`${item.id}-cust`} className="flex flex-wrap gap-1">
+              {item.mappedCustomerIds.length
+                ? item.mappedCustomerIds.map((cid) => (
+                    <span key={cid} className="rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
+                      {customerMap.get(cid)?.name ?? cid}
+                    </span>
                   ))
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    {previewCustomerId
-                      ? "No mapped materials are currently available for the selected customer."
-                      : "Select a customer to preview mapped materials."}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </TenantPanel>
-      </div>
+                : <span className="text-[11px] text-slate-400">—</span>}
+            </div>,
+            // Status
+            <Badge key={`${item.id}-status`} variant={item.status === "active" ? "success" : "warning"}>
+              {item.status}
+            </Badge>,
+            // Actions
+            <Button key={`${item.id}-edit`} size="sm" variant="ghost" onClick={() => openEdit(item)}>Edit</Button>,
+          ])}
+        />
+      ) : (
+        <TenantEmptyState
+          title="No materials found"
+          description="Add a material to get started."
+          action={<Button onClick={openCreate}>Add Material</Button>}
+        />
+      )}
 
+      {/* Add / Edit Material Dialog */}
       <Dialog
         open={open}
         onOpenChange={setOpen}
-        title={editingId ? "Edit material" : "Add material"}
-        description="Define quantity UOM, default weight UOM, and conversion mapping so booking can auto-calculate weight."
-        widthClassName="max-w-3xl"
+        title={editingId ? "Edit Material" : "Add Material"}
+        description=""
+        widthClassName="max-w-2xl"
         footer={
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveMaterial} disabled={!availableForTenant}>
-              {editingId ? "Save Changes" : "Create Material"}
-            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={saveMaterial}>{editingId ? "Save Changes" : "Create Material"}</Button>
           </div>
         }
       >
-        <div className="grid gap-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Material code" helper="Required. This is the tenant-facing unique reference hint.">
-              <Input value={form.materialCode} onChange={(event) => setForm((current) => ({ ...current, materialCode: event.target.value }))} />
+        <div className="space-y-4">
+          {formError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">{formError}</div>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {/* Material Name */}
+            <div className="sm:col-span-2">
+              <Field label="Material Name *">
+                <Input
+                  value={form.description}
+                  onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
+                  placeholder="e.g. Cement"
+                />
+              </Field>
+            </div>
+
+            {/* HSN Code */}
+            <Field label="HSN Code">
+              <Input
+                value={form.hsnCode}
+                onChange={(e) => setForm((c) => ({ ...c, hsnCode: e.target.value }))}
+                placeholder="e.g. 25232930"
+              />
             </Field>
-            <Field label="UOM" helper="Required. Quantity UOMs come from the tenant UOM configuration master.">
-              <Select value={form.uom} onChange={(event) => setForm((current) => ({ ...current, uom: event.target.value }))}>
-                <option value="">Select quantity UOM</option>
-                {quantityUOMOptions.map((uom) => (
-                  <option key={uom} value={uom}>
-                    {uom}
-                  </option>
-                ))}
+
+            {/* Qty UOM */}
+            <Field label="Quantity UOM *">
+              <Select value={form.uom} onChange={(e) => setForm((c) => ({ ...c, uom: e.target.value }))}>
+                <option value="">Select</option>
+                {quantityUOMOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
               </Select>
             </Field>
-            <Field label="Weight UOM" helper="Default booking weight unit for this material.">
-              <Select value={form.defaultWeightUOM} onChange={(event) => setForm((current) => ({ ...current, defaultWeightUOM: event.target.value }))}>
-                <option value="">Select weight UOM</option>
-                {uomDefinitions.filter((definition) => definition.category === "WEIGHT" && definition.status === "active").map((definition) => (
-                  <option key={definition.id} value={definition.code}>
-                    {definition.code}
-                  </option>
-                ))}
+
+            {/* Weight UOM */}
+            <Field label="Weight UOM *">
+              <Select value={form.defaultWeightUOM} onChange={(e) => setForm((c) => ({ ...c, defaultWeightUOM: e.target.value }))}>
+                <option value="">Select</option>
+                {weightUOMOptions.map((uom) => <option key={uom} value={uom}>{uom}</option>)}
               </Select>
+            </Field>
+
+            {/* Conversion */}
+            <Field label="Conversion Mapping *">
+              <Input
+                value={form.conversionValue}
+                onChange={(e) => setForm((c) => ({ ...c, conversionValue: e.target.value }))}
+                placeholder={`e.g. 0.05 → 1 ${form.uom || "BAG"} = 0.05 ${form.defaultWeightUOM || "MT"}`}
+              />
+              {form.uom && form.defaultWeightUOM && form.conversionValue ? (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Preview: 1 {form.uom} = {form.conversionValue} {form.defaultWeightUOM}
+                </p>
+              ) : null}
             </Field>
           </div>
-          {duplicateCode ? <ValidationHint text="A material with this code already exists. This is a non-blocking frontend hint." /> : null}
-          <Field label="Description" helper="Required. Use the customer-facing material description.">
-            <Input value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} />
+
+          {/* Sub-Brands */}
+          <Field label="Sub-Brands (optional)">
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={subBrandInput}
+                  onChange={(e) => setSubBrandInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubBrand(); } }}
+                  placeholder="e.g. OPC, PPC, White Cement"
+                  className="flex-1"
+                />
+                <Button type="button" size="sm" variant="outline" onClick={addSubBrand} disabled={!subBrandInput.trim()}>
+                  Add
+                </Button>
+              </div>
+              {form.subBrands.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {form.subBrands.map((sb) => (
+                    <span key={sb} className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-medium text-slate-700">
+                      {sb}
+                      <button
+                        type="button"
+                        onClick={() => removeSubBrand(sb)}
+                        className="text-slate-400 hover:text-red-500"
+                        aria-label={`Remove ${sb}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400">No sub-brands added. Type a name and press Add or Enter.</p>
+              )}
+            </div>
           </Field>
-          <Field label="Conversion Mapping" helper="Example: 1 BAG = 0.05 MT">
-            <Input value={form.conversionValue} onChange={(event) => setForm((current) => ({ ...current, conversionValue: event.target.value }))} />
-          </Field>
-          <Field label="Mapped customers" helper="Select one or more customers. Unmapped materials will not appear in the booking preview for that customer.">
-            <div className="grid max-h-[260px] gap-3 overflow-y-auto rounded-2xl border bg-muted/20 p-4 md:grid-cols-2">
+
+          {/* Mapped Customers */}
+          <Field label="Mapped Customers">
+            <div className="grid max-h-[200px] gap-2 overflow-y-auto rounded-lg border bg-muted/10 p-3 sm:grid-cols-2">
               {customers.length ? (
                 customers.map((customer) => (
                   <label
                     key={customer.id}
-                    className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${
+                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-[13px] transition ${
                       form.mappedCustomerIds.includes(customer.id)
-                        ? "border-primary/40 bg-primary/5"
-                        : "bg-background/80 hover:border-primary/20"
+                        ? "border-primary/40 bg-primary/5 font-medium"
+                        : "border-slate-200 hover:border-slate-300"
                     }`}
                   >
                     <input
                       type="checkbox"
                       checked={form.mappedCustomerIds.includes(customer.id)}
                       onChange={() => toggleCustomer(customer.id)}
-                      className="mt-1"
+                      className="size-3.5 accent-primary"
                     />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{customer.name}</p>
-                      <p className="text-xs text-muted-foreground">{customer.code ?? "No code"}</p>
-                    </div>
+                    <span className="truncate">{customer.name}</span>
                   </label>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">No tenant customers exist yet.</p>
+                <p className="text-[12px] text-slate-400">No customers configured yet.</p>
               )}
             </div>
           </Field>
+
+          {/* Status */}
           <Field label="Status">
-            <Select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as TenantMaterial["status"] }))}>
+            <Select value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value as TenantMaterial["status"] }))}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </Select>
@@ -567,7 +647,6 @@ export function TenantUOMConfigurationPage() {
   const [editingDefinition, setEditingDefinition] = useState<TenantUOMDefinition | null>(null);
   const [editingMapping, setEditingMapping] = useState<TenantUOMMapping | null>(null);
   const [message, setMessage] = useState("");
-  const [search, setSearch] = useState("");
   const [definitionForm, setDefinitionForm] = useState({
     category: "QUANTITY" as TenantUOMDefinition["category"],
     code: "",
@@ -584,96 +663,63 @@ export function TenantUOMConfigurationPage() {
 
   const enabledModuleCodes = getAccessibleModuleCodes(tenant.enabledModuleCodes, modules);
   const availableForTenant = enabledModuleCodes.includes("TMS");
-  const quantityDefinitions = useMemo(
-    () => definitions.filter((definition) => definition.category === "QUANTITY"),
-    [definitions],
-  );
-  const weightDefinitions = useMemo(
-    () => definitions.filter((definition) => definition.category === "WEIGHT"),
-    [definitions],
-  );
-  const quantityCodes = quantityDefinitions.map((definition) => definition.code);
-  const weightCodes = weightDefinitions.map((definition) => definition.code);
-  const filteredMappings = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-    if (!normalizedSearch) {
-      return mappings;
-    }
-    return mappings.filter((mapping) =>
-      `${mapping.quantityUOM} ${mapping.weightUOM} ${mapping.conversionValue}`
-        .toLowerCase()
-        .includes(normalizedSearch),
-    );
-  }, [mappings, search]);
+  const quantityDefinitions = useMemo(() => definitions.filter((d) => d.category === "QUANTITY"), [definitions]);
+  const weightDefinitions = useMemo(() => definitions.filter((d) => d.category === "WEIGHT"), [definitions]);
+  const quantityCodes = quantityDefinitions.map((d) => d.code);
+  const weightCodes = weightDefinitions.map((d) => d.code);
+  const mappingPreview =
+    mappingForm.quantityUOM && mappingForm.weightUOM && mappingForm.conversionValue
+      ? `1 ${mappingForm.quantityUOM} = ${mappingForm.conversionValue} ${mappingForm.weightUOM}`
+      : null;
 
   function openCreateDefinition(category: TenantUOMDefinition["category"]) {
     setEditingDefinition(null);
-    setDefinitionForm({
-      category,
-      code: "",
-      label: "",
-      isCustom: false,
-      status: "active",
-    });
+    setDefinitionForm({ category, code: "", label: "", isCustom: false, status: "active" });
     setDefinitionOpen(true);
   }
 
   function openEditDefinition(definition: TenantUOMDefinition) {
     setEditingDefinition(definition);
-    setDefinitionForm({
-      category: definition.category,
-      code: definition.code,
-      label: definition.label,
-      isCustom: Boolean(definition.isCustom),
-      status: definition.status,
-    });
+    setDefinitionForm({ category: definition.category, code: definition.code, label: definition.code, isCustom: Boolean(definition.isCustom), status: definition.status });
     setDefinitionOpen(true);
   }
 
   function saveDefinition() {
-    if (!definitionForm.code.trim() || !definitionForm.label.trim()) {
-      setMessage("Enter both UOM code and label.");
+    if (!definitionForm.code.trim()) {
+      setMessage("Enter UOM name.");
       return;
     }
     try {
+      const name = definitionForm.code.trim().toUpperCase();
+      const payload = { ...definitionForm, code: name, label: name };
       if (editingDefinition) {
-        updateDefinition(editingDefinition.id, definitionForm);
-        setMessage("UOM definition updated.");
+        updateDefinition(editingDefinition.id, payload);
+        setMessage("UOM updated.");
       } else {
-        createDefinition(definitionForm);
-        setMessage("UOM definition created.");
+        createDefinition(payload);
+        setMessage("UOM created.");
       }
       setDefinitionOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "UOM definition could not be saved.");
+      setMessage(error instanceof Error ? error.message : "UOM could not be saved.");
     }
   }
 
   function openCreateMapping() {
     setEditingMapping(null);
-    setMappingForm({
-      quantityUOM: quantityCodes[0] ?? "",
-      weightUOM: weightCodes[0] ?? "",
-      conversionValue: "",
-      status: "active",
-    });
+    setMappingForm({ quantityUOM: quantityCodes[0] ?? "", weightUOM: weightCodes[0] ?? "", conversionValue: "", status: "active" });
     setMappingOpen(true);
   }
 
   function openEditMapping(mapping: TenantUOMMapping) {
     setEditingMapping(mapping);
-    setMappingForm({
-      quantityUOM: mapping.quantityUOM,
-      weightUOM: mapping.weightUOM,
-      conversionValue: String(mapping.conversionValue),
-      status: mapping.status,
-    });
+    setMappingForm({ quantityUOM: mapping.quantityUOM, weightUOM: mapping.weightUOM, conversionValue: String(mapping.conversionValue), status: mapping.status });
     setMappingOpen(true);
   }
 
   function saveMapping() {
     if (!mappingForm.quantityUOM || !mappingForm.weightUOM) {
-      setMessage("Select both quantity and weight UOM.");
+      setMessage("Select both Quantity UOM and Weight UOM.");
       return;
     }
     const conversionValue = Number(mappingForm.conversionValue);
@@ -682,301 +728,226 @@ export function TenantUOMConfigurationPage() {
       return;
     }
     try {
-      const payload = {
-        quantityUOM: mappingForm.quantityUOM,
-        weightUOM: mappingForm.weightUOM,
-        conversionValue,
-        status: mappingForm.status,
-      };
+      const payload = { quantityUOM: mappingForm.quantityUOM, weightUOM: mappingForm.weightUOM, conversionValue, status: mappingForm.status };
       if (editingMapping) {
         updateMapping(editingMapping.id, payload);
-        setMessage("UOM mapping updated.");
+        setMessage("UOM Mapping updated.");
       } else {
         createMapping(payload);
-        setMessage("UOM mapping created.");
+        setMessage("UOM Mapping created.");
       }
       setMappingOpen(false);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "UOM mapping could not be saved.");
+      setMessage(error instanceof Error ? error.message : "UOM Mapping could not be saved.");
     }
   }
 
+  const definitionDialogTitle = editingDefinition
+    ? `Edit ${definitionForm.category === "QUANTITY" ? "Quantity" : "Weight"} UOM`
+    : `Add ${definitionForm.category === "QUANTITY" ? "Quantity" : "Weight"} UOM`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
-        eyebrow="Tenant Admin"
+        eyebrow="Administration"
         title="UOM Configuration"
-        description="Maintain quantity UOMs, weight UOMs, and global conversion defaults that downstream customer overrides and booking use."
         action={
-          <Button onClick={openCreateMapping} disabled={!availableForTenant || !quantityCodes.length || !weightCodes.length}>
-            Add UOM Mapping
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => openCreateDefinition("QUANTITY")} disabled={!availableForTenant}>
+              Add Quantity UOM
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => openCreateDefinition("WEIGHT")} disabled={!availableForTenant}>
+              Add Weight UOM
+            </Button>
+            <Button size="sm" onClick={openCreateMapping} disabled={!availableForTenant || !quantityCodes.length || !weightCodes.length}>
+              Add UOM Mapping
+            </Button>
+          </div>
         }
       />
 
-      <MasterDataAccessBanner
-        enabledModuleCodes={enabledModuleCodes}
-        requiredModules={["TMS"]}
-        disabledMessage="UOM configuration stays visible here, but create and edit actions are disabled until TMS is enabled for this tenant."
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <TenantSummaryCard label="Quantity UOMs" value={String(quantityDefinitions.length)} helper="Load-facing units like bag, drum, pallet" />
-        <TenantSummaryCard label="Weight UOMs" value={String(weightDefinitions.length)} helper="Weight units like KG, MT, Pounds" />
-        <TenantSummaryCard label="Global mappings" value={String(mappings.length)} helper="Default quantity-to-weight conversions" />
-      </div>
-
       {message ? <StatusBanner message={message} /> : null}
 
-      <div className="grid gap-3">
-        <ValidationHint text="Customer-specific overrides take precedence over these defaults." />
-        <ValidationHint text="Booking uses the resolved UOM mapping to auto-calculate shipment weight." />
+      <div className="grid gap-4 md:grid-cols-3">
+        {/* Quantity UOM */}
+        <div className="rounded-2xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <span className="text-sm font-semibold">Quantity UOM</span>
+            <Button size="sm" variant="ghost" onClick={() => openCreateDefinition("QUANTITY")} disabled={!availableForTenant}>+ Add</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {quantityDefinitions.length ? (
+                quantityDefinitions.map((d) => (
+                  <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2 font-semibold">{d.code}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant={d.status === "active" ? "success" : "warning"}>{d.status}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" variant="ghost" onClick={() => openEditDefinition(d)} disabled={!availableForTenant}>Edit</Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-sm text-muted-foreground">No records</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Weight UOM */}
+        <div className="rounded-2xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <span className="text-sm font-semibold">Weight UOM</span>
+            <Button size="sm" variant="ghost" onClick={() => openCreateDefinition("WEIGHT")} disabled={!availableForTenant}>+ Add</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Name</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {weightDefinitions.length ? (
+                weightDefinitions.map((d) => (
+                  <tr key={d.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2 font-semibold">{d.code}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant={d.status === "active" ? "success" : "warning"}>{d.status}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <Button size="sm" variant="ghost" onClick={() => openEditDefinition(d)} disabled={!availableForTenant}>Edit</Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-sm text-muted-foreground">No records</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* UOM Mapping */}
+        <div className="rounded-2xl border bg-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <span className="text-sm font-semibold">UOM Mapping</span>
+            <Button size="sm" variant="ghost" onClick={openCreateMapping} disabled={!availableForTenant || !quantityCodes.length || !weightCodes.length}>+ Add</Button>
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Mapping</th>
+                <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {mappings.length ? (
+                mappings.map((m) => (
+                  <tr key={m.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-2 font-medium">1 {m.quantityUOM} = {m.conversionValue} {m.weightUOM}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant={m.status === "active" ? "success" : "warning"}>{m.status}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => openEditMapping(m)} disabled={!availableForTenant}>Edit</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { deleteMapping(m.id); setMessage("UOM Mapping deleted."); }} disabled={!availableForTenant}>Delete</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="px-4 py-6 text-center text-sm text-muted-foreground">No records</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <TenantPanel
-          title="Quantity UOM Master"
-          description="Create tenant-approved quantity units for material and booking quantity capture."
-          action={
-            <Button size="sm" onClick={() => openCreateDefinition("QUANTITY")} disabled={!availableForTenant}>
-              Add Quantity UOM
-            </Button>
-          }
-        >
-          <div className="flex flex-wrap gap-2">
-            {quantityDefinitions.length ? (
-              quantityDefinitions.map((definition) => (
-                <button
-                  type="button"
-                  key={definition.id}
-                  onClick={() => openEditDefinition(definition)}
-                  className="rounded-full border bg-background px-3 py-2 text-sm transition hover:border-primary/30"
-                  disabled={!availableForTenant}
-                >
-                  {definition.code}
-                  {definition.isCustom ? " (Custom)" : ""}
-                </button>
-              ))
-            ) : (
-              <span className="text-sm text-muted-foreground">No quantity UOMs configured yet.</span>
-            )}
-          </div>
-        </TenantPanel>
-
-        <TenantPanel
-          title="Weight UOM Master"
-          description="Define the weight units allowed in conversion defaults and booking."
-          action={
-            <Button size="sm" onClick={() => openCreateDefinition("WEIGHT")} disabled={!availableForTenant}>
-              Add Weight UOM
-            </Button>
-          }
-        >
-          <div className="flex flex-wrap gap-2">
-            {weightDefinitions.length ? (
-              weightDefinitions.map((definition) => (
-                <button
-                  type="button"
-                  key={definition.id}
-                  onClick={() => openEditDefinition(definition)}
-                  className="rounded-full border bg-background px-3 py-2 text-sm transition hover:border-primary/30"
-                  disabled={!availableForTenant}
-                >
-                  {definition.code}
-                </button>
-              ))
-            ) : (
-              <span className="text-sm text-muted-foreground">No weight UOMs configured yet.</span>
-            )}
-          </div>
-        </TenantPanel>
-      </div>
-
-      <TenantFilterBar
-        searchValue={search}
-        searchPlaceholder="Search UOM mappings by quantity unit, weight unit, or conversion"
-        onSearchChange={setSearch}
-        trailing={<div className="text-sm text-muted-foreground">{filteredMappings.length} mappings shown</div>}
-      />
-
-      {filteredMappings.length ? (
-        <DataTable
-          title="Global UOM Mapping"
-          description="These are the tenant default conversions used when a customer-specific override does not exist."
-          headers={["Quantity UOM", "Weight UOM", "Conversion", "Status", "Actions"]}
-          rows={filteredMappings.map((mapping) => [
-            <Badge key={`${mapping.id}-qty`} variant="outline">
-              {mapping.quantityUOM}
-            </Badge>,
-            <Badge key={`${mapping.id}-weight`} variant="accent">
-              {mapping.weightUOM}
-            </Badge>,
-            <span key={`${mapping.id}-conversion`} className="text-sm font-medium">
-              1 {mapping.quantityUOM} = {mapping.conversionValue} {mapping.weightUOM}
-            </span>,
-            <Badge key={`${mapping.id}-status`} variant={mapping.status === "active" ? "success" : "warning"}>
-              {mapping.status}
-            </Badge>,
-            <div key={`${mapping.id}-actions`} className="flex gap-2">
-              <Button size="sm" variant="ghost" onClick={() => openEditMapping(mapping)} disabled={!availableForTenant}>
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  deleteMapping(mapping.id);
-                  setMessage("UOM mapping deleted.");
-                }}
-                disabled={!availableForTenant}
-              >
-                Delete
-              </Button>
-            </div>,
-          ])}
-        />
-      ) : (
-        <TenantEmptyState
-          title="No UOM mappings found"
-          description="Create the first global quantity-to-weight conversion default for downstream booking auto-calculation."
-          action={availableForTenant ? <Button onClick={openCreateMapping}>Add UOM Mapping</Button> : null}
-        />
-      )}
-
+      {/* Add / Edit UOM Definition */}
       <Dialog
         open={definitionOpen}
         onOpenChange={setDefinitionOpen}
-        title={editingDefinition ? "Edit UOM definition" : "Add UOM definition"}
-        description="UOM definitions become reusable choices across master data, customer overrides, and booking."
+        title={definitionDialogTitle}
         footer={
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setDefinitionOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveDefinition} disabled={!availableForTenant}>
-              {editingDefinition ? "Save Changes" : "Create UOM"}
-            </Button>
+            <Button variant="outline" onClick={() => setDefinitionOpen(false)}>Cancel</Button>
+            <Button onClick={saveDefinition} disabled={!availableForTenant}>Save</Button>
           </div>
         }
       >
         <div className="grid gap-4">
-          <Field label="Category">
+          <Field label="Name">
+            <Input
+              value={definitionForm.code}
+              onChange={(event) => setDefinitionForm((current) => ({ ...current, code: event.target.value }))}
+              placeholder={definitionForm.category === "QUANTITY" ? "BAG" : "KG"}
+            />
+          </Field>
+          <Field label="Status">
             <Select
-              value={definitionForm.category}
-              onChange={(event) =>
-                setDefinitionForm((current) => ({
-                  ...current,
-                  category: event.target.value as TenantUOMDefinition["category"],
-                }))
-              }
+              value={definitionForm.status}
+              onChange={(event) => setDefinitionForm((current) => ({ ...current, status: event.target.value as TenantUOMDefinition["status"] }))}
             >
-              <option value="QUANTITY">Quantity UOM</option>
-              <option value="WEIGHT">Weight UOM</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
             </Select>
           </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Code" helper="Stored in uppercase for consistent matching.">
-              <Input value={definitionForm.code} onChange={(event) => setDefinitionForm((current) => ({ ...current, code: event.target.value }))} />
-            </Field>
-            <Field label="Label">
-              <Input value={definitionForm.label} onChange={(event) => setDefinitionForm((current) => ({ ...current, label: event.target.value }))} />
-            </Field>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Status">
-              <Select
-                value={definitionForm.status}
-                onChange={(event) =>
-                  setDefinitionForm((current) => ({
-                    ...current,
-                    status: event.target.value as TenantUOMDefinition["status"],
-                  }))
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Select>
-            </Field>
-            <FlowToggle
-              label="Custom UOM"
-              description="Use this when the unit is tenant-defined rather than a standard unit."
-              checked={definitionForm.isCustom}
-              onCheckedChange={(checked) => setDefinitionForm((current) => ({ ...current, isCustom: checked }))}
-            />
-          </div>
         </div>
       </Dialog>
 
+      {/* Add / Edit UOM Mapping */}
       <Dialog
         open={mappingOpen}
         onOpenChange={setMappingOpen}
-        title={editingMapping ? "Edit UOM mapping" : "Add UOM mapping"}
-        description="Set the default quantity-to-weight conversion used by booking unless the customer has an override."
+        title={editingMapping ? "Edit UOM Mapping" : "Add UOM Mapping"}
         footer={
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setMappingOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={saveMapping} disabled={!availableForTenant}>
-              {editingMapping ? "Save Changes" : "Create Mapping"}
-            </Button>
+            <Button variant="outline" onClick={() => setMappingOpen(false)}>Cancel</Button>
+            <Button onClick={saveMapping} disabled={!availableForTenant}>Save</Button>
           </div>
         }
       >
         <div className="grid gap-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Quantity UOM">
-              <Select
-                value={mappingForm.quantityUOM}
-                onChange={(event) => setMappingForm((current) => ({ ...current, quantityUOM: event.target.value }))}
-              >
-                <option value="">Select quantity UOM</option>
-                {quantityCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
+              <Select value={mappingForm.quantityUOM} onChange={(event) => setMappingForm((current) => ({ ...current, quantityUOM: event.target.value }))}>
+                <option value="">Select Quantity UOM</option>
+                {quantityCodes.map((code) => <option key={code} value={code}>{code}</option>)}
               </Select>
             </Field>
             <Field label="Weight UOM">
-              <Select
-                value={mappingForm.weightUOM}
-                onChange={(event) => setMappingForm((current) => ({ ...current, weightUOM: event.target.value }))}
-              >
-                <option value="">Select weight UOM</option>
-                {weightCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
-                  </option>
-                ))}
+              <Select value={mappingForm.weightUOM} onChange={(event) => setMappingForm((current) => ({ ...current, weightUOM: event.target.value }))}>
+                <option value="">Select Weight UOM</option>
+                {weightCodes.map((code) => <option key={code} value={code}>{code}</option>)}
               </Select>
             </Field>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Conversion Value" helper="Example: 0.05 means 1 quantity unit = 0.05 weight units.">
-              <Input
-                type="number"
-                min="0"
-                step="0.0001"
-                value={mappingForm.conversionValue}
-                onChange={(event) => setMappingForm((current) => ({ ...current, conversionValue: event.target.value }))}
-              />
-            </Field>
-            <Field label="Status">
-              <Select
-                value={mappingForm.status}
-                onChange={(event) =>
-                  setMappingForm((current) => ({
-                    ...current,
-                    status: event.target.value as TenantUOMMapping["status"],
-                  }))
-                }
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Select>
-            </Field>
-          </div>
+          <Field label="Conversion Value">
+            <Input type="number" min="0" step="0.0001" value={mappingForm.conversionValue} onChange={(event) => setMappingForm((current) => ({ ...current, conversionValue: event.target.value }))} placeholder="0.05" />
+          </Field>
+          {mappingPreview ? (
+            <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm font-medium">
+              {mappingPreview}
+            </div>
+          ) : null}
         </div>
       </Dialog>
     </div>
