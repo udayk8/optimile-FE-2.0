@@ -443,7 +443,7 @@ export default function CreateInvoicePage() {
 
       {step === 'review' && (
         <>
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid gap-6">
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-text">Review &amp; edit charges</h3>
@@ -485,49 +485,6 @@ export default function CreateInvoicePage() {
                   </div>
                 )
               })}
-            </div>
-          </div>
-
-          <div className="space-y-4 rounded-2xl border border-gray-200 bg-gray-900 p-6 text-white shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
-                <ReceiptText className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">Review summary</h3>
-                <p className="text-sm text-gray-300">This is the invoice total that will be submitted.</p>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Bookings selected</span>
-                <span>{totals.bookingCount}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Subtotal</span>
-                <span><CurrencyDisplay amount={totals.subtotal} /></span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">GST</span>
-                <span><CurrencyDisplay amount={totals.gstAmount} /></span>
-              </div>
-              <div className="flex justify-between border-t border-white/10 pt-3 text-base font-semibold">
-                <span>Total invoice value</span>
-                <span><CurrencyDisplay amount={totals.grandTotal} /></span>
-              </div>
-              <div className="flex justify-between text-rose-300">
-                <span>Less: Advance</span>
-                <span>- <CurrencyDisplay amount={totals.totalAdvance} /></span>
-              </div>
-              <div className="flex justify-between border-t border-white/10 pt-3 text-base font-bold">
-                <span>Net payable</span>
-                <span><CurrencyDisplay amount={totals.netPayable} /></span>
-              </div>
-            </div>
-
-            <div className="rounded-xl bg-white/5 p-4 text-xs text-gray-300">
-              After submission, this invoice will be created with status <span className="font-semibold text-white">PENDING</span> and move to the invoice list for finance review. Once approved, it can be used in bill discounting.
             </div>
           </div>
         </div>

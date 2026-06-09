@@ -176,7 +176,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         </table>
 
         {/* ── In words + totals ── */}
-        <div className="flex border-t-2" style={{ borderColor: BLUE }}>
+        <div data-pdf-break className="flex border-t-2" style={{ borderColor: BLUE }}>
           <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
             <p className="text-[12px]"><span className="font-bold">In Words:</span> Rupees {amountInWords(netPayable)} Only</p>
           </div>
@@ -218,7 +218,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         </div>
 
         {/* ── Bank details + signatory ── */}
-        <div className="flex border-t-2" style={{ borderColor: BLUE }}>
+        <div data-pdf-break className="flex border-t-2" style={{ borderColor: BLUE }}>
           <div className="w-1/2 border-r-2 p-4 text-[11px]" style={{ borderColor: BLUE }}>
             <p className="font-bold">Bank Details:</p>
             <div className="mt-2 space-y-1.5">
@@ -234,7 +234,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         </div>
 
         {/* ── Declaration ── */}
-        <div className="px-3 py-1.5 text-center text-[11px] font-bold tracking-[0.2em] text-white" style={{ backgroundColor: BLUE }}>
+        <div data-pdf-break className="px-3 py-1.5 text-center text-[11px] font-bold tracking-[0.2em] text-white" style={{ backgroundColor: BLUE }}>
           DECLARATION
         </div>
         <div className="p-4 text-[10px] leading-relaxed text-gray-700">
