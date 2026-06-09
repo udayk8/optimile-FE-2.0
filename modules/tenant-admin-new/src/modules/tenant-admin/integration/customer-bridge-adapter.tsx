@@ -102,7 +102,11 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
     const cityOf = (addressId: string | null | undefined) => {
       if (!addressId) return "-";
       const a = addressById.get(addressId);
-      return a ? `${a.city}` : "-";
+      if (!a) return "-";
+      // "City, State" matches the convention the customer portal UI assumes (it
+      // splits on ',' for the city and uses the state for map geocoding), and
+      // disambiguates same-named cities across different states.
+      return a.state ? `${a.city}, ${a.state}` : a.city;
     };
     const nameOf = (addressId: string | null | undefined) => {
       if (!addressId) return "-";

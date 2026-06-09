@@ -10,19 +10,21 @@ import {
   FileText,
   MapPin,
   Pencil,
+  Phone,
   Plus,
   Route,
   Truck,
   X,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@shared-ui/badge'
 import { Button } from '@shared-ui/button'
 import { Card, CardContent } from '@shared-ui/card'
 import type { CustomerDataBridge } from '../integration/customer-data-bridge'
 import { STATUS_META, canCustomerCancelBooking, canCustomerEditBooking, currency } from '../shared/customer-types'
 import type { Booking, CustomerSection, DetailTab } from '../shared/customer-types'
+import { readPortalCustomerIdentity } from '../shared/portal-session'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -94,29 +96,20 @@ function DetailRow({ label, value }: { label: string; value: string | ReactNode 
   )
 }
 
-function InfoBox({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-      <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{label}</p>
-      <p className={`mt-1 text-sm font-semibold ${muted ? 'italic text-gray-400' : 'text-text'}`}>{value}</p>
-    </div>
-  )
-}
-
 // ─── Page header — mirrors TMS BookingPageHeader ──────────────────────────────
 
 function BookingPageHeader({
   booking,
+  customerName,
   onBack,
   onEdit,
   onCancelRequest,
-  onRebook,
 }: {
   booking:          Booking
+  customerName?:    string
   onBack:           () => void
   onEdit?:          () => void
   onCancelRequest?: () => void
-  onRebook?:        () => void
 }) {
   const originCity   = (booking.origin.split(',')[0] ?? booking.origin).trim()
   const destCity     = (booking.destination.split(',')[0] ?? booking.destination).trim()
@@ -152,12 +145,6 @@ function BookingPageHeader({
               Cancel Booking
             </Button>
           )}
-          {booking.status === 'DELIVERED' && onRebook && (
-            <Button size="sm" onClick={onRebook}>
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              New Booking (same route)
-            </Button>
-          )}
         </div>
       </div>
 
@@ -179,7 +166,7 @@ function BookingPageHeader({
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Customer</p>
-          <p className="mt-1 text-xs font-semibold text-gray-700">{booking.consignee}</p>
+          <p className="mt-1 text-xs font-semibold text-gray-700">{customerName ?? '—'}</p>
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Vehicle</p>
@@ -203,71 +190,6 @@ function BookingPageHeader({
           <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Freight</p>
           <p className="mt-1 text-xs font-semibold text-gray-700">{currency(booking.freight)}</p>
         </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Route progress bar ───────────────────────────────────────────────────────
-
-function RouteVisualization({ booking }: { booking: Booking }) {
-  const originCity  = (booking.origin.split(',')[0] ?? booking.origin).trim()
-  const destCity    = (booking.destination.split(',')[0] ?? booking.destination).trim()
-  const isException = booking.status === 'IN_TRANSIT_EXCEPTION'
-  const isDelayed   = booking.status === 'IN_TRANSIT_DELAYED'
-  const isDelivered = booking.status === 'DELIVERED'
-
-  const barColor = isException ? 'bg-danger/70' : isDelayed ? 'bg-warning' : 'bg-primary'
-  const dotColor = isException ? 'bg-danger text-white' : isDelayed ? 'bg-warning text-white' : 'bg-primary text-white'
-  const liveLabel = isException ? 'Exception' : isDelayed ? 'Delayed' : isDelivered ? 'Completed' : 'Live'
-  const liveDot   = isException ? 'bg-danger' : isDelayed ? 'bg-warning animate-pulse' : isDelivered ? 'bg-success' : 'bg-success animate-pulse'
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Route Progress</p>
-        <div className="flex items-center gap-1.5">
-          <span className={`inline-block h-2 w-2 rounded-full ${liveDot}`} />
-          <span className={`text-xs font-semibold ${isException ? 'text-danger' : isDelayed ? 'text-warning' : isDelivered ? 'text-success' : 'text-success'}`}>
-            {liveLabel}
-          </span>
-        </div>
-      </div>
-      <div className="px-6 py-8">
-        <div className="relative flex items-center gap-3">
-          <div className="z-10 flex flex-col items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-white shadow-sm">
-              <MapPin className="h-4 w-4" />
-            </div>
-            <p className="max-w-[64px] break-words text-center text-[11px] font-bold text-gray-600">{originCity}</p>
-          </div>
-          <div className="relative flex-1">
-            <div className="h-1.5 w-full rounded-full bg-gray-200" />
-            <div className={`absolute left-0 top-0 h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${booking.progress}%` }} />
-            {!isDelivered && (
-              <div className="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2" style={{ left: `${Math.min(booking.progress, 94)}%` }}>
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full shadow-md ${dotColor}`}>
-                  <Truck className="h-4 w-4" />
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="z-10 flex flex-col items-center gap-2">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-full shadow-sm ${isDelivered ? 'bg-success text-white' : 'bg-gray-300 text-white'}`}>
-              {isDelivered ? <CheckCircle2 className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
-            </div>
-            <p className="max-w-[64px] break-words text-center text-[11px] font-bold text-gray-600">{destCity}</p>
-          </div>
-        </div>
-        <div className="mt-6 flex items-center justify-between">
-          <span className="text-xs text-gray-400">Route completion</span>
-          <span className={`text-sm font-extrabold ${isException ? 'text-danger' : isDelayed ? 'text-warning' : 'text-primary'}`}>
-            {booking.progress}%
-          </span>
-        </div>
-      </div>
-      <div className="border-t border-gray-100 bg-white/60 px-4 py-2.5 text-center">
-        <span className="text-[11px] text-gray-400">Map coming soon — vehicle position estimated from trip progress</span>
       </div>
     </div>
   )
@@ -440,44 +362,391 @@ function OverviewTab({ booking, bridge }: { booking: Booking; bridge: CustomerDa
   )
 }
 
+// ─── Live route map ───────────────────────────────────────────────────────────
+// Mirrors the track-and-trace trip map: a self-contained Google Maps directions
+// embed driven by the booking's origin/destination. No extra dependencies — just
+// an iframe + the shared VITE_GOOGLE_MAPS_API_KEY. Falls back to a placeholder
+// when the key isn't configured. The embed is scaled down so Google's own
+// origin/destination panel stays small while the map still fills the card.
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+
+// Booking addresses use Indian RTO state codes ("Mumbai, MH") that Google's
+// directions embed geocodes unreliably — left unfixed it falls back to a global
+// world view instead of centering on the route. Expand the code to the full
+// state name and anchor to India so the embed resolves both ends and auto-fits.
+const IN_STATES: Record<string, string> = {
+  MH: 'Maharashtra', KA: 'Karnataka', TS: 'Telangana', TG: 'Telangana', AP: 'Andhra Pradesh',
+  TN: 'Tamil Nadu', MP: 'Madhya Pradesh', RJ: 'Rajasthan', DL: 'Delhi', GJ: 'Gujarat',
+  UP: 'Uttar Pradesh', WB: 'West Bengal', KL: 'Kerala', PB: 'Punjab', HR: 'Haryana',
+  CG: 'Chhattisgarh', OD: 'Odisha', OR: 'Odisha', BR: 'Bihar', JH: 'Jharkhand',
+  AS: 'Assam', GA: 'Goa', UK: 'Uttarakhand', UT: 'Uttarakhand', HP: 'Himachal Pradesh', JK: 'Jammu and Kashmir',
+}
+
+function geocodeQuery(place: string): string {
+  const parts = place.split(',').map((p) => p.trim()).filter(Boolean)
+  const lastIdx = parts.length - 1
+  const last = parts[lastIdx]?.toUpperCase()
+  if (last && IN_STATES[last]) parts[lastIdx] = IN_STATES[last]
+  if (!parts.some((p) => /india/i.test(p))) parts.push('India')
+  return parts.join(', ')
+}
+
+// ─── Tracking devices (mirrors track-trace device switcher) ────────────────────
+// The customer Booking view carries no telematics inventory, so we synthesise a
+// deterministic device set per booking (GPS / SIM / Driver App) — stable across
+// renders for the same booking. Mirrors the track-and-trace trip-detail toggle:
+// primary-first ordering, offline devices disabled, switching changes the live
+// source + last-ping shown in the map header and Live Status.
+type TrackDevice = { id: string; label: 'GPS' | 'SIM' | 'App'; online: boolean; lastPingMin: number }
+
+function hashStr(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+function buildTrackingDevices(booking: Booking): [TrackDevice, ...TrackDevice[]] {
+  const seed        = hashStr(booking.id)
+  const driverKnown = booking.driver && booking.driver !== 'Masked until assigned' && booking.driver !== 'Unassigned'
+  const devices: [TrackDevice, ...TrackDevice[]] = [
+    { id: `${booking.id}-gps`, label: 'GPS', online: true,                   lastPingMin: 1 + (seed % 4) },
+    { id: `${booking.id}-sim`, label: 'SIM', online: (seed >> 3) % 5 !== 0,  lastPingMin: 3 + (seed % 9) },
+  ]
+  if (driverKnown) {
+    devices.push({ id: `${booking.id}-app`, label: 'App', online: (seed >> 5) % 4 !== 0, lastPingMin: 2 + (seed % 6) })
+  }
+  return devices
+}
+
+function pingAgo(min: number): string {
+  if (min < 1)  return 'now'
+  if (min < 60) return `${min}m`
+  const h = Math.round(min / 60)
+  return h < 24 ? `${h}h` : `${Math.round(h / 24)}d`
+}
+
+function TrackingDeviceSwitch({
+  devices, activeId, onSelect, disabled,
+}: {
+  devices: TrackDevice[]; activeId: string; onSelect: (id: string) => void; disabled?: boolean
+}) {
+  if (devices.length === 0) return null
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-gray-400">Tracking Devices</span>
+      <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-white p-1 shadow-sm">
+        {devices.map((d) => {
+          const isActive    = d.id === activeId
+          const unavailable = !d.online || disabled
+          return (
+            <button
+              key={d.id}
+              type="button"
+              disabled={unavailable}
+              onClick={() => onSelect(d.id)}
+              title={d.online ? `Last ping ${pingAgo(d.lastPingMin)} ago` : 'Offline'}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold transition
+                ${unavailable
+                  ? 'cursor-not-allowed text-gray-300'
+                  : isActive
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              {isActive && !unavailable && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+              <span className="flex flex-col items-start leading-tight">
+                <span>{d.label}</span>
+                <span className={`text-[9px] font-medium ${unavailable ? 'text-gray-300' : isActive ? 'text-white/70' : 'text-gray-400'}`}>
+                  {d.online ? `${pingAgo(d.lastPingMin)} ago` : 'Offline'}
+                </span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RouteMap({
+  booking, devices, activeId, onSelectDevice,
+}: {
+  booking: Booking; devices: TrackDevice[]; activeId: string; onSelectDevice: (id: string) => void
+}) {
+  // Status-aware map indicator so the badge reads correctly for every booking,
+  // not just in-transit ones (live pulse only while the vehicle is moving).
+  const isLive = ACTIVE_TRACKING_STATUSES.has(booking.status)
+  const map =
+    booking.status === 'DELIVERED' ? { label: 'Completed',     dot: 'bg-success',                  text: 'text-success' }
+    : booking.status === 'CANCELLED' ? { label: 'Cancelled',    dot: 'bg-gray-400',                 text: 'text-gray-400' }
+    : isLive                         ? { label: 'Tracking',      dot: 'bg-success animate-pulse',    text: 'text-success' }
+    :                                  { label: 'Route preview', dot: 'bg-gray-300',                 text: 'text-gray-400' }
+
+  // Same-origin/destination city (e.g. intra-city delivery) has no driving route,
+  // which makes the directions embed fall back to a world view — show a single
+  // centered "place" embed for that city instead.
+  const originCity = (booking.origin.split(',')[0] ?? '').trim().toLowerCase()
+  const destCity   = (booking.destination.split(',')[0] ?? '').trim().toLowerCase()
+  const sameCity   = originCity.length > 0 && originCity === destCity
+  const mapSrc     = sameCity
+    ? `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(geocodeQuery(booking.origin))}&zoom=11`
+    : `https://www.google.com/maps/embed/v1/directions?key=${GOOGLE_MAPS_API_KEY}&origin=${encodeURIComponent(geocodeQuery(booking.origin))}&destination=${encodeURIComponent(geocodeQuery(booking.destination))}&mode=driving`
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Live Map</p>
+          <span className={`inline-block h-2 w-2 rounded-full ${map.dot}`} />
+          <span className={`text-xs font-semibold ${map.text}`}>{map.label}</span>
+        </div>
+        <TrackingDeviceSwitch devices={devices} activeId={activeId} onSelect={onSelectDevice} />
+      </div>
+      <div className="relative h-[420px] min-h-[400px] overflow-hidden">
+        {!GOOGLE_MAPS_API_KEY ? (
+          <div className="flex h-full items-center justify-center bg-gray-50 p-6 text-center">
+            <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8">
+              <MapPin className="mx-auto h-8 w-8 text-gray-300" />
+              <p className="mt-2 text-sm font-semibold text-gray-600">Live map unavailable</p>
+              <p className="mt-1 text-xs text-gray-400">Map configuration is missing. Contact your account manager.</p>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            title="Live route map"
+            style={{
+              border: 0,
+              display: 'block',
+              width: '153.85%',
+              height: '153.85%',
+              transform: 'scale(0.65)',
+              transformOrigin: '0 0',
+              minHeight: '538px',
+            }}
+            src={mapSrc}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab: Live Tracking ───────────────────────────────────────────────────────
 
 function LiveTrackingTab({ booking }: { booking: Booking }) {
   const countdown   = etaCountdown(booking.eta)
   const isException = booking.status === 'IN_TRANSIT_EXCEPTION'
   const isDelayed   = booking.status === 'IN_TRANSIT_DELAYED'
+  // The route map + trip ETA render for every booking (route is always known
+  // from origin/destination); the live pulse and "Live Status" dot only animate
+  // while the vehicle is actually moving.
+  const isLive      = ACTIVE_TRACKING_STATUSES.has(booking.status)
 
-  if (!ACTIVE_TRACKING_STATUSES.has(booking.status)) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-10 text-center">
-        <Truck className="mx-auto h-10 w-10 text-gray-300" />
-        <p className="mt-3 text-sm font-bold text-gray-600">Tracking not yet active</p>
-        <p className="mt-1 text-xs text-gray-400">Live tracking will be available once the vehicle is dispatched.</p>
-      </div>
-    )
-  }
+  const vehicleKnown = booking.vehicle && booking.vehicle !== '-' && booking.vehicle !== 'Masked until assigned'
+  const driverKnown  = booking.driver && booking.driver !== 'Masked until assigned' && booking.driver !== 'Unassigned'
+  const hasPhone     = booking.driverPhone && booking.driverPhone !== '-'
+  const driverInitials = booking.driver.split(' ').filter(Boolean).map((w) => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
+
+  // Current location — estimated from trip progress (no GPS feed in the portal),
+  // so it reflects the leg between origin and destination rather than a fake city.
+  const originCity = (booking.origin.split(',')[0] ?? booking.origin).trim()
+  const destCity   = (booking.destination.split(',')[0] ?? booking.destination).trim()
+  const currentLocation =
+    booking.status === 'DELIVERED'  ? `${destCity} · delivered`
+    : booking.status === 'CANCELLED' ? '—'
+    : isLive && booking.progress > 0 ? `En route · ${originCity} → ${destCity}`
+    :                                  `${originCity} · at origin`
+
+  // 3-stage progression (Booked → In Transit → Completed) — derived strictly from
+  // status so it always matches the badge:
+  //   • Booked     — everything before the goods move (draft, pending, ready,
+  //                  dispatched-to-pickup) and cancelled (never progressed).
+  //   • In Transit — the three IN_TRANSIT_* states.
+  //   • Completed  — delivered.
+  const inTransit = booking.status === 'IN_TRANSIT' || booking.status === 'IN_TRANSIT_DELAYED' || booking.status === 'IN_TRANSIT_EXCEPTION'
+  const delivered = booking.status === 'DELIVERED'
+  const activeStep = delivered ? 2 : inTransit ? 1 : 0
+  const STAGES = ['Booked', 'In Transit', 'Completed'] as const
+
+  // Progress % must agree with the stage: 0 before transit, the live figure while
+  // moving, 100 once delivered. Tracked distance follows the same figure.
+  const tripProgress = delivered ? 100 : inTransit ? Math.min(Math.max(booking.progress, 0), 100) : 0
+  const trackedKm    = Math.round((booking.distanceKm * tripProgress) / 100)
+  const remainingKm  = Math.max(0, booking.distanceKm - trackedKm)
+
+  // Tracking-device switcher — synthesised per booking, default to the primary
+  // (first, GPS) device; reset whenever a different booking is opened.
+  const devices = useMemo(() => buildTrackingDevices(booking), [booking.id])
+  const [activeDeviceId, setActiveDeviceId] = useState<string>(() => devices[0].id)
+  useEffect(() => { setActiveDeviceId(devices[0].id) }, [devices])
+  const activeDevice = devices.find((d) => d.id === activeDeviceId) ?? devices[0]
 
   return (
     <div className="space-y-5">
-      <RouteVisualization booking={booking} />
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div className={`rounded-lg border p-3 ${isDelayed ? 'border-danger/20 bg-danger/5' : 'border-gray-200 bg-gray-50'}`}>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">ETA</p>
-          <p className={`mt-1 text-sm font-bold ${isDelayed ? 'text-danger' : 'text-text'}`}>{booking.eta}</p>
-          {countdown && <p className={`mt-0.5 text-xs font-semibold ${isDelayed ? 'text-danger' : 'text-gray-500'}`}>{countdown}</p>}
-        </div>
-        {isException ? (
-          <div className="rounded-lg border border-danger/20 bg-danger/5 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Status</p>
-            <p className="mt-1 text-sm font-bold text-danger">Needs Attention</p>
-            <p className="mt-0.5 text-xs text-danger/80">Our team is working on this shipment</p>
+      <div className="grid gap-5 lg:grid-cols-3">
+        {/* Left column — Assignment + Live Status */}
+        <div className="flex flex-col gap-5 lg:col-span-1">
+          {/* Assignment */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h3 className="mb-4 flex items-center text-sm font-bold uppercase tracking-wide text-gray-500">
+              <Truck className="mr-2 h-4 w-4 text-gray-400" /> Assignment
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Vehicle</p>
+                {vehicleKnown ? (
+                  <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+                    <Truck className="h-7 w-7 shrink-0 text-primary" />
+                    <p className="text-sm font-semibold text-text">{booking.vehicle}</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-warning/10 p-3 text-sm font-medium text-warning">Not assigned yet</div>
+                )}
+              </div>
+              <div>
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Driver</p>
+                {driverKnown ? (
+                  <div className="flex items-center gap-3 rounded-lg bg-gray-50 p-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      {driverInitials || '–'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-text">{booking.driver}</p>
+                      {hasPhone && <p className="truncate text-xs text-gray-500">{booking.driverPhone}</p>}
+                    </div>
+                    {hasPhone && (
+                      <a
+                        href={`tel:${booking.driverPhone}`}
+                        title={`Call ${booking.driver}`}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white transition hover:bg-secondary"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-warning/10 p-3 text-sm font-medium text-warning">Not assigned yet</div>
+                )}
+              </div>
+            </div>
           </div>
-        ) : (
-          <InfoBox label="Total Distance" value={`${booking.distanceKm} km`} />
-        )}
-        {booking.avgSpeed > 0 && <InfoBox label="Avg Speed" value={`${booking.avgSpeed} km/h`} />}
-        <ConsigneeLinkTile value={booking.consigneeLink} />
+
+          {/* Live Status */}
+          <div className="flex flex-1 flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h3 className="mb-4 flex items-center text-sm font-bold uppercase tracking-wide text-gray-500">
+              <span className={`mr-2 h-2.5 w-2.5 rounded-full ${isException ? 'bg-danger' : isDelayed ? 'bg-warning animate-pulse' : isLive ? 'bg-success animate-pulse' : 'bg-gray-300'}`} />
+              Live Status
+            </h3>
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">Current location</dt>
+                <dd className="text-right font-semibold text-text">{currentLocation}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">Last update</dt>
+                <dd className="text-right font-semibold text-text">{booking.lastUpdate || '—'}</dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">Source</dt>
+                <dd className="text-right font-semibold text-text">
+                  {activeDevice.label}
+                  <span className="ml-1 text-xs font-medium text-gray-400">· {pingAgo(activeDevice.lastPingMin)} ago</span>
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">Delay</dt>
+                <dd className={`text-right font-semibold ${booking.delayedHours ? 'text-danger' : 'text-success'}`}>
+                  {booking.delayedHours ? `+${booking.delayedHours}h` : 'On time'}
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">ETA</dt>
+                <dd className={`text-right font-semibold ${isDelayed ? 'text-danger' : 'text-text'}`}>
+                  {booking.eta}{countdown ? ` · ${countdown}` : ''}
+                </dd>
+              </div>
+              {booking.avgSpeed > 0 && (
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-gray-500">Avg speed</dt>
+                  <dd className="text-right font-semibold text-text">{booking.avgSpeed} km/h</dd>
+                </div>
+              )}
+              <div className="flex items-start justify-between gap-3">
+                <dt className="text-gray-500">Distance left</dt>
+                <dd className="text-right font-semibold text-text">{remainingKm.toLocaleString()} km</dd>
+              </div>
+              {booking.exceptionNote && (
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-gray-500">Note</dt>
+                  <dd className="text-right font-semibold text-danger">{booking.exceptionNote}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        </div>
+
+        {/* Right column — Live Map + trip progress */}
+        <div className="flex flex-col gap-5 lg:col-span-2">
+          <RouteMap booking={booking} devices={devices} activeId={activeDeviceId} onSelectDevice={setActiveDeviceId} />
+
+          {/* Trip progress: stage timeline + metrics */}
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center">
+              {STAGES.map((label, idx) => {
+                const done   = idx < activeStep
+                const active = idx === activeStep
+                return (
+                  <Fragment key={label}>
+                    <div className="flex min-w-0 flex-col items-center gap-1">
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${done || active ? 'bg-primary text-white' : 'bg-gray-200 text-gray-400'} ${active ? 'ring-2 ring-primary/15' : ''}`}>
+                        {done ? <Check className="h-3.5 w-3.5" /> : idx === 1 ? <Truck className="h-3.5 w-3.5" /> : idx === 2 ? <CheckCircle2 className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
+                      </div>
+                      <span className={`whitespace-nowrap text-[10px] font-semibold ${active ? 'text-primary' : done ? 'text-gray-600' : 'text-gray-400'}`}>
+                        {label}
+                      </span>
+                    </div>
+                    {idx < STAGES.length - 1 && (
+                      <div className="relative mx-2 mb-3 h-0.5 flex-1">
+                        <div className="absolute inset-0 rounded-full bg-gray-200" />
+                        <div className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all" style={{ width: idx < activeStep ? '100%' : '0%' }} />
+                      </div>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </div>
+
+            <div className="flex items-start divide-x divide-gray-200">
+              <div className="flex-1 pr-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Expected</p>
+                <p className="mt-0.5 text-2xl font-extrabold leading-none text-text">
+                  {booking.distanceKm.toLocaleString()}<span className="ml-1 text-[11px] font-medium text-gray-400">km</span>
+                </p>
+              </div>
+              <div className="flex-1 px-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Tracked</p>
+                <p className="mt-0.5 text-2xl font-extrabold leading-none text-text">
+                  {trackedKm.toLocaleString()}<span className="ml-1 text-[11px] font-medium text-gray-400">km</span>
+                </p>
+              </div>
+              <div className="flex-1 px-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">ETA</p>
+                <p className={`mt-0.5 text-base font-extrabold leading-tight ${isDelayed ? 'text-danger' : 'text-text'}`}>{booking.eta}</p>
+              </div>
+              <div className="flex-1 pl-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Progress</p>
+                <p className="mt-0.5 text-2xl font-extrabold leading-none text-primary">{tripProgress}%</p>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${tripProgress}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <ConsigneeLinkTile value={booking.consigneeLink} />
     </div>
   )
 }
@@ -690,16 +959,10 @@ export function TrackingSection({
     setActiveSection('bookings')
   }
 
-  // Auto-select sensible default tab when booking changes
+  // Every booking opens on the Overview tab by default
   useEffect(() => {
     if (!selectedBooking) return
-    if (ACTIVE_TRACKING_STATUSES.has(selectedBooking.status)) {
-      setDetailTab('track')
-    } else if (selectedBooking.status === 'DELIVERED') {
-      setDetailTab('deliveries')
-    } else {
-      setDetailTab('overview')
-    }
+    setDetailTab('overview')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedBooking?.id])
 
@@ -725,10 +988,10 @@ export function TrackingSection({
       {/* Full-width page header — mirrors TMS BookingPageHeader */}
       <BookingPageHeader
         booking={selectedBooking}
+        customerName={bridge?.customerName ?? readPortalCustomerIdentity()?.customerName}
         onBack={() => setActiveSection('bookings')}
         onEdit={onEditBooking ? () => onEditBooking(selectedBooking.id) : undefined}
         onCancelRequest={bridge ? () => setCancelDialogOpen(true) : undefined}
-        onRebook={onCreateBooking}
       />
 
       {/* Tab card — full width, no sidebar */}

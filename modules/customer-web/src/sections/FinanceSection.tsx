@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Ban,
   Check,
   CircleDollarSign,
@@ -226,7 +227,7 @@ function RowActions({
     </button>
   )
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {invoice.live && invoice.status === 'Pending' && (
         <>
           <button type="button" title="Approve this invoice" onClick={() => onApprove?.(invoice.invoiceId)}
@@ -358,15 +359,9 @@ export function FinanceSection({
   return (
     <section className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-extrabold text-text">Finance</h2>
-          <p className="mt-1 text-sm text-gray-500">Review invoices from your 3PL — approve, dispute, or request a correction.</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setFinanceToast('Statement PDF generation coming soon')}>
-          <Download className="h-4 w-4" />
-          Download Statement
-        </Button>
+      <div>
+        <h2 className="text-xl font-extrabold text-text">Finance</h2>
+        <p className="mt-1 text-sm text-gray-500">Review invoices from your 3PL — approve, dispute, or request a correction.</p>
       </div>
 
       {/* KPI strip */}
@@ -448,10 +443,7 @@ export function FinanceSection({
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-gray-200 text-[11px] font-extrabold uppercase tracking-wide text-gray-400">
-                      <th className="px-4 py-2.5">Invoice</th>
-                      <th className="px-4 py-2.5">Booking / SO</th>
-                      <th className="px-4 py-2.5">Route</th>
-                      <th className="hidden px-4 py-2.5 xl:table-cell">Invoice Date</th>
+                      <th className="px-4 py-2.5">Invoice / Booking</th>
                       <th className="px-4 py-2.5">Due Date</th>
                       <th className="px-4 py-2.5">Amount</th>
                       <th className="px-4 py-2.5">Status</th>
@@ -462,34 +454,46 @@ export function FinanceSection({
                     {displayed.map((invoice) => {
                       const cfg = STATUS_CONFIG[invoice.status]
                       const panelOpen = panel?.id === invoice.invoiceId
+                      const [routeFrom = '', routeTo = ''] = invoice.route.split('→')
+                      const fromCity = (routeFrom.split(',')[0] ?? '').trim()
+                      const toCity   = (routeTo.split(',')[0] ?? '').trim()
                       return (
                         <Fragment key={invoice.invoiceId}>
                           <tr className={`border-b border-gray-100 transition-colors ${panelOpen ? 'bg-orange-50/40' : 'hover:bg-gray-50/60'}`}>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm font-bold text-text">{invoice.invoiceId}</td>
-                            <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                            {/* Combined invoice + booking block (mirrors the booking row) */}
+                            <td className="px-4 py-3 align-top">
+                              <p className="text-sm font-bold text-text">{invoice.invoiceId}</p>
+                              <p className="mt-0.5 text-[11px] text-gray-400">{invoice.invoiceDate}</p>
                               {onViewBooking ? (
-                                <button type="button" onClick={() => onViewBooking(invoice.bookingId)} className="font-semibold text-primary underline-offset-2 hover:underline">{invoice.bookingId}</button>
+                                <button type="button" onClick={() => onViewBooking(invoice.bookingId)} className="mt-1 block text-xs font-semibold text-primary underline-offset-2 hover:underline">{invoice.bookingId}</button>
                               ) : (
-                                <span className="font-semibold text-text">{invoice.bookingId}</span>
+                                <p className="mt-1 text-xs font-semibold text-text">{invoice.bookingId}</p>
+                              )}
+                              {fromCity && toCity ? (
+                                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-400">
+                                  <span>{fromCity}</span>
+                                  <ArrowRight className="h-2.5 w-2.5 shrink-0" />
+                                  <span>{toCity}</span>
+                                </p>
+                              ) : (
+                                <p className="mt-0.5 text-[11px] text-gray-400">{invoice.route}</p>
                               )}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-600">{invoice.route}</td>
-                            <td className="hidden whitespace-nowrap px-4 py-3 text-xs text-gray-500 xl:table-cell">{invoice.invoiceDate}</td>
-                            <td className={`whitespace-nowrap px-4 py-3 text-xs font-semibold ${invoice.status === 'Overdue' ? 'text-danger' : 'text-gray-500'}`}>
+                            <td className={`whitespace-nowrap px-4 py-3 align-top text-xs font-semibold ${invoice.status === 'Overdue' ? 'text-danger' : 'text-gray-500'}`}>
                               {invoice.dueDate}
                               {invoice.agingDays > 0 && invoice.status === 'Overdue' && (
                                 <span className="ml-1 rounded bg-danger/10 px-1 py-0.5 text-[10px] text-danger">+{invoice.agingDays}d</span>
                               )}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-sm font-extrabold text-text">{currency(invoice.amount)}</td>
-                            <td className="whitespace-nowrap px-4 py-3"><Badge variant={cfg.badge as Parameters<typeof Badge>[0]['variant']}>{cfg.label}</Badge></td>
-                            <td className="whitespace-nowrap px-4 py-3">
+                            <td className="whitespace-nowrap px-4 py-3 align-top text-sm font-extrabold text-text">{currency(invoice.amount)}</td>
+                            <td className="whitespace-nowrap px-4 py-3 align-top"><Badge variant={cfg.badge as Parameters<typeof Badge>[0]['variant']}>{cfg.label}</Badge></td>
+                            <td className="px-4 py-3 align-top">
                               <RowActions invoice={invoice} onDownload={onDownload} onApprove={onApprove}
                                 openPanel={(kind) => setPanel({ id: invoice.invoiceId, kind })} />
                             </td>
                           </tr>
                           {panelOpen && (
-                            <ActionPanel invoice={invoice} kind={panel!.kind} colSpan={8}
+                            <ActionPanel invoice={invoice} kind={panel!.kind} colSpan={5}
                               onApprove={onApprove} onDispute={onDispute} onRequestResubmission={onRequestResubmission} onReject={onReject} onReplyToDispute={onReplyToDispute}
                               onClose={() => setPanel(null)} />
                           )}
