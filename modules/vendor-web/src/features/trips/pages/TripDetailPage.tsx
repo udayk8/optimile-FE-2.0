@@ -21,9 +21,6 @@ import type { Trip, TripDocument } from '@vendor/types'
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
 type DetailTab = 'freight' | 'expense' | 'advance' | 'documents'
 
-const EXPENSE_TYPES = ['Toll charge', 'Loading and Unloading Charges', 'Detention Charges', 'Parking charge', 'Driver allowance', 'Weighment charge', 'Other']
-const PAID_BY_OPTIONS = ['Driver', 'Vendor', 'Company', 'Self']
-const PAYMENT_MODES = ['UPI', 'NEFT', 'Cash', 'Cheque']
 
 function getBookingMode(pathname: string) {
   const rawMode = pathname.split('/')[3]
@@ -36,44 +33,11 @@ export default function TripDetailPage() {
   const params = useParams()
   const id = params.id ?? ''
   const [detailTab, setDetailTab] = useState<DetailTab>('freight')
-  // Add expense / advance modal.
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false)
-  const [expenseMode, setExpenseMode] = useState<'expense' | 'advance'>('expense')
-  const [expType, setExpType] = useState('Toll charge')
-  const [expAmount, setExpAmount] = useState('')
-  const [expPaymentMode, setExpPaymentMode] = useState('UPI')
-  const [expPaidBy, setExpPaidBy] = useState('Driver')
-  const [expNotes, setExpNotes] = useState('')
-
-  const openExpenseModal = (mode: 'expense' | 'advance') => {
-    setExpenseMode(mode)
-    setExpType(mode === 'advance' ? 'Advance' : 'Toll charge')
-    setExpAmount('')
-    setExpPaymentMode('UPI')
-    setExpPaidBy(mode === 'advance' ? 'Company' : 'Driver')
-    setExpNotes('')
-    setExpenseModalOpen(true)
-  }
-
-  const submitExpense = () => {
-    const label = expenseMode === 'advance' ? 'Advance' : expType
-    const amount = Number(expAmount)
-    if (!label || !Number.isFinite(amount) || amount <= 0) return
-    addBookingExpense(id, {
-      label,
-      amount,
-      expenseType: label,
-      paymentMode: expPaymentMode,
-      paidBy: expPaidBy,
-      notes: expNotes.trim() || undefined,
-    })
-    setExpenseModalOpen(false)
-  }
 
   // Source bookings from the cross-module bridge when embedded (trips are
   // synthesized from shared bookings, not in the local app.store), else fall
   // back to app.store standalone.
-  const { indents, trips, acceptIndent, declineIndent, getBookingDetail, addBookingExpense } = useVendorBookings()
+  const { indents, trips, acceptIndent, declineIndent, getBookingDetail } = useVendorBookings()
   const [assignTripId, setAssignTripId] = useState<string | null>(null)
   const [declineConfirmId, setDeclineConfirmId] = useState<string | null>(null)
 
@@ -120,18 +84,7 @@ export default function TripDetailPage() {
     if (!haveType.has('INVOICE_COPY')) defaults.push({ id: `${trip.id}-inv`, type: 'INVOICE_COPY', title: 'Invoice copy', fileName: `invoice-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/invoice-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
     return [...defaults, ...tripDocs]
   })()
-  // Driver expenses are shown (cross-module) on bookings from In-Transit onward.
-  const showExpenseTab = Boolean(
-    trip && (IN_TRANSIT_STATES.includes(trip.status) || trip.status === 'POD_PENDING' || trip.status === 'COMPLETED' || trip.exceptionFlag),
-  )
-  const tripExpenses = trip?.expenses ?? []
-  const tripAdvances = trip?.advanceItems ?? []
-  const visibleTabs: DetailTab[] = [
-    'freight',
-    ...(showExpenseTab ? (['expense'] as DetailTab[]) : []),
-    ...(showExpenseTab ? (['advance'] as DetailTab[]) : []),
-    'documents',
-  ]
+  const visibleTabs: DetailTab[] = ['freight', 'documents']
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   // Mock/demo bookings have no shared-booking record, so build the same
@@ -309,8 +262,6 @@ export default function TripDetailPage() {
             }`}
           >
             {tab === 'freight' && 'Freight details'}
-            {tab === 'expense' && 'Expenses'}
-            {tab === 'advance' && 'Advance'}
             {tab === 'documents' && 'Documents'}
           </button>
         ))}
@@ -342,78 +293,6 @@ export default function TripDetailPage() {
                     {indent ? <SLACountdown deadline={indent.slaDeadline} /> : trip?.podStatus === 'CONFIRMED' ? 'POD confirmed' : 'Pending POD'}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {effectiveDetailTab === 'expense' && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" /> Expenses
-                </CardTitle>
-                <Button size="sm" onClick={() => openExpenseModal('expense')}>Add Expense</Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {tripExpenses.length === 0 ? (
-                  <EmptyState title="No expenses for this booking" />
-                ) : (
-                  <>
-                    {tripExpenses.map((expense) => (
-                      <div key={expense.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                        <div>
-                          <div className="font-semibold text-text">{expense.label || expense.expenseType || 'Expense'}</div>
-                          <div className="mt-0.5 text-xs text-gray-500">
-                            {[expense.expenseType, expense.paymentMode, expense.paidBy && `Paid by ${expense.paidBy}`, expense.dateTime && formatDate(expense.dateTime)]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-text"><CurrencyDisplay amount={expense.amount} /></div>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <span className="font-semibold text-text">Total Expenses</span>
-                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.approvedExpenses ?? 0} /></span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {effectiveDetailTab === 'advance' && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5 text-primary" /> Advance
-                </CardTitle>
-                <Button size="sm" onClick={() => openExpenseModal('advance')}>Add Advance</Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {tripAdvances.length === 0 ? (
-                  <EmptyState title="No advance recorded for this booking" />
-                ) : (
-                  <>
-                    {tripAdvances.map((adv) => (
-                      <div key={adv.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                        <div>
-                          <div className="font-semibold text-text">{adv.label || 'Advance'}</div>
-                          <div className="mt-0.5 text-xs text-gray-500">
-                            {[adv.paymentMode, adv.paidBy && `Paid by ${adv.paidBy}`, adv.dateTime && formatDate(adv.dateTime)].filter(Boolean).join(' · ')}
-                          </div>
-                        </div>
-                        <div className="font-bold text-text"><CurrencyDisplay amount={adv.amount} /></div>
-                      </div>
-                    ))}
-                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <span className="font-semibold text-text">Total Advance</span>
-                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.advance ?? 0} /></span>
-                    </div>
-                  </>
-                )}
               </CardContent>
             </Card>
           )}
@@ -500,75 +379,6 @@ export default function TripDetailPage() {
         confirmLabel="Decline Booking"
         variant="destructive"
       />
-
-      {expenseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setExpenseModalOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-text">{expenseMode === 'advance' ? 'Add Advance' : 'Add Expense'}</h3>
-            <div className="mt-4 space-y-4">
-              {expenseMode === 'expense' && (
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Expense Type</label>
-                  <select
-                    value={expType}
-                    onChange={(e) => setExpType(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary"
-                  >
-                    {EXPENSE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Amount</label>
-                <input
-                  type="number"
-                  value={expAmount}
-                  onChange={(e) => setExpAmount(e.target.value)}
-                  placeholder="0"
-                  className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Payment Mode</label>
-                  <select
-                    value={expPaymentMode}
-                    onChange={(e) => setExpPaymentMode(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary"
-                  >
-                    {PAYMENT_MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Paid By</label>
-                  <select
-                    value={expPaidBy}
-                    onChange={(e) => setExpPaidBy(e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-gray-300 px-3 text-sm outline-none focus:border-primary"
-                  >
-                    {PAID_BY_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Notes (optional)</label>
-                <textarea
-                  value={expNotes}
-                  onChange={(e) => setExpNotes(e.target.value)}
-                  rows={2}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-primary"
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setExpenseModalOpen(false)}>Cancel</Button>
-              <Button onClick={submitExpense} disabled={!(Number(expAmount) > 0)}>
-                {expenseMode === 'advance' ? 'Add Advance' : 'Add Expense'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

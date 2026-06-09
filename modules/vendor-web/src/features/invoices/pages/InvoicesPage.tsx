@@ -229,7 +229,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white px-6 py-6 shadow-sm">
         <HeroCard
           eyebrow="FINANCE"
           title="Invoices"
