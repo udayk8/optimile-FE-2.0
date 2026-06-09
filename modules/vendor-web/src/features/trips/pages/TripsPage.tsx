@@ -123,11 +123,21 @@ export default function TripsPage() {
   const { indents, trips, declineIndent, acceptIndent, isBridgeRecord, getBookingDetail } = useVendorBookings()
   const { invoices } = useVendorInvoices()
 
+  // contractId → customer name, derived from the seeded indents so mock trips
+  // (whose own indent may already be consumed) still resolve a customer.
+  const contractCustomer = useMemo(() => {
+    const map = new Map<string, string>()
+    indents.forEach((i) => { if (i.contractId && i.contractReference) map.set(i.contractId, i.contractReference) })
+    return map
+  }, [indents])
+
   // Customer (the tenant the booking belongs to) for a row — from the bridge
-  // detail when embedded, else the originating indent's contract reference.
+  // detail when embedded, else the originating indent's contract reference, else
+  // the trip's contract → customer mapping (mock data).
   const customerFor = (id: string, indentId?: string) =>
     getBookingDetail(id)?.customerName
     ?? indents.find((i) => i.id === (indentId ?? id))?.contractReference
+    ?? (() => { const t = trips.find((x) => x.id === id); return t ? contractCustomer.get(t.contractId) : undefined })()
     ?? '—'
 
   // Map each invoiced trip → the invoice number it belongs to.

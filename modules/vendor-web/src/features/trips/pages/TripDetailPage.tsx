@@ -140,7 +140,10 @@ export default function TripDetailPage() {
   const detail: VendorBookingDetail | null = bridgeDetail ?? (() => {
     if (!booking) return null
     const lane = booking.laneDetails
-    const customerName = indent?.contractReference.split('/').pop()?.trim() ?? 'Customer'
+    // Prefer the indent's customer; else resolve via the trip's contract → the
+    // customer of any indent on the same contract (mock trips whose indent is gone).
+    const contractCustomerName = trip ? indents.find((i) => i.contractId === trip.contractId)?.contractReference : undefined
+    const customerName = indent?.contractReference.split('/').pop()?.trim() ?? contractCustomerName ?? 'Customer'
     // Same party shape the bridge resolves from shared customer addresses.
     const party = (point: typeof lane.origin) =>
       MOCK_BOOKING_PARTIES[point.city] ?? {
