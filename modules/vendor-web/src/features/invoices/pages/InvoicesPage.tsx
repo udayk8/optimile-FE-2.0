@@ -134,6 +134,12 @@ export default function InvoicesPage() {
     return paid
   }, [ledger])
   const { trips: allBookings, getBookingDetail } = useVendorBookings()
+  // Approved driver expenses per trip — added into each invoice's totals.
+  const expenseByTripId = useMemo(() => {
+    const map = new Map<string, number>()
+    allBookings.forEach((trip) => map.set(trip.id, trip.approvedExpenses ?? 0))
+    return map
+  }, [allBookings])
   const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
@@ -333,15 +339,17 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Freight Cost</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Cost</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">GST</th>
-                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Total Amount</th>
+                  <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Final Amount</th>
                   <th className="p-4 text-right text-xs font-bold uppercase tracking-wide text-gray-500">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {pagedInvoices.map((invoice) => {
                   const dispute = disputeByInvoice[invoice.id]
+                  // Approved driver expenses across the invoice's trips.
+                  const expense = invoice.lineItems.reduce((sum, li) => sum + (expenseByTripId.get(li.tripId) ?? 0), 0)
                   return (
                     <tr key={invoice.id} className="cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/vendor/invoices/${invoice.id}`)}>
                       <td className="p-4 font-mono font-semibold">{invoice.invoiceNumber || invoice.id}</td>
@@ -372,13 +380,13 @@ export default function InvoicesPage() {
                       </td>
                       <td className="p-4">{invoice.lineItems.length}</td>
                       <td className="p-4 text-right">
-                        <CurrencyDisplay amount={invoice.subtotal} />
+                        <CurrencyDisplay amount={invoice.subtotal + expense} />
                       </td>
                       <td className="p-4 text-right text-gray-600">
                         <CurrencyDisplay amount={invoice.gstAmount} />
                       </td>
                       <td className="p-4 text-right">
-                        <CurrencyDisplay amount={invoice.grandTotal} className="font-semibold" />
+                        <CurrencyDisplay amount={invoice.grandTotal + expense} className="font-semibold" />
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
