@@ -166,16 +166,10 @@ const VEHICLE_REPLACEMENT_REASON_OPTIONS: Array<{ value: BookingVehicleReplaceme
 ];
 
 const BOOKING_EXPENSE_TYPES = [
-  "Advance",
-  "Toll charge",
-  "Loading charge",
-  "Unloading charge",
-  "Detention charge",
-  "Parking charge",
-  "Driver allowance",
-  "Weighment charge",
-  "Other",
+  "Loading and Unloading Charges",
+  "Detention Charges",
 ];
+const BOOKING_ADVANCE_TYPE = "Advance";
 const BOOKING_EXPENSE_PAID_BY = ["Driver", "Vendor", "Company", "Self"];
 
 export function BookingDetailsPage() {
@@ -223,8 +217,10 @@ export function BookingDetailsPage() {
   const [expenseLabel, setExpenseLabel] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  // "expense" = charge (loading/detention); "advance" = booking advance entry.
+  const [expenseMode, setExpenseMode] = useState<"expense" | "advance">("expense");
   const [expenseViewId, setExpenseViewId] = useState<string | null>(null);
-  const [expenseType, setExpenseType] = useState("Toll charge");
+  const [expenseType, setExpenseType] = useState("Loading and Unloading Charges");
   const [expensePaymentMode, setExpensePaymentMode] = useState<BookingExpensePaymentMode>("UPI");
   const [expensePaidBy, setExpensePaidBy] = useState("Driver");
   const [expenseBillFile, setExpenseBillFile] = useState("");
@@ -1830,20 +1826,32 @@ export function BookingDetailsPage() {
     });
   }
 
+  function openAddModal(mode: "expense" | "advance") {
+    setExpenseMode(mode);
+    setExpenseType(mode === "advance" ? BOOKING_ADVANCE_TYPE : "Loading and Unloading Charges");
+    setExpenseAmount("");
+    setExpenseBillFile("");
+    setExpenseNotes("");
+    setExpensePaymentMode("UPI");
+    setExpensePaidBy(mode === "advance" ? "Company" : "Driver");
+    setExpenseModalOpen(true);
+  }
+
   function submitExpense() {
-    if (!expenseType.trim() || Number(expenseAmount) <= 0 || !expenseBillFile.trim()) {
+    const typeValue = expenseMode === "advance" ? BOOKING_ADVANCE_TYPE : expenseType.trim();
+    if (!typeValue || Number(expenseAmount) <= 0 || !expenseBillFile.trim()) {
       return;
     }
     const now = new Date().toISOString();
     const nextExpense: BookingExpenseRecord = {
       id: `expense-${Date.now()}`,
-      label: expenseType.trim(),
+      label: typeValue,
       amount: Number(expenseAmount),
       createdAt: now,
       createdBy: session.actorName || "Ops",
       bookingId: bookingRecord.bookingId,
       dateTime: now,
-      expenseType: expenseType.trim(),
+      expenseType: typeValue,
       paymentMode: expensePaymentMode,
       paidBy: expensePaidBy,
       billReceiptFile: expenseBillFile.trim(),
@@ -1856,11 +1864,16 @@ export function BookingDetailsPage() {
     setExpenseAmount("");
     setExpenseBillFile("");
     setExpenseNotes("");
-    setExpenseType("Toll charge");
+    setExpenseType("Loading and Unloading Charges");
     setExpensePaymentMode("UPI");
     setExpensePaidBy("Driver");
     setExpenseModalOpen(false);
   }
+  // Advance entries are stored as expense items typed "Advance".
+  const isAdvanceItem = (e: { expenseType?: string; label?: string }) =>
+    /advance/i.test(`${e.expenseType ?? ""} ${e.label ?? ""}`);
+  const expenseItems = (bookingRecord.expenses ?? []).filter((e) => !isAdvanceItem(e));
+  const advanceItems = (bookingRecord.expenses ?? []).filter(isAdvanceItem);
 
   function setExpenseStatus(expenseId: string, status: BookingExpenseStatus) {
     updateBooking(bookingRecord.id, {
@@ -2188,7 +2201,7 @@ export function BookingDetailsPage() {
         <CardContent className="p-3">
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Tabs tabs={["Overview", "Deliveries", "Documents", "Timeline", "Expenses"]} active={activeTab} onChange={setActiveTab} />
+              <Tabs tabs={["Overview", "Deliveries", "Documents", "Timeline", "Expenses", "Advance"]} active={activeTab} onChange={setActiveTab} />
                           {activeTab === "Deliveries" && actionableReassignmentRemarks.length ? (
               <button
                 type="button"
@@ -2819,10 +2832,10 @@ export function BookingDetailsPage() {
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-gray-900">Booking Expenses</p>
                 {bookingRecord.status !== "COMPLETED" ? (
-                  <Button size="sm" onClick={() => setExpenseModalOpen(true)}>+ Add Expense</Button>
+                  <Button size="sm" onClick={() => openAddModal("expense")}>+ Add Expense</Button>
                 ) : null}
               </div>
-              {(bookingRecord.expenses ?? []).length ? (
+              {expenseItems.length ? (
                 <div className="overflow-x-auto rounded-xl border border-gray-200">
                   <table className="w-full text-sm">
                     <thead>
@@ -2838,7 +2851,7 @@ export function BookingDetailsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(bookingRecord.expenses ?? []).map((expense) => (
+                      {expenseItems.map((expense) => (
                         <tr key={expense.id} className="border-b border-gray-100">
                           <td className="px-3 py-2 text-gray-600">{formatDateTime(expense.dateTime ?? expense.createdAt)}</td>
                           <td className="px-3 py-2 font-medium text-gray-900">{expense.expenseType ?? expense.label}</td>
@@ -2876,6 +2889,67 @@ export function BookingDetailsPage() {
               )}
             </div>
           ) : null}
+
+                      {activeTab === "Advance" ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-gray-900">Booking Advance</p>
+                {bookingRecord.status !== "COMPLETED" ? (
+                  <Button size="sm" onClick={() => openAddModal("advance")}>+ Add Advance</Button>
+                ) : null}
+              </div>
+              {advanceItems.length ? (
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        <th className="px-3 py-2">Date &amp; time</th>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Payment mode</th>
+                        <th className="px-3 py-2">Paid by</th>
+                        <th className="px-3 py-2">Bill/Receipt</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advanceItems.map((expense) => (
+                        <tr key={expense.id} className="border-b border-gray-100">
+                          <td className="px-3 py-2 text-gray-600">{formatDateTime(expense.dateTime ?? expense.createdAt)}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900">{formatCurrency(expense.amount)}</td>
+                          <td className="px-3 py-2 text-gray-600">{expense.paymentMode ?? "-"}</td>
+                          <td className="px-3 py-2 text-gray-600">{expense.paidBy ?? "-"}</td>
+                          <td className="px-3 py-2">
+                            {expense.billReceiptFile ? (
+                              <button type="button" className="text-primary underline" onClick={() => setExpenseViewId(expense.id)}>Download</button>
+                            ) : "-"}
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant={expense.status === "Approved" ? "success" : expense.status === "Rejected" ? "danger" : "warning"}>
+                              {expense.status ?? "Pending"}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button size="sm" variant="outline" onClick={() => setExpenseViewId(expense.id)}>View</Button>
+                              {bookingRecord.status !== "COMPLETED" && (expense.status ?? "Pending") === "Pending" ? (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Approved")}>Approve</Button>
+                                  <Button size="sm" variant="outline" onClick={() => setExpenseStatus(expense.id, "Rejected")}>Reject</Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 px-3 py-6 text-center text-sm text-gray-400">No advance recorded yet.</div>
+              )}
+            </div>
+          ) : null}
           </div>
         </CardContent>
       </Card>
@@ -2884,23 +2958,27 @@ export function BookingDetailsPage() {
       <Dialog
         open={expenseModalOpen}
         onOpenChange={setExpenseModalOpen}
-        title="Add Booking Expense"
-        description="Recorded against this booking. Approved expenses are billed to the customer in Finance."
+        title={expenseMode === "advance" ? "Add Booking Advance" : "Add Booking Expense"}
+        description={expenseMode === "advance"
+          ? "Advance recorded against this booking. Approved advance is netted off the vendor invoice."
+          : "Recorded against this booking. Approved expenses are billed to the customer in Finance."}
         footer={
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setExpenseModalOpen(false)}>Cancel</Button>
-            <Button onClick={submitExpense}>Save Expense</Button>
+            <Button onClick={submitExpense}>{expenseMode === "advance" ? "Save Advance" : "Save Expense"}</Button>
           </div>
         }
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <CompactField label="Expense type *">
-            <Select value={expenseType} onChange={(event) => setExpenseType(event.target.value)}>
-              {BOOKING_EXPENSE_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </Select>
-          </CompactField>
+          {expenseMode === "advance" ? null : (
+            <CompactField label="Expense type *">
+              <Select value={expenseType} onChange={(event) => setExpenseType(event.target.value)}>
+                {BOOKING_EXPENSE_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </Select>
+            </CompactField>
+          )}
           <CompactField label="Amount *">
             <Input value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} placeholder="0" />
           </CompactField>

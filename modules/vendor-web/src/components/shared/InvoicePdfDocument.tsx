@@ -54,6 +54,12 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
 ) {
   const declarationLines = terms && terms.length > 0 ? terms : DEFAULT_TERMS
   const tripById = new Map(trips.map((t) => [t.id, t]))
+  // Aggregate charges (approved expenses) and advance across the invoice's trips.
+  const totalCharges = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.approvedExpenses ?? 0), 0)
+  const totalAdvance = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.advance ?? 0), 0)
+  // Final = freight + charges + GST; advance is netted off at the end.
+  const totalInvoiceValue = invoice.grandTotal + totalCharges
+  const netPayable = totalInvoiceValue - totalAdvance
 
   const lrFor = (tripId: string): string => {
     const bridgeLr = getLrNumber?.(tripId)
@@ -144,12 +150,12 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{(trip?.assignedVehicle.registrationNumber ?? '—').replace(/\s*\(.*\)\s*$/, '')}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(trip?.advance ?? 0)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(detention)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(loading)}</td>
-                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(others)}</td>
-                  <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(trip?.advance ?? 0)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(detention)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(loading)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(others)}</td>
+                  <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
               )
             })}
@@ -167,12 +173,16 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         {/* ── In words + totals ── */}
         <div className="flex border-t-2" style={{ borderColor: BLUE }}>
           <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
-            <p className="text-[12px]"><span className="font-bold">In Words:</span> Rupees {amountInWords(invoice.grandTotal)} Only</p>
+            <p className="text-[12px]"><span className="font-bold">In Words:</span> Rupees {amountInWords(netPayable)} Only</p>
           </div>
           <div className="w-1/2 text-[11px]">
             <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
-              <span className="text-gray-700">Taxable Value</span>
+              <span className="text-gray-700">Freight (Taxable Value)</span>
               <span className="font-semibold">{inr(invoice.subtotal)}</span>
+            </div>
+            <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+              <span className="text-gray-700">Charges (Detention / Loading &amp; Unloading / Others)</span>
+              <span className="font-semibold">{inr(totalCharges)}</span>
             </div>
             {interState ? (
               <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
@@ -191,9 +201,17 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                 </div>
               </>
             )}
-            <div className="flex justify-between px-4 py-2 text-[12px] font-extrabold" style={{ backgroundColor: '#EEF0FB' }}>
+            <div className="flex justify-between border-b px-4 py-2 text-[12px] font-bold" style={{ borderColor: '#C7CBEF' }}>
               <span>Total Invoice Value</span>
-              <span>{inr(invoice.grandTotal)}</span>
+              <span>{inr(totalInvoiceValue)}</span>
+            </div>
+            <div className="flex justify-between border-b px-4 py-2 text-rose-600" style={{ borderColor: '#C7CBEF' }}>
+              <span>Less: Advance</span>
+              <span className="font-semibold">- {inr(totalAdvance)}</span>
+            </div>
+            <div className="flex justify-between px-4 py-2 text-[12px] font-extrabold" style={{ backgroundColor: '#EEF0FB' }}>
+              <span>Net Payable</span>
+              <span>{inr(netPayable)}</span>
             </div>
           </div>
         </div>
