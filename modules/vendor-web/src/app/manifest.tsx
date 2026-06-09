@@ -40,9 +40,9 @@ export const vendorManifest: ModuleManifest = {
   basePath: '/vendor',
   sidebar: [
     { label: 'Home', path: '/vendor', icon: Home },
+    { label: 'Bookings', path: '/vendor/bookings', icon: Truck },
     { label: 'Sourcing', path: '/vendor/sourcing', icon: Search },
     { label: 'Contracts', path: '/vendor/contracts', icon: FileText },
-    { label: 'Bookings', path: '/vendor/bookings', icon: Truck },
     { label: 'Fleet', path: '/vendor/fleet', icon: Ship },
     { label: 'Invoices', path: '/vendor/invoices', icon: CreditCard },
     { label: 'Record Payments', path: '/vendor/record-payments', icon: ReceiptText },

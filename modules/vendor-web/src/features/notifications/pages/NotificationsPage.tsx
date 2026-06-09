@@ -30,6 +30,9 @@ export default function NotificationsPage() {
 
   const [readFilter, setReadFilter] = useState<ReadFilter>('ALL')
   const [typeFilter, setTypeFilter] = useState<NotificationCategory | null>(null)
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
 
   const filtered = useMemo(() => {
@@ -38,9 +41,12 @@ export default function NotificationsPage() {
       .filter((n) => {
         if (readFilter === 'UNREAD' && n.isRead) return false
         if (typeFilter && n.type !== typeFilter) return false
+        const created = (n.createdAt ?? '').slice(0, 10)
+        if (fromDate && created < fromDate) return false
+        if (toDate && created > toDate) return false
         return true
       })
-  }, [notifications, readFilter, typeFilter])
+  }, [notifications, readFilter, typeFilter, fromDate, toDate])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -78,6 +84,18 @@ export default function NotificationsPage() {
           </div>
         }
       />
+
+      {/* Date filter (unapplied by default) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary" />
+        <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+          className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-primary" />
+        {(fromDate || toDate) && (
+          <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
+            className="h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear dates</button>
+        )}
+      </div>
 
       {/* Type filter chips */}
       <div className="flex flex-wrap gap-2">

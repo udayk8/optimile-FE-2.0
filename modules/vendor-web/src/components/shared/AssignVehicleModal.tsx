@@ -34,11 +34,9 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
       : indent?.vehicleTypeRequired
   const expectedVehicleType = rawExpectedType && rawExpectedType !== '—' ? rawExpectedType : null
 
-  // Filter for ACTIVE resources; vehicles must also match the booking's expected type.
-  const activeVehicles = vehicles.filter(v => v.operationalStatus === 'ACTIVE')
-  const availableVehicles = expectedVehicleType
-    ? activeVehicles.filter((v) => v.vehicleType === expectedVehicleType)
-    : activeVehicles
+  // Show ALL active vehicles & drivers — vehicle-type matching is intentionally
+  // ignored, the vendor can assign any of its vehicles/drivers to any booking.
+  const availableVehicles = vehicles.filter(v => v.operationalStatus === 'ACTIVE')
   const availableDrivers = drivers.filter(d => d.currentStatus === 'ACTIVE')
 
   const handleAssign = () => {
@@ -90,9 +88,9 @@ export function AssignVehicleModal({ isOpen, onClose, tripId }: AssignVehicleMod
                 </option>
               ))}
             </select>
-            {expectedVehicleType && availableVehicles.length === 0 && (
+            {availableVehicles.length === 0 && (
               <p className="text-xs text-amber-600">
-                No active {expectedVehicleType} vehicles in your fleet. Onboard a {expectedVehicleType} vehicle to assign this booking.
+                No active vehicles in your fleet. Onboard a vehicle to assign this booking.
               </p>
             )}
           </div>

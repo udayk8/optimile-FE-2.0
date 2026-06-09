@@ -26,13 +26,9 @@ function formatBalance(balance: number, tab: LedgerTab) {
 }
 
 export default function LedgerPage() {
-  // Default window: last two months up to today.
-  const [fromDate, setFromDate] = useState(() => {
-    const from = new Date()
-    from.setMonth(from.getMonth() - 2)
-    return from.toISOString().slice(0, 10)
-  })
-  const [toDate, setToDate] = useState('2026-06-10')
+  // Date filter is unapplied by default — the full ledger shows until a range is set.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [invoiceFilter, setInvoiceFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const activeTab: LedgerTab = 'CUSTOMER'
@@ -41,7 +37,7 @@ export default function LedgerPage() {
 
   const dateFilteredEntries = useMemo(() => {
     return ledger
-      .filter((entry) => entry.date >= fromDate && entry.date <= toDate)
+      .filter((entry) => (!fromDate || entry.date >= fromDate) && (!toDate || entry.date <= toDate))
       .sort((a, b) => a.date.localeCompare(b.date))
   }, [fromDate, toDate, ledger])
 

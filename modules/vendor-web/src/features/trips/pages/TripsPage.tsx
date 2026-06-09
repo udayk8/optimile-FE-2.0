@@ -129,12 +129,9 @@ export default function TripsPage() {
   // Search + date filter + pagination shared across tabs.
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [fromDate, setFromDate] = useState(() => {
-    const d = new Date()
-    d.setMonth(d.getMonth() - 2)
-    return d.toISOString().slice(0, 10)
-  })
-  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10))
+  // Date filter unapplied by default — all bookings show until a range is set.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
   // Reset to the first page whenever the view changes.
   useEffect(() => {

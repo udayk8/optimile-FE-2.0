@@ -34,6 +34,9 @@ export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState<ContractStatus | 'ALL'>('ALL')
   const [sourceTab, setSourceTab] = useState<ContractSourceTab>('MANUAL')
   const [search, setSearch] = useState('')
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const navigate = useNavigate()
   const { id: selectedContractId } = useParams()
@@ -54,6 +57,9 @@ export default function ContractsPage() {
     if (sourceTab === 'MANUAL' && isAuction) return false
     if (statusFilter !== 'ALL' && c.status !== statusFilter) return false
     if (search && !c.id.toLowerCase().includes(search.toLowerCase()) && !laneLabel(c).toLowerCase().includes(search.toLowerCase())) return false
+    const created = (c.awardedOn ?? c.createdAt ?? '').slice(0, 10)
+    if (fromDate && created < fromDate) return false
+    if (toDate && created > toDate) return false
     return true
   })
   const pageSize = 5
@@ -94,9 +100,17 @@ export default function ContractsPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input type="text" placeholder="Search by ID or lane..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="h-10 w-60 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none ring-primary/20 transition focus:border-primary focus:ring-4" />
+          <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
+          <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+            className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
+          {(fromDate || toDate) && (
+            <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
+              className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
+          )}
         </div>
       </div>
 

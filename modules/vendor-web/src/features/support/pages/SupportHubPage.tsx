@@ -30,6 +30,9 @@ export default function SupportHubPage() {
   const exceptions = useAppStore((state) => state.exceptions)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | ExceptionStatus>('ALL')
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
 
   const filteredExceptions = useMemo(() => {
@@ -42,7 +45,9 @@ export default function SupportHubPage() {
               value.toLowerCase().includes(query),
             )
           : true
-        return matchesStatus && matchesSearch
+        const created = (item.createdAt ?? '').slice(0, 10)
+        const matchesDate = (!fromDate || created >= fromDate) && (!toDate || created <= toDate)
+        return matchesStatus && matchesSearch && matchesDate
       })
       .sort((a, b) => {
         const severityDiff = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
@@ -51,7 +56,7 @@ export default function SupportHubPage() {
         if (statusDiff !== 0) return statusDiff
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       })
-  }, [exceptions, search, statusFilter])
+  }, [exceptions, search, statusFilter, fromDate, toDate])
 
   const totalPages = Math.max(1, Math.ceil(filteredExceptions.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -128,6 +133,16 @@ export default function SupportHubPage() {
                 {item === 'ALL' ? 'All' : statusLabel(item)}
               </button>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+              className="h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-primary focus:bg-white" />
+            <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+              className="h-9 rounded-lg border border-gray-200 bg-gray-50 px-3 text-sm outline-none focus:border-primary focus:bg-white" />
+            {(fromDate || toDate) && (
+              <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
+            )}
           </div>
         </div>
 

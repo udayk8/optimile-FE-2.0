@@ -45,6 +45,9 @@ export default function PaymentsPage() {
   } = useAppStore()
 
   const [page, setPage] = useState(1)
+  // Date filter unapplied by default (filters the recorded-payments list).
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
   const [entryType, setEntryType] = useState<LedgerEntryInputType>('CUSTOMER_PAYMENT')
@@ -56,8 +59,12 @@ export default function PaymentsPage() {
   const rows = useMemo(() =>
     payments
       .map((p) => ({ payment: p, invoice: invoices.find((inv) => inv.id === p.invoiceId) }))
+      .filter(({ payment }) => {
+        const d = (payment.paymentDate ?? '').slice(0, 10)
+        return (!fromDate || d >= fromDate) && (!toDate || d <= toDate)
+      })
       .sort((a, b) => b.payment.paymentDate.localeCompare(a.payment.paymentDate)),
-    [payments, invoices]
+    [payments, invoices, fromDate, toDate]
   )
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
@@ -110,6 +117,15 @@ export default function PaymentsPage() {
         icon={<Banknote className="h-6 w-6 text-primary" />}
         action={<Button variant="outline" onClick={openModal}><Plus className="h-4 w-4" />Record Payment</Button>}
       />
+
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+        <span className="text-sm font-semibold text-text">Date filter</span>
+        <Input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} className="w-[160px]" />
+        <Input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} className="w-[160px]" />
+        {(fromDate || toDate) && (
+          <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}>Clear</Button>
+        )}
+      </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">

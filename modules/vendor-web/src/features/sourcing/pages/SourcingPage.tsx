@@ -59,16 +59,22 @@ export default function SourcingPage() {
   }, [bridgeAuctions, storeAuctions])
   const activeTab = getSourcingTab(location.search)
   const [page, setPage] = useState(1)
+  // Date filter unapplied by default.
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
-  const displayedAuctions = useMemo(
-    () =>
+  const displayedAuctions = useMemo(() => {
+    const byTab =
       activeTab === 'ALL'
         ? auctions
         : activeTab === 'ENDED'
           ? auctions.filter((auction) => ENDING_STATES.includes(auction.state))
-          : auctions.filter((auction) => auction.state === activeTab),
-    [activeTab, auctions]
-  )
+          : auctions.filter((auction) => auction.state === activeTab)
+    return byTab.filter((auction) => {
+      const created = ((auction as { createdAt?: string }).createdAt ?? '').slice(0, 10)
+      return (!fromDate || created >= fromDate) && (!toDate || created <= toDate)
+    })
+  }, [activeTab, auctions, fromDate, toDate])
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(displayedAuctions.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -91,7 +97,18 @@ export default function SourcingPage() {
         icon={<Search className="h-5 w-5 text-primary" />}
       />
 
-      <div className="mb-6 mt-6 flex max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
+          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
+        <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
+          className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
+        {(fromDate || toDate) && (
+          <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
+            className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear dates</button>
+        )}
+      </div>
+
+      <div className="mb-6 mt-4 flex max-w-full gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}
