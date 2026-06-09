@@ -211,6 +211,7 @@ export default function CreateInvoicePage() {
                       <th className="px-5 py-3 font-bold">Route</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold text-right">Freight</th>
+                      <th className="px-5 py-3 font-bold text-right">Expenses</th>
                       <th className="px-5 py-3 font-bold text-right">Line total</th>
                     </tr>
                   </thead>
@@ -249,6 +250,9 @@ export default function CreateInvoicePage() {
                           </td>
                           <td className="px-5 py-4 text-right font-medium text-emerald-600">
                             <CurrencyDisplay amount={trip.freightRate} />
+                          </td>
+                          <td className="px-5 py-4 text-right text-sm text-text">
+                            <CurrencyDisplay amount={trip.approvedExpenses ?? 0} />
                           </td>
                           <td className="px-5 py-4 text-right font-semibold text-text">
                             <CurrencyDisplay amount={lineTotal} />
