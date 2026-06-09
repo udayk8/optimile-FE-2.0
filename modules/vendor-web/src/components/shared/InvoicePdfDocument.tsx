@@ -59,7 +59,10 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     if (bridgeLr) return bridgeLr
     const doc = tripById.get(tripId)?.documents?.find((d) => d.type === 'LR_COPY')
     if (doc) return doc.fileName.replace(/\.[a-z]+$/i, '').toUpperCase()
-    return '—'
+    // Fallback mock LR for bookings that don't carry one yet — deterministic
+    // from the booking reference so it stays stable per trip.
+    const digits = tripId.replace(/\D/g, '').slice(-6)
+    return `LR-${digits || tripId.toUpperCase()}`
   }
 
   const paymentTermDays = Math.max(
