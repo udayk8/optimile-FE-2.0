@@ -142,6 +142,7 @@ import type {
   TenantVendorRateCard,
   TenantVendorRateCardInput,
 } from "@/types/vendor";
+import { deriveVendorStatus } from "@/types/vendor";
 import type {
   PlatformAuditEvent,
   PlatformModule,
@@ -912,7 +913,8 @@ function ensureDemoTenantsRehydrated(): void {
 // Gated by its own version key so it runs once and never clobbers later edits.
 // v2: ACC cement gains a Coimbatore address + Bengaluru→Coimbatore rate cards.
 // v3: 3 vendors get configured GST rates (Mahesh 10 / ABC 12 / VRL 18).
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v3";
+// v4: 3 vendors get bank details + logo + invoice terms (for the invoice PDF).
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v4";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
@@ -4553,10 +4555,21 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           email: input.email?.trim().toLowerCase() || undefined,
           serviceableLocations: Array.from(new Set((input.serviceableLocations ?? []).filter(Boolean))),
           supportedVehicleTypes: Array.from(new Set((input.supportedVehicleTypes ?? []).filter(Boolean))),
-          status: input.status,
+          bankName: input.bankName?.trim() || undefined,
+          branch: input.branch?.trim() || undefined,
+          accountNumber: input.accountNumber?.trim() || undefined,
+          ifscCode: input.ifscCode?.trim().toUpperCase() || undefined,
+          accountType: input.accountType,
+          logoUrl: input.logoUrl?.trim() || undefined,
+          invoiceTerms: (input.invoiceTerms ?? []).map((t) => t.trim()).filter(Boolean),
+          rateMatchingConfig: input.rateMatchingConfig,
+          status: "onboarding_incomplete",
           createdAt: now,
           updatedAt: now,
         };
+        // Status is always derived from invoice-profile completeness (unless the
+        // tenant explicitly deactivates the vendor).
+        created.status = deriveVendorStatus(created, input.status);
         setTenantVendors((current) => [created, ...current]);
         return created;
       },
@@ -4622,8 +4635,18 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             updates.supportedVehicleTypes !== undefined
               ? Array.from(new Set(updates.supportedVehicleTypes.filter(Boolean)))
               : existing.supportedVehicleTypes,
+          ifscCode:
+            updates.ifscCode !== undefined ? updates.ifscCode.trim().toUpperCase() || undefined : existing.ifscCode,
+          logoUrl:
+            updates.logoUrl !== undefined ? updates.logoUrl.trim() || undefined : existing.logoUrl,
+          invoiceTerms:
+            updates.invoiceTerms !== undefined
+              ? updates.invoiceTerms.map((t) => t.trim()).filter(Boolean)
+              : existing.invoiceTerms,
           updatedAt: new Date().toISOString(),
         };
+        // Re-derive status from completeness on every edit (manual deactivate wins).
+        updated.status = deriveVendorStatus(updated, updates.status ?? existing.status);
         setTenantVendors((current) =>
           current.map((item) => (item.id === tenantVendorId ? updated : item)),
         );

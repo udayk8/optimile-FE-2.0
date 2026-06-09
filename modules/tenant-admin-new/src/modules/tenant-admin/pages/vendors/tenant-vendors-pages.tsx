@@ -72,8 +72,22 @@ const vendorSchema = z.object({
   accountNumber: z.string().optional(),
   ifscCode: z.string().optional(),
   accountType: z.enum(["SAVINGS", "CURRENT"]).optional(),
-  status: z.enum(["active", "inactive"]),
+  status: z.enum(["active", "onboarding_incomplete", "inactive"]),
 });
+
+const VENDOR_STATUS_LABEL: Record<TenantVendor["status"], string> = {
+  active: "Active",
+  onboarding_incomplete: "Onboarding Incomplete",
+  inactive: "Inactive",
+};
+
+// Default invoice declaration lines pre-filled for a new vendor; the tenant can
+// edit them. These print on the vendor's invoice PDF.
+const DEFAULT_INVOICE_TERMS = [
+  "No credit is available unless confirmed in writing by our Authorised Signatory.",
+  "Interest @ 18% per annum will be charged on delayed payments past the due date.",
+  "Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted.",
+];
 
 function formatAddress(addr: VendorOnboardingDraft["registeredAddress"]) {
   return [addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
@@ -228,11 +242,15 @@ export function TenantVendorsPage() {
             <Switch
               checked={vendor.status === "active"}
               onCheckedChange={(checked) => {
-                updateTenantVendor(vendor.id, { status: checked ? "active" : "inactive" });
-                setMessage(`${vendor.name} marked as ${checked ? "active" : "inactive"}.`);
+                const updated = updateTenantVendor(vendor.id, { status: checked ? "active" : "inactive" });
+                setMessage(`${vendor.name} is now ${VENDOR_STATUS_LABEL[updated.status]}.`);
               }}
             />
-            <span className="text-xs text-muted-foreground">{vendor.status}</span>
+            <Badge
+              variant={vendor.status === "active" ? "default" : vendor.status === "onboarding_incomplete" ? "outline" : "secondary"}
+            >
+              {VENDOR_STATUS_LABEL[vendor.status]}
+            </Badge>
           </div>,
           new Date(vendor.updatedAt).toLocaleDateString(),
           <div key={`${vendor.id}-actions`} className="flex flex-wrap gap-2">
@@ -300,6 +318,19 @@ export function TenantVendorOnboardingPage() {
     status: initialForm.status,
   };
   const [error, setError] = useState("");
+  // Invoice-profile fields the vendor PDF reads — logo + declaration terms.
+  // Required before the vendor can become "active"; otherwise it stays
+  // "onboarding_incomplete".
+  const [logoUrl, setLogoUrl] = useState(editingVendor?.logoUrl ?? "");
+  const [invoiceTermsText, setInvoiceTermsText] = useState(
+    (editingVendor?.invoiceTerms?.length ? editingVendor.invoiceTerms : DEFAULT_INVOICE_TERMS).join("\n"),
+  );
+  function handleLogoFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setLogoUrl(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  }
   // Pending rate card rows (create flow) — persisted once the vendor record is
   // saved. The edit flow manages the live rate card directly in the wizard
   // step, exactly like the vendor detail page.
@@ -361,10 +392,15 @@ export function TenantVendorOnboardingPage() {
       setError("Enter a valid email address.");
       return;
     }
+    const invoiceTerms = invoiceTermsText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const payload = { ...parsed.data, logoUrl: logoUrl.trim() || undefined, invoiceTerms };
     try {
       const saved = editingVendor
-        ? updateTenantVendor(editingVendor.id, parsed.data)
-        : createVendor(parsed.data);
+        ? updateTenantVendor(editingVendor.id, payload)
+        : createVendor(payload);
       if (!editingVendor && pendingRateRows.length > 0) {
         pendingRateRows.forEach((row) => createRateCard(saved.id, row));
       }
@@ -399,6 +435,55 @@ export function TenantVendorOnboardingPage() {
         lockCompanyName={Boolean(editingVendor)}
         lockPrimaryContactPhone={Boolean(editingVendor)}
         extraSteps={[
+          {
+            label: "Invoice Profile",
+            content: (
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground">
+                  These details print on the vendor's invoice PDF. Together with company, GSTIN, PAN, address
+                  and bank details they are required before the vendor can be marked <strong>Active</strong> —
+                  until then the vendor stays <strong>Onboarding Incomplete</strong>. The vendor cannot edit
+                  these.
+                </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Company Logo</label>
+                  <div className="flex items-center gap-4">
+                    <label className="inline-flex cursor-pointer items-center rounded-xl border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent">
+                      {logoUrl ? "Replace Logo" : "Upload Logo"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(event) => {
+                          handleLogoFile(event.target.files?.[0] ?? null);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {logoUrl ? (
+                      <div className="flex items-center gap-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={logoUrl} alt="Vendor logo" className="h-12 w-auto rounded border object-contain" />
+                        <Button size="sm" variant="ghost" onClick={() => setLogoUrl("")}>Remove</Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No logo uploaded</span>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Invoice Terms &amp; Declaration</label>
+                  <p className="text-xs text-muted-foreground">One line per term — these print in the declaration block of the invoice.</p>
+                  <textarea
+                    value={invoiceTermsText}
+                    onChange={(event) => setInvoiceTermsText(event.target.value)}
+                    rows={5}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            ),
+          },
           {
             label: "Rate Card",
             content: isEdit && editingVendor ? (

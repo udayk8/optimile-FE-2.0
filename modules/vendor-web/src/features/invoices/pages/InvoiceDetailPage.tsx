@@ -13,7 +13,7 @@ import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
+import { useVendorInvoiceProfile } from '@vendor/integration/useVendorInvoiceProfile'
 import { ArrowLeft, Download, FileText, MessageSquareWarning, ReceiptText, Route } from 'lucide-react'
 
 // Customer block for the printable invoice (the tenant the vendor bills).
@@ -49,7 +49,7 @@ export default function InvoiceDetailPage() {
   const supersededBy = invoice.supersededByInvoiceId ? invoices.find((item) => item.id === invoice.supersededByInvoiceId) : undefined
   const supersedes = invoice.supersedesInvoiceId ? invoices.find((item) => item.id === invoice.supersedesInvoiceId) : undefined
 
-  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
 
@@ -233,9 +233,11 @@ export default function InvoiceDetailPage() {
           ref={pdfRef}
           invoice={invoice}
           trips={trips}
-          companyName={companyName}
-          companyInfo={MOCK_COMPANY_INFO}
-          bank={MOCK_BANK}
+          companyName={invoiceProfile.companyName}
+          companyInfo={invoiceProfile.companyInfo}
+          bank={invoiceProfile.bank}
+          terms={invoiceProfile.terms}
+          logoUrl={invoiceProfile.logoUrl}
           customerName={customerName}
           customerAddress={CUSTOMER_ADDRESS}
           getLrNumber={getLrNumber}

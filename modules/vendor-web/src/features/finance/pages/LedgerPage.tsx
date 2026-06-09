@@ -32,7 +32,7 @@ export default function LedgerPage() {
     from.setMonth(from.getMonth() - 2)
     return from.toISOString().slice(0, 10)
   })
-  const [toDate, setToDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [toDate, setToDate] = useState('2026-06-10')
   const [invoiceFilter, setInvoiceFilter] = useState('ALL')
   const [search, setSearch] = useState('')
   const activeTab: LedgerTab = 'CUSTOMER'
@@ -72,6 +72,7 @@ export default function LedgerPage() {
 
     let customerPending = 0
     let customerSettledInvoices = 0
+    let customerPendingInvoices = 0
     let customerCollected = 0
     let tdsDeducted = 0
 
@@ -79,6 +80,7 @@ export default function LedgerPage() {
       if (entry.ledgerType === 'CUSTOMER') {
         customerPending += Math.max(0, entry.runningBalance)
         if (entry.runningBalance === 0) customerSettledInvoices += 1
+        else if (entry.runningBalance > 0) customerPendingInvoices += 1
       }
     }
 
@@ -87,8 +89,28 @@ export default function LedgerPage() {
       if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'TDS_DEDUCTION') tdsDeducted += entry.credit
     }
 
-    return { customerPending, customerSettledInvoices, customerCollected, tdsDeducted }
+    // Total amount paid is the full-history customer collection (not range-bound).
+    let totalAmountPaid = 0
+    for (const entry of ledger) {
+      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'CUSTOMER_PAYMENT') totalAmountPaid += entry.credit
+    }
+
+    return { customerPending, customerSettledInvoices, customerPendingInvoices, customerCollected, tdsDeducted, totalAmountPaid }
   }, [ledger, dateFilteredEntries])
+
+  // True running balance for the statement: accumulate Debit − Credit across
+  // the date-ordered entries so the Balance column adds up across invoices,
+  // rather than showing each entry's stored per-invoice balance.
+  const balanceByEntryId = useMemo(() => {
+    const ordered = [...tabEntries].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id))
+    const map = new Map<string, number>()
+    let balance = 0
+    for (const entry of ordered) {
+      balance += entry.debit - entry.credit
+      map.set(entry.id, balance)
+    }
+    return map
+  }, [tabEntries])
 
   const totalPages = Math.max(1, Math.ceil(tabEntries.length / 10))
   const safePage = Math.min(page, totalPages)
@@ -110,7 +132,7 @@ export default function LedgerPage() {
       row.description,
       row.debit > 0 ? String(row.debit) : '',
       row.credit > 0 ? String(row.credit) : '',
-      formatBalance(row.runningBalance, activeTab),
+      formatBalance(balanceByEntryId.get(row.id) ?? row.runningBalance, activeTab),
     ])
     const csv = [header, ...rows].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -157,6 +179,16 @@ export default function LedgerPage() {
         </div>
 
         <div className="grid gap-4 border-b border-gray-100 bg-gray-50/70 px-6 py-5 md:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-medium text-gray-500">Invoices Pending Payment</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-text">{summary.customerPendingInvoices}</div>
+            <div className="mt-2 text-xs text-gray-500">Invoices with an outstanding customer balance.</div>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="text-sm font-medium text-gray-500">Total Amount Paid</div>
+            <div className="mt-2 text-3xl font-semibold tracking-tight text-emerald-600">₹{summary.totalAmountPaid.toLocaleString('en-IN')}</div>
+            <div className="mt-2 text-xs text-gray-500">Total customer payments collected across all invoices.</div>
+          </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Customer Pending</div>
             <div className="mt-2 text-3xl font-semibold tracking-tight text-text">₹{summary.customerPending.toLocaleString('en-IN')} Dr</div>
@@ -240,7 +272,7 @@ export default function LedgerPage() {
                   <td className="p-4 text-gray-600">{row.description}</td>
                   <td className="p-4 text-right font-medium text-rose-600">{row.debit > 0 ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
                   <td className="p-4 text-right font-medium text-emerald-600">{row.credit > 0 ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
-                  <td className="p-4 text-right font-mono">{formatBalance(row.runningBalance, activeTab)}</td>
+                  <td className="p-4 text-right font-mono">{formatBalance(balanceByEntryId.get(row.id) ?? row.runningBalance, activeTab)}</td>
                 </tr>
               ))}
             </tbody>

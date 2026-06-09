@@ -15,9 +15,6 @@ import { ConfirmDialog } from '@vendor/components/shared/ConfirmDialog'
 import { ChangeAssignmentModal } from '@vendor/features/trips/components/ChangeAssignmentModal'
 import type { Trip } from '@vendor/types'
 
-// Pickup time comes from the originating indent's reporting slot.
-const pickupTime = (trip: { indentId: string }, indents: { id: string; reportingDateTime: string }[]) =>
-  indents.find((indent) => indent.id === trip.indentId)?.reportingDateTime
 // Most recent lifecycle event — falls back to creation time.
 const lastUpdateTime = (trip: { createdAt: string; timeline?: { timestamp: string }[] }) =>
   trip.timeline?.length ? [...trip.timeline].sort((a, b) => a.timestamp.localeCompare(b.timestamp)).at(-1)!.timestamp : trip.createdAt
@@ -123,7 +120,8 @@ export default function TripsPage() {
   const cancelledTripBookings = trips.filter((trip) => trip.status === 'CANCELLED')
   const cancelledBookings = cancelledTripBookings.map((trip) => ({
     id: trip.id,
-    route: `${trip.laneDetails.origin.city} → ${trip.laneDetails.destination.city}`,
+    originCity: trip.laneDetails.origin.city,
+    destinationCity: trip.laneDetails.destination.city,
     stage: 'Post Dispatch',
     cancelledBy: 'Vendor',
     reason: 'Booking cancelled',
@@ -134,7 +132,8 @@ export default function TripsPage() {
   const rejectedIndentBookings = indents.filter((indent) => indent.status === 'DECLINED')
   const rejectedBookings = rejectedIndentBookings.map((indent) => ({
     id: indent.id,
-    route: `${indent.laneDetails.origin.city} → ${indent.laneDetails.destination.city}`,
+    originCity: indent.laneDetails.origin.city,
+    destinationCity: indent.laneDetails.destination.city,
     stage: 'Pending Transport Allocation',
     rejectedBy: 'Vendor',
     reason: indent.rejectionReason ?? 'Declined before allocation',
@@ -187,8 +186,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Load</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Received</th>
                     <th className="px-5 py-3 font-bold">SLA</th>
                     <th className="px-5 py-3 font-bold text-right">Actions</th>
@@ -204,11 +203,11 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2 text-sm text-text">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {indent.laneDetails.origin.city} → {indent.laneDetails.destination.city}
+                          {indent.laneDetails.origin.city}
                         </div>
                         <div className="mt-1 text-xs text-gray-500">{formatDateTime(indent.reportingDateTime)}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{indent.loadDetails.commodity}, {indent.loadDetails.weightKg / 1000}T</td>
+                      <td className="px-5 py-4 text-sm text-text">{indent.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(indent.createdAt)}</td>
                       <td className="px-5 py-4"><SLACountdown deadline={indent.slaDeadline} /></td>
                       <td className="px-5 py-4 text-right">
@@ -244,8 +243,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Pickup</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Vehicle</th>
                     <th className="px-5 py-3 font-bold">Driver</th>
@@ -262,12 +261,10 @@ export default function TripsPage() {
                       <td className="px-5 py-4 text-sm text-text">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {booking.laneDetails.origin.city} → {booking.laneDetails.destination.city}
+                          {booking.laneDetails.origin.city}
                         </div>
                       </td>
-                      {(() => { const p = pickupTime(booking, indents); return (
-                      <td className="px-5 py-4 text-sm text-text">{p ? formatDateTime(p) : '—'}</td>
-                      ) })()}
+                      <td className="px-5 py-4 text-sm text-text">{booking.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.assignedVehicle.registrationNumber}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.assignedDriver.name}</td>
@@ -303,8 +300,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
-                    <th className="px-5 py-3 font-bold">Pickup</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Vehicle</th>
                     <th className="px-5 py-3 font-bold">Driver</th>
@@ -326,12 +323,10 @@ export default function TripsPage() {
                       <td className="px-5 py-4 text-sm text-text">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
+                          {trip.laneDetails.origin.city}
                         </div>
                       </td>
-                      {(() => { const p = pickupTime(trip, indents); return (
-                      <td className="px-5 py-4 text-sm text-text">{p ? formatDateTime(p) : '—'}</td>
-                      ) })()}
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
@@ -360,7 +355,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Delivered</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold text-right">Actions</th>
@@ -373,7 +369,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                       <td className="px-5 py-4 text-right">
@@ -411,7 +408,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Delivered</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Freight</th>
@@ -427,7 +425,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(trip))}</td>
                       <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
@@ -456,7 +455,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Stage</th>
                     <th className="px-5 py-3 font-bold">Cancelled By</th>
@@ -471,7 +471,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.cancelledBy}</td>
@@ -501,7 +502,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Stage</th>
                     <th className="px-5 py-3 font-bold">Rejected By</th>
@@ -516,7 +518,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{booking.id}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{booking.route}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.originCity}</td>
+                      <td className="px-5 py-4 text-sm text-text">{booking.destinationCity}</td>
                       <td className="px-5 py-4 text-sm text-text">{formatDateTime(lastUpdateTime(booking))}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.stage}</td>
                       <td className="px-5 py-4 text-sm text-text">{booking.rejectedBy}</td>
@@ -546,7 +549,8 @@ export default function TripsPage() {
                   <tr>
                     <th className="px-5 py-3 font-bold">Status</th>
                     <th className="px-5 py-3 font-bold">Booking</th>
-                    <th className="px-5 py-3 font-bold">Route</th>
+                    <th className="px-5 py-3 font-bold">Source</th>
+                    <th className="px-5 py-3 font-bold">Destination</th>
                     <th className="px-5 py-3 font-bold">Issue</th>
                     <th className="px-5 py-3 font-bold">Last Update</th>
                     <th className="px-5 py-3 font-bold">Vehicle / Driver</th>
@@ -566,7 +570,8 @@ export default function TripsPage() {
                       <td className="px-5 py-4">
                         <div className="font-mono text-sm font-semibold">{trip.id}</div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
+                      <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                       <td className="px-5 py-4">
                         {trip.disruption ? (
                           <div className="space-y-1">

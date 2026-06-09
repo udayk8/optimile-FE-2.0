@@ -884,22 +884,18 @@ export const useAppStore = create<AppState>((set) => ({
 
         const timestamp = new Date().toISOString()
         const action =
-          status === 'ACKNOWLEDGED'
-            ? 'Acknowledged'
-            : status === 'IN_PROGRESS'
-              ? 'In Progress'
-              : status === 'RESOLVED'
-                ? 'Resolved'
-                : 'Closed'
+          status === 'IN_PROGRESS'
+            ? 'In Progress'
+            : status === 'RESOLVED'
+              ? 'Resolved'
+              : 'Open'
 
         const defaultNotes =
-          status === 'ACKNOWLEDGED'
-            ? 'Operations confirmed receipt and started triage.'
-            : status === 'IN_PROGRESS'
-              ? 'Working on recovery and customer communication.'
-              : status === 'RESOLVED'
-                ? 'Issue has been resolved.'
-                : 'Exception closed after resolution.'
+          status === 'IN_PROGRESS'
+            ? 'Working on recovery and customer communication.'
+            : status === 'RESOLVED'
+              ? 'Issue has been resolved.'
+              : 'Exception reported and awaiting triage.'
 
         return {
           ...exception,

@@ -19,11 +19,21 @@ export interface InvoicePdfProps {
   bank: BankDetails
   customerName: string
   customerAddress: string
+  /** Vendor logo (data URL or URL), configured by the tenant at onboarding. */
+  logoUrl?: string
+  /** Declaration / terms lines, configured by the tenant at onboarding. */
+  terms?: string[]
   /** Resolves shared-booking LR numbers when embedded; optional. */
   getLrNumber?: (tripId: string) => string | null
 }
 
-const inr = (n: number) => n.toLocaleString('en-IN')
+const DEFAULT_TERMS = [
+  'No credit is available unless confirmed in writing by our Authorised Signatory.',
+  'Interest @ 18% per annum will be charged on delayed payments past the due date.',
+  'Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted.',
+]
+
+const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`
 
 function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -35,9 +45,10 @@ function Row({ label, value, strong = false }: { label: string; value: string; s
 }
 
 export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(function InvoicePdfDocument(
-  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, getLrNumber },
+  { invoice, trips, companyName, companyInfo, bank, customerName, customerAddress, logoUrl, terms, getLrNumber },
   ref,
 ) {
+  const declarationLines = terms && terms.length > 0 ? terms : DEFAULT_TERMS
   const tripById = new Map(trips.map((t) => [t.id, t]))
   const firstTrip = invoice.lineItems.map((li) => tripById.get(li.tripId)).find(Boolean)
 
@@ -73,6 +84,10 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         {/* ── Header: company block + invoice meta ── */}
         <div className="flex">
           <div className="w-1/2 border-r-2 p-4" style={{ borderColor: BLUE }}>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={`${companyName} logo`} className="mb-2 h-12 w-auto object-contain" />
+            ) : null}
             <h1 className="text-2xl font-extrabold tracking-tight">{companyName}</h1>
             <p className="mt-1 text-[11px] text-gray-700">
               {addr.street}, {addr.city}, {addr.state} – {addr.pincode}
@@ -213,9 +228,9 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           DECLARATION
         </div>
         <div className="p-4 text-[10px] leading-relaxed text-gray-700">
-          <p>No credit is available unless confirmed in writing by our Authorised Signatory.</p>
-          <p>Interest @ 18% per annum will be charged on delayed payments past the due date.</p>
-          <p>Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted.</p>
+          {declarationLines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
           <p className="mt-2 text-center font-semibold" style={{ color: BLUE }}>This is a Computer Generated Invoice</p>
         </div>
       </div>

@@ -14,9 +14,10 @@ import { downloadElementAsPdf } from '@vendor/lib/pdf'
 import { useVendorInvoices } from '@vendor/integration/useVendorInvoices'
 import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useAppStore } from '@vendor/stores/app.store'
 import { InvoicePdfDocument } from '@vendor/components/shared/InvoicePdfDocument'
-import { MOCK_BANK, MOCK_COMPANY_INFO } from '@vendor/lib/mock-data'
-import { CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
+import { useVendorInvoiceProfile, type VendorInvoiceProfileData } from '@vendor/integration/useVendorInvoiceProfile'
+import { CalendarDays, CreditCard, Download, FileText, MessageSquareMore, Plus, RefreshCw, ArrowRight, X } from 'lucide-react'
 import type { Dispute, Invoice, InvoiceLineItem, Trip } from '@vendor/types'
 
 const CUSTOMER_ADDRESS =
@@ -26,14 +27,14 @@ const CUSTOMER_ADDRESS =
 function HiddenInvoicePdf({
   invoice,
   trips,
-  companyName,
+  profile,
   customerName,
   getLrNumber,
   onDone,
 }: {
   invoice: Invoice
   trips: Trip[]
-  companyName: string
+  profile: VendorInvoiceProfileData
   customerName: string
   getLrNumber: (tripId: string) => string | null
   onDone: () => void
@@ -50,9 +51,11 @@ function HiddenInvoicePdf({
         ref={ref}
         invoice={invoice}
         trips={trips}
-        companyName={companyName}
-        companyInfo={MOCK_COMPANY_INFO}
-        bank={MOCK_BANK}
+        companyName={profile.companyName}
+        companyInfo={profile.companyInfo}
+        bank={profile.bank}
+        terms={profile.terms}
+        logoUrl={profile.logoUrl}
         customerName={customerName}
         customerAddress={CUSTOMER_ADDRESS}
         getLrNumber={getLrNumber}
@@ -61,19 +64,22 @@ function HiddenInvoicePdf({
   )
 }
 
-type InvoiceWorkspaceTab = 'all' | 'pending' | 'approved' | 'disputed' | 'resubmission' | 'closed'
+type InvoiceWorkspaceTab = 'all' | 'pending' | 'approved' | 'disputed' | 'resubmission' | 'paid' | 'closed'
 type StatusTab = Exclude<InvoiceWorkspaceTab, 'all'>
 
-const INVOICE_TABS: InvoiceWorkspaceTab[] = ['all', 'pending', 'approved', 'disputed', 'resubmission', 'closed']
+const INVOICE_TABS: InvoiceWorkspaceTab[] = ['all', 'pending', 'approved', 'disputed', 'resubmission', 'paid', 'closed']
 
 function getInvoiceTab(search: string): InvoiceWorkspaceTab {
   const requested = new URLSearchParams(search).get('tab')
   return INVOICE_TABS.includes(requested as InvoiceWorkspaceTab) ? (requested as InvoiceWorkspaceTab) : 'all'
 }
 
-// The tab a single invoice belongs to is derived purely from its status — the status is the source of truth.
-function statusToTab(status: Invoice['status']): StatusTab {
-  switch (status) {
+// The tab a single invoice belongs to is derived from its status — except a
+// fully-paid invoice (its ledger receivable settled to zero by recorded
+// payments) moves to the Paid tab regardless of its APPROVED status.
+function tabForInvoice(invoice: Invoice, paidInvoiceIds: Set<string>): StatusTab {
+  if (paidInvoiceIds.has(invoice.id)) return 'paid'
+  switch (invoice.status) {
     case 'APPROVED':
       return 'approved'
     case 'DISPUTED':
@@ -105,9 +111,30 @@ export default function InvoicesPage() {
   const [downloadInvoiceId, setDownloadInvoiceId] = useState<string | null>(null)
 
   const { invoices, disputes, createResubmissionInvoice } = useVendorInvoices()
+  const ledger = useAppStore((s) => s.ledger)
   const bridge = useTenantBridge()
+
+  // An invoice is "fully paid" when its customer-ledger receivable, opened on
+  // approval, has been settled to a zero balance by the payments recorded
+  // against it (payment + TDS entries).
+  const paidInvoiceIds = useMemo(() => {
+    const sorted = [...ledger]
+      .filter((entry) => entry.ledgerType === 'CUSTOMER')
+      .sort((a, b) => a.date.localeCompare(b.date))
+    const opened = new Set<string>()
+    const latestBalance = new Map<string, number>()
+    for (const entry of sorted) {
+      if (entry.entryType === 'INVOICE_APPROVED') opened.add(entry.invoiceId)
+      latestBalance.set(entry.invoiceId, entry.runningBalance)
+    }
+    const paid = new Set<string>()
+    for (const [invoiceId, balance] of latestBalance) {
+      if (opened.has(invoiceId) && balance === 0) paid.add(invoiceId)
+    }
+    return paid
+  }, [ledger])
   const { trips: allBookings, getBookingDetail } = useVendorBookings()
-  const companyName = bridge?.vendorName ?? MOCK_COMPANY_INFO.tradingName
+  const invoiceProfile = useVendorInvoiceProfile()
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
   const downloadInvoice = downloadInvoiceId ? invoices.find((item) => item.id === downloadInvoiceId) : null
@@ -121,32 +148,37 @@ export default function InvoicesPage() {
   }, [disputes])
 
   const tabCounts = useMemo(() => {
-    const counts: Record<InvoiceWorkspaceTab, number> = { all: invoices.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, closed: 0 }
+    const counts: Record<InvoiceWorkspaceTab, number> = { all: invoices.length, pending: 0, approved: 0, disputed: 0, resubmission: 0, paid: 0, closed: 0 }
     invoices.forEach((invoice) => {
-      counts[statusToTab(invoice.status)] += 1
+      counts[tabForInvoice(invoice, paidInvoiceIds)] += 1
     })
     return counts
-  }, [invoices])
+  }, [invoices, paidInvoiceIds])
 
   const tabs: Array<{ key: InvoiceWorkspaceTab; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'pending', label: 'Pending' },
-    { key: 'approved', label: 'Approved' },
     { key: 'disputed', label: 'Disputed' },
     { key: 'resubmission', label: 'Resubmission Required' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'approved', label: 'Approved' },
     { key: 'closed', label: 'Closed' },
   ]
 
   const invoicesForTab = useMemo(() => {
     return invoices
       .filter((invoice) => {
-        if (activeTab !== 'all' && statusToTab(invoice.status) !== activeTab) return false
-        if (fromDate && invoice.invoiceDate < fromDate) return false
-        if (toDate && invoice.invoiceDate > toDate) return false
+        if (activeTab !== 'all' && tabForInvoice(invoice, paidInvoiceIds) !== activeTab) return false
+        // Compare date-only portion — invoiceDate may carry a time suffix from
+        // the finance bridge, which would break a raw string compare at the
+        // range boundaries.
+        const invDate = (invoice.invoiceDate ?? '').slice(0, 10)
+        if (fromDate && invDate < fromDate) return false
+        if (toDate && invDate > toDate) return false
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [activeTab, fromDate, invoices, toDate])
+  }, [activeTab, fromDate, invoices, toDate, paidInvoiceIds])
 
   const approvedInvoices = invoices.filter((invoice) => invoice.status === 'APPROVED')
   const approvedSummary = useMemo(() => {
@@ -227,6 +259,27 @@ export default function InvoicesPage() {
         </Button>
       </div>
 
+      <div className="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <CalendarDays className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-text">Date Filter</div>
+            <div className="text-xs text-gray-500">Filter invoices by invoice date</div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setFromDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
+          <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setToDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
+          {(fromDate || toDate) && (
+            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setInvoicePage(1) }}>
+              Clear dates
+            </Button>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="p-4">
@@ -246,9 +299,9 @@ export default function InvoicesPage() {
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total GST</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total GST Approved</div>
             <div className="mt-2 text-2xl font-bold text-amber-700">
-              <CurrencyDisplay amount={invoiceSummary.totalGst} />
+              <CurrencyDisplay amount={approvedSummary.totalGstApproved} />
             </div>
           </CardContent>
         </Card>
@@ -276,16 +329,6 @@ export default function InvoicesPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-6 py-4">
-          <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setFromDate(e.target.value)} className="w-[180px]" />
-          <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => setToDate(e.target.value)} className="w-[180px]" />
-          {(fromDate || toDate) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate('') }}>
-              Clear dates
-            </Button>
-          )}
-        </div>
-
         <div className="overflow-x-auto">
           {invoicesForTab.length === 0 ? (
             <div className="p-8">
@@ -302,7 +345,6 @@ export default function InvoicesPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Invoice Number</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Date</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Created On</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Due Date</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Dispute</th>
                   <th className="p-4 text-xs font-bold uppercase tracking-wide text-gray-500">Bookings</th>
@@ -321,13 +363,7 @@ export default function InvoicesPage() {
                       <td className="p-4">{formatDate(invoice.invoiceDate)}</td>
                       <td className="p-4">{formatDateTime(invoice.createdAt)}</td>
                       <td className="p-4">
-                        {formatDate(invoice.paymentDueDate)}
-                        {invoice.paymentDate ? (
-                          <div className="mt-1 text-xs text-emerald-600">Paid {formatDate(invoice.paymentDate)}</div>
-                        ) : null}
-                      </td>
-                      <td className="p-4">
-                        <StatusBadge status={invoice.status} />
+                        <StatusBadge status={paidInvoiceIds.has(invoice.id) ? 'PAID' : invoice.status} />
                         {invoice.status === 'CLOSED' && invoice.closeReason ? (
                           <p className="mt-1 text-xs text-gray-400">{CLOSE_REASON_LABEL[invoice.closeReason]}</p>
                         ) : null}
@@ -462,7 +498,7 @@ export default function InvoicesPage() {
         <HiddenInvoicePdf
           invoice={downloadInvoice}
           trips={allBookings}
-          companyName={companyName}
+          profile={invoiceProfile}
           customerName={customerName}
           getLrNumber={getLrNumber}
           onDone={() => setDownloadInvoiceId(null)}

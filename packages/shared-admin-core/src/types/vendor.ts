@@ -24,13 +24,70 @@ export interface TenantVendor {
   accountNumber?: string;
   ifscCode?: string;
   accountType?: "SAVINGS" | "CURRENT";
+  /** Invoice-document branding/terms, configured by the tenant at onboarding and
+   *  surfaced on the vendor's invoice PDF. The vendor never edits these. */
+  logoUrl?: string;
+  invoiceTerms?: string[];
   /** Vendor contract rate-card STRUCTURE — which dimension columns this vendor's
    *  rate card has AND what booking matches on (same engine as customers; there
    *  is no separate strategy for vendors). See shared/lib/rate-matching-config.ts. */
   rateMatchingConfig?: RateMatchingConfig;
-  status: "active" | "inactive";
+  /** "onboarding_incomplete" is the middle state held automatically until every
+   *  mandatory invoice-profile field (GSTIN, PAN, address, bank, terms, logo) is
+   *  filled; only then can the vendor be "active". "inactive" is set manually. */
+  status: TenantVendorStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export type TenantVendorStatus = "active" | "onboarding_incomplete" | "inactive";
+
+/** Mandatory invoice-profile fields a vendor must have before it can be active. */
+export const VENDOR_INVOICE_REQUIRED_FIELDS = [
+  "name",
+  "legalName",
+  "gstin",
+  "pan",
+  "address",
+  "bankName",
+  "branch",
+  "accountNumber",
+  "ifscCode",
+  "logoUrl",
+  "invoiceTerms",
+] as const;
+
+/** True when every mandatory invoice-profile field is present. */
+export function isVendorInvoiceProfileComplete(
+  vendor: Pick<TenantVendor, "name" | "legalName" | "gstin" | "pan" | "address" | "bankName" | "branch" | "accountNumber" | "ifscCode" | "logoUrl" | "invoiceTerms">,
+): boolean {
+  const filled = (v?: string) => Boolean(v && v.trim());
+  return (
+    filled(vendor.name) &&
+    filled(vendor.legalName) &&
+    filled(vendor.gstin) &&
+    filled(vendor.pan) &&
+    filled(vendor.address) &&
+    filled(vendor.bankName) &&
+    filled(vendor.branch) &&
+    filled(vendor.accountNumber) &&
+    filled(vendor.ifscCode) &&
+    filled(vendor.logoUrl) &&
+    Boolean(vendor.invoiceTerms && vendor.invoiceTerms.some((t) => t.trim()))
+  );
+}
+
+/**
+ * Derives the persisted status from invoice-profile completeness. A vendor the
+ * tenant has explicitly deactivated stays "inactive"; otherwise it is "active"
+ * once complete, else "onboarding_incomplete".
+ */
+export function deriveVendorStatus(
+  vendor: Parameters<typeof isVendorInvoiceProfileComplete>[0],
+  requested: TenantVendorStatus,
+): TenantVendorStatus {
+  if (requested === "inactive") return "inactive";
+  return isVendorInvoiceProfileComplete(vendor) ? "active" : "onboarding_incomplete";
 }
 
 export type VendorRateType = "PER_MT" | "PER_TRIP" | "PER_KM";
@@ -98,8 +155,10 @@ export interface TenantVendorInput {
   accountNumber?: string;
   ifscCode?: string;
   accountType?: "SAVINGS" | "CURRENT";
+  logoUrl?: string;
+  invoiceTerms?: string[];
   rateMatchingConfig?: RateMatchingConfig;
-  status: "active" | "inactive";
+  status: TenantVendorStatus;
 }
 
 export interface TenantVendorRateCardInput {

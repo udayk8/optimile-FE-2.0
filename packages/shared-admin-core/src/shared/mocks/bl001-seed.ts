@@ -1054,6 +1054,17 @@ export const bl001Vendors = [
     "supportedVehicleTypes": [
       "HGV"
     ],
+    "bankName": "HDFC Bank",
+    "branch": "Banashankari, Bengaluru",
+    "accountNumber": "50100234567811",
+    "ifscCode": "HDFC0001456",
+    "accountType": "CURRENT",
+    "logoUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='48'><rect width='120' height='48' rx='6' fill='%232D3AC8'/><text x='60' y='30' font-family='Arial' font-size='15' font-weight='bold' fill='white' text-anchor='middle'>MAHESH</text></svg>",
+    "invoiceTerms": [
+      "No credit is available unless confirmed in writing by our Authorised Signatory.",
+      "Interest @ 18% per annum will be charged on delayed payments past the due date.",
+      "Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted."
+    ],
     "status": "active",
     "createdAt": "2026-06-01T09:07:26.077Z",
     "updatedAt": "2026-06-01T09:07:26.077Z"
@@ -1079,6 +1090,17 @@ export const bl001Vendors = [
     "supportedVehicleTypes": [
       "HGVLGVMGV"
     ],
+    "bankName": "ICICI Bank",
+    "branch": "GM Palya, Bengaluru",
+    "accountNumber": "002105500456",
+    "ifscCode": "ICIC0000210",
+    "accountType": "CURRENT",
+    "logoUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='48'><rect width='120' height='48' rx='6' fill='%232D3AC8'/><text x='60' y='30' font-family='Arial' font-size='18' font-weight='bold' fill='white' text-anchor='middle'>ABC</text></svg>",
+    "invoiceTerms": [
+      "No credit is available unless confirmed in writing by our Authorised Signatory.",
+      "Interest @ 18% per annum will be charged on delayed payments past the due date.",
+      "Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted."
+    ],
     "status": "active",
     "createdAt": "2026-05-31T14:34:10.910Z",
     "updatedAt": "2026-05-31T14:34:10.910Z"
@@ -1103,6 +1125,17 @@ export const bl001Vendors = [
     ],
     "supportedVehicleTypes": [
       "HGVLGVMGV"
+    ],
+    "bankName": "Axis Bank",
+    "branch": "Banashankari, Bengaluru",
+    "accountNumber": "918020012345678",
+    "ifscCode": "UTIB0000456",
+    "accountType": "CURRENT",
+    "logoUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='48'><rect width='120' height='48' rx='6' fill='%232D3AC8'/><text x='60' y='30' font-family='Arial' font-size='16' font-weight='bold' fill='white' text-anchor='middle'>VRL</text></svg>",
+    "invoiceTerms": [
+      "No credit is available unless confirmed in writing by our Authorised Signatory.",
+      "Interest @ 18% per annum will be charged on delayed payments past the due date.",
+      "Any discrepancies in the invoice should be informed in writing within 7 days of submission, otherwise the invoice will be considered as accepted."
     ],
     "status": "active",
     "createdAt": "2026-05-31T13:35:36.619Z",

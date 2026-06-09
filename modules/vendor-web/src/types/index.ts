@@ -611,7 +611,7 @@ export interface NBFCApplication {
 }
 
 export type ExceptionSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type ExceptionStatus = 'OPEN' | 'ACKNOWLEDGED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'
+export type ExceptionStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
 export type ExceptionIssueType = 'Breakdown' | 'Delay' | 'Accident' | 'Route deviation' | 'Cargo issue'
 
 export interface ExceptionTimelineEntry {

@@ -10,13 +10,11 @@ import { formatDateTime } from '@vendor/lib/date-utils'
 
 const PAGE_SIZE = 6
 
-const STATE_FILTERS: Array<'ALL' | ExceptionStatus> = ['ALL', 'OPEN', 'ACKNOWLEDGED', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']
+const STATE_FILTERS: Array<'ALL' | ExceptionStatus> = ['ALL', 'OPEN', 'IN_PROGRESS', 'RESOLVED']
 const STATUS_ORDER: Record<ExceptionStatus, number> = {
   OPEN: 0,
-  ACKNOWLEDGED: 1,
-  IN_PROGRESS: 2,
-  RESOLVED: 3,
-  CLOSED: 4,
+  IN_PROGRESS: 1,
+  RESOLVED: 2,
 }
 const SEVERITY_ORDER: Record<ExceptionRecord['severity'], number> = {
   CRITICAL: 0,
@@ -60,9 +58,9 @@ export default function SupportHubPage() {
   const pageItems = filteredExceptions.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const openCount = exceptions.filter((item) => item.status === 'OPEN').length
-  const activeCount = exceptions.filter((item) => item.status === 'ACKNOWLEDGED' || item.status === 'IN_PROGRESS').length
-  const resolvedCount = exceptions.filter((item) => item.status === 'RESOLVED' || item.status === 'CLOSED').length
-  const breachedCount = exceptions.filter((item) => item.severity === 'CRITICAL' && item.status !== 'CLOSED').length
+  const activeCount = exceptions.filter((item) => item.status === 'IN_PROGRESS').length
+  const resolvedCount = exceptions.filter((item) => item.status === 'RESOLVED').length
+  const breachedCount = exceptions.filter((item) => item.severity === 'CRITICAL' && item.status !== 'RESOLVED').length
 
   return (
     <div className="space-y-6">
@@ -76,7 +74,7 @@ export default function SupportHubPage() {
       <div className="grid gap-4 md:grid-cols-4">
         {[
           { label: 'Open', value: openCount, note: 'Newly reported or waiting to be handled.' },
-          { label: 'Active', value: activeCount, note: 'Acknowledged or in progress cases.' },
+          { label: 'Active', value: activeCount, note: 'Cases currently in progress.' },
           { label: 'Resolved', value: resolvedCount, note: 'Completed exceptions kept for history.' },
           { label: 'Critical', value: breachedCount, note: 'Top severity items surface first automatically.' },
         ].map((item) => (

@@ -10,6 +10,7 @@ import { KPICard } from '@vendor/components/cards/KPICard'
 import { useAppStore } from '@vendor/stores/app.store'
 import { formatLaneDisplay } from '@shared-utils'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useVendorInvoices, invoicedTripIds } from '@vendor/integration/useVendorInvoices'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -17,15 +18,16 @@ export default function DashboardPage() {
   // Pending Indents + Active Bookings come from the cross-module bridge when
   // embedded (bookings assigned to this vendor); other KPIs keep their source.
   const { indents: vendorIndents, trips: vendorTrips } = useVendorBookings()
+  const { invoices } = useVendorInvoices()
   const auctions = useAppStore(state => state.auctions)
-  const trips = useAppStore(state => state.trips)
   const vehicles = useAppStore(state => state.vehicles)
   const drivers = useAppStore(state => state.drivers)
   const pendingIndents = vendorIndents.filter(i => i.status === 'PENDING')
   const liveAuctions = auctions.filter(a => a.state === 'LIVE')
   const upcomingAuctions = auctions.filter(a => a.state === 'UPCOMING')
 
-  const uninvoicedBookings = trips.filter(t => t.status === 'COMPLETED' && !t.isInvoiced && t.freightRate > 0)
+  const lockedTripIds = invoicedTripIds(invoices)
+  const uninvoicedBookings = vendorTrips.filter(t => t.status === 'COMPLETED' && !lockedTripIds.has(t.id) && t.freightRate > 0)
   const totalBillableAmount = uninvoicedBookings.reduce((sum, booking) => sum + (booking.freightRate || 0), 0)
 
   const activeBookings = vendorTrips.filter(t => ['ACCEPTED', 'ASSIGNED', 'OUT_FOR_PICKUP', 'PICKUP_REACHED', 'LOADING_STARTED', 'LOADING_COMPLETED', 'IN_TRANSIT', 'DESTINATION_REACHED', 'POD_PENDING'].includes(t.status))
