@@ -930,7 +930,9 @@ function ensureDemoTenantsRehydrated(): void {
 // v6: driver expenses seeded on a completed booking (vendor expense tab/column).
 // v7: LR advance seeded on that booking (vendor advance column, info-only).
 // v8: 4 ACC cement bookings set COMPLETED + POD for the AR invoice-flow demo.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v8";
+// v9: Ultratech customer mapped to materials (Cement, PPC Cement) + advance/
+//     charge expense items reseeded on the demo booking.
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v9";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {

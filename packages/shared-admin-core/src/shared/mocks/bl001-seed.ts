@@ -1945,13 +1945,30 @@ export const bl001Materials = [
     "defaultWeightUOM": "MT",
     "conversionValue": 0.05,
     "mappedCustomerIds": [
-      "tenant-customer-o8kyr7u"
+      "tenant-customer-o8kyr7u",
+      "tenant-customer-ultra01"
     ],
     "status": "active",
     "quantityUOM": "BAG",
     "id": "material-i8gm01l",
     "createdAt": "2026-05-31T13:31:41.452Z",
     "updatedAt": "2026-05-31T13:31:41.452Z"
+  },
+  {
+    "tenantId": "tenant-bl001",
+    "materialCode": "PPC_CEMENT",
+    "description": "PPC Cement",
+    "uom": "BAG",
+    "defaultWeightUOM": "MT",
+    "conversionValue": 0.05,
+    "mappedCustomerIds": [
+      "tenant-customer-ultra01"
+    ],
+    "status": "active",
+    "quantityUOM": "BAG",
+    "id": "material-ultra-ppc",
+    "createdAt": "2026-06-02T10:00:00.000Z",
+    "updatedAt": "2026-06-02T10:00:00.000Z"
   }
 ] as unknown as TenantMaterial[];
 export const bl001UOMDefinitions = [
