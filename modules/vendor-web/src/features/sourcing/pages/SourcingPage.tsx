@@ -62,6 +62,7 @@ export default function SourcingPage() {
   // Date filter unapplied by default.
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
 
   const displayedAuctions = useMemo(() => {
     const byTab =
@@ -70,11 +71,15 @@ export default function SourcingPage() {
         : activeTab === 'ENDED'
           ? auctions.filter((auction) => ENDING_STATES.includes(auction.state))
           : auctions.filter((auction) => auction.state === activeTab)
+    const q = searchText.trim().toLowerCase()
     return byTab.filter((auction) => {
       const created = ((auction as { createdAt?: string }).createdAt ?? '').slice(0, 10)
-      return (!fromDate || created >= fromDate) && (!toDate || created <= toDate)
+      if (fromDate && created < fromDate) return false
+      if (toDate && created > toDate) return false
+      if (q && ![auction.id, (auction as { customerName?: string }).customerName].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+      return true
     })
-  }, [activeTab, auctions, fromDate, toDate])
+  }, [activeTab, auctions, fromDate, toDate, searchText])
   const pageSize = 5
   const totalPages = Math.max(1, Math.ceil(displayedAuctions.length / pageSize))
   const currentPage = Math.min(page, totalPages)
@@ -98,13 +103,16 @@ export default function SourcingPage() {
       />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
+        <input type="text" value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }}
+          placeholder="Search auction id / customer…"
+          className="h-9 w-64 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
         <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }}
           className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
         <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }}
           className="h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-primary" />
-        {(fromDate || toDate) && (
-          <button onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}
-            className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear dates</button>
+        {(fromDate || toDate || searchText) && (
+          <button onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setPage(1) }}
+            className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-600 hover:bg-gray-50">Clear</button>
         )}
       </div>
 

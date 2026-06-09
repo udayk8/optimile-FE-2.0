@@ -48,6 +48,7 @@ export default function PaymentsPage() {
   // Date filter unapplied by default (filters the recorded-payments list).
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [open, setOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
   const [entryType, setEntryType] = useState<LedgerEntryInputType>('CUSTOMER_PAYMENT')
@@ -59,12 +60,16 @@ export default function PaymentsPage() {
   const rows = useMemo(() =>
     payments
       .map((p) => ({ payment: p, invoice: invoices.find((inv) => inv.id === p.invoiceId) }))
-      .filter(({ payment }) => {
+      .filter(({ payment, invoice }) => {
         const d = (payment.paymentDate ?? '').slice(0, 10)
-        return (!fromDate || d >= fromDate) && (!toDate || d <= toDate)
+        if (fromDate && d < fromDate) return false
+        if (toDate && d > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![payment.invoiceId, invoice?.invoiceNumber].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+        return true
       })
       .sort((a, b) => b.payment.paymentDate.localeCompare(a.payment.paymentDate)),
-    [payments, invoices, fromDate, toDate]
+    [payments, invoices, fromDate, toDate, searchText]
   )
 
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
@@ -119,11 +124,11 @@ export default function PaymentsPage() {
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <span className="text-sm font-semibold text-text">Date filter</span>
+        <Input value={searchText} onChange={(e) => { setSearchText(e.target.value); setPage(1) }} placeholder="Search invoice no…" className="w-[220px]" />
         <Input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} className="w-[160px]" />
         <Input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} className="w-[160px]" />
-        {(fromDate || toDate) && (
-          <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setPage(1) }}>Clear</Button>
+        {(fromDate || toDate || searchText) && (
+          <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setPage(1) }}>Clear</Button>
         )}
       </div>
 

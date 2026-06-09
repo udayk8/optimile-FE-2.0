@@ -1,3 +1,4 @@
+import { Fragment, useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import type { VendorComparisonEntry } from "@/modules/tms/booking/services/booking-selectors";
 
@@ -5,6 +6,11 @@ import type { VendorComparisonEntry } from "@/modules/tms/booking/services/booki
  * Vendor Recommendation Engine UI — header summary + a cheapest-first table of
  * vendors whose contract matches the booking. Shared by the Assignment Queue and
  * the booking workspace Assign Vehicle dialog so both render the same engine.
+ *
+ * When `enableRemark` is on (send-indent flow): the lowest-rate (L1) vendors can
+ * be sent with one click (remark optional); every higher-rate vendor's Send
+ * button stays disabled until a remark is added through the inline Remark
+ * toggle (no modal). The captured remark is passed back through onSelect.
  */
 export function VendorContractComparison({
   entries,
@@ -15,6 +21,7 @@ export function VendorContractComparison({
   showCustomerFreight = true,
   actionLabel = "Select",
   mutedVendorIds = [],
+  enableRemark = false,
   header,
 }: {
   entries: VendorComparisonEntry[];
@@ -23,18 +30,29 @@ export function VendorContractComparison({
    *  More than one when vendors tie at the best rate. Action stays enabled
    *  (unlike selectedRateCardId's no-op). */
   recommendedRateCardIds?: string[];
-  onSelect: (vendorId: string, rateCardId: string) => void;
+  onSelect: (vendorId: string, rateCardId: string, remark?: string) => void;
   showMargin?: boolean;
   showCustomerFreight?: boolean;
   /** Label for the per-row action button (e.g. "Send Indent"). */
   actionLabel?: string;
   /** Vendors to grey out (e.g. already rejected); their action reads "Resend". */
   mutedVendorIds?: string[];
+  /** Enables the inline per-row remark editor + the L1-only no-remark rule. */
+  enableRemark?: boolean;
   header: { route: string; customerFreight: number; vehicleType: string; material: string };
 }) {
   const muted = new Set(mutedVendorIds);
   const recommended = new Set(recommendedRateCardIds);
   const money = (value: number) => `Rs ${Math.round(value).toLocaleString()}`;
+
+  // Inline remark state, keyed by rate card row.
+  const [remarkByRow, setRemarkByRow] = useState<Record<string, string>>({});
+  const [openRow, setOpenRow] = useState<string | null>(null);
+
+  // Vendor, Source, Volume, Est. Trips, Trips Left, Rate Type, Buying Rate,
+  // [Customer Freight], [Margin], Action.
+  const colCount = 8 + (showCustomerFreight ? 1 : 0) + (showMargin ? 1 : 0);
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 rounded-xl border border-border/70 bg-muted/10 p-3 sm:grid-cols-5">
@@ -66,49 +84,95 @@ export function VendorContractComparison({
               {entries.map((entry) => {
                 const isMuted = muted.has(entry.vendorId);
                 const isRecommended = recommended.has(entry.rateCardId);
+                const remark = remarkByRow[entry.rateCardId] ?? "";
+                const hasRemark = remark.trim().length > 0;
+                // L1 rows: remark optional → always sendable. Others: need a remark.
+                const sendDisabled = enableRemark && !isRecommended && !hasRemark;
+                const isOpen = openRow === entry.rateCardId;
                 return (
-                  <tr
-                    key={entry.rateCardId}
-                    className={`${entry.rateCardId === selectedRateCardId || isRecommended ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
-                  >
-                    <td className="px-3 py-2 font-medium">
-                      {entry.vendorName}
-                      {isRecommended ? <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">L1 · Lowest</span> : null}
-                      {isMuted ? <span className="ml-2 text-[11px] font-normal text-rose-600">Rejected</span> : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          entry.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {entry.source}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "—"}
-                      {entry.allocationRank ? <span className="ml-1 text-[11px] text-muted-foreground">({entry.allocationRank})</span> : null}
-                    </td>
-                    <td className="px-3 py-2">{entry.estimatedTrips ?? "—"}</td>
-                    <td className="px-3 py-2">{entry.tripsRemaining ?? "—"}</td>
-                    <td className="px-3 py-2">{entry.rateType === "PER_MT" ? "Per MT" : entry.rateType === "PER_KM" ? "Per KM" : "Per Trip"}</td>
-                    <td className="px-3 py-2">{money(entry.vendorFreight)}</td>
-                    {showCustomerFreight ? <td className="px-3 py-2">{money(entry.customerFreight)}</td> : null}
-                    {showMargin ? (
-                      <td className="px-3 py-2">
-                        {money(entry.marginAmount)} ({entry.marginPercent}%)
+                  <Fragment key={entry.rateCardId}>
+                    <tr
+                      className={`${entry.rateCardId === selectedRateCardId || isRecommended ? "bg-primary/5" : ""} ${isMuted ? "opacity-50" : ""}`}
+                    >
+                      <td className="px-3 py-2 font-medium">
+                        {entry.vendorName}
+                        {isRecommended ? <span className="ml-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">L1 · Lowest</span> : null}
+                        {isMuted ? <span className="ml-2 text-[11px] font-normal text-rose-600">Rejected</span> : null}
                       </td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            entry.source === "Auction" ? "bg-indigo-50 text-indigo-700" : "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {entry.source}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2">
+                        {entry.volumeAllocationPercent != null ? `${entry.volumeAllocationPercent}%` : "—"}
+                        {entry.allocationRank ? <span className="ml-1 text-[11px] text-muted-foreground">({entry.allocationRank})</span> : null}
+                      </td>
+                      <td className="px-3 py-2">{entry.estimatedTrips ?? "—"}</td>
+                      <td className="px-3 py-2">{entry.tripsRemaining ?? "—"}</td>
+                      <td className="px-3 py-2">{entry.rateType === "PER_MT" ? "Per MT" : entry.rateType === "PER_KM" ? "Per KM" : "Per Trip"}</td>
+                      <td className="px-3 py-2">{money(entry.vendorFreight)}</td>
+                      {showCustomerFreight ? <td className="px-3 py-2">{money(entry.customerFreight)}</td> : null}
+                      {showMargin ? (
+                        <td className="px-3 py-2">
+                          {money(entry.marginAmount)} ({entry.marginPercent}%)
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-2">
+                        {entry.rateCardId === selectedRateCardId ? (
+                          <Button size="sm" onClick={() => undefined}>Selected</Button>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {enableRemark ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setOpenRow(isOpen ? null : entry.rateCardId)}
+                              >
+                                {hasRemark ? "View Remark" : "Add Remark"}
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={sendDisabled}
+                              title={sendDisabled ? "Add a remark to send the indent to this higher-rate vendor" : undefined}
+                              onClick={() => onSelect(entry.vendorId, entry.rateCardId, remark.trim() || undefined)}
+                            >
+                              {isMuted ? "Resend" : actionLabel}
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                    {enableRemark && isOpen ? (
+                      <tr className="bg-muted/10">
+                        <td colSpan={colCount} className="px-3 py-3">
+                          <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Remark{isRecommended ? " (optional)" : " (required for higher-rate vendor)"}
+                          </label>
+                          <textarea
+                            value={remark}
+                            onChange={(event) =>
+                              setRemarkByRow((current) => ({ ...current, [entry.rateCardId]: event.target.value }))
+                            }
+                            rows={2}
+                            autoFocus
+                            placeholder={
+                              isRecommended
+                                ? "Optional note for this indent…"
+                                : "Why send the indent to this vendor instead of the lowest-rate (L1) contract?"
+                            }
+                            className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                          />
+                        </td>
+                      </tr>
                     ) : null}
-                    <td className="px-3 py-2">
-                      {entry.rateCardId === selectedRateCardId ? (
-                        <Button size="sm" onClick={() => undefined}>Selected</Button>
-                      ) : (
-                        <Button size="sm" variant="outline" onClick={() => onSelect(entry.vendorId, entry.rateCardId)}>
-                          {isMuted ? "Resend" : actionLabel}
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
+                  </Fragment>
                 );
               })}
             </tbody>

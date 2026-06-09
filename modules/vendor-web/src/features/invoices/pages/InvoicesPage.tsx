@@ -105,6 +105,7 @@ export default function InvoicesPage() {
 
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [invoicePage, setInvoicePage] = useState(1)
   const [editModalInvoiceId, setEditModalInvoiceId] = useState<string | null>(null)
   const [editedItems, setEditedItems] = useState<InvoiceLineItem[]>([])
@@ -174,10 +175,12 @@ export default function InvoicesPage() {
         const createdOn = (invoice.createdAt ?? '').slice(0, 10)
         if (fromDate && createdOn < fromDate) return false
         if (toDate && createdOn > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![invoice.invoiceNumber, invoice.id, invoice.status].some((v) => (v ?? '').toLowerCase().includes(q))) return false
         return true
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [activeTab, fromDate, invoices, toDate, paidInvoiceIds])
+  }, [activeTab, fromDate, invoices, toDate, paidInvoiceIds, searchText])
 
   const approvedInvoices = invoices.filter((invoice) => invoice.status === 'APPROVED')
   const approvedSummary = useMemo(() => {
@@ -258,11 +261,12 @@ export default function InvoicesPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Input value={searchText} onChange={(e: ChangeEvent<HTMLInputElement>) => { setSearchText(e.target.value); setInvoicePage(1) }} placeholder="Search invoice no / status…" className="w-[220px]" />
           <Input type="date" value={fromDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setFromDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
           <Input type="date" value={toDate} onChange={(e: ChangeEvent<HTMLInputElement>) => { setToDate(e.target.value); setInvoicePage(1) }} className="w-[180px]" />
-          {(fromDate || toDate) && (
-            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setInvoicePage(1) }}>
-              Clear dates
+          {(fromDate || toDate || searchText) && (
+            <Button variant="outline" size="sm" onClick={() => { setFromDate(''); setToDate(''); setSearchText(''); setInvoicePage(1) }}>
+              Clear
             </Button>
           )}
         </div>
