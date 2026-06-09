@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 
 import { useModuleNavigate as useNavigate, ModuleLink as Link } from '@vendor/hooks/useModuleRoute'
 import { ArrowLeft, ArrowRight, CheckCircle2, FilePlus, ReceiptText } from 'lucide-react'
@@ -15,7 +16,7 @@ import { useTenantBridge } from '@vendor/integration/tenant-data-bridge'
 import { useVendorBookings } from '@vendor/integration/useVendorBookings'
 import { useVendorInvoices, invoicedTripIds } from '@vendor/integration/useVendorInvoices'
 import { useVendorGstRate } from '@vendor/integration/useVendorGstRate'
-import type { Invoice } from '@vendor/types'
+import type { Invoice, InvoiceLineItem, Trip } from '@vendor/types'
 
 type Step = 'select' | 'review'
 
@@ -23,15 +24,54 @@ const PAGE_SIZE = 5
 const CUSTOMER_ADDRESS =
   '161, Basavanagar Main Rd, above Reliance Trends, Vignan Nagar, Doddanekkundi Road, Bengaluru, Karnataka – 560037'
 
+// Per-booking editable charges (string-backed for the inputs).
+type ChargeEdit = { freight: string; advance: string; detention: string; loading: string; others: string }
+
+// Default charges pulled from the booking — freight rate + approved expenses,
+// bucketed into detention / loading-unloading / others, plus the advance.
+function chargeDefaults(trip: Trip): ChargeEdit {
+  const approved = (trip.expenses ?? []).filter((e) => e.status === 'Approved')
+  const bucket = (re: RegExp) => approved.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
+  const detention = bucket(/detention/i)
+  const loading = bucket(/load|unload/i)
+  const others = Math.max(0, (trip.approvedExpenses ?? 0) - detention - loading)
+  return {
+    freight: String(trip.freightRate || 0),
+    advance: String(trip.advance ?? 0),
+    detention: String(detention),
+    loading: String(loading),
+    others: String(others),
+  }
+}
+
+const num = (v: string) => {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
 export default function CreateInvoicePage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { trips } = useVendorBookings()
-  const { generateInvoice, invoices } = useVendorInvoices()
+  const { generateInvoice, createResubmissionInvoice, invoices } = useVendorInvoices()
   // Vendor's GST rate, configured by the tenant admin at onboarding (cross-module).
   const GST_RATE = useVendorGstRate()
   const [step, setStep] = useState<Step>('select')
   const [page, setPage] = useState(1)
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([])
+  // Editable per-booking charges, keyed by trip id.
+  const [edits, setEdits] = useState<Record<string, ChargeEdit>>({})
+  const setEditField = (tripId: string, field: keyof ChargeEdit, value: string) =>
+    setEdits((prev) => ({ ...prev, [tripId]: { ...(prev[tripId] ?? { freight: '0', advance: '0', detention: '0', loading: '0', others: '0' }), [field]: value } }))
+
+  // Resubmission: ?resubmit=<invoiceId> loads that invoice's bookings + charges
+  // into the same editable flow, then submits as a corrected (superseding) invoice.
+  const resubmitId = useMemo(() => new URLSearchParams(location.search).get('resubmit'), [location.search])
+  const resubmitInvoice = useMemo(
+    () => (resubmitId ? invoices.find((inv) => inv.id === resubmitId) ?? null : null),
+    [resubmitId, invoices],
+  )
+  const [resubmitInit, setResubmitInit] = useState(false)
 
   // A booking is eligible to bill once it is COMPLETED with a freight value and
   // no active invoice already covers it. Raising an invoice removes the booking
@@ -45,21 +85,53 @@ export default function CreateInvoicePage() {
 
   const eligibleTripIds = useMemo(() => eligibleTrips.map((trip) => trip.id), [eligibleTrips])
 
+  // Selected bookings resolve from the FULL trip list (resubmission re-bills
+  // already-invoiced bookings, which are excluded from the eligible set).
   const selectedTrips = useMemo(
-    () => eligibleTrips.filter((trip) => selectedTripIds.includes(trip.id)),
-    [eligibleTrips, selectedTripIds],
+    () => selectedTripIds.map((id) => trips.find((t) => t.id === id)).filter((t): t is Trip => Boolean(t)),
+    [trips, selectedTripIds],
+  )
+
+  // Resolve a booking's editable charges — the live edit if present, else defaults.
+  const chargesFor = (trip: Trip): ChargeEdit => edits[trip.id] ?? chargeDefaults(trip)
+
+  // Line items built from the edited charges. lineTotal (taxable) excludes advance.
+  const lineItems = useMemo<InvoiceLineItem[]>(
+    () =>
+      selectedTrips.map((trip) => {
+        const c = chargesFor(trip)
+        const freight = num(c.freight)
+        const detention = num(c.detention)
+        const loading = num(c.loading)
+        const others = num(c.others)
+        return {
+          tripId: trip.id,
+          tripReference: trip.id,
+          freightCharge: freight,
+          advance: num(c.advance),
+          detentionCharges: detention,
+          loadingUnloadingCharges: loading,
+          otherCharges: others,
+          lineTotal: freight + detention + loading + others,
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedTrips, edits],
   )
 
   const totals = useMemo(() => {
-    const subtotal = selectedTrips.reduce((sum, trip) => sum + trip.freightRate, 0)
+    const subtotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0)
     const gstAmount = Math.round(subtotal * (GST_RATE / 100))
+    const totalAdvance = lineItems.reduce((sum, li) => sum + (li.advance ?? 0), 0)
     return {
       subtotal,
       gstAmount,
       grandTotal: subtotal + gstAmount,
-      bookingCount: selectedTrips.length,
+      totalAdvance,
+      netPayable: subtotal + gstAmount - totalAdvance,
+      bookingCount: lineItems.length,
     }
-  }, [selectedTrips, GST_RATE])
+  }, [lineItems, GST_RATE])
 
   const bridge = useTenantBridge()
   const { getBookingDetail } = useVendorBookings()
@@ -67,30 +139,62 @@ export default function CreateInvoicePage() {
   const customerName = bridge?.tenantName ?? 'Optimile Pvt Ltd'
   const getLrNumber = (tripId: string) => getBookingDetail(tripId)?.lrNumbers?.[0] ?? null
 
-  // Draft invoice mirroring what generateInvoice() will create — drives the PDF preview.
+  // Draft invoice mirroring what will be created — drives the PDF preview.
   const draftInvoice = useMemo((): Invoice => {
     const now = new Date().toISOString()
     return {
       id: 'DRAFT',
-      invoiceNumber: 'DRAFT (assigned on submit)',
+      invoiceNumber: resubmitInvoice ? `${resubmitInvoice.invoiceNumber} (revised)` : 'DRAFT (assigned on submit)',
       invoiceDate: now,
       paymentDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       subtotal: totals.subtotal,
       gstAmount: totals.gstAmount,
       grandTotal: totals.grandTotal,
       status: 'PENDING',
-      lineItems: selectedTrips.map((trip) => ({
-        tripId: trip.id,
-        tripReference: trip.id,
-        freightCharge: trip.freightRate || 0,
-        lineTotal: trip.freightRate || 0,
-      })),
+      lineItems,
       // Preview only — the submitted invoice's GSTINs + GST split are set in the store.
       vendorGstin: invoiceProfile.companyInfo.gstin,
       customerGstin: '27AABCU9603R1ZM',
       createdAt: now,
     } as unknown as Invoice
-  }, [selectedTrips, totals, invoiceProfile])
+  }, [lineItems, totals, invoiceProfile, resubmitInvoice])
+
+  // Seed default charges for any selected booking that has no edits yet, so the
+  // inputs are controlled and editing one field never wipes the others.
+  useEffect(() => {
+    setEdits((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const trip of selectedTrips) {
+        if (!next[trip.id]) {
+          next[trip.id] = chargeDefaults(trip)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [selectedTrips])
+
+  // Resubmission: load the invoice's bookings + charges into the editable flow.
+  useEffect(() => {
+    if (!resubmitInvoice || resubmitInit) return
+    const seeded: Record<string, ChargeEdit> = {}
+    for (const li of resubmitInvoice.lineItems) {
+      const trip = trips.find((t) => t.id === li.tripId)
+      const def = trip ? chargeDefaults(trip) : { freight: '0', advance: '0', detention: '0', loading: '0', others: '0' }
+      seeded[li.tripId] = {
+        freight: String(li.freightCharge ?? def.freight),
+        advance: String(li.advance ?? def.advance),
+        detention: String(li.detentionCharges ?? def.detention),
+        loading: String(li.loadingUnloadingCharges ?? def.loading),
+        others: String(li.otherCharges ?? def.others),
+      }
+    }
+    setEdits((prev) => ({ ...seeded, ...prev }))
+    setSelectedTripIds(resubmitInvoice.lineItems.map((li) => li.tripId))
+    setStep('review')
+    setResubmitInit(true)
+  }, [resubmitInvoice, resubmitInit, trips])
 
   const totalPages = Math.max(1, Math.ceil(eligibleTrips.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -132,9 +236,16 @@ export default function CreateInvoicePage() {
   const canReview = selectedTrips.length > 0
 
   const handleSubmit = () => {
+    if (resubmitInvoice) {
+      // Corrected invoice supersedes the resubmission-required one.
+      createResubmissionInvoice(resubmitInvoice.id, lineItems)
+      navigate('/vendor/invoices?tab=pending')
+      return
+    }
     generateInvoice({
       tripIds: selectedTrips.map((trip) => trip.id),
       gstRate: GST_RATE,
+      lineItems,
     })
     navigate('/vendor/invoices/list')
   }
@@ -335,29 +446,45 @@ export default function CreateInvoicePage() {
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-text">Review selected bookings</h3>
-              <p className="mt-1 text-sm text-gray-500">Confirm the booking set before submitting the invoice.</p>
+              <h3 className="text-lg font-semibold text-text">Review &amp; edit charges</h3>
+              <p className="mt-1 text-sm text-gray-500">Adjust freight, advance, detention, loading &amp; unloading and other charges per booking before raising the invoice.</p>
             </div>
             <div className="divide-y divide-gray-100">
-              {selectedTrips.map((trip) => (
-                <div key={trip.id} className="flex flex-col gap-3 p-6 md:flex-row md:items-center md:justify-between">
+              {selectedTrips.map((trip) => {
+                const c = chargesFor(trip)
+                const lineTotal = num(c.freight) + num(c.detention) + num(c.loading) + num(c.others)
+                const field = (label: string, key: keyof ChargeEdit) => (
                   <div>
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{label}</label>
+                    <input
+                      type="number"
+                      value={c[key]}
+                      onChange={(e) => setEditField(trip.id, key, e.target.value)}
+                      className="mt-1 h-9 w-full rounded-lg border border-gray-300 px-2 text-sm outline-none focus:border-primary"
+                    />
+                  </div>
+                )
+                return (
+                  <div key={trip.id} className="space-y-3 p-6">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm font-semibold text-text">{trip.id}</span>
                       <StatusBadge status={trip.status} />
+                      <span className="text-sm text-gray-500">{trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}</span>
                     </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      {trip.laneDetails.origin.city} → {trip.laneDetails.destination.city}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {field('Freight', 'freight')}
+                      {field('Advance', 'advance')}
+                      {field('Detention Charges', 'detention')}
+                      {field('Loading & Unloading', 'loading')}
+                      {field('Others', 'others')}
+                      <div className="flex flex-col justify-end">
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Line total (taxable)</span>
+                        <span className="mt-1 font-semibold text-text"><CurrencyDisplay amount={lineTotal} /></span>
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-gray-500">Line total</div>
-                    <div className="font-semibold text-text">
-                      <CurrencyDisplay amount={trip.freightRate} />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
 
@@ -386,8 +513,16 @@ export default function CreateInvoicePage() {
                 <span><CurrencyDisplay amount={totals.gstAmount} /></span>
               </div>
               <div className="flex justify-between border-t border-white/10 pt-3 text-base font-semibold">
-                <span>Grand total</span>
+                <span>Total invoice value</span>
                 <span><CurrencyDisplay amount={totals.grandTotal} /></span>
+              </div>
+              <div className="flex justify-between text-rose-300">
+                <span>Less: Advance</span>
+                <span>- <CurrencyDisplay amount={totals.totalAdvance} /></span>
+              </div>
+              <div className="flex justify-between border-t border-white/10 pt-3 text-base font-bold">
+                <span>Net payable</span>
+                <span><CurrencyDisplay amount={totals.netPayable} /></span>
               </div>
             </div>
 
@@ -421,11 +556,13 @@ export default function CreateInvoicePage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 p-6">
-            <Button variant="outline" onClick={() => setStep('select')}>
-              Back to selection
-            </Button>
+            {!resubmitInvoice && (
+              <Button variant="outline" onClick={() => setStep('select')}>
+                Back to selection
+              </Button>
+            )}
             <Button onClick={handleSubmit}>
-              Submit invoice
+              {resubmitInvoice ? 'Submit revised invoice' : 'Submit invoice'}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>

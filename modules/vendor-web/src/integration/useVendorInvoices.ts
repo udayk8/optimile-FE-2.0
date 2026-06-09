@@ -28,6 +28,9 @@ export interface GenerateInvoicePayload {
   invoiceDate?: string
   dueDate?: string
   invoiceNumber?: string
+  /** Edited line items (freight + charges) captured on the Create Invoice page.
+   *  When provided, these override the freight-only defaults derived from trips. */
+  lineItems?: InvoiceLineItem[]
 }
 
 export interface VendorInvoicesData {
@@ -36,6 +39,7 @@ export interface VendorInvoicesData {
   generateInvoice: (payload: GenerateInvoicePayload) => void
   respondToDispute: (disputeId: string, message: string, attachmentNames?: string[]) => void
   createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[], invoiceNumber?: string) => void
+  closeInvoice: (invoiceId: string) => void
 }
 
 /**
@@ -52,6 +56,7 @@ export function useVendorInvoices(): VendorInvoicesData {
   const storeGenerate = useAppStore((s) => s.generateInvoice)
   const storeRespond = useAppStore((s) => s.respondToDispute)
   const storeResubmit = useAppStore((s) => s.createResubmissionInvoice)
+  const storeClose = useAppStore((s) => s.closeInvoice)
 
   if (bridge) {
     // MERGE shared-store invoices/disputes with the local mock demo dataset
@@ -73,12 +78,14 @@ export function useVendorInvoices(): VendorInvoicesData {
           .map((id) => trips.find((t) => t.id === id))
           .filter((t): t is NonNullable<typeof t> => Boolean(t && t.status === 'COMPLETED'))
         if (selected.length === 0) return
-        const lineItems: InvoiceLineItem[] = selected.map((t) => ({
-          tripId: t.id,
-          tripReference: t.id,
-          freightCharge: t.freightRate || 0,
-          lineTotal: t.freightRate || 0,
-        }))
+        // Prefer edited line items (freight + charges) from the Create Invoice
+        // page; fall back to freight-only when not supplied.
+        const editedById = new Map((payload.lineItems ?? []).map((li) => [li.tripId, li]))
+        const lineItems: InvoiceLineItem[] = selected.map((t) => {
+          const edited = editedById.get(t.id)
+          if (edited) return edited
+          return { tripId: t.id, tripReference: t.id, freightCharge: t.freightRate || 0, lineTotal: t.freightRate || 0 }
+        })
         const subtotal = lineItems.reduce((s, li) => s + li.lineTotal, 0)
         const gstAmount = Math.round(subtotal * (gstRate / 100))
         const tripDates = selected.map((t) => (t as any).completedDate ?? (t as any).deliveredDate ?? payload.invoiceDate ?? new Date().toISOString().slice(0, 10)).sort()
@@ -114,6 +121,8 @@ export function useVendorInvoices(): VendorInvoicesData {
         // Mock invoice — local store resubmission (it numbers the new invoice itself).
         storeResubmit(oldInvoiceId, lineItems)
       },
+      closeInvoice: (invoiceId) =>
+        bridgeInvoiceIds.has(invoiceId) ? bridge.closeInvoice(invoiceId) : storeClose(invoiceId),
     }
   }
 
@@ -123,5 +132,6 @@ export function useVendorInvoices(): VendorInvoicesData {
     generateInvoice: storeGenerate,
     respondToDispute: storeRespond,
     createResubmissionInvoice: storeResubmit,
+    closeInvoice: storeClose,
   }
 }

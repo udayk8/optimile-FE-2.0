@@ -452,7 +452,7 @@ export type InvoiceStatus =
   | 'RESUBMISSION_REQUIRED'
   | 'CLOSED'
 
-export type InvoiceCloseReason = 'SUPERSEDED' | 'REJECTED'
+export type InvoiceCloseReason = 'SUPERSEDED' | 'REJECTED' | 'WITHDRAWN'
 
 export interface Invoice {
   id: string
@@ -490,6 +490,12 @@ export interface InvoiceLineItem {
   tripId: string
   tripReference: string
   freightCharge: number
+  /** Editable charges captured at invoice time (default-filled from the booking). */
+  advance?: number
+  detentionCharges?: number
+  loadingUnloadingCharges?: number
+  otherCharges?: number
+  /** Taxable line total = freight + detention + loading/unloading + others (advance excluded). */
   lineTotal: number
 }
 

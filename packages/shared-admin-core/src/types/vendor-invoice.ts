@@ -11,12 +11,16 @@ export type TenantVendorInvoiceStatus =
   | "RESUBMISSION_REQUIRED"
   | "CLOSED";
 
-export type TenantVendorInvoiceCloseReason = "SUPERSEDED" | "REJECTED";
+export type TenantVendorInvoiceCloseReason = "SUPERSEDED" | "REJECTED" | "WITHDRAWN";
 
 export interface TenantVendorInvoiceLineItem {
   tripId: string;
   tripReference: string;
   freightCharge: number;
+  advance?: number;
+  detentionCharges?: number;
+  loadingUnloadingCharges?: number;
+  otherCharges?: number;
   lineTotal: number;
 }
 

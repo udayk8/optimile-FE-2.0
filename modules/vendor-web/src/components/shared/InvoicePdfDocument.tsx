@@ -54,9 +54,20 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
 ) {
   const declarationLines = terms && terms.length > 0 ? terms : DEFAULT_TERMS
   const tripById = new Map(trips.map((t) => [t.id, t]))
-  // Aggregate charges (approved expenses) and advance across the invoice's trips.
-  const totalCharges = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.approvedExpenses ?? 0), 0)
-  const totalAdvance = invoice.lineItems.reduce((sum, li) => sum + (tripById.get(li.tripId)?.advance ?? 0), 0)
+  // Per-line charges: prefer the values captured on the line item (editable at
+  // invoice time); fall back to the booking's approved expenses for older invoices.
+  const rows = invoice.lineItems.map((item) => {
+    const trip = tripById.get(item.tripId)
+    const approvedExp = (trip?.expenses ?? []).filter((e) => e.status === 'Approved')
+    const bucket = (re: RegExp) => approvedExp.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
+    const detention = item.detentionCharges ?? bucket(/detention/i)
+    const loading = item.loadingUnloadingCharges ?? bucket(/load|unload/i)
+    const others = item.otherCharges ?? Math.max(0, (trip?.approvedExpenses ?? 0) - bucket(/detention/i) - bucket(/load|unload/i))
+    const advance = item.advance ?? trip?.advance ?? 0
+    const freight = item.freightCharge
+    return { item, trip, detention, loading, others, advance, freight, totalCost: freight + detention + loading + others }
+  })
+  const totalAdvance = rows.reduce((sum, r) => sum + r.advance, 0)
 
   const lrFor = (tripId: string): string => {
     const bridgeLr = getLrNumber?.(tripId)
@@ -84,7 +95,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
       : !(supplierState && buyerState && supplierState === buyerState)
   // Charges (detention/loading/others) are taxable too, so the taxable value =
   // freight + charges and GST is charged on the whole "Total Cost".
-  const taxableValue = invoice.subtotal + totalCharges
+  const taxableValue = rows.reduce((sum, r) => sum + r.totalCost, 0)
   const gstAmount = Math.round(taxableValue * (gstRate / 100))
   const cgstAmt = interState ? 0 : Math.round(gstAmount / 2)
   const sgstAmt = interState ? 0 : gstAmount - Math.round(gstAmount / 2)
@@ -137,16 +148,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
             </tr>
           </thead>
           <tbody>
-            {invoice.lineItems.map((item, index) => {
-              const trip = tripById.get(item.tripId)
-              const approvedExp = (trip?.expenses ?? []).filter((e) => e.status === 'Approved')
-              const bucket = (re: RegExp) => approvedExp.filter((e) => re.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)).reduce((s, e) => s + (e.amount || 0), 0)
-              const detention = bucket(/detention/i)
-              const loading = bucket(/load|unload/i)
-              const expenseTotal = trip?.approvedExpenses ?? 0
-              const others = Math.max(0, expenseTotal - detention - loading)
-              const totalCost = item.lineTotal + expenseTotal
-              return (
+            {rows.map(({ item, trip, detention, loading, others, advance, freight, totalCost }, index) => (
                 <tr key={item.tripId}>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{index + 1}</td>
                   <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{item.tripReference}</td>
@@ -154,15 +156,14 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{trip?.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{(trip?.assignedVehicle.registrationNumber ?? '—').replace(/\s*\(.*\)\s*$/, '')}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(trip?.advance ?? 0)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(freight)}</td>
+                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(advance)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(detention)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(loading)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{inr(others)}</td>
                   <td className="border px-1.5 py-3 text-center font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
-              )
-            })}
+            ))}
             {/* exactly one filler row below the booking rows */}
             {Array.from({ length: 1 }).map((_, i) => (
               <tr key={`filler-${i}`}>

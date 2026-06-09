@@ -24,7 +24,7 @@ export default function InvoiceDetailPage() {
   const params = useParams()
   const navigate = useNavigate()
   const bridge = useTenantBridge()
-  const { invoices, disputes } = useVendorInvoices()
+  const { invoices, disputes, closeInvoice } = useVendorInvoices()
   // Merged bookings (bridge + mock) so PDF line items resolve truck/lane/dates
   // for cross-module bookings too.
   const { trips, getBookingDetail } = useVendorBookings()
@@ -115,8 +115,11 @@ export default function InvoiceDetailPage() {
       {invoice.status === 'RESUBMISSION_REQUIRED' ? (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
-            <p className="text-sm text-orange-700">Finance requires a corrected invoice. Create a new invoice to replace this one — it will be closed as superseded.</p>
-            <Button onClick={() => navigate('/vendor/invoices?tab=resubmission')}>Create New Invoice</Button>
+            <p className="text-sm text-orange-700">Finance requires a corrected invoice. Resubmit to open the invoice flow with the booking charges prefilled and editable, or close this invoice to release its bookings.</p>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" onClick={() => closeInvoice(invoice.id)}>Close Invoice</Button>
+              <Button onClick={() => navigate(`/vendor/invoices/create?resubmit=${invoice.id}`)}>Resubmit</Button>
+            </div>
           </CardContent>
         </Card>
       ) : null}

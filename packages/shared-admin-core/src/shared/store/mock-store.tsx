@@ -302,6 +302,7 @@ interface MockStoreValue {
   financeReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
   vendorRespondToInvoiceDispute: (invoiceId: string, message: string) => void;
   vendorCreateInvoiceResubmission: (oldInvoiceId: string, lineItems: TenantVendorInvoiceLineItem[], invoiceNumber?: string) => TenantVendorInvoiceRecord | null;
+  vendorWithdrawInvoice: (invoiceId: string) => void;
   listTenantVendorRateCards: (tenantVendorId: string) => TenantVendorRateCard[];
   createTenantVendorRateCard: (
     input: Omit<TenantVendorRateCard, "id" | "createdAt" | "updatedAt">,
@@ -6526,6 +6527,16 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           ...current.map((inv) => (inv.id === oldInvoiceId ? { ...inv, status: "CLOSED" as const, closeReason: "SUPERSEDED" as const, statusUpdatedAt: now, supersededByInvoiceId: newNumber } : inv)),
         ]);
         return newInvoice;
+      },
+      vendorWithdrawInvoice: (invoiceId) => {
+        const now = new Date().toISOString();
+        setTenantVendorInvoices((current) =>
+          current.map((inv) =>
+            inv.id === invoiceId && inv.status === "RESUBMISSION_REQUIRED"
+              ? { ...inv, status: "CLOSED" as const, closeReason: "WITHDRAWN" as const, statusUpdatedAt: now }
+              : inv,
+          ),
+        );
       },
       listTenantLrPools: (tenantId) => tenantLrPools.filter((item) => item.tenantId === tenantId),
       listTenantLrs: (tenantId) => tenantLrs.filter((item) => item.tenantId === tenantId),

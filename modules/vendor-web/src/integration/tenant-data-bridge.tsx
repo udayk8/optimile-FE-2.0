@@ -150,6 +150,8 @@ export interface TenantDataBridge {
   respondToInvoiceDispute: (invoiceId: string, message: string) => void
   /** Vendor raises a corrected invoice that supersedes a resubmission-required one. */
   createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[], invoiceNumber?: string) => void
+  /** Vendor withdraws (closes) a resubmission-required invoice. */
+  closeInvoice: (invoiceId: string) => void
 }
 
 const TenantDataBridgeContext = createContext<TenantDataBridge | null>(null)

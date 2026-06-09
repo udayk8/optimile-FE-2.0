@@ -139,6 +139,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     vendorSubmitInvoice,
     vendorRespondToInvoiceDispute,
     vendorCreateInvoiceResubmission,
+    vendorWithdrawInvoice,
   } = useMockStore();
 
   const isVendorSession = session.loginType === "VENDOR" && Boolean(session.vendorId);
@@ -558,6 +559,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       respondToInvoiceDispute: (invoiceId: string, message: string) => vendorRespondToInvoiceDispute(invoiceId, message),
       createResubmissionInvoice: (oldInvoiceId: string, lineItems, invoiceNumber?: string) =>
         vendorCreateInvoiceResubmission(oldInvoiceId, lineItems, invoiceNumber),
+      closeInvoice: (invoiceId: string) => vendorWithdrawInvoice(invoiceId),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

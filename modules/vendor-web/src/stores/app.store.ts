@@ -99,7 +99,9 @@ interface AppState {
     dueDate?: string
     gstRate?: number
     invoiceNumber?: string
+    lineItems?: InvoiceLineItem[]
   }) => void
+  closeInvoice: (invoiceId: string) => void
   submitNbfcApplication: (payload: {
     invoiceId: string
     invoiceNumber: string
@@ -557,10 +559,16 @@ export const useAppStore = create<AppState>((set) => ({
 
       if (selectedTrips.length === 0) return state
 
-      const subtotal = selectedTrips.reduce(
-        (sum, trip) => sum + (trip.freightRate || 0),
-        0
-      )
+      // Prefer edited line items (freight + charges) supplied by the Create
+      // Invoice page; fall back to freight-only derived from the trips.
+      const editedById = new Map((payload.lineItems ?? []).map((li) => [li.tripId, li]))
+      const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
+        const edited = editedById.get(trip.id)
+        if (edited) return edited
+        const freightCharge = trip.freightRate || 0
+        return { tripId: trip.id, tripReference: trip.id, freightCharge, lineTotal: freightCharge }
+      })
+      const subtotal = lineItems.reduce((sum, li) => sum + li.lineTotal, 0)
       // Split GST by place of supply: supplier = vendor's own GSTIN state,
       // place of supply = buyer's GSTIN state. Inter-state -> IGST, intra -> CGST+SGST.
       const vendorGstin = MOCK_COMPANY_INFO.gstin
@@ -573,16 +581,6 @@ export const useAppStore = create<AppState>((set) => ({
       const gstAmount = tax.igst + tax.cgst + tax.sgst
       const finalDueDate = dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       const generatedInvoiceNumber = invoiceNumber ?? `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-
-      const lineItems: InvoiceLineItem[] = selectedTrips.map((trip) => {
-        const freightCharge = trip.freightRate || 0
-        return {
-          tripId: trip.id,
-          tripReference: trip.id,
-          freightCharge,
-          lineTotal: freightCharge,
-        }
-      })
 
       const newInvoice = {
         id: generatedInvoiceNumber,
@@ -625,6 +623,20 @@ export const useAppStore = create<AppState>((set) => ({
       }
     })
   },
+
+  // Vendor withdraws a resubmission-required invoice — closed (WITHDRAWN); the
+  // bookings it covered become billable again (invoicedTripIds skips CLOSED).
+  closeInvoice: (invoiceId) =>
+    set((state) => {
+      const now = new Date().toISOString()
+      return {
+        invoices: state.invoices.map((inv) =>
+          inv.id === invoiceId && inv.status === 'RESUBMISSION_REQUIRED'
+            ? { ...inv, status: 'CLOSED' as const, closeReason: 'WITHDRAWN' as const, statusUpdatedAt: now }
+            : inv,
+        ),
+      }
+    }),
 
   recordInvoicePayment: ({ invoiceId, paymentDate, cashAmount, tdsAmount, referenceNumber, note }) =>
     set((state) => {

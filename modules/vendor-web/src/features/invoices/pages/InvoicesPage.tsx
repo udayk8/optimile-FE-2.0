@@ -98,6 +98,7 @@ function tabForInvoice(invoice: Invoice, paidInvoiceIds: Set<string>): StatusTab
 const CLOSE_REASON_LABEL: Record<NonNullable<Invoice['closeReason']>, string> = {
   REJECTED: 'Rejected by finance',
   SUPERSEDED: 'Superseded by a new invoice',
+  WITHDRAWN: 'Closed by vendor',
 }
 
 export default function InvoicesPage() {
@@ -109,11 +110,9 @@ export default function InvoicesPage() {
   const [toDate, setToDate] = useState('')
   const [searchText, setSearchText] = useState('')
   const [invoicePage, setInvoicePage] = useState(1)
-  const [editModalInvoiceId, setEditModalInvoiceId] = useState<string | null>(null)
-  const [editedItems, setEditedItems] = useState<InvoiceLineItem[]>([])
   const [downloadInvoiceId, setDownloadInvoiceId] = useState<string | null>(null)
 
-  const { invoices, disputes, createResubmissionInvoice } = useVendorInvoices()
+  const { invoices, disputes, closeInvoice } = useVendorInvoices()
   const ledger = useAppStore((s) => s.ledger)
   const bridge = useTenantBridge()
 
@@ -213,41 +212,6 @@ export default function InvoicesPage() {
   const invoiceTotalPages = Math.max(1, Math.ceil(invoicesForTab.length / invoicePageSize))
   const safePage = Math.min(invoicePage, invoiceTotalPages)
   const pagedInvoices = invoicesForTab.slice((safePage - 1) * invoicePageSize, safePage * invoicePageSize)
-
-  const editInvoice = editModalInvoiceId ? invoices.find((invoice) => invoice.id === editModalInvoiceId) : null
-  const editSubtotal = editedItems.reduce((sum, item) => sum + item.lineTotal, 0)
-  const editGstRate = editInvoice && editInvoice.subtotal > 0 ? editInvoice.gstAmount / editInvoice.subtotal : 0.12
-  const editGst = Math.round(editSubtotal * editGstRate)
-  const editTotal = editSubtotal + editGst
-
-  const openEditModal = (invoiceId: string) => {
-    const invoice = invoices.find((item) => item.id === invoiceId)
-    if (!invoice) return
-    setEditedItems(invoice.lineItems.map((item) => ({ ...item })))
-    setEditModalInvoiceId(invoiceId)
-  }
-
-  const handleFreightChange = (lineIdx: number, value: number) => {
-    setEditedItems((prev) =>
-      prev.map((item, index) => {
-        if (index !== lineIdx) return item
-        const freightCharge = Math.max(0, value)
-        return {
-          ...item,
-          freightCharge,
-          lineTotal: freightCharge,
-        }
-      }),
-    )
-  }
-
-  const handleResubmit = () => {
-    if (!editModalInvoiceId) return
-    // Creates a NEW pending invoice and closes the old one as SUPERSEDED.
-    createResubmissionInvoice(editModalInvoiceId, editedItems)
-    setEditModalInvoiceId(null)
-    navigate('/vendor/invoices?tab=pending')
-  }
 
   return (
     <div className="space-y-6">
@@ -370,10 +334,15 @@ export default function InvoicesPage() {
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                           {invoice.status === 'RESUBMISSION_REQUIRED' ? (
-                            <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => openEditModal(invoice.id)}>
-                              <RefreshCw className="mr-1 h-3.5 w-3.5" />
-                              Create New Invoice
-                            </Button>
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => closeInvoice(invoice.id)}>
+                                Close
+                              </Button>
+                              <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => navigate(`/vendor/invoices/create?resubmit=${invoice.id}`)}>
+                                <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                                Resubmit
+                              </Button>
+                            </>
                           ) : null}
                           <Button
                             size="sm"
@@ -421,67 +390,6 @@ export default function InvoicesPage() {
           </div>
         ) : null}
       </div>
-
-      {editModalInvoiceId && editInvoice ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-text">Create Corrected Invoice</h3>
-                <p className="mt-0.5 font-mono text-xs text-gray-500">Replaces {editInvoice.invoiceNumber}</p>
-              </div>
-              <button onClick={() => setEditModalInvoiceId(null)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <p className="mt-3 text-xs font-semibold text-gray-500">Update freight amounts. This creates a new PENDING invoice for finance review; {editInvoice.invoiceNumber} will be closed as superseded.</p>
-
-            <div className="mt-4 space-y-3">
-              {editedItems.map((item, lineIdx) => (
-                <div key={item.tripId} className="rounded-xl border border-gray-200 p-4">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="font-mono text-sm font-bold text-text">{item.tripReference}</span>
-                    <span className="text-xs text-gray-500">Line: <CurrencyDisplay amount={item.lineTotal} className="font-semibold text-text" /></span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-gray-600">Freight</span>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm text-gray-400">Rs</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={item.freightCharge}
-                        onChange={(e) => handleFreightChange(lineIdx, Number(e.target.value))}
-                        className="w-28 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1.5 text-right text-sm font-semibold text-text outline-none focus:border-primary focus:bg-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
-              <div className="flex justify-between text-gray-500">
-                <span>Subtotal</span><CurrencyDisplay amount={editSubtotal} />
-              </div>
-              <div className="mt-1 flex justify-between text-gray-500">
-                <span>GST ({Math.round(editGstRate * 100)}%)</span><CurrencyDisplay amount={editGst} />
-              </div>
-              <div className="mt-2 flex justify-between border-t pt-2 font-bold">
-                <span>Total</span><CurrencyDisplay amount={editTotal} className="text-primary" />
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setEditModalInvoiceId(null)}>Cancel</Button>
-              <Button onClick={handleResubmit}>
-                Create New Invoice <ArrowRight className="ml-1 h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {downloadInvoice ? (
         <HiddenInvoicePdf
