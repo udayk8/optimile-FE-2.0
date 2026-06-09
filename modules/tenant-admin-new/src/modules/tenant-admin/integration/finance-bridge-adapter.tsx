@@ -422,6 +422,12 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           paymentStatus: inv.paymentStatus ?? "unpaid",
           paidAt: inv.paidAt ?? undefined,
           customerGstin: customerGstin(inv.customerId),
+          // Customer-side dispute thread + supersede chain, surfaced on the 3PL
+          // issuer console (reply / re-issue).
+          closeReason: inv.closeReason,
+          supersedesInvoiceId: inv.supersedesInvoiceId,
+          supersededByInvoiceId: inv.supersededByInvoiceId,
+          dispute: inv.dispute,
           // One drop per booking so multi-booking invoices resolve every trip.
           drops: invBookings.length > 1
             ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))
@@ -647,6 +653,13 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           store.setTenantInvoiceStage(invoiceId, decision === "dispute" ? "disputed" : "correction");
         }
       },
+
+      // 3PL replies to an open customer dispute thread (the customer decides the
+      // outcome). Re-issue creates a corrected invoice that supersedes the old one.
+      replyToCustomerDispute: (invoiceId: string, message: string) =>
+        store.tplReplyToInvoiceDispute(invoiceId, message),
+      releaseInvoiceForResubmission: (invoiceId: string) =>
+        store.tplReleaseInvoiceForResubmission(invoiceId),
 
       // Commit a working-capital budget as the customer's credit limit (Contract Budget CTA).
       setCreditLimit: (customerId: string, amount: number) =>

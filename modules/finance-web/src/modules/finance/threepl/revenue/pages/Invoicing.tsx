@@ -8,7 +8,6 @@ import { fmtINR } from "@finance/lib/format";
 import { computeGst, stateCodeOf } from "@shared-utils";
 import { ACCESSORIAL_LIBRARY, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
 import { useReceivables, type ARInvoice, type ARTrip, type LedgerExpense } from "@finance/lib/receivablesStore";
-import { useDisputes } from "@finance/lib/disputesStore";
 import { Trace } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
 import BookingDetailCard from "@finance/modules/finance/threepl/revenue/components/BookingDetailCard";
 import ExpenseTable from "@finance/modules/finance/threepl/revenue/components/ExpenseTable";
@@ -33,10 +32,31 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const STAGE_LABEL: Record<string, string> = {
   draft: "Draft", submitted: "Awaiting client", approved: "Approved",
-  disputed: "Disputed", correction: "Correction requested",
+  disputed: "Disputed", correction: "Resubmission Required", closed: "Closed",
 };
 const STAGE_TONE: Record<string, any> = {
-  draft: "slate", submitted: "blue", approved: "green", disputed: "amber", correction: "amber",
+  draft: "slate", submitted: "blue", approved: "green", disputed: "amber", correction: "amber", closed: "slate",
+};
+
+// Vendor-style status tabs for the issuer console (mirrors the vendor portal).
+const INV_TABS: { id: string; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "pending", label: "Pending" },
+  { id: "approved", label: "Approved" },
+  { id: "disputed", label: "Disputed" },
+  { id: "resubmission", label: "Resubmission Required" },
+  { id: "closed", label: "Closed" },
+  { id: "paid", label: "Paid" },
+];
+const invTabOf = (inv: ARInvoice): string => {
+  if (inv.paymentStatus === "paid") return "paid";
+  switch (inv.stage) {
+    case "approved": return "approved";
+    case "disputed": return "disputed";
+    case "correction": return "resubmission";
+    case "closed": return "closed";
+    default: return "pending"; // draft + submitted
+  }
 };
 const WORKFLOW_STEPS = ["Draft", "Submitted", "Client approval", "Ledger"];
 const stepIndex = (s: string) => (s === "draft" || s === "correction" ? 0 : s === "submitted" ? 1 : s === "approved" ? 3 : 2);
@@ -246,18 +266,18 @@ function previewInvoiceFromDrops(drops: ARTrip[]): ARInvoice {
   };
 }
 
-function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
-  const { trips, addAccessorial, removeAccessorial, submitInvoice, clientDecision, recordPayment } = useReceivables();
-  const { addDispute } = useDisputes();
+export function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => void; toast: (m: string) => void }) {
+  const { trips, addAccessorial, removeAccessorial, submitInvoice, recordPayment, replyToCustomerDispute, releaseInvoiceForResubmission } = useReceivables();
   const paid = inv.paymentStatus === "paid";
   const markPaid = () => { recordPayment?.(inv.id); toast(`Payment recorded for ${inv.id} — credit released`); };
+  const [reply, setReply] = useState("");
   const [adding, setAdding] = useState(false);
   const [preview, setPreview] = useState(false);
   const [dl, setDl] = useState(false);
   const [dlPod, setDlPod] = useState(false);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const podRef = useRef<HTMLDivElement>(null);
-  const editable = inv.stage === "draft" || inv.stage === "correction";
+  const editable = inv.stage === "draft";
 
   const doc = toInvoiceDoc(inv);
   const podTrips = invoiceTrips(inv, trips);
@@ -287,16 +307,13 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
   };
 
   const submit = () => { submitInvoice(inv.id); toast(`${inv.id} submitted to ${inv.client} for approval`); };
-  const approve = () => { clientDecision(inv.id, "approve"); toast(`${inv.id} approved — posted to AR ledger`); onBack(); };
-  const requestCorrection = () => { clientDecision(inv.id, "correction"); toast(`Correction requested on ${inv.id}`); };
-  const dispute = () => {
-    clientDecision(inv.id, "dispute");
-    addDispute({
-      id: inv.id, client: inv.client, amount: inv.invoiced,
-      reason: "Client disputed the submitted invoice",
-      stage: "raised", raised: today(), slaHrs: 48, owner: "—", kind: "customer",
-    });
-    toast(`${inv.id} disputed — sent to Disputes`);
+  // The customer decides (approve / dispute / request resubmission) from their
+  // portal. The 3PL replies to the dispute thread and re-issues on resubmission.
+  const sendReply = () => { if (reply.trim()) { replyToCustomerDispute?.(inv.id, reply.trim()); setReply(""); toast(`Reply sent to ${inv.client}`); } };
+  const resubmitBookings = (inv.bookingIds?.length ? inv.bookingIds : inv.tripId ? [inv.tripId] : []);
+  const releaseForRebill = () => {
+    releaseInvoiceForResubmission?.(inv.id);
+    toast(`Released ${resubmitBookings.join(", ") || "booking"} — generate a corrected invoice from Generate Invoice`);
     onBack();
   };
 
@@ -467,21 +484,46 @@ function InvoiceDetail({ inv, onBack, toast }: { inv: ARInvoice; onBack: () => v
           </div>
         )}
         {inv.stage === "submitted" && (
-          <div>
-            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><ScrollText size={16} className="text-blue-500" />Client-side approval</div>
-            <p className="mb-4 text-xs text-slate-500">The client's finance team reviews the side-by-side comparison above and decides.</p>
-            <div className="flex flex-wrap gap-3">
-              <Btn onClick={approve}><Check size={14} />Approve</Btn>
-              <Btn variant="ghost" onClick={requestCorrection}><RefreshCw size={14} />Request correction</Btn>
-              <Btn variant="danger" onClick={dispute}><AlertTriangle size={14} />Dispute</Btn>
-            </div>
-          </div>
+          <div className="flex items-center gap-2 text-sm text-blue-700"><ScrollText size={16} className="text-blue-500" />Awaiting client decision — {inv.client} reviews this invoice in their portal and approves, disputes, or requests a resubmission.</div>
         )}
         {inv.stage === "approved" && (
-          <div className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} />Approved — recorded in the AR ledger, due {inv.due}.</div>
+          <div className="flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 size={16} />Approved by client — recorded in the AR ledger, due {inv.due}.</div>
         )}
         {inv.stage === "disputed" && (
-          <div className="flex items-center gap-2 text-sm text-amber-700"><AlertTriangle size={16} />Disputed — tracked on the Disputes page.</div>
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-700"><AlertTriangle size={16} />Disputed by {inv.client}</div>
+            {inv.dispute && (
+              <div className="mb-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                {inv.dispute.messages.map((m) => (
+                  <div key={m.id} className={`flex flex-col ${m.sender === "TPL" ? "items-end" : "items-start"}`}>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{m.sender === "TPL" ? "You (3PL)" : inv.client} · {m.createdAt.slice(0, 16).replace("T", " ")}</span>
+                    <span className={`mt-0.5 max-w-[80%] rounded-lg px-3 py-1.5 text-sm ${m.sender === "TPL" ? "bg-blue-100 text-slate-800" : "bg-white text-slate-700 ring-1 ring-amber-200"}`}>{m.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {inv.dispute?.status === "OPEN" && (
+              <div className="flex flex-wrap items-end gap-2">
+                <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder="Reply to the client…" className="min-w-[260px] flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500" />
+                <Btn onClick={sendReply}><Send size={14} />Send reply</Btn>
+              </div>
+            )}
+          </div>
+        )}
+        {inv.stage === "correction" && (
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-700"><RefreshCw size={16} />{inv.client} requested a resubmission. Release the booking to raise a corrected invoice — this one is superseded.</div>
+            {resubmitBookings.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span className="font-medium">Booking{resubmitBookings.length > 1 ? "s" : ""}:</span>
+                {resubmitBookings.map((b) => <Pill key={b} tone="slate">{b}</Pill>)}
+              </div>
+            )}
+            <Btn onClick={releaseForRebill}><RefreshCw size={14} />Release booking &amp; re-bill</Btn>
+          </div>
+        )}
+        {inv.stage === "closed" && (
+          <div className="flex items-center gap-2 text-sm text-slate-500"><FileText size={16} />Closed{inv.closeReason === "SUPERSEDED" && inv.supersededByInvoiceId ? ` — superseded by ${inv.supersededByInvoiceId}` : inv.closeReason === "REJECTED" ? " — rejected" : ""}.</div>
         )}
         {/* Customer payment (AR) — records the receipt so the client's credit
             utilisation is released (BRD 3.5). Available on bridged invoices. */}
@@ -640,10 +682,10 @@ export function Kpis({ freight, bookings, drops, approvedExpenses = 0, pendingEx
   );
 }
 
-function DraftsTable({ rows, onOpen }: { rows: ARInvoice[]; onOpen: (id: string) => void }) {
+function DraftsTable({ rows, onOpen, title = "Drafts & in progress" }: { rows: ARInvoice[]; onOpen: (id: string) => void; title?: string }) {
   return (
     <Card className="overflow-hidden">
-      <div className="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">Drafts &amp; in progress</div>
+      <div className="border-b border-slate-100 px-5 py-3 font-semibold text-slate-800">{title}</div>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-200 bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -681,6 +723,7 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
   const [openBooking, setOpenBooking] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<{ ids: string[]; drops: ARTrip[]; label: string } | null>(null);
   const [draftClient, setDraftClient] = useState("all");
+  const [invTab, setInvTab] = useState("all");
 
   const open = openId ? invoices.find((i) => i.id === openId) : null;
   if (open) return <InvoiceDetail inv={open} onBack={() => setOpenId(null)} toast={toast} />;
@@ -704,10 +747,17 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
     };
     const confirmGenerate = () => {
       if (!confirming) return;
-      const id = generateConsolidatedInvoice(confirming.ids);
-      if (id) toast(`Invoice ${id} generated for ${confirming.label}`);
-      setSelected(new Set());
+      const { ids, label } = confirming;
+      // Close the preview first so an error in generation can never strand it open.
       setConfirming(null);
+      setSelected(new Set());
+      try {
+        const id = generateConsolidatedInvoice(ids);
+        if (id) toast(`Invoice ${id} generated for ${label}`);
+        else toast("Nothing to invoice — bookings already billed.");
+      } catch {
+        toast("Could not generate invoice");
+      }
     };
     const custDrafts = working.filter((i) => i.client === c.customer);
 
@@ -754,7 +804,7 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
                   <button onClick={() => setOpenBooking(expanded ? null : g.bookingId)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
                     {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}{expanded ? "Hide details" : "View details"}
                   </button>
-                  <Btn onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
+                  <Btn disabled={selected.size > 0} onClick={() => genBooking(g)}><ReceiptIndianRupee size={13} />Generate invoice</Btn>
                 </div>
               </div>
               <div className="mt-3 space-y-1.5">
@@ -839,16 +889,33 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
       )}
 
       <div className="mt-6">
-        {working.length > 0 && (
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">Filter drafts by client</span>
+        {invoices.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            {/* Vendor-style status tabs — the 3PL manages all issued invoices here. */}
+            <div role="tablist" className="flex flex-wrap gap-1.5">
+              {INV_TABS.map((t) => {
+                const count = t.id === "all" ? invoices.length : invoices.filter((i) => invTabOf(i) === t.id).length;
+                const active = invTab === t.id;
+                return (
+                  <button key={t.id} type="button" role="tab" aria-selected={active} onClick={() => setInvTab(t.id)}
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition-colors ${active ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}>
+                    {t.label}
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
             <select value={draftClient} onChange={(e) => setDraftClient(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-300">
               <option value="all">All clients</option>
-              {[...new Set(working.map((i) => i.client))].sort().map((cl) => <option key={cl} value={cl}>{cl}</option>)}
+              {[...new Set(invoices.map((i) => i.client))].sort().map((cl) => <option key={cl} value={cl}>{cl}</option>)}
             </select>
           </div>
         )}
-        <DraftsTable rows={working.filter((i) => draftClient === "all" || i.client === draftClient)} onOpen={setOpenId} />
+        <DraftsTable
+          title="Invoices"
+          rows={invoices.filter((i) => (invTab === "all" || invTabOf(i) === invTab) && (draftClient === "all" || i.client === draftClient))}
+          onOpen={setOpenId}
+        />
       </div>
     </div>
   );

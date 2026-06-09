@@ -107,6 +107,11 @@ export interface FinanceDataBridge {
   // AR lifecycle write-backs so finance decisions persist in embedded mode.
   submitInvoice?: (invoiceId: string) => void
   decideInvoice?: (invoiceId: string, decision: 'approve' | 'correction' | 'dispute') => void
+  // 3PL side of the customer-invoice dispute flow: reply to an open thread, or
+  // (on a resubmission request) close the invoice as superseded and release its
+  // booking back to the Generate-Invoice pool to raise a corrected invoice.
+  replyToCustomerDispute?: (invoiceId: string, message: string) => void
+  releaseInvoiceForResubmission?: (invoiceId: string) => void
   // Real AR ledger projected from invoices (Invoice + Payment rows, running balance).
   arLedger?: LedgerEntry[]
 }

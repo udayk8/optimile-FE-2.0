@@ -281,6 +281,17 @@ interface MockStoreValue {
   // Record a customer payment against an AR invoice (marks it paid so it leaves
   // the customer's live credit utilisation). BRD 3.5.
   recordTenantInvoicePayment: (invoiceId: string, opts?: { at?: string }) => void;
+  // 3PL→customer (AR) invoice lifecycle — the 3PL issues, the customer reviews.
+  // Mirrors the vendor→finance flow; shared dispute thread across both views.
+  customerApproveInvoice: (invoiceId: string) => void;
+  customerDisputeInvoice: (invoiceId: string, reason: string) => void;
+  customerRequestInvoiceResubmission: (invoiceId: string, message?: string) => void;
+  customerRejectInvoice: (invoiceId: string, reason?: string) => void;
+  customerReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
+  tplReplyToInvoiceDispute: (invoiceId: string, message: string) => void;
+  // Close a Resubmission-Required invoice (superseded) and release its bookings
+  // back to the Generate-Invoice pool so the 3PL can raise a corrected invoice.
+  tplReleaseInvoiceForResubmission: (invoiceId: string) => void;
   // Vendor (AP) invoice lifecycle — shared by the vendor portal and finance.
   listTenantVendorInvoices: (tenantId: string) => TenantVendorInvoiceRecord[];
   vendorSubmitInvoice: (input: TenantVendorInvoiceRecord) => TenantVendorInvoiceRecord;
@@ -918,7 +929,8 @@ function ensureDemoTenantsRehydrated(): void {
 //     vendor rate cards for that lane.
 // v6: driver expenses seeded on a completed booking (vendor expense tab/column).
 // v7: LR advance seeded on that booking (vendor advance column, info-only).
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v7";
+// v8: 4 ACC cement bookings set COMPLETED + POD for the AR invoice-flow demo.
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v8";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
@@ -6252,6 +6264,152 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           ),
         );
       },
+      // ---- 3PL→customer (AR) invoice lifecycle ----------------------------
+      customerApproveInvoice: (invoiceId) =>
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            const stage = inv.stage ?? "submitted";
+            // Approvable while awaiting the client OR mid-dispute (accept after discussion).
+            if (inv.invoiceId !== invoiceId || (stage !== "submitted" && stage !== "disputed")) return inv;
+            const now = new Date().toISOString();
+            const base = inv.createdAt ? new Date(inv.createdAt) : new Date();
+            const dueDate = new Date(base.getTime() + 30 * 86400000).toISOString(); // Net 30
+            return {
+              ...inv,
+              stage: "approved",
+              approvedAt: now,
+              dueDate,
+              dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" as const } : inv.dispute,
+            };
+          }),
+        ),
+      customerDisputeInvoice: (invoiceId, reason) =>
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            if (inv.invoiceId !== invoiceId || (inv.stage ?? "submitted") !== "submitted") return inv;
+            const now = new Date().toISOString();
+            return {
+              ...inv,
+              stage: "disputed",
+              dispute: {
+                reason,
+                status: "OPEN",
+                raisedAt: now,
+                responseDueAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+                messages: [{ id: `cdmsg-${invoiceId}-1`, sender: "CUSTOMER", message: reason, createdAt: now }],
+              },
+            };
+          }),
+        ),
+      customerRequestInvoiceResubmission: (invoiceId, message) =>
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            const stage = inv.stage ?? "submitted";
+            if (inv.invoiceId !== invoiceId || (stage !== "submitted" && stage !== "disputed")) return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              stage: "correction",
+              dispute: {
+                reason: inv.dispute?.reason ?? (message?.trim() || "Resubmission requested by customer."),
+                status: "CLOSED",
+                raisedAt: inv.dispute?.raisedAt ?? now,
+                responseDueAt: inv.dispute?.responseDueAt,
+                messages: [
+                  ...msgs,
+                  { id: `cdmsg-${invoiceId}-${msgs.length + 1}`, sender: "CUSTOMER", message: message?.trim() || "Please re-issue a corrected invoice.", createdAt: now },
+                ],
+              },
+            };
+          }),
+        ),
+      customerRejectInvoice: (invoiceId, reason) => {
+        const target = tenantInvoices.find((inv) => inv.invoiceId === invoiceId);
+        if (!target) return;
+        const stage = target.stage ?? "submitted";
+        if (stage !== "submitted" && stage !== "disputed") return;
+        const now = new Date().toISOString();
+        // Close the invoice as rejected (terminal) and release its booking(s) so
+        // the 3PL can re-bill or drop them.
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            if (inv.invoiceId !== invoiceId) return inv;
+            const msgs = inv.dispute?.messages ?? [];
+            return {
+              ...inv,
+              stage: "closed" as const,
+              closeReason: "REJECTED" as const,
+              dispute: {
+                reason: inv.dispute?.reason ?? (reason?.trim() || "Invoice rejected by customer."),
+                status: "CLOSED" as const,
+                raisedAt: inv.dispute?.raisedAt ?? now,
+                responseDueAt: inv.dispute?.responseDueAt,
+                messages: [
+                  ...msgs,
+                  { id: `cdmsg-${invoiceId}-${msgs.length + 1}`, sender: "CUSTOMER" as const, message: reason?.trim() || "Invoice rejected.", createdAt: now },
+                ],
+              },
+            };
+          }),
+        );
+        const releasedIds = new Set(target.bookingIds ?? []);
+        if (releasedIds.size) {
+          setTenantBookings((current) =>
+            current.map((b) =>
+              releasedIds.has(b.bookingId) || releasedIds.has(b.id)
+                ? { ...b, invoiceId: null, isInvoiced: false }
+                : b,
+            ),
+          );
+        }
+      },
+      customerReplyToInvoiceDispute: (invoiceId, message) =>
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            if (inv.invoiceId !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `cdmsg-${invoiceId}-${msgs.length + 1}`, sender: "CUSTOMER", message, createdAt: now }] } };
+          }),
+        ),
+      tplReplyToInvoiceDispute: (invoiceId, message) =>
+        setTenantInvoices((current) =>
+          current.map((inv) => {
+            if (inv.invoiceId !== invoiceId || !inv.dispute || inv.dispute.status !== "OPEN") return inv;
+            const now = new Date().toISOString();
+            const msgs = inv.dispute.messages ?? [];
+            return { ...inv, dispute: { ...inv.dispute, messages: [...msgs, { id: `cdmsg-${invoiceId}-${msgs.length + 1}`, sender: "TPL", message, createdAt: now }] } };
+          }),
+        ),
+      tplReleaseInvoiceForResubmission: (invoiceId) => {
+        const target = tenantInvoices.find((inv) => inv.invoiceId === invoiceId);
+        if (!target) return;
+        // Close the old invoice (superseded) and release its bookings back to the
+        // Generate-Invoice pool so the 3PL can raise a fresh, corrected invoice.
+        setTenantInvoices((current) =>
+          current.map((inv) =>
+            inv.invoiceId === invoiceId
+              ? {
+                  ...inv,
+                  stage: "closed" as const,
+                  closeReason: "SUPERSEDED" as const,
+                  dispute: inv.dispute ? { ...inv.dispute, status: "CLOSED" as const } : inv.dispute,
+                }
+              : inv,
+          ),
+        );
+        const releasedIds = new Set(target.bookingIds ?? []);
+        if (releasedIds.size) {
+          setTenantBookings((current) =>
+            current.map((b) =>
+              releasedIds.has(b.bookingId) || releasedIds.has(b.id)
+                ? { ...b, invoiceId: null, isInvoiced: false }
+                : b,
+            ),
+          );
+        }
+      },
       // ---- Vendor (AP) invoice lifecycle ----------------------------------
       listTenantVendorInvoices: (tenantId) => tenantVendorInvoices.filter((item) => item.tenantId === tenantId),
       vendorSubmitInvoice: (input) => {
@@ -7489,6 +7647,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
       tenantBookings,
       tenantCustomers,
       tenantDrivers,
+      tenantInvoices,
       tenantVendorInvoices,
       tenantLRConfigs,
       tenantLrs,

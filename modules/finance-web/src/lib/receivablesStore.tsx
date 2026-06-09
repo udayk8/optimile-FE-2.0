@@ -26,7 +26,7 @@ import { useFinanceBridge, type RateCardDescriptor } from '@finance/integration/
    ============================================================ */
 
 export type PodStage = 'pending' | 'uploaded' | 'validated' | 'rejected' | 'invoiced'
-export type InvoiceStage = 'draft' | 'submitted' | 'approved' | 'disputed' | 'correction'
+export type InvoiceStage = 'draft' | 'submitted' | 'approved' | 'disputed' | 'correction' | 'closed'
 export type ClientDecision = 'approve' | 'dispute' | 'correction'
 
 export interface Accessorial {
@@ -131,6 +131,18 @@ export interface ARInvoice {
   // decides IGST vs CGST+SGST on the printable invoice. Absent for standalone
   // mock invoices, which then fall back to inter-state (IGST).
   customerGstin?: string
+  // 3PL→customer dispute thread + supersede chain (bridged invoices). The customer
+  // raises/replies; the 3PL replies + re-issues. Mirrors the vendor flow.
+  closeReason?: 'SUPERSEDED' | 'REJECTED'
+  supersedesInvoiceId?: string
+  supersededByInvoiceId?: string
+  dispute?: {
+    reason: string
+    status: 'OPEN' | 'CLOSED'
+    raisedAt: string
+    responseDueAt?: string
+    messages: { id: string; sender: 'CUSTOMER' | 'TPL'; message: string; createdAt: string }[]
+  }
 }
 
 export interface LedgerEntry {
@@ -476,6 +488,10 @@ export function useReceivables() {
       submitInvoice: (invoiceId: string) => bridge.submitInvoice?.(invoiceId),
       clientDecision: (invoiceId: string, decision: 'approve' | 'correction' | 'dispute') =>
         bridge.decideInvoice?.(invoiceId, decision),
+      // 3PL-side customer-invoice dispute actions (the customer decides; the 3PL
+      // replies / releases for re-bill). Undefined standalone.
+      replyToCustomerDispute: bridge.replyToCustomerDispute,
+      releaseInvoiceForResubmission: bridge.releaseInvoiceForResubmission,
       allocate: store.allocate,
       addSeries: store.addSeries,
       updateSeries: store.updateSeries,
@@ -499,5 +515,7 @@ export function useReceivables() {
     resetFinancialYear: store.resetFinancialYear,
     // No payment write-back in standalone (mock) mode.
     recordPayment: undefined as ((invoiceId: string) => void) | undefined,
+    replyToCustomerDispute: undefined as ((invoiceId: string, message: string) => void) | undefined,
+    releaseInvoiceForResubmission: undefined as ((invoiceId: string) => void) | undefined,
   }
 }

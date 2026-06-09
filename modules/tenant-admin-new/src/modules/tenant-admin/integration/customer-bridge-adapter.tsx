@@ -21,6 +21,8 @@ import type {
   CustomerBookingStatus,
   CustomerBookingView,
   CustomerDataBridge,
+  CustomerInvoiceStatus,
+  CustomerInvoiceView,
   CustomerMaterialOption,
   CustomerVehicleTypeOption,
 } from "@customer/integration/customer-data-bridge";
@@ -207,12 +209,61 @@ export function useCustomerTenantDataBridge(): CustomerDataBridge | null {
     const weightUomOptions = getWeightUOMOptions(uomDefinitions, selectedCustomerRecord);
     const effectiveWeightUomOptions = weightUomOptions.length > 0 ? weightUomOptions : ["KG", "MT", "TON"];
 
+    // ── AR invoices the 3PL issued to this customer (shared TenantInvoiceRecord) ──
+    const bookingById = new Map(bookings.map((b) => [b.id, b]));
+    const invoiceStatusOf = (inv: { stage?: string; paymentStatus?: string; dueDate?: string | null }): { status: CustomerInvoiceStatus; agingDays: number } => {
+      if (inv.paymentStatus === "paid") return { status: "Paid", agingDays: 0 };
+      const stage = inv.stage ?? "submitted";
+      if (stage === "closed") return { status: "Closed", agingDays: 0 };
+      if (stage === "disputed") return { status: "Disputed", agingDays: 0 };
+      if (stage === "correction") return { status: "Resubmission Required", agingDays: 0 };
+      if (stage === "approved") {
+        const days = inv.dueDate ? Math.round((Date.now() - new Date(inv.dueDate).getTime()) / 86400000) : 0;
+        return days > 0 ? { status: "Overdue", agingDays: days } : { status: "Approved", agingDays: 0 };
+      }
+      return { status: "Pending", agingDays: 0 };
+    };
+    const customerInvoices: CustomerInvoiceView[] = store
+      .listTenantInvoices(tenantId)
+      .filter((inv) => inv.customerId === customerId)
+      .map((inv) => {
+        const firstBooking = inv.bookingIds?.[0] ? bookingById.get(inv.bookingIds[0]) : undefined;
+        const { status, agingDays } = invoiceStatusOf(inv);
+        return {
+          invoiceId: inv.invoiceId,
+          bookingRef: firstBooking?.salesOrder ?? inv.bookingIds?.[0] ?? "-",
+          route: firstBooking ? `${firstBooking.origin} → ${firstBooking.destination}` : "-",
+          invoiceDate: fmt(inv.createdAt),
+          dueDate: inv.dueDate ? fmt(inv.dueDate) : "On approval",
+          amount: inv.total,
+          status,
+          agingDays,
+          dispute: inv.dispute
+            ? {
+                reason: inv.dispute.reason,
+                status: inv.dispute.status,
+                raisedAt: inv.dispute.raisedAt,
+                responseDueAt: inv.dispute.responseDueAt,
+                messages: inv.dispute.messages.map((m) => ({ id: m.id, sender: m.sender, message: m.message, createdAt: m.createdAt })),
+              }
+            : undefined,
+          supersedesInvoiceId: inv.supersedesInvoiceId,
+          supersededByInvoiceId: inv.supersededByInvoiceId,
+        };
+      });
+
     return {
       tenantId,
       tenantName,
       customerId,
       customerName,
       bookings,
+      invoices: customerInvoices,
+      approveInvoice: (invoiceId) => store.customerApproveInvoice(invoiceId),
+      disputeInvoice: (invoiceId, reason) => store.customerDisputeInvoice(invoiceId, reason),
+      requestResubmission: (invoiceId, message) => store.customerRequestInvoiceResubmission(invoiceId, message),
+      rejectInvoice: (invoiceId, reason) => store.customerRejectInvoice(invoiceId, reason),
+      replyToDispute: (invoiceId, message) => store.customerReplyToInvoiceDispute(invoiceId, message),
       getBookingById: (id) => {
         const record = store.getTenantBookingById(id);
         if (!record || record.customerId !== customerId) return null;

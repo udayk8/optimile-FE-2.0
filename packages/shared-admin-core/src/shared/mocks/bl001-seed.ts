@@ -2700,7 +2700,6 @@ export const bl001Bookings = [
         "deliveryId": "draft-delivery-1"
       }
     ],
-    "expenses": [],
     "deliveries": [
       {
         "id": "draft-delivery-1",
@@ -3521,9 +3520,9 @@ export const bl001Bookings = [
     "vehicleTypeId": "vehicle-type-d29xwv3",
     "lrType": "MANUAL",
     "manualLrPoolPreference": "GENERAL",
-    "status": "VEHICLE_ASSIGNED",
+    "status": "COMPLETED",
     "opsRemark": null,
-    "pod": null,
+    "pod": { "podUploaded": true, "podUploadedAt": "2026-06-05T10:00:00.000Z" },
     "documents": [],
     "expenses": [],
     "deliveries": [
@@ -3717,9 +3716,9 @@ export const bl001Bookings = [
     "vehicleTypeId": "vehicle-type-d29xwv3",
     "lrType": "AUTO",
     "manualLrPoolPreference": "GENERAL",
-    "status": "VEHICLE_ASSIGNED",
+    "status": "COMPLETED",
     "opsRemark": null,
-    "pod": null,
+    "pod": { "podUploaded": true, "podUploadedAt": "2026-06-05T10:00:00.000Z" },
     "documents": [],
     "expenses": [],
     "deliveries": [
@@ -3898,9 +3897,9 @@ export const bl001Bookings = [
     "vehicleTypeId": "vehicle-type-d29xwv3",
     "lrType": "AUTO",
     "manualLrPoolPreference": "GENERAL",
-    "status": "VEHICLE_ASSIGNED",
+    "status": "COMPLETED",
     "opsRemark": null,
-    "pod": null,
+    "pod": { "podUploaded": true, "podUploadedAt": "2026-06-05T10:00:00.000Z" },
     "documents": [],
     "expenses": [],
     "deliveries": [
@@ -4079,9 +4078,9 @@ export const bl001Bookings = [
     "vehicleTypeId": "vehicle-type-d29xwv3",
     "lrType": "MANUAL",
     "manualLrPoolPreference": "GENERAL",
-    "status": "VEHICLE_ASSIGNED",
+    "status": "COMPLETED",
     "opsRemark": null,
-    "pod": null,
+    "pod": { "podUploaded": true, "podUploadedAt": "2026-06-05T10:00:00.000Z" },
     "documents": [],
     "expenses": [],
     "deliveries": [

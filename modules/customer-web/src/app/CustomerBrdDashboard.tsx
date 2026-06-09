@@ -555,6 +555,12 @@ export function CustomerDashboardShell({ embedded = false }: { embedded?: boolea
                   bookings={bookings}
                   initialTab={financeInitialTab}
                   onViewBooking={(id) => { setSelectedBookingId(id); setActiveSection('tracking') }}
+                  invoices={bridge?.invoices}
+                  onApprove={bridge?.approveInvoice}
+                  onDispute={bridge?.disputeInvoice}
+                  onRequestResubmission={bridge?.requestResubmission}
+                  onReject={bridge?.rejectInvoice}
+                  onReplyToDispute={bridge?.replyToDispute}
                 />
               )}
               {activeSection === 'reports'  && (

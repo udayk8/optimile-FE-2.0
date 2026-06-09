@@ -570,9 +570,11 @@ export interface TenantInvoiceRecord {
   igst?: number;
   total: number;
   createdAt: string;
-  // AR lifecycle stage (BRD 4.x). Persisted so finance Approve/Dispute/Correction
-  // stick across renders in embedded mode. Absent ⇒ treated as 'submitted'.
-  stage?: "submitted" | "approved" | "disputed" | "correction";
+  // AR lifecycle stage (BRD 4.x). Persisted so the customer's Approve/Dispute/
+  // Resubmission decisions stick across renders in embedded mode. Absent ⇒
+  // treated as 'submitted'. 'correction' ⇒ "Resubmission Required" (3PL re-issues);
+  // 'closed' ⇒ superseded/rejected.
+  stage?: "submitted" | "approved" | "disputed" | "correction" | "closed";
   approvedAt?: string | null;
   dueDate?: string | null;
   // Customer payment (AR). Absent ⇒ unpaid. A paid invoice no longer counts
@@ -580,6 +582,28 @@ export interface TenantInvoiceRecord {
   paymentStatus?: "unpaid" | "paid";
   paidAt?: string | null;
   paidAmount?: number | null;
+  // 3PL→customer invoice lifecycle (mirrors the vendor→3PL flow). The 3PL issues,
+  // the customer reviews. Supersede chain for re-issued (corrected) invoices.
+  closeReason?: "SUPERSEDED" | "REJECTED";
+  supersedesInvoiceId?: string;   // on the NEW invoice — the old it replaces
+  supersededByInvoiceId?: string; // on the OLD invoice — the new that replaced it
+  // Embedded dispute thread shared by the 3PL finance + customer portal views.
+  dispute?: TenantInvoiceDispute;
+}
+
+export interface TenantInvoiceDisputeMessage {
+  id: string;
+  sender: "CUSTOMER" | "TPL"; // TPL = the 3PL / tenant finance team
+  message: string;
+  createdAt: string;
+}
+
+export interface TenantInvoiceDispute {
+  reason: string;
+  status: "OPEN" | "CLOSED";
+  raisedAt: string;
+  responseDueAt?: string;
+  messages: TenantInvoiceDisputeMessage[];
 }
 
 export interface BookingShipmentDocuments {

@@ -3,8 +3,10 @@ import { AlertTriangle, Check, Clock, Bell, FileText, RefreshCw, MessageSquare, 
 import { Card, Pill, Money, SectionTitle, Stepper, Modal, ModalHeader } from "@finance/components/primitives";
 import { useDisputes } from "@finance/lib/disputesStore";
 import { usePayables } from "@finance/lib/payablesStore";
+import { useReceivables } from "@finance/lib/receivablesStore";
 import { VENDOR_BILLS, VENDOR_BILL_DETAILS } from "@finance/data/mock";
 import { VendorBillDetail } from "@finance/modules/finance/threepl/payables/pages/VendorMatch";
+import { InvoiceDetail } from "@finance/modules/finance/threepl/revenue/pages/Invoicing";
 
 const hoursUntil = (iso?: string) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000) : 24);
 
@@ -48,7 +50,7 @@ function DisputeChatModal({ dispute, onClose, onSend }: any) {
       ) : (
         <div className="flex items-center gap-2 border-t border-slate-200 px-4 py-3">
           <input autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder="Reply to the vendor…"
+            placeholder="Reply…"
             className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-300 focus:bg-white" />
           <button onClick={send} disabled={!text.trim()} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"><Send size={14} />Send</button>
         </div>
@@ -66,6 +68,7 @@ const billFor = (d: any) =>
 export default function Disputes({ toast }: any) {
   const { disputes, resolveDispute, escalateDispute, replyToDispute } = useDisputes();
   const { bills, bridgedAP, vendorApprove, vendorRequestResubmission, vendorReplyToDispute } = usePayables();
+  const { invoices, replyToCustomerDispute, releaseInvoiceForResubmission } = useReceivables();
   const [tab, setTab] = useState("all");
   const [viewing, setViewing] = useState<any>(null);
   const [chatId, setChatId] = useState<any>(null);
@@ -88,7 +91,25 @@ export default function Disputes({ toast }: any) {
       bill: b,
     }));
 
-  const allDisputes: any[] = [...bridgedDisputes, ...disputes];
+  // Customer-raised (AR) disputes from the bridged invoices' threads, projected into
+  // the same card shape so they list + chat alongside vendor disputes. The customer
+  // is the decider, so the 3PL can reply + re-issue (release) but not approve here.
+  const bridgedCustomerDisputes = (invoices ?? [])
+    .filter((inv: any) => inv.stage === "disputed" && inv.dispute)
+    .map((inv: any) => ({
+      id: inv.id,
+      invoiceId: inv.id,
+      customerBridged: true,
+      kind: "customer" as const,
+      client: inv.client,
+      amount: inv.amount ?? inv.invoiced ?? 0,
+      reason: inv.dispute.reason,
+      stage: inv.dispute.messages.some((m: any) => m.sender === "TPL") ? "vendor-response" : "raised",
+      slaHrs: hoursUntil(inv.dispute.responseDueAt),
+      thread: inv.dispute.messages.map((m: any) => ({ from: m.sender === "TPL" ? "admin" : "vendor", text: m.message, at: (m.createdAt ?? "").slice(0, 16).replace("T", " ") })),
+    }));
+
+  const allDisputes: any[] = [...bridgedDisputes, ...bridgedCustomerDisputes, ...disputes];
   const chatDispute = allDisputes.find((x) => x.id === chatId);
 
   const resolve = (d: any, how: any) => {
@@ -107,14 +128,24 @@ export default function Disputes({ toast }: any) {
   };
 
   const sendChat = (d: any, text: string) => {
-    if (d.bridged) vendorReplyToDispute?.(d.billId, text);
+    if (d.customerBridged) replyToCustomerDispute?.(d.invoiceId, text);
+    else if (d.bridged) vendorReplyToDispute?.(d.billId, text);
     else replyToDispute(d.id, text);
+  };
+
+  const releaseForRebill = (d: any) => {
+    releaseInvoiceForResubmission?.(d.invoiceId);
+    toast(`${d.invoiceId} released for re-bill — generate a corrected invoice from POD & Invoicing`);
   };
 
   const items = allDisputes.filter((d) => tab === "all" || (d.kind || "customer") === tab);
 
   if (viewing) {
     const d = allDisputes.find((x) => x.id === viewing);
+    if (d?.customerBridged) {
+      const inv = (invoices ?? []).find((i: any) => i.id === viewing);
+      if (inv) return <InvoiceDetail inv={inv as any} onBack={() => setViewing(null)} toast={toast} />;
+    }
     if (d) return <VendorBillDetail bill={(d as any).bridged ? (d as any).bill : billFor(d)} disputed onBack={() => setViewing(null)} onAct={() => {}} onDispute={() => {}} backLabel="Back to disputes" toast={toast} />;
   }
 
@@ -133,7 +164,7 @@ export default function Disputes({ toast }: any) {
           const idx = STAGE_IDX[d.stage as keyof typeof STAGE_IDX];
           const overdue = d.slaHrs < 0;
           const kind = d.kind || "customer";
-          const hasDetail = (d as any).bridged || !!(VENDOR_BILL_DETAILS as Record<string, any>)[d.id];
+          const hasDetail = (d as any).bridged || (d as any).customerBridged || !!(VENDOR_BILL_DETAILS as Record<string, any>)[d.id];
           return (
             <Card key={d.id} className={`p-5 ${overdue && d.stage !== "resolved" ? "ring-1 ring-red-200" : ""}`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -186,14 +217,20 @@ export default function Disputes({ toast }: any) {
                 )}
                 {d.stage !== "resolved" && (
                   <>
-                    {(d as any).bridged && (
+                    {((d as any).bridged || (d as any).customerBridged) && (
                       <button onClick={() => setChatId(d.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><MessageSquare size={13} />Chat{d.thread?.length ? ` (${d.thread.length})` : ""}</button>
                     )}
-                    {d.slaHrs < 0 && d.stage !== "escalated" && (
-                      <button onClick={() => escalate(d.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={13} />Escalate to finance heads</button>
+                    {(d as any).customerBridged ? (
+                      <button onClick={() => releaseForRebill(d)} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><RefreshCw size={13} />Release &amp; re-bill</button>
+                    ) : (
+                      <>
+                        {d.slaHrs < 0 && d.stage !== "escalated" && (
+                          <button onClick={() => escalate(d.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100"><AlertTriangle size={13} />Escalate to finance heads</button>
+                        )}
+                        <button onClick={() => resolve(d, "approve")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><Check size={13} />Approve invoice &amp; close dispute</button>
+                        <button onClick={() => resolve(d, "resubmit")} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><RefreshCw size={13} />Resubmit invoice &amp; close dispute</button>
+                      </>
                     )}
-                    <button onClick={() => resolve(d, "approve")} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><Check size={13} />Approve invoice &amp; close dispute</button>
-                    <button onClick={() => resolve(d, "resubmit")} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"><RefreshCw size={13} />Resubmit invoice &amp; close dispute</button>
                   </>
                 )}
               </div>

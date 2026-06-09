@@ -179,12 +179,63 @@ export interface CustomerSpotContractMatch {
   endDate: string
 }
 
+export type CustomerInvoiceStatus =
+  | 'Pending'
+  | 'Approved'
+  | 'Disputed'
+  | 'Resubmission Required'
+  | 'Paid'
+  | 'Overdue'
+  | 'Closed'
+
+export interface CustomerInvoiceMessage {
+  id: string
+  sender: 'CUSTOMER' | 'TPL' // TPL = the 3PL / tenant finance team
+  message: string
+  createdAt: string
+}
+
+export interface CustomerInvoiceDispute {
+  reason: string
+  status: 'OPEN' | 'CLOSED'
+  raisedAt: string
+  responseDueAt?: string
+  messages: CustomerInvoiceMessage[]
+}
+
+// One AR invoice issued to this customer by the 3PL, mapped from the shared
+// TenantInvoiceRecord for the customer Finance view.
+export interface CustomerInvoiceView {
+  invoiceId: string
+  bookingRef: string
+  route: string
+  invoiceDate: string
+  dueDate: string
+  amount: number
+  status: CustomerInvoiceStatus
+  agingDays: number
+  dispute?: CustomerInvoiceDispute
+  supersedesInvoiceId?: string
+  supersededByInvoiceId?: string
+}
+
 export interface CustomerDataBridge {
   // Logged-in identity (from the shared session context).
   tenantId: string
   tenantName: string | null
   customerId: string
   customerName: string
+
+  // AR invoices the 3PL issued to THIS customer, from the shared store. The
+  // customer is the reviewer: approve / dispute / request resubmission, with a
+  // shared dispute thread the 3PL finance side also sees. Optional so the
+  // standalone customer build (no live store) falls back to demo data.
+  invoices?: CustomerInvoiceView[]
+  approveInvoice?: (invoiceId: string) => void
+  disputeInvoice?: (invoiceId: string, reason: string) => void
+  requestResubmission?: (invoiceId: string, message?: string) => void
+  rejectInvoice?: (invoiceId: string, reason?: string) => void
+  replyToDispute?: (invoiceId: string, message: string) => void
 
   // Bookings for THIS customer only, mapped to the dashboard view shape and
   // sourced from the same shared store the internal Booking module uses.
