@@ -59,10 +59,11 @@ export default function LedgerPage() {
       })
   }, [activeTab, dateFilteredEntries, invoiceFilter, search])
 
+  // All summary cards reflect the active date filter — computed from the
+  // date-filtered entries, not the full ledger history.
   const summary = useMemo(() => {
     const latestByInvoiceLedger = new Map<string, LedgerEntry>()
-    const sorted = [...ledger].sort((a, b) => a.date.localeCompare(b.date))
-    for (const entry of sorted) {
+    for (const entry of dateFilteredEntries) {
       latestByInvoiceLedger.set(`${entry.invoiceId}::${entry.ledgerType}`, entry)
     }
 
@@ -71,6 +72,7 @@ export default function LedgerPage() {
     let customerPendingInvoices = 0
     let customerCollected = 0
     let tdsDeducted = 0
+    let totalAmountPaid = 0
 
     for (const entry of latestByInvoiceLedger.values()) {
       if (entry.ledgerType === 'CUSTOMER') {
@@ -81,18 +83,15 @@ export default function LedgerPage() {
     }
 
     for (const entry of dateFilteredEntries) {
-      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'CUSTOMER_PAYMENT') customerCollected += entry.credit
+      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'CUSTOMER_PAYMENT') {
+        customerCollected += entry.credit
+        totalAmountPaid += entry.credit
+      }
       if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'TDS_DEDUCTION') tdsDeducted += entry.credit
     }
 
-    // Total amount paid is the full-history customer collection (not range-bound).
-    let totalAmountPaid = 0
-    for (const entry of ledger) {
-      if (entry.ledgerType === 'CUSTOMER' && entry.entryType === 'CUSTOMER_PAYMENT') totalAmountPaid += entry.credit
-    }
-
     return { customerPending, customerSettledInvoices, customerPendingInvoices, customerCollected, tdsDeducted, totalAmountPaid }
-  }, [ledger, dateFilteredEntries])
+  }, [dateFilteredEntries])
 
   // True running balance for the statement: accumulate Debit − Credit across
   // the date-ordered entries so the Balance column adds up across invoices,
@@ -152,6 +151,19 @@ export default function LedgerPage() {
           </div>
         </div>
 
+        <div className="px-6 pt-5">
+          <PageFilterBar
+            search={search}
+            onSearch={(v) => { setSearch(v); setPage(1) }}
+            searchPlaceholder="Search type, description, reference"
+            fromDate={fromDate}
+            toDate={toDate}
+            onFromDate={(v) => { setFromDate(v); setPage(1) }}
+            onToDate={(v) => { setToDate(v); setPage(1) }}
+            onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
+          />
+        </div>
+
         <div className="grid gap-3 border-b border-gray-100 bg-gray-50/70 px-6 py-5 sm:grid-cols-2 md:grid-cols-4">
           <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
             <div className="text-sm font-medium text-gray-500">Invoices Pending Payment</div>
@@ -175,17 +187,6 @@ export default function LedgerPage() {
           </div>
         </div>
       </div>
-
-      <PageFilterBar
-        search={search}
-        onSearch={(v) => { setSearch(v); setPage(1) }}
-        searchPlaceholder="Search type, description, reference"
-        fromDate={fromDate}
-        toDate={toDate}
-        onFromDate={(v) => { setFromDate(v); setPage(1) }}
-        onToDate={(v) => { setToDate(v); setPage(1) }}
-        onClear={() => { setSearch(''); setFromDate(''); setToDate(''); setPage(1) }}
-      />
 
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 p-6">

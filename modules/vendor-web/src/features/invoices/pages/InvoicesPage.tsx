@@ -189,7 +189,22 @@ export default function InvoicesPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [activeTab, fromDate, invoices, toDate, paidInvoiceIds, searchText])
 
-  const approvedInvoices = invoices.filter((invoice) => invoice.status === 'APPROVED')
+  // Cards reflect the active date + search filter (across all tabs), so the
+  // summary changes with the filter — not just the table.
+  const filteredForCards = useMemo(
+    () =>
+      invoices.filter((invoice) => {
+        const createdOn = (invoice.createdAt ?? '').slice(0, 10)
+        if (fromDate && createdOn < fromDate) return false
+        if (toDate && createdOn > toDate) return false
+        const q = searchText.trim().toLowerCase()
+        if (q && ![invoice.invoiceNumber, invoice.id, invoice.status].some((v) => (v ?? '').toLowerCase().includes(q))) return false
+        return true
+      }),
+    [invoices, fromDate, toDate, searchText],
+  )
+
+  const approvedInvoices = filteredForCards.filter((invoice) => invoice.status === 'APPROVED')
   const approvedSummary = useMemo(() => {
     const totalInvoiceApproved = approvedInvoices.reduce((sum, invoice) => sum + invoice.grandTotal, 0)
     const totalGstApproved = approvedInvoices.reduce((sum, invoice) => sum + invoice.gstAmount, 0)
@@ -199,13 +214,13 @@ export default function InvoicesPage() {
       totalGstApproved,
     }
   }, [approvedInvoices])
-  // Totals across ALL invoices (not just approved) for the summary cards.
+  // Totals across the filtered invoices (all statuses) for the summary cards.
   const invoiceSummary = useMemo(
     () => ({
-      totalInvoiced: invoices.reduce((sum, invoice) => sum + invoice.grandTotal, 0),
-      totalGst: invoices.reduce((sum, invoice) => sum + invoice.gstAmount, 0),
+      totalInvoiced: filteredForCards.reduce((sum, invoice) => sum + invoice.grandTotal, 0),
+      totalGst: filteredForCards.reduce((sum, invoice) => sum + invoice.gstAmount, 0),
     }),
-    [invoices],
+    [filteredForCards],
   )
 
   const invoicePageSize = 5
