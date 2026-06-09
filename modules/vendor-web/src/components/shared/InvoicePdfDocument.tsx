@@ -126,7 +126,7 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
         <table className="w-full border-t-2 text-[10px]" style={{ borderColor: BLUE }}>
           <thead>
             <tr className="text-white" style={{ backgroundColor: BLUE }}>
-              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Truck No', 'Origin', 'Destination', 'LR No', 'Freight', 'Advance', 'Detention', 'Loading & Unloading', 'Other', 'Freight Cost'].map((h) => (
+              {['Sr No', 'Bkg ID', 'Shipping Date', 'Delivery Date', 'Truck No', 'Origin', 'Destination', 'LR No', 'Freight Cost', 'Advance', 'Expense', 'Total Cost'].map((h) => (
                 <th key={h} className="border px-1.5 py-2 text-center font-bold" style={{ borderColor: '#C7CBEF' }}>{h}</th>
               ))}
             </tr>
@@ -134,6 +134,8 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
           <tbody>
             {invoice.lineItems.map((item, index) => {
               const trip = tripById.get(item.tripId)
+              const expense = trip?.approvedExpenses ?? 0
+              const totalCost = item.lineTotal + expense
               return (
                 <tr key={item.tripId}>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{index + 1}</td>
@@ -146,17 +148,15 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>{lrFor(item.tripId)}</td>
                   <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{inr(item.freightCharge)}</td>
                   <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-center" style={{ borderColor: '#C7CBEF' }}>–</td>
-                  <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(item.lineTotal)}</td>
+                  <td className="border px-1.5 py-3 text-right" style={{ borderColor: '#C7CBEF' }}>{expense > 0 ? inr(expense) : '–'}</td>
+                  <td className="border px-1.5 py-3 text-right font-semibold" style={{ borderColor: '#C7CBEF' }}>{inr(totalCost)}</td>
                 </tr>
               )
             })}
             {/* filler rows so short invoices still look like the printed form */}
             {Array.from({ length: Math.max(0, 3 - invoice.lineItems.length) }).map((_, i) => (
               <tr key={`filler-${i}`}>
-                {Array.from({ length: 14 }).map((__, j) => (
+                {Array.from({ length: 12 }).map((__, j) => (
                   <td key={j} className="border px-1.5 py-3" style={{ borderColor: '#C7CBEF' }}>&nbsp;</td>
                 ))}
               </tr>

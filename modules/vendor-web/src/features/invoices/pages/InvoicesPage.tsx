@@ -359,9 +359,15 @@ export default function InvoicesPage() {
                       </td>
                       <td className="p-4">
                         {dispute ? (
-                          <div className="space-y-1">
+                          <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
                             <StatusBadge status={dispute.status} />
                             {dispute.responseDueAt ? <p className="text-xs text-gray-400">SLA: {formatDate(dispute.responseDueAt)}</p> : null}
+                            {invoice.status === 'DISPUTED' ? (
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
+                                <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
+                                Open Thread
+                              </Button>
+                            ) : null}
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400">-</span>
@@ -379,12 +385,6 @@ export default function InvoicesPage() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                          {invoice.status === 'DISPUTED' && dispute ? (
-                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/disputes/${dispute.id}`)}>
-                              <MessageSquareMore className="mr-1 h-3.5 w-3.5" />
-                              Open Thread
-                            </Button>
-                          ) : null}
                           {invoice.status === 'RESUBMISSION_REQUIRED' ? (
                             <Button size="sm" variant="outline" className="border-orange-200 text-orange-600 hover:bg-orange-50" onClick={() => openEditModal(invoice.id)}>
                               <RefreshCw className="mr-1 h-3.5 w-3.5" />

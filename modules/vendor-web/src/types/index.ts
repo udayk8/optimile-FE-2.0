@@ -297,6 +297,21 @@ export interface Trip {
   freightRate: number
   isInvoiced: boolean
   createdAt: string
+  /** Driver-submitted expenses approved on the booking (cross-module). */
+  expenses?: TripExpense[]
+  /** Sum of approved expenses — surfaced on the bookings list + invoice. */
+  approvedExpenses?: number
+}
+
+export interface TripExpense {
+  id: string
+  label: string
+  amount: number
+  expenseType?: string
+  paymentMode?: string
+  paidBy?: string
+  status?: 'Pending' | 'Approved' | 'Rejected'
+  dateTime?: string
 }
 
 export type TripDocumentType = 'INVOICE_COPY' | 'POD_COPY' | 'EWAY_BILL' | 'LR_COPY' | 'REMARKS' | 'SUB_DELIVERY' | 'OTHER'

@@ -723,6 +723,8 @@ function toVendorTrip(
   buyingRateFallback = 0,
 ): VendorTrip {
   const assignment = booking.assignment ?? null;
+  // Driver-submitted expenses approved on the booking — surfaced to the vendor.
+  const approvedExpenseItems = (booking.expenses ?? []).filter((expense) => expense.status === "Approved");
   return {
     id: booking.bookingId,
     contractId: booking.id,
@@ -740,5 +742,16 @@ function toVendorTrip(
     freightRate: assignment?.vendorFreight ?? buyingRateFallback ?? 0,
     isInvoiced: booking.isInvoiced ?? false,
     createdAt: booking.createdAt,
+    expenses: approvedExpenseItems.map((expense) => ({
+      id: expense.id,
+      label: expense.label,
+      amount: expense.amount,
+      expenseType: expense.expenseType,
+      paymentMode: expense.paymentMode,
+      paidBy: expense.paidBy,
+      status: expense.status,
+      dateTime: expense.dateTime,
+    })),
+    approvedExpenses: approvedExpenseItems.reduce((sum, expense) => sum + (expense.amount || 0), 0),
   };
 }

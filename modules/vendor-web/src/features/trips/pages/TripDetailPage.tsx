@@ -19,7 +19,7 @@ import { ArrowLeft, CheckCircle, Download, ExternalLink, FileText, MapPin, Packa
 import type { Trip, TripDocument } from '@vendor/types'
 
 type BookingMode = 'new' | 'accepted' | 'active' | 'pending-pod' | 'completed' | 'cancelled' | 'rejected' | 'exception'
-type DetailTab = 'freight' | 'documents'
+type DetailTab = 'freight' | 'expense' | 'documents'
 
 function getBookingMode(pathname: string) {
   const rawMode = pathname.split('/')[3]
@@ -83,7 +83,12 @@ export default function TripDetailPage() {
     if (!haveType.has('INVOICE_COPY')) defaults.push({ id: `${trip.id}-inv`, type: 'INVOICE_COPY', title: 'Invoice copy', fileName: `invoice-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/invoice-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
     return [...defaults, ...tripDocs]
   })()
-  const visibleTabs: DetailTab[] = ['freight', 'documents']
+  // Driver expenses are shown (cross-module) on bookings from In-Transit onward.
+  const showExpenseTab = Boolean(
+    trip && (IN_TRANSIT_STATES.includes(trip.status) || trip.status === 'POD_PENDING' || trip.status === 'COMPLETED' || trip.exceptionFlag),
+  )
+  const tripExpenses = trip?.expenses ?? []
+  const visibleTabs: DetailTab[] = ['freight', ...(showExpenseTab ? (['expense'] as DetailTab[]) : []), 'documents']
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   // Mock/demo bookings have no shared-booking record, so build the same
@@ -258,6 +263,7 @@ export default function TripDetailPage() {
             }`}
           >
             {tab === 'freight' && 'Freight details'}
+            {tab === 'expense' && 'Expenses'}
             {tab === 'documents' && 'Documents'}
           </button>
         ))}
@@ -297,6 +303,44 @@ export default function TripDetailPage() {
                     {indent ? <SLACountdown deadline={indent.slaDeadline} /> : trip?.podStatus === 'CONFIRMED' ? 'POD confirmed' : 'Pending POD'}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {effectiveDetailTab === 'expense' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" /> Approved Expenses
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tripExpenses.length === 0 ? (
+                  <EmptyState title="No approved expenses for this booking" />
+                ) : (
+                  <>
+                    {tripExpenses.map((expense) => (
+                      <div key={expense.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div>
+                          <div className="font-semibold text-text">{expense.label || expense.expenseType || 'Expense'}</div>
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            {[expense.expenseType, expense.paymentMode, expense.paidBy && `Paid by ${expense.paidBy}`, expense.dateTime && formatDate(expense.dateTime)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-text"><CurrencyDisplay amount={expense.amount} /></div>
+                          {expense.status ? <StatusBadge status={expense.status === 'Approved' ? 'APPROVED' : expense.status.toUpperCase()} /> : null}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
+                      <span className="font-semibold text-text">Total Approved Expenses</span>
+                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.approvedExpenses ?? 0} /></span>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

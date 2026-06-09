@@ -916,7 +916,8 @@ function ensureDemoTenantsRehydrated(): void {
 // v4: 3 vendors get bank details + logo + invoice terms (for the invoice PDF).
 // v5: 2nd customer (Ultratech, Bengaluru->Hyderabad) + addresses + customer &
 //     vendor rate cards for that lane.
-const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v5";
+// v6: driver expenses seeded on a completed booking (vendor expense tab/column).
+const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v6";
 const BL001_TENANT = "tenant-bl001";
 
 function ensureBl001SnapshotSeeded(): void {
