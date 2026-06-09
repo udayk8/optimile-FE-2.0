@@ -624,17 +624,25 @@ export const useAppStore = create<AppState>((set) => ({
     })
   },
 
-  // Vendor withdraws a resubmission-required invoice — closed (WITHDRAWN); the
-  // bookings it covered become billable again (invoicedTripIds skips CLOSED).
+  // Vendor closes a resubmission-required invoice (WITHDRAWN). The bookings it
+  // covered are released — invoicedTripIds skips CLOSED invoices AND we clear
+  // each trip's isInvoiced flag so they're eligible to invoice again.
   closeInvoice: (invoiceId) =>
     set((state) => {
+      const target = state.invoices.find((inv) => inv.id === invoiceId && inv.status === 'RESUBMISSION_REQUIRED')
+      if (!target) return state
       const now = new Date().toISOString()
+      const releasedIds = new Set([
+        ...target.lineItems.map((li) => li.tripId),
+        ...(target.tripReferences ?? []),
+      ])
       return {
         invoices: state.invoices.map((inv) =>
-          inv.id === invoiceId && inv.status === 'RESUBMISSION_REQUIRED'
+          inv.id === invoiceId
             ? { ...inv, status: 'CLOSED' as const, closeReason: 'WITHDRAWN' as const, statusUpdatedAt: now }
             : inv,
         ),
+        trips: state.trips.map((t) => (releasedIds.has(t.id) ? { ...t, isInvoiced: false } : t)),
       }
     }),
 
