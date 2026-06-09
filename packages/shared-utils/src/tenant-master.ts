@@ -4,6 +4,7 @@
 
 const TENANT_VEHICLE_TYPES_KEY = 'optimile.tenant.vehicleTypes'
 const TENANT_VENDORS_KEY = 'optimile.tenant.vendors'
+const CUSTOMER_ADDRESSES_KEY = 'optimile.tenant.customerAddresses'
 
 interface StoredVehicleType {
   tenantId?: string
@@ -29,6 +30,37 @@ function readJson<T>(key: string): T[] {
   } catch {
     return []
   }
+}
+
+interface StoredCustomerAddress {
+  tenantId?: string
+  city?: string
+}
+
+/**
+ * Cities from the onboarded customers' addresses for the tenant. Used by the
+ * auction lane dropdowns. Lenient on tenant scoping: prefer addresses matching
+ * the tenant, but if none match (seed/tenant-id mismatch) fall back to every
+ * address's city so the dropdown is never empty.
+ */
+export function listCustomerAddressCities(tenantId?: string): string[] {
+  const all = readJson<StoredCustomerAddress>(CUSTOMER_ADDRESSES_KEY)
+  const collect = (rows: StoredCustomerAddress[]) => {
+    const seen = new Set<string>()
+    const out: string[] = []
+    for (const a of rows) {
+      const city = (a.city ?? '').trim().replace(/\s+/g, ' ')
+      if (!city) continue
+      const key = city.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push(city)
+    }
+    return out.sort((a, b) => a.localeCompare(b))
+  }
+  const scoped = tenantId ? all.filter((a) => !a.tenantId || a.tenantId === tenantId) : all
+  const cities = collect(scoped)
+  return cities.length > 0 ? cities : collect(all)
 }
 
 /** Active vehicle-type labels onboarded for the tenant (typeName, else typeCode). */

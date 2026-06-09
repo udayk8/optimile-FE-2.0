@@ -13,7 +13,7 @@ import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
 import { createAuction, fetchVendors } from '@auction/lib/mock-services'
 import { readSessionTenantId } from '@auction/lib/auction-store'
-import { citiesToDisplayLane, isKnownTenantCity, listTenantCities, listTenantVehicleTypes, normalizeCity } from '@shared-utils'
+import { citiesToDisplayLane, isKnownTenantCity, listCustomerAddressCities, listTenantCities, listTenantVehicleTypes, normalizeCity } from '@shared-utils'
 import type { AuctionType, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
@@ -217,9 +217,13 @@ export default function AuctionCreatePage() {
     )
   }
 
-  // Cities come from the tenant address book — a lane can only be auctioned
-  // between places bookings can actually use.
-  const tenantCities = useMemo(() => listTenantCities(readSessionTenantId()), [])
+  // Origin/destination cities come from the onboarded customers' addresses; fall
+  // back to the broader tenant city pool only if no customer addresses exist yet.
+  const tenantCities = useMemo(() => {
+    const tenantId = readSessionTenantId()
+    const fromCustomers = listCustomerAddressCities(tenantId)
+    return fromCustomers.length > 0 ? fromCustomers : listTenantCities(tenantId)
+  }, [])
   // Vehicle types onboarded in tenant-admin; fall back to the built-in list when
   // none are configured yet (e.g. fresh tenant / standalone demo).
   const vehicleTypeOptions = useMemo(() => {
@@ -624,7 +628,7 @@ export default function AuctionCreatePage() {
                                   <select
                                     value={lane.originCity}
                                     onChange={(event) => updateLaneCity(index, 'originCity', event.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                    className="flex h-11 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-base text-[#0F172A] outline-none"
                                   >
                                     <option value="">Select origin city</option>
                                     {tenantCities.map((city) => (
@@ -637,7 +641,7 @@ export default function AuctionCreatePage() {
                                   <select
                                     value={lane.destinationCity}
                                     onChange={(event) => updateLaneCity(index, 'destinationCity', event.target.value)}
-                                    className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
+                                    className="flex h-11 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-base text-[#0F172A] outline-none"
                                   >
                                     <option value="">Select destination city</option>
                                     {tenantCities.map((city) => (
