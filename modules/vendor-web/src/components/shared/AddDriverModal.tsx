@@ -160,8 +160,11 @@ export function AddDriverModal({ isOpen, onClose, initialDriver }: AddDriverModa
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !pendingUploadKey) return
+    // Demo autofill: valid reference + 1-year expiry so the doc reads valid and
+    // the driver turns Compliant. Keep any reference already typed.
     const oneYearFromNow = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)
-    setDoc(pendingUploadKey, { fileName: file.name, expiryDate: oneYearFromNow })
+    const dummyRef = `${pendingUploadKey.toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`
+    setDoc(pendingUploadKey, { fileName: file.name, expiryDate: oneYearFromNow, referenceNo: docs[pendingUploadKey].referenceNo || dummyRef })
     setPendingUploadKey(null)
   }
 
