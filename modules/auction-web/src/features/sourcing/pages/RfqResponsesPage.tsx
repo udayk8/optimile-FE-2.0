@@ -12,6 +12,10 @@ import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
 import type { RfqResponse, RfqResponseRow, RfqType } from '@auction/types'
 import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/lib/mock-services'
 import { fetchRfqs } from '@auction/lib/mock-services'
+import { readSessionTenantId } from '@auction/lib/auction-store'
+import { isKnownTenantCity, listTenantCities } from '@shared-utils'
+
+export const LOT_DRAFT_KEY = 'optimile.auction.lotDraftFromRfq'
 
 const PAGE_SIZE = 15
 const RFQ_TEMPLATE_HEADERS = ['originCity', 'destinationCity', 'vehicleType', 'price'] as const
@@ -286,6 +290,39 @@ export default function RfqResponsesPage() {
 
   const hasFilters = search || dateFrom || dateTo
 
+  // Cities valid for an auction lane = those onboarded in a customer address or
+  // rate card (listTenantCities already merges both pools).
+  const tenantCities = useMemo(() => listTenantCities(readSessionTenantId()), [])
+
+  // Build a LOT auction from the selected RFQ's responses (distinct lanes),
+  // validate the cities, and jump to the auction-create page prefilled.
+  const createLotFromRfq = () => {
+    const seen = new Set<string>()
+    const lanes = filteredRows.reduce<{ originCity: string; destinationCity: string; vehicleType: string; ceilingRate: number }[]>((acc, row) => {
+      const key = `${row.originCity}||${row.destinationCity}||${row.vehicleType}`
+      if (seen.has(key)) return acc
+      seen.add(key)
+      acc.push({ originCity: row.originCity, destinationCity: row.destinationCity, vehicleType: row.vehicleType, ceilingRate: row.avgPrice || row.price })
+      return acc
+    }, [])
+    if (lanes.length === 0) {
+      setError('No responses available to build a LOT auction from this RFQ.')
+      return
+    }
+    const missing = new Set<string>()
+    lanes.forEach((lane) => {
+      if (!isKnownTenantCity(lane.originCity, tenantCities)) missing.add(lane.originCity)
+      if (!isKnownTenantCity(lane.destinationCity, tenantCities)) missing.add(lane.destinationCity)
+    })
+    if (missing.size > 0) {
+      setError(`Cannot create the auction — these cities are not onboarded in any customer address or rate card: ${[...missing].join(', ')}. Add them in Administration first.`)
+      return
+    }
+    setError(null)
+    sessionStorage.setItem(LOT_DRAFT_KEY, JSON.stringify(lanes))
+    navigate('/auction/auctions/create/lot')
+  }
+
   return (
     <div className="space-y-6">
       <HeroCard
@@ -408,6 +445,11 @@ export default function RfqResponsesPage() {
               Quote Responses
               {filteredRows.length > 0 && (
                 <span className="text-sm font-normal text-[#64748B]">({filteredRows.length} rows)</span>
+              )}
+              {filteredRows.length > 0 && (
+                <Button size="sm" onClick={createLotFromRfq} className="ml-2">
+                  Create LOT Auction
+                </Button>
               )}
             </CardTitle>
             <div className="flex flex-wrap items-center gap-2">

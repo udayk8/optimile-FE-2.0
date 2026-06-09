@@ -280,6 +280,7 @@ export function citiesToDisplayLane(originCity: string, destinationCity: string)
 
 const BOOKING_SETUP_KEY = 'optimile.tenant.bookingSetup'
 const CUSTOMER_ADDRESSES_KEY = 'optimile.tenant.customerAddresses'
+const CUSTOMER_RATE_CARDS_KEY = 'optimile.tenant.customerRateCards'
 
 /** Distinct cities (display-cased, sorted) from both tenant address pools. */
 export function listTenantCities(tenantId?: string): string[] {
@@ -308,6 +309,18 @@ export function listTenantCities(tenantId?: string): string[] {
       addresses.forEach((address) => {
         if (tenantId && address?.tenantId && address.tenantId !== tenantId) return
         add(address?.city)
+      })
+    }
+  } catch { /* tolerate malformed storage */ }
+  try {
+    // Customer rate-card lanes are also a valid source of cities.
+    const rateCardsRaw = window.localStorage.getItem(CUSTOMER_RATE_CARDS_KEY)
+    if (rateCardsRaw) {
+      const cards = JSON.parse(rateCardsRaw) as { tenantId?: string; fromCity?: string; toCity?: string }[]
+      cards.forEach((card) => {
+        if (tenantId && card?.tenantId && card.tenantId !== tenantId) return
+        add(card?.fromCity)
+        add(card?.toCity)
       })
     }
   } catch { /* tolerate malformed storage */ }

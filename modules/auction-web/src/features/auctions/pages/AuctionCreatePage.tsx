@@ -191,10 +191,36 @@ export default function AuctionCreatePage() {
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
     setAuctionRegion('North India')
-    setLanes([])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
     setImportFileName('')
+    // Prefill from an RFQ → "Create LOT Auction" handoff (default single winner;
+    // the dispatcher can switch to split + reconfigure).
+    if (effectiveType === 'LOT' && typeof window !== 'undefined') {
+      const draftRaw = window.sessionStorage.getItem('optimile.auction.lotDraftFromRfq')
+      if (draftRaw) {
+        window.sessionStorage.removeItem('optimile.auction.lotDraftFromRfq')
+        try {
+          const draft = JSON.parse(draftRaw) as { originCity: string; destinationCity: string; vehicleType?: string; ceilingRate?: number }[]
+          const prefilled = draft.map((d) => ({
+            ...makeEmptyLane('LOT'),
+            originCity: d.originCity,
+            destinationCity: d.destinationCity,
+            vehicleType: d.vehicleType || '20 MT Open Body',
+            ceilingRate: d.ceilingRate ? String(Math.round(d.ceilingRate)) : '10000',
+            allocationMode: 'SINGLE' as const,
+            l1: '100',
+            l2: '0',
+            l3: '0',
+          }))
+          if (prefilled.length > 0) {
+            setLanes(prefilled)
+            return
+          }
+        } catch { /* ignore malformed draft */ }
+      }
+    }
+    setLanes([])
   }, [effectiveType])
 
   // SPOT/BULK: exactly one lane. LOT: many (manual or Excel).
