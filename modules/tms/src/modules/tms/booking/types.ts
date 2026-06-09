@@ -504,8 +504,11 @@ export interface TenantInvoiceRecord {
   customerId: string;
   bookingIds: string[];
   subtotal: number;
+  // GST split by place of supply: intra-state populates cgst+sgst (igst 0),
+  // inter-state populates igst (cgst+sgst 0). igst is optional for back-compat.
   cgst: number;
   sgst: number;
+  igst?: number;
   total: number;
   createdAt: string;
   // AR lifecycle stage (BRD 4.x). Persisted so finance Approve/Dispute/Correction

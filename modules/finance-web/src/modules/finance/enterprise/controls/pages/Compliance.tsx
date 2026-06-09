@@ -2,9 +2,14 @@ import React, { useState } from "react";
 import { FileText, Download, Check, X, FileSpreadsheet } from "lucide-react";
 import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { TDS_ROWS, GST_ROWS, EWAY_BILLS } from "@finance/data/mock";
+import { usePayables } from "@finance/lib/payablesStore";
 
 export default function Compliance({ toast }: any) {
   const [tab, setTab] = useState("tds");
+  // Prefer real 194C deductions from processed vendor payments; fall back to the
+  // seeded sample when none have run yet.
+  const { tdsRows } = usePayables();
+  const tdsData = tdsRows.length ? tdsRows : TDS_ROWS;
   return (
     <div>
       <SectionTitle sub="TDS, GST input credit and e-way bills calculated automatically — no manual compliance work, no penalty risk.">Tax Compliance · TDS &amp; GST</SectionTitle>
@@ -22,7 +27,7 @@ export default function Compliance({ toast }: any) {
               {["Vendor", "PAN", "Section · Rate", "Gross", "TDS", "Net paid", "Form 16A"].map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
             </tr></thead>
             <tbody>
-              {TDS_ROWS.map((r) => (
+              {tdsData.map((r) => (
                 <tr key={r.vendor} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
                   <td className="px-5 py-3.5 text-slate-700">{r.vendor}</td>
                   <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{r.pan}</td>

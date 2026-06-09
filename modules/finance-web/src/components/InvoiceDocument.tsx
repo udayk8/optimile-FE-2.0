@@ -101,9 +101,14 @@ const InvoiceDocument = React.forwardRef<HTMLDivElement, any>(function InvoiceDo
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
             <tbody>
               <tr><td style={{ padding: "4px 10px", color: "#334155" }}>Taxable Value</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace" }}>{amt(inv.taxableValue)}</td></tr>
-              <tr><td style={{ padding: "4px 10px", color: "#334155" }}>IGST @ {inv.igstPct}%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace" }}>{amt(inv.igst)}</td></tr>
-              <tr><td style={{ padding: "4px 10px", color: "#94a3b8" }}>CGST @ 9%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace", color: "#94a3b8" }}>{amt(inv.cgst)}</td></tr>
-              <tr><td style={{ padding: "4px 10px", color: "#94a3b8" }}>SGST @ 9%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace", color: "#94a3b8" }}>{amt(inv.sgst)}</td></tr>
+              {inv.cgst || inv.sgst ? (
+                <>
+                  <tr><td style={{ padding: "4px 10px", color: "#334155" }}>CGST @ {inv.cgstPct ?? 9}%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace" }}>{amt(inv.cgst)}</td></tr>
+                  <tr><td style={{ padding: "4px 10px", color: "#334155" }}>SGST @ {inv.sgstPct ?? 9}%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace" }}>{amt(inv.sgst)}</td></tr>
+                </>
+              ) : (
+                <tr><td style={{ padding: "4px 10px", color: "#334155" }}>IGST @ {inv.igstPct}%</td><td style={{ padding: "4px 10px", textAlign: "right", fontFamily: "monospace" }}>{amt(inv.igst)}</td></tr>
+              )}
               <tr style={{ background: "#eef2ff" }}><td style={{ padding: "6px 10px", fontWeight: 700 }}>Total Invoice Value</td><td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 700, fontFamily: "monospace" }}>{amt(inv.total)}</td></tr>
             </tbody>
           </table>

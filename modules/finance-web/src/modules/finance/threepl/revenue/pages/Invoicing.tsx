@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Stepper, Btn } from "@finance/components/primitives";
 import { fmtINR } from "@finance/lib/format";
+import { computeGst, stateCodeOf } from "@shared-utils";
 import { ACCESSORIAL_LIBRARY, OPTIMILE_BILL_TO, contractRateFor, TRIP_POD_META, vendorMeta, PENDING_POD_DETAILS } from "@finance/data/mock";
 import { useReceivables, type ARInvoice, type ARTrip, type LedgerExpense } from "@finance/lib/receivablesStore";
 import { useDisputes } from "@finance/lib/disputesStore";
@@ -40,6 +41,10 @@ const STAGE_TONE: Record<string, any> = {
 const WORKFLOW_STEPS = ["Draft", "Submitted", "Client approval", "Ledger"];
 const stepIndex = (s: string) => (s === "draft" || s === "correction" ? 0 : s === "submitted" ? 1 : s === "approved" ? 3 : 2);
 
+/* Standard freight GST rate (%). The IGST vs CGST+SGST split is decided by place
+   of supply via computeGst, not hardcoded. */
+const AR_GST_RATE_PCT = 18;
+
 /* Aggregator letterhead for the printable draft (BRD step: review & submit). */
 const SELLER = {
   name: OPTIMILE_BILL_TO.name,
@@ -61,19 +66,29 @@ function toInvoiceDoc(inv: ARInvoice) {
   const loading = inv.accessorials.filter((a) => a.code === "LUL").reduce((s, a) => s + a.rate, 0) + expLoading;
   const other = inv.accessorials.filter((a) => a.code !== "DET" && a.code !== "LUL").reduce((s, a) => s + a.rate, 0) + expOther;
   const [origin, destination] = inv.lane.split("→").map((s) => s.trim());
-  const taxableValue = inv.invoiced;
-  const igst = Math.round(taxableValue * 0.18);
-  const total = taxableValue + igst;
+  // GST split by place of supply: supplier = aggregator GSTIN state, place of
+  // supply = customer GSTIN state. Falls back to inter-state (IGST) when the
+  // customer GSTIN is unknown (standalone mock invoices).
+  const tax = computeGst({
+    taxableValue: inv.invoiced,
+    ratePct: AR_GST_RATE_PCT,
+    supplierStateCode: stateCodeOf(SELLER.gstin),
+    placeOfSupplyStateCode: stateCodeOf(inv.customerGstin),
+  });
   return {
     invoice: {
       invoiceNo: inv.id, billDate: inv.date, dueDate: inv.due ?? "On approval", terms: inv.terms,
       bookingId: inv.tripId, lrNo: "—", qty: 1, shippingDate: inv.date, deliveryDate: inv.date,
       truckNo: inv.truck, origin, destination,
       lineItems: { freight: inv.base, advance: 0, detention, loading, other, freightCost: inv.invoiced },
-      taxableValue, igstPct: 18, igst, cgst: 0, sgst: 0, total,
-      amountInWords: `${fmtINR(total)} only`,
+      taxableValue: tax.taxableValue,
+      igstPct: tax.igstPct, igst: tax.igst,
+      cgstPct: tax.cgstPct, cgst: tax.cgst,
+      sgstPct: tax.sgstPct, sgst: tax.sgst,
+      total: tax.total,
+      amountInWords: `${fmtINR(tax.total)} only`,
     },
-    billTo: { name: inv.client, address: "—", gstin: "—", customerCode: "—" },
+    billTo: { name: inv.client, address: "—", gstin: inv.customerGstin ?? "—", customerCode: "—" },
   };
 }
 

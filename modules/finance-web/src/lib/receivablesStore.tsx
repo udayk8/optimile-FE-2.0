@@ -127,6 +127,10 @@ export interface ARInvoice {
   // client's live credit utilisation (BRD 3.5).
   paymentStatus?: 'unpaid' | 'paid'
   paidAt?: string
+  // Customer GSTIN (bridged invoices). Its state code is the place of supply that
+  // decides IGST vs CGST+SGST on the printable invoice. Absent for standalone
+  // mock invoices, which then fall back to inter-state (IGST).
+  customerGstin?: string
 }
 
 export interface LedgerEntry {

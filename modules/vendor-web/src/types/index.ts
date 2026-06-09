@@ -446,6 +446,12 @@ export interface Invoice {
   lineItems: InvoiceLineItem[]
   subtotal: number
   gstAmount: number
+  // GST split by place of supply (vendor state vs buyer state). Inter-state
+  // populates igst; intra-state populates cgst+sgst. Optional for back-compat;
+  // gstAmount remains the combined tax = igst + cgst + sgst.
+  igst?: number
+  cgst?: number
+  sgst?: number
   grandTotal: number
   status: InvoiceStatus
   closeReason?: InvoiceCloseReason

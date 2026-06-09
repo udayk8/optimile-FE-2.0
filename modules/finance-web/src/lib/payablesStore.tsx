@@ -94,11 +94,23 @@ export interface Payment {
   id: string
   billId: string
   vendor: string
+  /** Net amount actually paid to the vendor = gross − tds. */
   amount: number
+  /** Invoice freight value (ex-GST) on which TDS u/s 194C is computed. */
+  gross: number
+  /** Tax deducted at source (194C). */
+  tds: number
   dueDate: string
   status: PaymentStatus
   batchId?: string
 }
+
+/* TDS u/s 194C on freight paid to a transporter (company/firm). 1% applies to
+   individual/HUF deductees; we default to the higher 2% and net it off the
+   payment, deducting at source instead of paying gross. */
+export const TDS_RATE_PCT = 2
+/** PAN is characters 3–12 of a GSTIN; used for the 194C deductee record. */
+const panFromGstin = (gstin?: string) => (gstin && gstin.length >= 12 ? gstin.slice(2, 12) : undefined)
 
 export interface LedgerEntry {
   date: string
@@ -191,7 +203,10 @@ function storeFor(mode: FinanceMode): Store {
   const approveOne = (bill: VendorBill): { bills: VendorBill[]; payments: Payment[]; apLedger: LedgerEntry[]; paySeq: number } | null => {
     if (!bill.pod || bill.stage !== 'pending') return null
     const payId = `PAY-${state.paySeq}`
-    const payment: Payment = { id: payId, billId: bill.id, vendor: bill.vendor, amount: bill.billed, dueDate: bill.due, status: 'scheduled' }
+    // Deduct TDS u/s 194C at source on the freight value (ex-GST); pay net.
+    const gross = bill.billed
+    const tds = Math.round(gross * (TDS_RATE_PCT / 100))
+    const payment: Payment = { id: payId, billId: bill.id, vendor: bill.vendor, gross, tds, amount: gross - tds, dueDate: bill.due, status: 'scheduled' }
     return {
       bills: state.bills.map((b) => (b.id === bill.id ? { ...b, stage: 'scheduled' } : b)),
       payments: [...state.payments, payment],
@@ -248,8 +263,14 @@ function storeFor(mode: FinanceMode): Store {
       const batchId = `BATCH-${state.batchSeq}`
       const paidBillIds = new Set(targets.map((t) => t.billId))
       let ledger = state.apLedger
+      const append = (type: string, ref: string, amt: number) => {
+        ledger = [...ledger, { date: today(), type, ref, amt, bal: (ledger.length ? ledger[ledger.length - 1].bal : 0) + amt }]
+      }
       targets.forEach((t) => {
-        ledger = [...ledger, { date: today(), type: 'Payment', ref: t.billId, amt: -t.amount, bal: (ledger.length ? ledger[ledger.length - 1].bal : 0) - t.amount }]
+        // Net cash to vendor, then the TDS withheld (194C payable) — together they
+        // clear the gross liability posted at approval.
+        append('Payment', t.billId, -t.amount)
+        if (t.tds > 0) append('TDS withheld (194C)', t.billId, -t.tds)
       })
       const total = targets.reduce((s, t) => s + t.amount, 0)
       set({
@@ -317,9 +338,26 @@ export function usePayables() {
   // shared bookings' vendor assignments. Approve/dispute are handled in the UI
   // (VendorMatch) for bridged bills. Standalone (no bridge) keeps the mock bills.
   const bills = bridge && bridge.vendorBills && bridge.vendorBills.length > 0 ? bridge.vendorBills : state.bills
+  // Real 194C TDS rows derived from actual payments (deductee PAN from the bill's
+  // vendor GSTIN). Drives the Compliance / Form 16A view instead of static mock.
+  const tdsRows = state.payments
+    .filter((p) => p.tds > 0)
+    .map((p) => {
+      const bill = bills.find((b) => b.id === p.billId)
+      return {
+        vendor: p.vendor,
+        pan: panFromGstin(bill?.vendorGstin) ?? '—',
+        section: '194C',
+        rate: TDS_RATE_PCT,
+        gross: p.gross,
+        tds: p.tds,
+        net: p.amount,
+      }
+    })
   return {
     ...state,
     bills,
+    tdsRows,
     // Bridged AP lifecycle (embedded). Undefined standalone → VendorMatch falls
     // back to the local approveBill/disputeBill mock behaviour.
     bridgedAP: !!(bridge && bridge.vendorBills),

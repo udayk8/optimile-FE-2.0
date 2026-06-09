@@ -1,6 +1,7 @@
 import { forwardRef } from 'react'
 import { amountInWords } from '@vendor/lib/pdf'
 import { formatDate } from '@vendor/lib/date-utils'
+import { stateCodeOf } from '@shared-utils'
 import type { BankDetails, CompanyInfo, Invoice, Trip } from '@vendor/types'
 
 /* Transporter freight invoice — classic blue tabular layout (Royal Carriers
@@ -53,6 +54,17 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
     Math.round((new Date(invoice.paymentDueDate).getTime() - new Date(invoice.invoiceDate).getTime()) / 86400000),
   )
   const gstRate = invoice.subtotal > 0 ? Math.round((invoice.gstAmount / invoice.subtotal) * 100) : 0
+  // Place of supply: inter-state -> IGST, intra-state -> CGST+SGST. Prefer the
+  // stored split; fall back to deriving from the two GSTINs for older invoices.
+  const supplierState = stateCodeOf(invoice.vendorGstin)
+  const buyerState = stateCodeOf(invoice.customerGstin)
+  const interState =
+    invoice.igst != null || invoice.cgst != null
+      ? (invoice.igst ?? 0) > 0
+      : !(supplierState && buyerState && supplierState === buyerState)
+  const cgstAmt = invoice.cgst ?? (interState ? 0 : Math.round(invoice.gstAmount / 2))
+  const sgstAmt = invoice.sgst ?? (interState ? 0 : invoice.gstAmount - Math.round(invoice.gstAmount / 2))
+  const igstAmt = invoice.igst ?? (interState ? invoice.gstAmount : 0)
   const addr = companyInfo.registeredAddress
 
   return (
@@ -153,18 +165,23 @@ export const InvoicePdfDocument = forwardRef<HTMLDivElement, InvoicePdfProps>(fu
               <span className="text-gray-700">Taxable Value</span>
               <span className="font-semibold">{inr(invoice.subtotal)}</span>
             </div>
-            <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
-              <span className="text-gray-700">IGST @ {gstRate}%</span>
-              <span className="font-semibold">{inr(invoice.gstAmount)}</span>
-            </div>
-            <div className="flex justify-between border-b px-4 py-2 text-gray-400" style={{ borderColor: '#C7CBEF' }}>
-              <span>CGST @ {gstRate / 2}%</span>
-              <span>–</span>
-            </div>
-            <div className="flex justify-between border-b px-4 py-2 text-gray-400" style={{ borderColor: '#C7CBEF' }}>
-              <span>SGST @ {gstRate / 2}%</span>
-              <span>–</span>
-            </div>
+            {interState ? (
+              <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                <span className="text-gray-700">IGST @ {gstRate}%</span>
+                <span className="font-semibold">{inr(igstAmt)}</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                  <span className="text-gray-700">CGST @ {gstRate / 2}%</span>
+                  <span className="font-semibold">{inr(cgstAmt)}</span>
+                </div>
+                <div className="flex justify-between border-b px-4 py-2" style={{ borderColor: '#C7CBEF' }}>
+                  <span className="text-gray-700">SGST @ {gstRate / 2}%</span>
+                  <span className="font-semibold">{inr(sgstAmt)}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between px-4 py-2 text-[12px] font-extrabold" style={{ backgroundColor: '#EEF0FB' }}>
               <span>Total Invoice Value</span>
               <span>{inr(invoice.grandTotal)}</span>

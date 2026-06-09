@@ -80,7 +80,8 @@ export default function CreateInvoicePage() {
         freightCharge: trip.freightRate || 0,
         lineTotal: trip.freightRate || 0,
       })),
-      vendorGstin: '29AABCF1234M1ZP',
+      // Preview only — the submitted invoice's GSTINs + GST split are set in the store.
+      vendorGstin: MOCK_COMPANY_INFO.gstin,
       customerGstin: '27AABCU9603R1ZM',
       createdAt: now,
     } as unknown as Invoice

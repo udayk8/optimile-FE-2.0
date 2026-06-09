@@ -4,9 +4,9 @@ import { useTenantRouteContext } from "@/modules/tenant-admin/hooks/useTenantRou
 import type { BookingRecord, BookingExpenseRecord, BookingStatus } from "@/modules/tms/booking/types";
 import { areAllDeliveryPodsCaptured, perTrip, perMT, perKM } from "@/modules/tms/booking/services/booking-engine";
 import { calculateVendorFreightFromRateCard, getVendorRateCardUnitRate } from "@/modules/tms/booking/services/booking-selectors";
-import { readVendorContracts, type VendorContract } from "@shared-utils";
+import { readVendorContracts, type VendorContract, computeGst, stateCodeOf } from "@shared-utils";
 import { computeCreditUsage } from "@/modules/tenant-admin/integration/credit-usage";
-import { AR_TOLERANCE_PCT } from "@finance/data/mock";
+import { AR_TOLERANCE_PCT, OPTIMILE_BILL_TO } from "@finance/data/mock";
 import type { FinanceDataBridge, RateCardDescriptor, FinanceCustomerCredit } from "@finance/integration/finance-data-bridge";
 import type { ARInvoice, ARTrip, LedgerExpense, PodStage } from "@finance/lib/receivablesStore";
 import type { VendorBill } from "@finance/lib/payablesStore";
@@ -31,9 +31,11 @@ function freightFor(
   return Number(perTrip(rate).toFixed(2));
 }
 
-// Single source for 18% GST (CGST 9% + SGST 9%) so every invoice builder here
-// rounds identically. Returns the combined tax on a subtotal.
-const gst18 = (subtotal: number) => 2 * Math.round(subtotal * 0.09);
+// Standard freight GST rate (%). Routed through computeGst so the IGST vs
+// CGST+SGST split follows place of supply instead of being hardcoded.
+const AR_GST_RATE_PCT = 18;
+// Supplier (3PL) state code = first 2 digits of the tenant's registered GSTIN.
+const SUPPLIER_STATE_CODE = stateCodeOf(OPTIMILE_BILL_TO.gstin);
 
 // Project one booking expense into the finance LedgerExpense shape so the finance
 // team sees every charge line (not just rolled-up totals). Read-only in finance.
@@ -76,6 +78,21 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
   return useMemo<FinanceDataBridge>(() => {
     const customerName = (customerId: string) =>
       store.getTenantCustomerById(customerId)?.name ?? "Customer";
+
+    const customerGstin = (customerId: string) => {
+      const c = store.getTenantCustomerById(customerId);
+      return c?.gstin ?? c?.gstNumber ?? undefined;
+    };
+    // Place of supply = the customer's registered state. Inter-state -> IGST,
+    // intra-state -> CGST+SGST. Single source so the stored split and the
+    // displayed invoice agree.
+    const gstFor = (subtotal: number, customerId: string) =>
+      computeGst({
+        taxableValue: subtotal,
+        ratePct: AR_GST_RATE_PCT,
+        supplierStateCode: SUPPLIER_STATE_CODE,
+        placeOfSupplyStateCode: stateCodeOf(customerGstin(customerId)),
+      });
 
     const laneOf = (booking: BookingRecord) => {
       const d = booking.deliveries?.[0];
@@ -340,7 +357,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           0,
         );
         const subtotalLive = base + approvedExpenseTotal;          // freight + approved expenses
-        const totalLive = subtotalLive + gst18(subtotalLive);      // + 18% GST (CGST+SGST)
+        const totalLive = gstFor(subtotalLive, inv.customerId).total; // + GST (IGST or CGST+SGST per place of supply)
         // Independent contracted total = Σ customer rate-card L1 freight (fallback
         // to the booking's own freight when there's no L1 rate). Real variance vs
         // the live invoiced amount surfaces deviation + accessorials.
@@ -404,6 +421,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           margin,
           paymentStatus: inv.paymentStatus ?? "unpaid",
           paidAt: inv.paidAt ?? undefined,
+          customerGstin: customerGstin(inv.customerId),
           // One drop per booking so multi-booking invoices resolve every trip.
           drops: invBookings.length > 1
             ? invBookings.map((b) => ({ trip: b.bookingId, lane: laneOf(b), amount: b.pricing?.calculatedFreight ?? 0 }))
@@ -584,9 +602,8 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         const freightTotal = sameCustomer.reduce((sum, b) => sum + (b.pricing?.calculatedFreight ?? 0), 0);
         const approvedExpenseTotal = sameCustomer.reduce((sum, b) => sum + approvedExpensesOf(b), 0);
         const subtotal = freightTotal + approvedExpenseTotal;
-        const cgst = Math.round(subtotal * 0.09);
-        const sgst = Math.round(subtotal * 0.09);
-        const total = subtotal + cgst + sgst;
+        // Split GST by place of supply (customer state vs supplier state).
+        const tax = gstFor(subtotal, customerId);
 
         const count = store.listTenantInvoices(tenantId).length + 1;
         const invoiceId = `INV-${new Date().getFullYear()}-${String(count).padStart(4, "0")}`;
@@ -597,9 +614,10 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
           customerId,
           bookingIds: sameCustomer.map((b) => b.bookingId),
           subtotal,
-          cgst,
-          sgst,
-          total,
+          cgst: tax.cgst,
+          sgst: tax.sgst,
+          igst: tax.igst,
+          total: tax.total,
           createdAt: new Date().toISOString(),
           stage: "submitted",
         });

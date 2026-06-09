@@ -12,13 +12,20 @@ import {
   MOCK_NOTIFICATIONS,
   MOCK_EXCEPTIONS,
   MOCK_DISPUTES,
+  MOCK_COMPANY_INFO,
 } from '@vendor/lib/mock-data'
+import { computeGst, stateCodeOf } from '@shared-utils'
 import {
   Indent, Trip, Auction, Vehicle, Driver, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
   Dispute, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
 } from '@vendor/types'
+
+// Buyer (the 3PL / Optimile entity the vendor bills). Single source so we never
+// scatter the GSTIN literal; its state code is the place of supply for the
+// vendor's outgoing invoice. Tenant-configurable in a real deployment.
+const BUYER_GSTIN = '27AABCU9603R1ZM'
 
 interface AppState {
   indents: Indent[]
@@ -519,7 +526,16 @@ export const useAppStore = create<AppState>((set) => ({
         (sum, trip) => sum + (trip.freightRate || 0),
         0
       )
-      const gstAmount = Math.round(subtotal * (gstRate / 100))
+      // Split GST by place of supply: supplier = vendor's own GSTIN state,
+      // place of supply = buyer's GSTIN state. Inter-state -> IGST, intra -> CGST+SGST.
+      const vendorGstin = MOCK_COMPANY_INFO.gstin
+      const tax = computeGst({
+        taxableValue: subtotal,
+        ratePct: gstRate,
+        supplierStateCode: stateCodeOf(vendorGstin),
+        placeOfSupplyStateCode: stateCodeOf(BUYER_GSTIN),
+      })
+      const gstAmount = tax.igst + tax.cgst + tax.sgst
       const finalDueDate = dueDate ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       const generatedInvoiceNumber = invoiceNumber ?? `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
 
@@ -540,11 +556,14 @@ export const useAppStore = create<AppState>((set) => ({
         paymentDueDate: finalDueDate,
         subtotal,
         gstAmount,
-        grandTotal: subtotal + gstAmount,
+        igst: tax.igst,
+        cgst: tax.cgst,
+        sgst: tax.sgst,
+        grandTotal: tax.total,
         status: 'PENDING' as any,
         lineItems,
-        vendorGstin: '29AABCF1234M1ZP',
-        customerGstin: selectedTrips[0]?.contractId ? '27AABCU9603R1ZM' : '27AABCU9603R1ZM',
+        vendorGstin,
+        customerGstin: BUYER_GSTIN,
         billingPeriod: {
           from: selectedTrips
             .map((trip) => (trip.deliveredDate ?? trip.createdAt).slice(0, 10))
@@ -1008,8 +1027,15 @@ export const useAppStore = create<AppState>((set) => ({
       if (!oldInvoice || oldInvoice.status !== 'RESUBMISSION_REQUIRED') return state
 
       const subtotal = updatedLineItems.reduce((sum, item) => sum + item.lineTotal, 0)
-      const gstRate = oldInvoice.subtotal > 0 ? oldInvoice.gstAmount / oldInvoice.subtotal : 0.12
-      const gstAmount = Math.round(subtotal * gstRate)
+      const gstFraction = oldInvoice.subtotal > 0 ? oldInvoice.gstAmount / oldInvoice.subtotal : 0.12
+      // Re-split GST by place of supply, carrying the original invoice's GSTINs.
+      const tax = computeGst({
+        taxableValue: subtotal,
+        ratePct: gstFraction * 100,
+        supplierStateCode: stateCodeOf(oldInvoice.vendorGstin),
+        placeOfSupplyStateCode: stateCodeOf(oldInvoice.customerGstin),
+      })
+      const gstAmount = tax.igst + tax.cgst + tax.sgst
       const nowIso = new Date().toISOString()
       const newInvoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
 
@@ -1025,7 +1051,10 @@ export const useAppStore = create<AppState>((set) => ({
         lineItems: updatedLineItems,
         subtotal,
         gstAmount,
-        grandTotal: subtotal + gstAmount,
+        igst: tax.igst,
+        cgst: tax.cgst,
+        sgst: tax.sgst,
+        grandTotal: tax.total,
         notes: `Resubmission of ${oldInvoice.invoiceNumber}.`,
         pdfUrl: `/invoices/${newInvoiceNumber}.pdf`,
         createdAt: nowIso,
