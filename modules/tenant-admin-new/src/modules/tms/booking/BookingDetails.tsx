@@ -2845,7 +2845,6 @@ export function BookingDetailsPage() {
                         <th className="px-3 py-2">Payment mode</th>
                         <th className="px-3 py-2">Paid by</th>
                         <th className="px-3 py-2">Bill/Receipt</th>
-                        <th className="px-3 py-2">Status</th>
                         <th className="px-3 py-2">Action</th>
                       </tr>
                     </thead>
@@ -2861,11 +2860,6 @@ export function BookingDetailsPage() {
                             {expense.billReceiptFile ? (
                               <button type="button" className="text-primary underline" onClick={() => setExpenseViewId(expense.id)}>Download</button>
                             ) : "-"}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant={expense.status === "Approved" ? "success" : expense.status === "Rejected" ? "danger" : "warning"}>
-                              {expense.status ?? "Pending"}
-                            </Badge>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-1.5">
@@ -2901,7 +2895,6 @@ export function BookingDetailsPage() {
                         <th className="px-3 py-2">Payment mode</th>
                         <th className="px-3 py-2">Paid by</th>
                         <th className="px-3 py-2">Bill/Receipt</th>
-                        <th className="px-3 py-2">Status</th>
                         <th className="px-3 py-2">Action</th>
                       </tr>
                     </thead>
@@ -2916,11 +2909,6 @@ export function BookingDetailsPage() {
                             {expense.billReceiptFile ? (
                               <button type="button" className="text-primary underline" onClick={() => setExpenseViewId(expense.id)}>Download</button>
                             ) : "-"}
-                          </td>
-                          <td className="px-3 py-2">
-                            <Badge variant={expense.status === "Approved" ? "success" : expense.status === "Rejected" ? "danger" : "warning"}>
-                              {expense.status ?? "Pending"}
-                            </Badge>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex flex-wrap gap-1.5">
