@@ -1059,100 +1059,14 @@ const mockTenantBookingsBase: BookingRecord[] = [
   },
 ];
 
-const mockTenantVendorsBase: TenantVendor[] = [
-  {
-    id: "tenant-vendor-1",
-    tenantId: "tenant-northstar",
-    name: "ABC Transport",
-    legalName: "ABC Transport Services Private Limited",
-    code: "ABCT",
-    gstin: "07AAACA1111A1Z1",
-    gstNumber: "07AAACA1111A1Z1",
-    pan: "AAACA1111A",
-    address: "Transport Nagar, Ghaziabad, Uttar Pradesh",
-    vendorType: "Fleet Partner",
-    contactPerson: "Rahul Verma",
-    phone: "9810012345",
-    contactNumber: "9810012345",
-    email: "ops@abctransport.in",
-    serviceableLocations: ["Delhi, Haryana", "Bengaluru, Karnataka"],
-    supportedVehicleTypes: ["vehicle-type-1"],
-    status: "active",
-    createdAt: "2026-02-11T07:40:00Z",
-    updatedAt: "2026-03-02T10:15:00Z",
-  },
-  {
-    id: "tenant-vendor-2",
-    tenantId: "tenant-polar",
-    name: "VRL Logistics",
-    legalName: "VRL Logistics Limited",
-    code: "VRL",
-    gstin: "29AACCV4999P1ZQ",
-    gstNumber: "29AACCV4999P1ZQ",
-    pan: "AACCV4999P",
-    address: "Jebel Ali Free Zone, Dubai",
-    vendorType: "Line Haul",
-    contactPerson: "Anil Patil",
-    phone: "9822011122",
-    contactNumber: "9822011122",
-    email: "contracts@vrl.example",
-    serviceableLocations: ["Dubai, Dubai"],
-    supportedVehicleTypes: ["vehicle-type-2"],
-    status: "active",
-    createdAt: "2026-02-18T09:00:00Z",
-    updatedAt: "2026-02-26T12:00:00Z",
-  },
-  {
-    id: "tenant-vendor-bl001-mahesh",
-    tenantId: "tenant-bl001",
-    name: "Mahesh Transport",
-    legalName: "Mahesh Transport",
-    code: "VND-0003",
-    gstin: "GSTN0001",
-    gstNumber: "GSTN0001",
-    pan: "PAN88282",
-    address: "Uma Maheshwari Park, Banashankari Stage 2, Bengaluru, Karnataka, 560070",
-    vendorType: "Fleet Partner",
-    contactPerson: "Haris",
-    phone: "9878001234",
-    contactNumber: "9878001234",
-    email: "haris@gmail.com",
-    serviceableLocations: ["Bengaluru, Karnataka"],
-    supportedVehicleTypes: ["vehicle-type-bl001-mgv"],
-    status: "active",
-    createdAt: "2026-06-01T09:07:26.077Z",
-    updatedAt: "2026-06-01T09:07:26.077Z",
-  },
-];
+// Vendors are demo-seeded only for Blue Dart (bl001) via bl001Vendors. Other
+// demo tenants (northstar/polar) carry no seeded vendors — they were leaking
+// ABC Transport / VRL Logistics into those tenants' vendor lists.
+const mockTenantVendorsBase: TenantVendor[] = [];
 
-const mockTenantVendorRateCardsBase: TenantVendorRateCard[] = [
-  {
-    id: "vendor-rate-card-1",
-    tenantId: "tenant-northstar",
-    tenantVendorId: "tenant-vendor-1",
-    sourcePincode: "110001",
-    destinationPincode: "400001",
-    rateType: "PER_TRIP",
-    vehicleType: "32FT_OPEN",
-    rate: 18000,
-    status: "active",
-    createdAt: "2026-02-13T09:15:00Z",
-    updatedAt: "2026-02-13T09:15:00Z",
-  },
-  {
-    id: "vendor-rate-card-2",
-    tenantId: "tenant-northstar",
-    tenantVendorId: "tenant-vendor-1",
-    sourcePincode: "560001",
-    destinationPincode: "600001",
-    rateType: "PER_MT",
-    vehicleType: null,
-    rate: 310,
-    status: "active",
-    createdAt: "2026-02-13T09:20:00Z",
-    updatedAt: "2026-02-13T09:20:00Z",
-  },
-];
+// Vendor rate cards seed for bl001 only (bl001VendorRateCards). The northstar
+// rate cards belonged to the removed ABC Transport vendor.
+const mockTenantVendorRateCardsBase: TenantVendorRateCard[] = [];
 
 const mockTenantVehicleTypesBase: TenantVehicleType[] = [
   {
@@ -1219,7 +1133,7 @@ const mockTenantVehiclesBase: TenantVehicle[] = [
     vehicleTypeId: "vehicle-type-1",
     fuelType: "DIESEL",
     ownershipType: "VENDOR",
-    vendorId: "tenant-vendor-1",
+    vendorId: null,
     chassisNo: "VIN-VEN-2001",
     insurance: { number: "INS-VEN-2001", expiry: "2027-02-28" },
     fitness: { number: "FIT-VEN-2001", expiry: "2026-11-30" },
@@ -1289,7 +1203,7 @@ const mockTenantDriversBase: TenantDriver[] = [
     drugTestStatus: "CLEAR",
     endorsements: ["PTL", "Night Shift"],
     assignedVehicleId: "vehicle-2",
-    vendorId: "tenant-vendor-1",
+    vendorId: null,
     isActive: true,
     createdAt: "2026-04-06T10:00:00Z",
     updatedAt: "2026-04-06T10:00:00Z",

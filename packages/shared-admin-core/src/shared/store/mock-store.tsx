@@ -936,6 +936,28 @@ function ensureDemoTenantsRehydrated(): void {
 const BL001_SNAPSHOT_KEY = "optimile.platform.bl001SnapshotSeed.v10";
 const BL001_TENANT = "tenant-bl001";
 
+// One-time purge: earlier demo seeds added ABC Transport (tenant-vendor-1,
+// northstar) and VRL Logistics (tenant-vendor-2, polar) as vendors for those
+// tenants. They're removed from the seed now; strip them (and their rate cards)
+// from any cached storage so they stop showing in other tenants' vendor lists.
+const DEMO_VENDOR_LEAK_CLEANUP_KEY = "optimile.tenant.demoVendorLeak.cleanup.v1";
+function ensureDemoVendorLeakCleanupOnce(): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (window.localStorage.getItem(DEMO_VENDOR_LEAK_CLEANUP_KEY) === "done") return;
+    const dropIds = new Set(["tenant-vendor-1", "tenant-vendor-2"]);
+    const vendors = readStoredValue<{ id: string }[]>(storageKeys.tenantVendors, []);
+    writeStoredValue(storageKeys.tenantVendors, vendors.filter((v) => !dropIds.has(v.id)));
+    const rateCards = readStoredValue<{ tenantVendorId?: string }[]>(storageKeys.tenantVendorRateCards, []);
+    writeStoredValue(storageKeys.tenantVendorRateCards, rateCards.filter((r) => !dropIds.has(r.tenantVendorId ?? "")));
+    const vehicles = readStoredValue<{ vendorId?: string | null }[]>(storageKeys.tenantVehicles, []);
+    writeStoredValue(storageKeys.tenantVehicles, vehicles.map((v) => (dropIds.has(v.vendorId ?? "") ? { ...v, vendorId: null } : v)));
+    window.localStorage.setItem(DEMO_VENDOR_LEAK_CLEANUP_KEY, "done");
+  } catch {
+    /* leave data untouched on any failure */
+  }
+}
+
 function ensureBl001SnapshotSeeded(): void {
   if (typeof window === "undefined") return;
   try {
@@ -3648,6 +3670,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
   ensureEnterpriseTenantEl001CleanupOnce();
   ensureBootstrapOrgUnitCleanupOnce();
   ensureStarterCeoRoleCleanupOnce();
+  ensureDemoVendorLeakCleanupOnce();
   ensureDemoTenantsRehydrated();
   ensureBl001SnapshotSeeded();
   const seededWorkspaces = loadSeededState(storageKeys.tenantWorkspaces, buildSeedWorkspaces());
