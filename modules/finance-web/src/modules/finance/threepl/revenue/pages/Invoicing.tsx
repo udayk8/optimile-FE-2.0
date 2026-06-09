@@ -768,7 +768,19 @@ export default function Invoicing({ toast, toggle }: { toast: (m: string) => voi
         </button>
         <SectionTitle sub="All booked freight with POD uploaded, ready to bill. Generate one invoice per booking, or select several and raise a single consolidated invoice.">{c.customer}</SectionTitle>
 
-        <Kpis freight={c.freight} bookings={c.bookings.length} drops={c.drops} approvedExpenses={c.approvedExpenses} pendingExpenses={c.pendingExpenses} />
+        {/* KPI cards reflect the selected bookings (or the full customer total when none selected). */}
+        {(() => {
+          const kpiBookings = selected.size > 0 ? c.bookings.filter((b) => selected.has(b.bookingId)) : c.bookings;
+          return (
+            <Kpis
+              freight={kpiBookings.reduce((s, b) => s + b.freight, 0)}
+              bookings={kpiBookings.length}
+              drops={kpiBookings.reduce((s, b) => s + b.drops.length, 0)}
+              approvedExpenses={kpiBookings.reduce((s, b) => s + b.approvedExpenses, 0)}
+              pendingExpenses={kpiBookings.reduce((s, b) => s + b.pendingExpenses, 0)}
+            />
+          );
+        })()}
 
         {selected.size > 0 && (
           <Card className="mb-4 flex flex-wrap items-center justify-between gap-3 p-4 ring-1 ring-blue-200">

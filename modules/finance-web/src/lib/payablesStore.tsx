@@ -166,6 +166,7 @@ interface Store {
   autoApproveMatched: () => number
   disputeBill: (billId: string) => void
   processBatch: (paymentIds: string[]) => string | null
+  addSubvendorRow: (row: Omit<SubvendorRow, 'stage'>) => void
   recordSubvendorPayment: (ref: string) => void
   releaseRetention: (vendor: string) => void
   forfeitRetention: (vendor: string) => void
@@ -283,6 +284,17 @@ function storeFor(mode: FinanceMode): Store {
       return batchId
     },
 
+    addSubvendorRow: (row) => {
+      // BRD 5.2 — record a sub-vendor payable. Vendor-wise when an invoice exists,
+      // vehicle-number-wise fallback when the informal transporter submits none.
+      set({ subvendorRows: [{ ...row, stage: 'open' }, ...state.subvendorRows] })
+      logAudit(mode, {
+        user: 'Priya Nair',
+        action: row.mode === 'vehicle' ? 'Sub-vendor recorded (vehicle-wise)' : 'Sub-vendor recorded (vendor-wise)',
+        entity: row.ref, type: 'Payable', amount: row.payable, from: '—', to: 'Open',
+      })
+    },
+
     recordSubvendorPayment: (ref) => {
       const row = state.subvendorRows.find((r) => r.ref === ref)
       if (!row || row.stage === 'paid') return
@@ -371,6 +383,7 @@ export function usePayables() {
     autoApproveMatched: store.autoApproveMatched,
     disputeBill: store.disputeBill,
     processBatch: store.processBatch,
+    addSubvendorRow: store.addSubvendorRow,
     recordSubvendorPayment: store.recordSubvendorPayment,
     releaseRetention: store.releaseRetention,
     forfeitRetention: store.forfeitRetention,

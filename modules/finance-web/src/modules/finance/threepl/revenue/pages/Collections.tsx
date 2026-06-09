@@ -1,14 +1,12 @@
 import React, { useState, useMemo } from "react";
-import { Bell, Download, ScrollText, AlertTriangle } from "lucide-react";
-import { Card, Pill, Money, SectionTitle, Modal, ModalHeader } from "@finance/components/primitives";
+import { Bell, Download, ScrollText } from "lucide-react";
+import { Card, Pill, Money, SectionTitle } from "@finance/components/primitives";
 import { exportCsv } from "@finance/lib/csv";
-import { useDisputes } from "@finance/lib/disputesStore";
 import { useReceivables } from "@finance/lib/receivablesStore";
 import { useAuditLogger } from "@finance/lib/auditStore";
 
 const STATUS_LABEL = { overdue: "Overdue", "due-soon": "Due soon", current: "Current" };
 const STATUS_TONE = { overdue: "red", "due-soon": "amber", current: "green" };
-const today = () => new Date().toISOString().slice(0, 10);
 
 const REPORT_COLUMNS = [
   { key: "id", label: "Invoice" },
@@ -20,35 +18,7 @@ const REPORT_COLUMNS = [
   { key: "ageing", label: "Ageing", value: (i: any) => (i.status === "overdue" ? `${i.daysOverdue}d overdue` : `in ${i.daysUntil}d`) },
 ];
 
-function RaiseDisputeModal({ invoice, onClose, onSubmit }: any) {
-  const [reason, setReason] = useState("");
-  return (
-    <Modal onClose={onClose}>
-      <ModalHeader title="Raise dispute" tone="amber" icon={AlertTriangle} onClose={onClose} />
-      <div className="p-6">
-        <div className="mb-4 space-y-1 text-sm">
-          <div className="flex justify-between"><span className="text-slate-500">Invoice</span><span className="font-mono text-slate-800">{invoice.id}</span></div>
-          <div className="flex justify-between"><span className="text-slate-500">Customer</span><span className="text-slate-800">{invoice.client}</span></div>
-          <div className="flex justify-between"><span className="text-slate-500">Amount</span><Money value={invoice.amount} className="font-semibold text-slate-800" /></div>
-        </div>
-        <label className="text-xs font-medium text-slate-500">Reason raised by customer</label>
-        <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
-          placeholder="e.g. Rate mismatch — billed higher than agreed contract rate"
-          className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-300 focus:bg-white" />
-        <div className="mt-5 flex gap-3">
-          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-          <button onClick={() => onSubmit(reason.trim())} disabled={!reason.trim()}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
-            <AlertTriangle size={14} />Raise dispute
-          </button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function Collections({ toast }: any) {
-  const { disputes, addDispute } = useDisputes();
   const { invoices } = useReceivables();
   const logAudit = useAuditLogger();
   const remind = (inv: { id: string; client: string }) => {
@@ -56,29 +26,28 @@ export default function Collections({ toast }: any) {
     toast(`Reminder email sent to ${inv.client}`);
   };
   const [customer, setCustomer] = useState("all");
-  const [raising, setRaising] = useState<any>(null);
 
-  // Debtors = raised & unpaid invoices (submitted or approved, not yet paid).
-  const approved = useMemo(() => invoices.filter((i) => (i.stage === "submitted" || i.stage === "approved") && i.paymentStatus !== "paid"), [invoices]);
-  const customers = useMemo(() => [...new Set(approved.map((i) => i.client))], [approved]);
-  const rows = approved.filter((i) => customer === "all" || i.client === customer);
+  // Debtors = customers who owe money = APPROVED invoices not yet paid.
+  // (Submitted/awaiting-client isn't owed yet; disputed/closed/paid aren't debtors.)
+  const owed = useMemo(() => invoices.filter((i) => i.stage === "approved" && i.paymentStatus !== "paid"), [invoices]);
+  const customers = useMemo(() => [...new Set(owed.map((i) => i.client))], [owed]);
+  const rows = owed.filter((i) => customer === "all" || i.client === customer);
 
-  // Live dispute summary (customer-raised, still open)
-  const openDisputes = disputes.filter((d) => d.kind === "customer" && d.stage !== "resolved");
-  const inDispute = openDisputes.reduce((s, d) => s + d.amount, 0);
-  const byCustomer = openDisputes.reduce((m: Record<string, any>, d) => ({ ...m, [d.client]: (m[d.client] || 0) + d.amount }), {});
-  const disputedIds = new Set(disputes.filter((d) => d.kind === "customer").map((d) => d.id));
+  // KPIs from the live AR invoices.
+  const accepted = useMemo(() => invoices.filter((i) => i.stage === "approved" || i.paymentStatus === "paid"), [invoices]);
+  const invoicedTotal = accepted.reduce((s, i) => s + i.amount, 0);
+  const collectedTotal = invoices.filter((i) => i.paymentStatus === "paid").reduce((s, i) => s + i.amount, 0);
+  const overdueTotal = owed.filter((i) => i.status === "overdue").reduce((s, i) => s + i.amount, 0);
+  const efficiency = invoicedTotal > 0 ? Math.round((collectedTotal / invoicedTotal) * 100) : 0;
+
+  // Live dispute summary — customer-raised disputes, straight from the bridged invoices.
+  const openDisputes = useMemo(() => invoices.filter((i) => i.stage === "disputed"), [invoices]);
+  const inDispute = openDisputes.reduce((s, i) => s + i.amount, 0);
+  const byCustomer = openDisputes.reduce((m: Record<string, number>, i) => ({ ...m, [i.client]: (m[i.client] || 0) + i.amount }), {});
 
   const downloadReport = () => {
     exportCsv("debtors-report.csv", REPORT_COLUMNS, rows);
     toast(`Downloaded debtors-report.csv (${rows.length} invoices)`);
-  };
-
-  const submitDispute = (reason: any) => {
-    const inv = raising;
-    addDispute({ id: inv.id, client: inv.client, amount: inv.amount, reason, stage: "raised", raised: today(), slaHrs: 48, owner: "—", kind: "customer" });
-    setRaising(null);
-    toast(`Dispute raised on ${inv.id} by ${inv.client}`);
   };
 
   return (
@@ -99,10 +68,10 @@ export default function Collections({ toast }: any) {
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
-          { l: "Invoiced (MTD)", v: 1245000, tone: "slate" },
-          { l: "Collected (MTD)", v: 722000, tone: "green" },
-          { l: "Overdue", v: 344000, tone: "red" },
-          { l: "Collection Efficiency", v: "58%", tone: "amber", raw: true },
+          { l: "Invoiced", v: invoicedTotal, tone: "slate" },
+          { l: "Collected", v: collectedTotal, tone: "green" },
+          { l: "Overdue", v: overdueTotal, tone: "red" },
+          { l: "Collection Efficiency", v: `${efficiency}%`, tone: "amber", raw: true },
         ].map((s, i) => (
           <Card key={i} className="p-4">
             <div className="text-xs text-slate-500">{s.l}</div>
@@ -144,44 +113,32 @@ export default function Collections({ toast }: any) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((inv) => {
-              const disputed = disputedIds.has(inv.id);
-              return (
-                <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                  <td className="px-5 py-3.5 font-mono text-xs text-slate-700">{inv.id}</td>
-                  <td className="px-5 py-3.5 text-slate-700">{inv.client}</td>
-                  <td className="px-5 py-3.5 text-slate-500">{inv.lane}</td>
-                  <td className="px-5 py-3.5"><Money value={inv.amount} className="font-semibold text-slate-800" /></td>
-                  <td className="px-5 py-3.5 text-slate-600">{inv.due}
-                    <div className="text-xs text-slate-400">{inv.status === "overdue" ? `${inv.daysOverdue}d overdue` : `in ${inv.daysUntil}d`}</div>
-                  </td>
-                  <td className="px-5 py-3.5"><Pill tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] as any}>{STATUS_LABEL[inv.status as keyof typeof STATUS_LABEL]}</Pill></td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {inv.status === "overdue" && (
-                        <button onClick={() => remind(inv)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
-                          <Bell size={12} />Remind
-                        </button>
-                      )}
-                      {disputed ? (
-                        <Pill tone="amber"><AlertTriangle size={11} />Disputed</Pill>
-                      ) : (
-                        <button onClick={() => setRaising(inv)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100">
-                          <ScrollText size={12} />Raise dispute
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {rows.map((inv) => (
+              <tr key={inv.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                <td className="px-5 py-3.5 font-mono text-xs text-slate-700">{inv.id}</td>
+                <td className="px-5 py-3.5 text-slate-700">{inv.client}</td>
+                <td className="px-5 py-3.5 text-slate-500">{inv.lane}</td>
+                <td className="px-5 py-3.5"><Money value={inv.amount} className="font-semibold text-slate-800" /></td>
+                <td className="px-5 py-3.5 text-slate-600">{inv.due}
+                  <div className="text-xs text-slate-400">{inv.status === "overdue" ? `${inv.daysOverdue}d overdue` : `in ${inv.daysUntil}d`}</div>
+                </td>
+                <td className="px-5 py-3.5"><Pill tone={STATUS_TONE[inv.status as keyof typeof STATUS_TONE] as any}>{STATUS_LABEL[inv.status as keyof typeof STATUS_LABEL]}</Pill></td>
+                <td className="px-5 py-3.5 text-right">
+                  {inv.status === "overdue" && (
+                    <button onClick={() => remind(inv)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+                      <Bell size={12} />Remind
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No outstanding invoices — nothing owed right now.</td></tr>
+            )}
           </tbody>
         </table>
       </Card>
-
-      {raising && <RaiseDisputeModal invoice={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}
     </div>
   );
 }

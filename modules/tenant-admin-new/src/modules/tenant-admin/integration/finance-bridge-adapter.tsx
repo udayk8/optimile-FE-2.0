@@ -460,9 +460,13 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         .map((li) => bookingForTripRef(li.tripId))
         .filter((b): b is BookingRecord => Boolean(b));
       const apContracts = linkedRecords.map(resolveVendorContract);
+      // 3-way match baseline = the booking's agreed Buying Freight (what the 3PL
+      // committed to pay the vendor). The vendor's billed freight is checked
+      // against this; the rate-card contracted rate is only a fallback when a
+      // booking has no assigned buying freight.
       const contractRate = linkedRecords.length
         ? linkedRecords.reduce(
-            (s, b, i) => s + (apContracts[i].contracted ?? (b.assignment?.vendorFreight ?? 0)),
+            (s, b, i) => s + (b.assignment?.vendorFreight ?? apContracts[i].contracted ?? 0),
             0,
           )
         : inv.subtotal;
@@ -473,7 +477,7 @@ export function useFinanceTenantDataBridge(): FinanceDataBridge {
         trip: inv.lineItems[0]?.tripId ?? inv.invoiceNumber,
         lane: linkedRecords[0] ? laneOf(linkedRecords[0]) : "—",
         contractRate,
-        billed: inv.subtotal,                                   // freight billed (ex-GST) vs contract freight
+        billed: inv.subtotal,                                   // freight billed (ex-GST) vs buying freight
         pod: linkedRecords.length ? linkedRecords.every(podConfirmedForAp) : true,
         terms: "Net 30",
         due: (inv.paymentDueDate ?? "").slice(0, 10),

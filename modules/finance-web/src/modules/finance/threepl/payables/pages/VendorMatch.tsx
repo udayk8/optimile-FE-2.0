@@ -49,7 +49,7 @@ function RaiseDisputeModal({ bill, onClose, onSubmit }: any) {
         </div>
         <label className="text-xs font-medium text-slate-500">Reason for dispute</label>
         <textarea autoFocus value={reason} onChange={(e) => setReason(e.target.value)} rows={3}
-          placeholder="e.g. Billed above contract rate / accessorial not authorised / short delivery"
+          placeholder="e.g. Billed above agreed buying freight / accessorial not authorised / short delivery"
           className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-300 focus:bg-white" />
         <div className="mt-5 flex gap-3">
           <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -189,13 +189,13 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
 
       {/* 3-way summary */}
       <Card className="mb-6 flex flex-wrap items-center justify-center gap-10 p-5">
-        <Match label="Contract" v={fmtINR(bill.contractRate)} ok />
+        <Match label="Buying freight" v={fmtINR(bill.contractRate)} ok />
         <Match label="POD" v={bill.pod ? "Verified" : "Missing"} ok={bill.pod} />
         <Match label="Billed" v={fmtINR(bill.billed)} ok={bill.status !== "variance"} />
       </Card>
 
-      {/* Contract rate card — transparency on what the `Contract` baseline is built
-          from (the awarded spot rate or the standing vendor rate card). */}
+      {/* Contract rate card — transparency on the contract behind the lane (the
+          awarded spot rate or the standing vendor rate card). */}
       {bill.rateCard && <RateCardPanel rateCard={bill.rateCard} commercialType={bill.commercialType} />}
 
       {/* 3PL profit on this bill — what the customer was charged vs what the vendor is paid. */}
@@ -223,7 +223,7 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
                 <Row k="Subtotal (freight)" v={<span className="font-mono">{fmtINR(bill.subtotal ?? bill.billed)}</span>} />
                 <Row k="GST (12%)" v={<span className="font-mono">{fmtINR(bill.gst ?? 0)}</span>} />
                 <div className="border-t border-slate-100 pt-2"><Row k={<span className="font-semibold text-slate-700">Total</span>} v={<span className="font-mono font-semibold text-slate-900">{fmtINR(bill.total ?? bill.billed)}</span>} /></div>
-                <div className="mt-2 border-t border-slate-100 pt-2"><Row k="Contract rate" v={<span className="font-mono">{fmtINR(bill.contractRate)}</span>} /></div>
+                <div className="mt-2 border-t border-slate-100 pt-2"><Row k="Buying freight" v={<span className="font-mono">{fmtINR(bill.contractRate)}</span>} /></div>
                 <Row k="Billed" v={<span className={`font-mono ${bill.status === "variance" ? "text-red-600" : "text-slate-800"}`}>{fmtINR(bill.billed)}</span>} />
               </div>
             </Card>
@@ -337,7 +337,7 @@ export function VendorBillDetail({ bill, onBack, onAct, onDispute, disputed, dis
 
 export default function VendorMatch({ toast, onNavigate }: any) {
   const { disputes, addDispute } = useDisputes();
-  const { bills, tolerancePct, setTolerance, approveBill, disputeBill, bridgedAP, vendorApprove, vendorDispute, vendorRequestResubmission, vendorReject } = usePayables();
+  const { bills, approveBill, disputeBill, bridgedAP, vendorApprove, vendorDispute, vendorRequestResubmission, vendorReject } = usePayables();
   const [open, setOpen] = useState<string | null>(null);
   const [raising, setRaising] = useState<any>(null);
   const [vendor, setVendor] = useState("all");
@@ -347,12 +347,12 @@ export default function VendorMatch({ toast, onNavigate }: any) {
 
   const disputeOf = (id: any) => disputes.find((d) => d.id === id && d.kind === "subvendor");
 
-  // Live 3-way match computed against the configurable tolerance. Show only the
-  // actionable queue (pending / disputed); approved bills move to Scheduled Payments.
+  // Live 3-way match — EXACT: the billed freight must equal the buying freight.
+  // Show only the actionable queue (pending / disputed); approved bills move to Scheduled Payments.
   const queue = bills
     .filter((b) => b.stage === "pending" || b.stage === "disputed")
     .map((b) => {
-      const m = computeMatch(b, tolerancePct);
+      const m = computeMatch(b, 0);
       return { ...b, status: m.status, variancePct: m.variancePct, variance: Number(Math.abs(m.variancePct).toFixed(1)), autoEligible: m.autoEligible };
     })
     .filter((b) => bridgedAP || !approvedIds.has(b.id));
@@ -423,17 +423,13 @@ export default function VendorMatch({ toast, onNavigate }: any) {
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <SectionTitle sub="Auto-checks Contract Rate = POD = Invoice. Within tolerance auto-approves; outside it needs manual approval. Approving schedules the payment.">Vendor Bills · 3-Way Match</SectionTitle>
+        <SectionTitle sub="Auto-checks Buying Freight = POD = Invoice. An exact match auto-approves; any variance needs manual approval. Approving schedules the payment.">Vendor Bills · 3-Way Match</SectionTitle>
         <div className="flex flex-wrap items-center gap-3">
           <select value={vendor} onChange={(e) => setVendor(e.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 outline-none focus:border-slate-300">
             <option value="all">All vendors</option>
             {vendors.map((v) => <option key={v} value={v}>{v}</option>)}
           </select>
-          <label className="flex items-center gap-1.5 text-xs text-slate-500">Tolerance ±
-            <input type="number" min={0} step={0.5} value={tolerancePct} onChange={(e) => setTolerance(Number(e.target.value))}
-              className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-slate-300" />%
-          </label>
           <button onClick={autoApprove} disabled={matchedCount === 0}
             className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
             <CheckCircle2 size={15} />Auto-approve matched ({matchedCount})
@@ -460,7 +456,7 @@ export default function VendorMatch({ toast, onNavigate }: any) {
                   <div className="mt-0.5 text-xs text-slate-400">{b.trip} · {b.lane} · {b.terms} (due {b.due})</div>
                 </div>
                 <div className="flex items-center gap-6 text-sm">
-                  <Match label="Contract" v={fmtINR(b.contractRate)} ok />
+                  <Match label="Buying freight" v={fmtINR(b.contractRate)} ok />
                   <Match label="POD" v={b.pod ? "Verified" : "Missing"} ok={b.pod} />
                   <Match label="Billed" v={fmtINR(b.billed)} ok={!variance} />
                 </div>
@@ -469,11 +465,11 @@ export default function VendorMatch({ toast, onNavigate }: any) {
               {variance && (
                 <div className="mt-4 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                   <AlertTriangle size={15} />
-                  <span>Invoice shows <b className="font-mono">{fmtINR(b.billed)}</b> but contract is <b className="font-mono">{fmtINR(b.contractRate)}</b> — variance of <b>{b.variancePct > 0 ? "+" : ""}{b.variancePct.toFixed(1)}%</b>. Manual approval required.</span>
+                  <span>Invoice shows <b className="font-mono">{fmtINR(b.billed)}</b> but agreed buying freight is <b className="font-mono">{fmtINR(b.contractRate)}</b> — variance of <b>{b.variancePct > 0 ? "+" : ""}{b.variancePct.toFixed(1)}%</b>. Manual approval required.</span>
                 </div>
               )}
               {noPod && <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700"><Clock size={15} />POD not yet uploaded — approval gated until delivery is proven.</div>}
-              {ok && <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"><CheckCircle2 size={15} />All three match within ±{tolerancePct}% — eligible for auto-approval.</div>}
+              {ok && <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"><CheckCircle2 size={15} />Buying freight matches the billed amount — eligible for auto-approval.</div>}
 
               <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
                 <button onClick={() => setOpen(b.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"><FileText size={13} />View invoice &amp; trace</button>

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { FileText, Hash, AlertTriangle, ScrollText, Banknote, CheckCircle2 } from "lucide-react";
+import { FileText, Hash, AlertTriangle, ScrollText, Banknote, CheckCircle2, Plus } from "lucide-react";
 import { Card, Pill, Money, SectionTitle, Modal, ModalHeader, Btn } from "@finance/components/primitives";
 import { useDisputes } from "@finance/lib/disputesStore";
 import { usePayables, type SubvendorRow } from "@finance/lib/payablesStore";
@@ -35,14 +35,95 @@ function RaiseDisputeModal({ row, onClose, onSubmit }: any) {
   );
 }
 
+// BRD 5.2 — record a sub-vendor payable. Vendor-wise when an invoice exists;
+// vehicle-number-wise fallback when the informal transporter submits none.
+function RecordEntryModal({ onClose, onSubmit }: any) {
+  const [hasInvoice, setHasInvoice] = useState(true);
+  const [party, setParty] = useState("");
+  const [ref, setRef] = useState("");
+  const [trip, setTrip] = useState("");
+  const [lane, setLane] = useState("");
+  const [agreed, setAgreed] = useState("");
+  const [billed, setBilled] = useState("");
+
+  const agreedN = Number(agreed) || 0;
+  const billedN = Number(billed) || 0;
+  const valid = ref.trim() && party.trim() && agreedN > 0 && (!hasInvoice || billedN > 0);
+
+  const submit = () => {
+    if (!valid) return;
+    onSubmit(
+      hasInvoice
+        ? { mode: "invoice", ref: ref.trim(), party: party.trim(), trip: trip.trim() || "—", lane: lane.trim() || "—", agreed: agreedN, payable: billedN, status: billedN === agreedN ? "matched" : "variance" }
+        : { mode: "vehicle", ref: ref.trim().toUpperCase(), party: party.trim(), trip: trip.trim() || "—", lane: lane.trim() || "—", agreed: agreedN, payable: agreedN, status: "no-invoice" },
+    );
+  };
+
+  const inputCls = "mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-slate-300 focus:bg-white";
+
+  return (
+    <Modal onClose={onClose}>
+      <ModalHeader title="Record sub-vendor payable" tone="blue" icon={Plus} onClose={onClose} />
+      <div className="space-y-4 p-6">
+        {/* Decision branch — BRD 5.2 */}
+        <div>
+          <span className="text-xs font-medium text-slate-500">Did the sub-vendor submit an invoice?</span>
+          <div className="mt-1 inline-flex rounded-lg bg-slate-100 p-1 text-sm">
+            {[["yes", "Yes — invoice"], ["no", "No — vehicle-wise"]].map(([k, l]) => {
+              const active = (k === "yes") === hasInvoice;
+              return (
+                <button key={k} onClick={() => setHasInvoice(k === "yes")}
+                  className={`rounded-md px-3 py-1.5 font-medium transition ${active ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{l}</button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            {hasInvoice
+              ? "Vendor-wise: the billed amount is matched against the agreed trip rate."
+              : "No invoice — the vehicle registration number becomes the tracking unit; what's owed is consolidated by vehicle across trips."}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block"><span className="text-xs font-medium text-slate-500">{hasInvoice ? "Invoice no." : "Vehicle reg. no."}</span>
+            <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder={hasInvoice ? "SV-1009" : "KA01AB1234"} className={inputCls} /></label>
+          <label className="block"><span className="text-xs font-medium text-slate-500">{hasInvoice ? "Sub-vendor" : "Vehicle owner / transporter"}</span>
+            <input value={party} onChange={(e) => setParty(e.target.value)} placeholder={hasInvoice ? "Sharma Transport" : "Ramesh Singh"} className={inputCls} /></label>
+          <label className="block"><span className="text-xs font-medium text-slate-500">Trip</span>
+            <input value={trip} onChange={(e) => setTrip(e.target.value)} placeholder="TR-4460" className={inputCls} /></label>
+          <label className="block"><span className="text-xs font-medium text-slate-500">Lane</span>
+            <input value={lane} onChange={(e) => setLane(e.target.value)} placeholder="Pune → Nashik" className={inputCls} /></label>
+          <label className="block"><span className="text-xs font-medium text-slate-500">Agreed rate (₹)</span>
+            <input type="number" value={agreed} onChange={(e) => setAgreed(e.target.value)} placeholder="40000" className={inputCls} /></label>
+          {hasInvoice && <label className="block"><span className="text-xs font-medium text-slate-500">Billed amount (₹)</span>
+            <input type="number" value={billed} onChange={(e) => setBilled(e.target.value)} placeholder="40000" className={inputCls} /></label>}
+        </div>
+
+        {hasInvoice && agreedN > 0 && billedN > 0 && billedN !== agreedN && (
+          <div className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700"><AlertTriangle size={13} />Billed ≠ agreed — this will be flagged as a variance.</div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={submit} disabled={!valid}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50">
+            <Plus size={14} />Record payable
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 const statusTone = { matched: "green", variance: "red", "no-invoice": "amber" };
 const statusLabel = { matched: "Matched", variance: "Variance", "no-invoice": "No invoice — vehicle-wise" };
 
 export default function SubVendor({ toast }: any) {
   const { disputes, addDispute } = useDisputes();
-  const { subvendorRows, recordSubvendorPayment } = usePayables();
+  const { subvendorRows, recordSubvendorPayment, addSubvendorRow } = usePayables();
   const [filter, setFilter] = useState("all");
   const [raising, setRaising] = useState<any>(null);
+  const [recording, setRecording] = useState(false);
 
   const rows = subvendorRows.filter((r) => filter === "all" || r.mode === filter);
   const disputedIds = new Set(disputes.filter((d) => d.kind === "subvendor").map((d) => d.id));
@@ -70,14 +151,23 @@ export default function SubVendor({ toast }: any) {
     toast(r.mode === "vehicle" ? `Vehicle-number payment recorded for ${r.ref}` : `Vendor payment recorded for ${r.ref}`);
   };
 
+  const recordEntry = (row: Omit<SubvendorRow, "stage">) => {
+    addSubvendorRow(row);
+    setRecording(false);
+    toast(row.mode === "vehicle" ? `Vehicle-wise payable recorded for ${row.ref}` : `Sub-vendor invoice recorded for ${row.ref}`);
+  };
+
   return (
     <div>
       <SectionTitle sub="When a sub-vendor issues no invoice, the system falls back to vehicle-number accounting — essential for India's informal market.">Sub-Vendor &amp; Vehicle-Number Accounting</SectionTitle>
 
-      <div className="mb-5 inline-flex rounded-lg bg-slate-100 p-1 text-sm">
-        {[["all", "All"], ["invoice", "Vendor invoice"], ["vehicle", "Vehicle-number fallback"]].map(([k, l]) => (
-          <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-4 py-1.5 font-medium transition ${filter === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{l}</button>
-        ))}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg bg-slate-100 p-1 text-sm">
+          {[["all", "All"], ["invoice", "Vendor invoice"], ["vehicle", "Vehicle-number fallback"]].map(([k, l]) => (
+            <button key={k} onClick={() => setFilter(k)} className={`rounded-md px-4 py-1.5 font-medium transition ${filter === k ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>{l}</button>
+          ))}
+        </div>
+        <Btn onClick={() => setRecording(true)}><Plus size={14} />Record sub-vendor payable</Btn>
       </div>
 
       <Card className="overflow-hidden">
@@ -146,6 +236,7 @@ export default function SubVendor({ toast }: any) {
       <p className="mt-3 text-xs text-slate-400">Vehicle-number rows track what's owed to informal transporters who never submit a formal invoice — consolidated by registration number across trips. As a customer to your sub-vendors, you can raise a dispute against any line — it is tracked on the <span className="font-medium text-slate-500">Disputes</span> page.</p>
 
       {raising && <RaiseDisputeModal row={raising} onClose={() => setRaising(null)} onSubmit={submitDispute} />}
+      {recording && <RecordEntryModal onClose={() => setRecording(false)} onSubmit={recordEntry} />}
     </div>
   );
 }
