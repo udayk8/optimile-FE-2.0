@@ -16,6 +16,17 @@ export interface VendorInvoiceProfile {
   status: 'active' | 'onboarding_incomplete' | 'inactive'
 }
 
+/** A new expense/advance the vendor records against a booking from the portal. */
+export interface VendorExpenseInput {
+  label: string
+  amount: number
+  expenseType: string
+  paymentMode?: string
+  paidBy?: string
+  notes?: string
+  billReceiptFile?: string
+}
+
 /** Payload the vendor portal sends when generating an invoice (embedded mode). */
 export interface VendorInvoiceSubmitPayload {
   invoiceNumber: string
@@ -121,6 +132,12 @@ export interface TenantDataBridge {
   assignVehicleResolved: (bookingId: string, vehicle: Vehicle, driver: Driver) => void
   /** Full booking detail (consignor/consignee, documents, LR) for the detail page. */
   getBookingDetail: (bookingRef: string) => VendorBookingDetail | null
+  /**
+   * Vendor records an expense or advance against a booking. Persisted on the
+   * shared tenant booking (status Approved), so it flows back to the booking
+   * detail and into the vendor invoice — exactly like the tenant ops entry.
+   */
+  addBookingExpense: (bookingRef: string, input: VendorExpenseInput) => void
 
   // Vendor (AP) invoices — single source of truth shared with the finance module.
   // The vendor reads its own invoices/disputes here and the finance decisions

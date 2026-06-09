@@ -16,7 +16,7 @@ import {
 } from '@vendor/lib/mock-data'
 import { computeGst, stateCodeOf } from '@shared-utils'
 import {
-  Indent, Trip, Auction, Vehicle, Driver, AuctionBid, AuctionLane,
+  Indent, Trip, TripExpense, Auction, Vehicle, Driver, AuctionBid, AuctionLane,
   Contract, Invoice, LedgerEntry, CapacityDeclaration, Notification, InvoiceLineItem, NBFCApplication, NBFCDiscountingStatus,
   ExceptionRecord, ExceptionStatus, ExceptionTimelineEntry, ExceptionSeverity, ExceptionIssueType,
   Dispute, PaymentRecord, PaymentKind, DisruptionReason, CustomerLedgerPostPayload, NbfcLedgerPostPayload
@@ -78,6 +78,10 @@ interface AppState {
   // Actions
   acceptIndent: (indentId: string) => void
   assignVehicleToTrip: (tripId: string, vehicleId: string, driverId: string) => void
+  addTripExpense: (
+    tripId: string,
+    input: { label: string; amount: number; expenseType: string; paymentMode?: string; paidBy?: string; notes?: string },
+  ) => void
   // Like assignVehicleToTrip but takes already-resolved vehicle/driver objects
   // instead of ids. Used by the embedded "merge" mode where the fleet list mixes
   // local mock vehicles with the vendor's real (bridge) vehicles, whose ids do
@@ -413,6 +417,37 @@ export const useAppStore = create<AppState>((set) => ({
         status: 'ASSIGNED',
       }
 
+      return { trips: updatedTrips }
+    })
+  },
+
+  addTripExpense: (tripId, input) => {
+    set((state) => {
+      const tripIndex = state.trips.findIndex((t) => t.id === tripId)
+      if (tripIndex === -1) return state
+      const trip = state.trips[tripIndex] as Trip
+      const now = new Date().toISOString()
+      const record: TripExpense = {
+        id: `expense-${Date.now()}`,
+        label: input.label,
+        amount: input.amount,
+        expenseType: input.expenseType,
+        paymentMode: input.paymentMode,
+        paidBy: input.paidBy,
+        status: 'Approved',
+        dateTime: now,
+      }
+      const expenses = [...(trip.expenses ?? []), record]
+      const isAdvance = (e: TripExpense) => /advance/i.test(`${e.expenseType ?? ''} ${e.label ?? ''}`)
+      const approved = expenses.filter((e) => e.status === 'Approved')
+      const updatedTrips = [...state.trips]
+      updatedTrips[tripIndex] = {
+        ...trip,
+        expenses,
+        approvedExpenses: approved.filter((e) => !isAdvance(e)).reduce((s, e) => s + (e.amount || 0), 0),
+        advance: approved.filter(isAdvance).reduce((s, e) => s + (e.amount || 0), 0),
+        advanceItems: approved.filter(isAdvance),
+      }
       return { trips: updatedTrips }
     })
   },

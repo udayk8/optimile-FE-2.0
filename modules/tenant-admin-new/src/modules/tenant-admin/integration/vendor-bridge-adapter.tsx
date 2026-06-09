@@ -8,8 +8,8 @@ import type {
   TenantVehicle,
   VehicleFuelType,
 } from "@/types/fleet";
-import type { BookingRecord } from "@/modules/tms/booking/types";
-import type { TenantDataBridge, VendorInvoiceSubmitPayload } from "@vendor/integration/tenant-data-bridge";
+import type { BookingExpenseRecord, BookingRecord } from "@/modules/tms/booking/types";
+import type { TenantDataBridge, VendorInvoiceSubmitPayload, VendorExpenseInput } from "@vendor/integration/tenant-data-bridge";
 import type {
   ComplianceDocument as VendorComplianceDocument,
   Driver as VendorDriver,
@@ -125,6 +125,8 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     updateTenantDriver,
     listTenantVehicleTypes,
     listTenantBookings,
+    getTenantBookingById,
+    updateTenantBooking,
     listTenantCustomers,
     listTenantCustomerAddresses,
     listTenantLrs,
@@ -402,6 +404,33 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       };
     };
 
+    // Vendor records an expense/advance against one of its bookings. Mirrors the
+    // tenant ops entry: stored on booking.expenses as Approved so it flows back
+    // to the vendor booking-detail tabs and into the vendor invoice.
+    const addBookingExpense = (bookingRef: string, input: VendorExpenseInput) => {
+      const booking = tenantBookings.find((b) => b.bookingId === bookingRef || b.id === bookingRef);
+      if (!booking || booking.assignment?.vendorId !== vendorId) return;
+      const record = getTenantBookingById(booking.id);
+      if (!record) return;
+      const now = new Date().toISOString();
+      const nextExpense: BookingExpenseRecord = {
+        id: `expense-${Date.now()}`,
+        label: input.label,
+        amount: input.amount,
+        createdAt: now,
+        createdBy: vendorName ?? "Vendor",
+        bookingId: record.bookingId,
+        dateTime: now,
+        expenseType: input.expenseType,
+        paymentMode: input.paymentMode as BookingExpenseRecord["paymentMode"],
+        paidBy: input.paidBy,
+        billReceiptFile: input.billReceiptFile,
+        notes: input.notes,
+        status: "Approved",
+      };
+      updateTenantBooking(record.id, { expenses: [...(record.expenses ?? []), nextExpense] });
+    };
+
     // ── Vendor (AP) invoices — this vendor's slice of the shared collection ──
     const myInvoiceRecords = allVendorInvoices.filter((r) => r.vendorId === vendorId);
     const vendorInvoices: VendorInvoice[] = myInvoiceRecords.map((r) => ({
@@ -522,6 +551,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       assignVehicle,
       assignVehicleResolved,
       getBookingDetail,
+      addBookingExpense,
       vendorInvoices,
       vendorDisputes,
       submitInvoice,

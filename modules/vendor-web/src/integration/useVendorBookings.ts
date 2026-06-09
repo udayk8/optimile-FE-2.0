@@ -21,6 +21,11 @@ export interface VendorBookingsData {
   assignVehicle: (bookingId: string, vehicleId: string, driverId: string) => void
   /** Rich shared-booking detail (embedded only); null standalone. */
   getBookingDetail: (bookingRef: string) => VendorBookingDetail | null
+  /** Record an expense/advance against a booking (persists cross-module when embedded). */
+  addBookingExpense: (
+    bookingId: string,
+    input: { label: string; amount: number; expenseType: string; paymentMode?: string; paidBy?: string; notes?: string },
+  ) => void
   /** True when the record came from the cross-module tenant bridge (vs local mock data). */
   isBridgeRecord: (id: string) => boolean
 }
@@ -37,6 +42,7 @@ export function useVendorBookings(): VendorBookingsData {
   const acceptIndent = useAppStore((state) => state.acceptIndent)
   const declineIndent = useAppStore((state) => state.declineIndent)
   const assignVehicleToTrip = useAppStore((state) => state.assignVehicleToTrip)
+  const addTripExpense = useAppStore((state) => state.addTripExpense)
 
   // Embedded → MERGE the vendor's real tenant bookings (bridge) with the local
   // mock demo dataset, so a freshly onboarded / demo vendor like Mahesh sees the
@@ -61,10 +67,12 @@ export function useVendorBookings(): VendorBookingsData {
       // Mock trips have no rich detail; bridge.getBookingDetail returns null for
       // any ref it doesn't own, so this is safe for both.
       getBookingDetail: bridge.getBookingDetail,
+      addBookingExpense: (id, input) =>
+        mockTripIds.has(id) ? addTripExpense(id, input) : bridge.addBookingExpense(id, input),
       isBridgeRecord: (id) => bridgeIds.has(id),
     }
   }
 
   // Standalone (no bridge): local mock demo dataset only.
-  return { indents: dropExpiredPendingIndents(indents), trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, isBridgeRecord: () => false }
+  return { indents: dropExpiredPendingIndents(indents), trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, addBookingExpense: addTripExpense, isBridgeRecord: () => false }
 }
