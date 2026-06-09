@@ -95,7 +95,11 @@ function ExplorerNode({
   const itemId = getItemId(item, parentId);
   const hasChildren = Boolean(item.children?.length);
   const isExpanded = expandedNodes.has(itemId);
-  const isActive = matchesPath(pathname, item);
+  // Highlight only the deepest matching node — if a child also matches the route,
+  // the parent is "active-branch" (expanded) but not itself highlighted, so only
+  // one item shows the active (black) state at a time.
+  const childMatches = Boolean(item.children?.some((child) => hasActiveDescendant(pathname, child)));
+  const isActive = matchesPath(pathname, item) && !childMatches;
   const isParentActive = hasActiveDescendant(pathname, item);
   const Icon = item.icon ?? FolderTree;
 

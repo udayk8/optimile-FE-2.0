@@ -189,19 +189,8 @@ export function TenantProfileMenu() {
         <div className="absolute right-0 z-40 mt-1 w-44 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-md">
           <button
             type="button"
-            onClick={() => {
-              setDrawerOpen(true);
-              setOpen(false);
-            }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-slate-700 transition hover:bg-slate-50"
-          >
-            <UserIcon className="size-3.5 text-slate-500" />
-            View Profile
-          </button>
-          <button
-            type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left text-[12px] text-slate-700 transition hover:bg-slate-50"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-slate-700 transition hover:bg-slate-50"
           >
             <LogOut className="size-3.5 text-slate-500" />
             Logout
