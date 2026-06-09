@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import * as ExcelJS from 'exceljs'
 import { useModuleNavigate as useNavigate } from '@auction/hooks/useModuleRoute'
 import { HeroCard } from '@auction/components/cards/HeroCard'
 import { Button } from '@auction/components/ui/button'
@@ -7,12 +8,73 @@ import { Input } from '@auction/components/ui/input'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDate } from '@auction/lib/date-utils'
 import { formatCurrency } from '@auction/lib/currency-utils'
-import { FileSpreadsheet, Upload, X } from 'lucide-react'
+import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
 import type { RfqResponse, RfqResponseRow, RfqType } from '@auction/types'
 import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/lib/mock-services'
 import { fetchRfqs } from '@auction/lib/mock-services'
 
 const PAGE_SIZE = 15
+const RFQ_TEMPLATE_HEADERS = ['originCity', 'destinationCity', 'vehicleType', 'price'] as const
+
+// Build + download an RFQ-response Excel template (header row + one sample).
+async function downloadRfqTemplate() {
+  const wb = new ExcelJS.Workbook()
+  const ws = wb.addWorksheet('RFQ Response')
+  ws.addRow([...RFQ_TEMPLATE_HEADERS])
+  ws.addRow(['Mumbai', 'Delhi', '20 MT Open Body', 48000])
+  const buf = await wb.xlsx.writeBuffer()
+  const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'Optimile_Auction_Vendor_RFQ_Template.xlsx'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// Parse an uploaded RFQ-response file (xlsx or csv) into rows + validation errors.
+async function parseRfqFile(file: File): Promise<{ rows: RfqResponseRow[]; errors: string[] }> {
+  const rows: RfqResponseRow[] = []
+  const errors: string[] = []
+  const pushRow = (cells: string[], rowNo: number) => {
+    const originCity = (cells[0] ?? '').trim()
+    const destinationCity = (cells[1] ?? '').trim()
+    const vehicleType = (cells[2] ?? '').trim()
+    const priceText = (cells[3] ?? '').trim()
+    if (!originCity && !destinationCity && !vehicleType && !priceText) return
+    const price = Number(priceText)
+    if (!originCity) errors.push(`Row ${rowNo}: source city is missing.`)
+    if (!destinationCity) errors.push(`Row ${rowNo}: destination city is missing.`)
+    if (!vehicleType) errors.push(`Row ${rowNo}: vehicle type is missing.`)
+    if (!priceText || !Number.isFinite(price) || price <= 0) errors.push(`Row ${rowNo}: price must be a positive number.`)
+    rows.push({ originCity, destinationCity, vehicleType, price: Number.isFinite(price) ? price : 0 })
+  }
+  if (file.name.toLowerCase().endsWith('.csv')) {
+    const text = await file.text()
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    const headerIsLabels = (lines[0] ?? '').toLowerCase().includes('origin')
+    lines.slice(headerIsLabels ? 1 : 0).forEach((line, i) => pushRow(line.split(','), i + 1))
+  } else {
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(await file.arrayBuffer())
+    const ws = wb.worksheets[0]
+    if (!ws) return { rows: [], errors: ['No sheets found in the file.'] }
+    // Header column-order check.
+    const headerCells = (ws.getRow(1).values as unknown[]).slice(1).map((v) => String(v ?? '').trim().toLowerCase())
+    const expected = RFQ_TEMPLATE_HEADERS.map((h) => h.toLowerCase())
+    if (expected.some((h, i) => headerCells[i] !== h)) {
+      errors.push(`Column mismatch. Expected headers in order: ${RFQ_TEMPLATE_HEADERS.join(', ')}.`)
+    }
+    ws.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return
+      const values = (row.values as unknown[]).slice(1).map((v) => String(v ?? ''))
+      pushRow(values, rowNumber - 1)
+    })
+  }
+  if (rows.length === 0 && errors.length === 0) errors.push('No data rows found in the file.')
+  return { rows, errors }
+}
 
 type FlatRow = {
   id: string
@@ -29,11 +91,14 @@ export default function RfqResponsesPage() {
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [vendorName, setVendorName] = useState('')
   const [rfqs, setRfqs] = useState<RfqType[]>([])
   const [selectedRfqId, setSelectedRfqId] = useState('')
   const [uploading, setUploading] = useState(false)
+  // Parsed preview before commit.
+  const [previewRows, setPreviewRows] = useState<RfqResponseRow[]>([])
+  const [previewErrors, setPreviewErrors] = useState<string[]>([])
+  const [parsing, setParsing] = useState(false)
 
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -73,6 +138,8 @@ export default function RfqResponsesPage() {
   const allRows = useMemo<FlatRow[]>(() => {
     const rows: FlatRow[] = []
     rfqResponses.forEach((response: RfqResponse) => {
+      // Show responses for the SELECTED RFQ only — never a mix across RFQs.
+      if (selectedRfqId && response.rfqId !== selectedRfqId) return
       response.rows.forEach((row, idx) => {
         rows.push({
           id: `${response.id}-${idx}`,
@@ -87,7 +154,7 @@ export default function RfqResponsesPage() {
       })
     })
     return rows
-  }, [rfqResponses])
+  }, [rfqResponses, selectedRfqId])
 
   const avgPriceMap = useMemo(() => {
     const map = new Map<string, { sum: number; count: number }>()
@@ -162,61 +229,56 @@ export default function RfqResponsesPage() {
     []
   )
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setFileName(file.name)
-      setSelectedFile(file)
+    if (!file) return
+    setFileName(file.name)
+    setError(null)
+    setParsing(true)
+    try {
+      const { rows, errors } = await parseRfqFile(file)
+      setPreviewRows(rows)
+      setPreviewErrors(errors)
+    } catch (err) {
+      setPreviewRows([])
+      setPreviewErrors([err instanceof Error ? err.message : 'Could not read the file.'])
+    } finally {
+      setParsing(false)
     }
   }
 
   const clearFile = (e: React.MouseEvent) => {
     e.stopPropagation()
     setFileName('')
-    setSelectedFile(null)
+    setPreviewRows([])
+    setPreviewErrors([])
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const parseRows = async (): Promise<RfqResponseRow[]> => {
-    const raw = selectedFile?.name.toLowerCase().endsWith('.csv') ? await selectedFile.text() : ''
-    if (!raw) throw new Error('Upload a CSV file with quote rows.')
-
-    return raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line, index) => {
-        const [originCity, destinationCity, vehicleType, priceText] = line.split(',').map((part) => part.trim())
-        const price = Number(priceText)
-        if (!originCity || !destinationCity || !vehicleType || !Number.isFinite(price)) {
-          throw new Error(`Invalid quote row ${index + 1}. Use: source city, destination city, vehicle type, price`)
-        }
-        return { originCity, destinationCity, vehicleType, price }
-      })
-  }
+  const canSave = Boolean(selectedRfqId) && previewRows.length > 0 && previewErrors.length === 0
 
   const handleUpload = async () => {
     if (!selectedRfqId) {
-      setError('Select an RFQ before uploading a response.')
+      setError('Select an RFQ before saving a response.')
       return
     }
-    if (!fileName) return
+    if (!canSave) return
     setUploading(true)
     try {
-      const rows = await parseRows()
       const uploaded = await uploadRfqResponse(selectedRfqId, {
         fileName,
         vendorName: vendorName || undefined,
-        rows,
+        rows: previewRows,
       })
       setRfqResponses((current) => [uploaded, ...current])
       setFileName('')
-      setSelectedFile(null)
       setVendorName('')
+      setPreviewRows([])
+      setPreviewErrors([])
       if (fileRef.current) fileRef.current.value = ''
       setPage(1)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to upload RFQ response.')
+      setError(e instanceof Error ? e.message : 'Failed to save RFQ response.')
     } finally {
       setUploading(false)
     }
@@ -236,10 +298,15 @@ export default function RfqResponsesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Upload className="h-4 w-4 text-primary" />
-            Upload Response
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Upload className="h-4 w-4 text-primary" />
+              Upload Response
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => { void downloadRfqTemplate() }}>
+              <Download className="mr-2 h-4 w-4" /> Download Template
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
@@ -285,11 +352,52 @@ export default function RfqResponsesPage() {
               />
             </div>
 
-            <Button disabled={!fileName || uploading || !selectedRfqId} onClick={handleUpload} className="shrink-0">
+            <Button disabled={!canSave || uploading} onClick={handleUpload} className="shrink-0">
               <Upload className="mr-2 h-4 w-4" />
-              {uploading ? 'Uploading...' : 'Upload'}
+              {uploading ? 'Saving...' : 'Save Response'}
             </Button>
           </div>
+
+          {/* Preview before save — confirm columns + data, surface any errors. */}
+          {parsing && <p className="mt-4 text-sm text-[#64748B]">Reading file…</p>}
+          {previewErrors.length > 0 && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <p className="font-semibold">Fix these before saving:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {previewErrors.slice(0, 8).map((err, i) => <li key={i}>{err}</li>)}
+                {previewErrors.length > 8 && <li>…and {previewErrors.length - 8} more.</li>}
+              </ul>
+            </div>
+          )}
+          {previewRows.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+                Preview — {previewRows.length} row{previewRows.length === 1 ? '' : 's'}
+              </p>
+              <div className="overflow-x-auto rounded-xl border border-[#E2E8F0]">
+                <table className="w-full text-sm">
+                  <thead className="bg-[#F8FAFC] text-left text-xs font-semibold uppercase tracking-wide text-[#64748B]">
+                    <tr>
+                      <th className="px-3 py-2">Source</th>
+                      <th className="px-3 py-2">Destination</th>
+                      <th className="px-3 py-2">Vehicle Type</th>
+                      <th className="px-3 py-2 text-right">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F1F5F9]">
+                    {previewRows.map((row, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-2">{row.originCity || <span className="text-red-500">missing</span>}</td>
+                        <td className="px-3 py-2">{row.destinationCity || <span className="text-red-500">missing</span>}</td>
+                        <td className="px-3 py-2">{row.vehicleType || <span className="text-red-500">missing</span>}</td>
+                        <td className="px-3 py-2 text-right">{row.price > 0 ? formatCurrency(row.price) : <span className="text-red-500">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
