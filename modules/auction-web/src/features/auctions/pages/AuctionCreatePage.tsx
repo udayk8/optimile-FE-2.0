@@ -13,7 +13,7 @@ import { useAuctionAuth } from '@auction/hooks/useAuctionAuth'
 import { useAuctionPermissions } from '@auction/app/permission-context'
 import { createAuction, fetchVendors } from '@auction/lib/mock-services'
 import { readSessionTenantId } from '@auction/lib/auction-store'
-import { citiesToDisplayLane, isKnownTenantCity, listTenantCities, normalizeCity } from '@shared-utils'
+import { citiesToDisplayLane, isKnownTenantCity, listTenantCities, listTenantVehicleTypes, normalizeCity } from '@shared-utils'
 import type { AuctionType, VendorOption } from '@auction/types'
 
 // SPOT  — single lane tied to a booking, single winner
@@ -75,8 +75,6 @@ const COMMODITY_OPTIONS = [
   'Pharma',
   'Agriculture',
 ] as const
-
-const REGION_OPTIONS = ['North India', 'South India', 'West India', 'East India', 'Central India'] as const
 
 function titleCase(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
@@ -176,7 +174,6 @@ export default function AuctionCreatePage() {
   }, [])
 
   const [title, setTitle] = useState('Spot | Lane Auction | Mumbai - Delhi')
-  const [auctionRegion, setAuctionRegion] = useState('North India')
   const [lanes, setLanes] = useState<DraftLane[]>([])
   const [auctionSettings, setAuctionSettings] = useState<AuctionSettingsState>(makeAuctionSettings('SPOT'))
   const [laneImportMode, setLaneImportMode] = useState<LaneImportMode>('MANUAL')
@@ -190,7 +187,6 @@ export default function AuctionCreatePage() {
         ? 'Spot | Lane Auction'
         : `${titleCase(effectiveType)} | Demo Procurement Event`
     )
-    setAuctionRegion('North India')
     setLanes([])
     setAuctionSettings(makeAuctionSettings(effectiveType))
     setLaneImportMode('MANUAL')
@@ -224,6 +220,12 @@ export default function AuctionCreatePage() {
   // Cities come from the tenant address book — a lane can only be auctioned
   // between places bookings can actually use.
   const tenantCities = useMemo(() => listTenantCities(readSessionTenantId()), [])
+  // Vehicle types onboarded in tenant-admin; fall back to the built-in list when
+  // none are configured yet (e.g. fresh tenant / standalone demo).
+  const vehicleTypeOptions = useMemo(() => {
+    const onboarded = listTenantVehicleTypes(readSessionTenantId())
+    return onboarded.length > 0 ? onboarded : [...VEHICLE_TYPE_OPTIONS]
+  }, [])
 
   const updateLaneCity = (index: number, field: 'originCity' | 'destinationCity', value: string) => {
     setLanes((current) =>
@@ -314,7 +316,6 @@ export default function AuctionCreatePage() {
       const payload = {
         type: effectiveType,
         title,
-        region: effectiveType === 'LOT' ? auctionRegion : undefined,
         minBidDecrement: Number(auctionSettings.minBidDecrement),
         extensionTriggerMinutes: Number(auctionSettings.extensionTriggerMinutes),
         extensionDurationMinutes: Number(auctionSettings.extensionDurationMinutes),
@@ -330,7 +331,6 @@ export default function AuctionCreatePage() {
         lanes: lanes.map((lane) => ({
           originCity: lane.originCity,
           destinationCity: lane.destinationCity,
-          region: effectiveType === 'LOT' ? auctionRegion : undefined,
           vehicleType: lane.vehicleType,
           capacityMt: Number(lane.capacityMt),
           rateUnit: lane.rateUnit,
@@ -451,23 +451,6 @@ export default function AuctionCreatePage() {
                     <div className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] p-4 text-xs text-[#1D4ED8]">
                       Spot auctions run per lane, in advance of any booking. The winning vendor receives a
                       one-time spot contract for the lane, which a spot booking on the same lane can consume.
-                    </div>
-                  )}
-
-                  {/* LOT — region selector */}
-                  {effectiveType === 'LOT' && (
-                    <div className="rounded-xl border border-[#E5E7EB] p-4">
-                      <label className="mb-1 block text-sm font-medium text-[#334155]">Region</label>
-                      <select
-                        value={auctionRegion}
-                        onChange={(event) => setAuctionRegion(event.target.value)}
-                        className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
-                      >
-                        {REGION_OPTIONS.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                      <p className="mt-2 text-xs text-[#64748B]">Choose the region first, then pick lanes from that region below.</p>
                     </div>
                   )}
 
@@ -682,7 +665,8 @@ export default function AuctionCreatePage() {
                                 onChange={(event) => updateLane(index, 'vehicleType', event.target.value)}
                                 className="flex h-10 w-full rounded-md border border-[#E5E7EB] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none"
                               >
-                                {VEHICLE_TYPE_OPTIONS.map((option) => (
+                                <option value="">Select vehicle type</option>
+                                {vehicleTypeOptions.map((option) => (
                                   <option key={option} value={option}>{option}</option>
                                 ))}
                               </select>
@@ -703,12 +687,6 @@ export default function AuctionCreatePage() {
                                     <option key={option} value={option}>{option}</option>
                                   ))}
                                 </select>
-                              </div>
-                            )}
-                            {effectiveType === 'LOT' && (
-                              <div>
-                                <label className="mb-1 block text-sm font-medium text-[#334155]">Region</label>
-                                <Input value={auctionRegion} readOnly />
                               </div>
                             )}
                             <div>

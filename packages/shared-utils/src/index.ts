@@ -1,6 +1,7 @@
 export * from './gst'
 export * from './lane'
 export * from './rate-type'
+export * from './tenant-master'
 export * from './vendor-contracts'
 
 export function formatCurrency(value: number, currency = 'INR') {

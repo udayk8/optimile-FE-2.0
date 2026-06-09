@@ -8,30 +8,15 @@ import { Input } from '@auction/components/ui/input'
 import { DataTable, type DataTableColumn } from '@shared-ui/data-table'
 import { formatDate } from '@auction/lib/date-utils'
 import { formatCurrency } from '@auction/lib/currency-utils'
-import { Download, FileSpreadsheet, Upload, X } from 'lucide-react'
+import { FileSpreadsheet, Upload, X } from 'lucide-react'
 import type { RfqResponse, RfqResponseRow, RfqType } from '@auction/types'
 import { fetchAllRfqResponses, uploadRfqResponse } from '@auction/lib/mock-services'
 import { fetchRfqs } from '@auction/lib/mock-services'
+import { readSessionTenantId } from '@auction/lib/auction-store'
+import { listTenantVendors } from '@shared-utils'
 
 const PAGE_SIZE = 15
 const RFQ_TEMPLATE_HEADERS = ['originCity', 'destinationCity', 'vehicleType', 'price'] as const
-
-// Build + download an RFQ-response Excel template (header row + one sample).
-async function downloadRfqTemplate() {
-  const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('RFQ Response')
-  ws.addRow([...RFQ_TEMPLATE_HEADERS])
-  ws.addRow(['Mumbai', 'Delhi', '20 MT Open Body', 48000])
-  const buf = await wb.xlsx.writeBuffer()
-  const url = URL.createObjectURL(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'Optimile_Auction_Vendor_RFQ_Template.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
 
 // Parse an uploaded RFQ-response file (xlsx or csv) into rows + validation errors.
 async function parseRfqFile(file: File): Promise<{ rows: RfqResponseRow[]; errors: string[] }> {
@@ -92,6 +77,9 @@ export default function RfqResponsesPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState('')
   const [vendorName, setVendorName] = useState('')
+  // Vendors onboarded in tenant-admin (cross-module) — the response is attributed
+  // to one of them rather than free text.
+  const tenantVendors = useMemo(() => listTenantVendors(readSessionTenantId()), [])
   const [rfqs, setRfqs] = useState<RfqType[]>([])
   const [selectedRfqId, setSelectedRfqId] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -255,7 +243,7 @@ export default function RfqResponsesPage() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const canSave = Boolean(selectedRfqId) && previewRows.length > 0 && previewErrors.length === 0
+  const canSave = Boolean(selectedRfqId) && Boolean(vendorName) && previewRows.length > 0 && previewErrors.length === 0
 
   const handleUpload = async () => {
     if (!selectedRfqId) {
@@ -298,15 +286,10 @@ export default function RfqResponsesPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Upload className="h-4 w-4 text-primary" />
-              Upload Response
-            </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => { void downloadRfqTemplate() }}>
-              <Download className="mr-2 h-4 w-4" /> Download Template
-            </Button>
-          </div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Upload className="h-4 w-4 text-primary" />
+            Upload Response
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
@@ -344,12 +327,17 @@ export default function RfqResponsesPage() {
             </div>
 
             <div className="space-y-1.5 lg:w-52">
-              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Vendor Name (optional)</label>
-              <Input
+              <label className="text-xs font-semibold uppercase tracking-wide text-[#64748B]">Vendor *</label>
+              <select
                 value={vendorName}
                 onChange={(e) => setVendorName(e.target.value)}
-                placeholder="e.g. Fast Logistics"
-              />
+                className="flex h-10 w-full rounded-md border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#0F172A] outline-none focus:border-primary"
+              >
+                <option value="">{tenantVendors.length === 0 ? 'No vendors onboarded' : 'Select vendor'}</option>
+                {tenantVendors.map((v) => (
+                  <option key={v.id} value={v.name}>{v.name}</option>
+                ))}
+              </select>
             </div>
 
             <Button disabled={!canSave || uploading} onClick={handleUpload} className="shrink-0">
