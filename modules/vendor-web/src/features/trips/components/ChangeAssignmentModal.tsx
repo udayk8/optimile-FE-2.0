@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Users } from 'lucide-react'
-import { useAppStore } from '@vendor/stores/app.store'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AlertTriangle, Wrench, Truck, CheckCircle2 } from 'lucide-react'
+import { useVendorBookings } from '@vendor/integration/useVendorBookings'
+import { useFleetData } from '@vendor/integration/useFleetData'
 import type { DisruptionReason, Trip } from '@vendor/types'
 
 const REASON_OPTIONS: { value: DisruptionReason; label: string }[] = [
@@ -9,6 +10,8 @@ const REASON_OPTIONS: { value: DisruptionReason; label: string }[] = [
   { value: 'VEHICLE_OR_DRIVER_BREAKDOWN', label: 'Vehicle and driver breakdown' },
 ]
 
+type ExceptionAction = 'update' | 'replace' | 'resolve'
+
 interface ChangeAssignmentModalProps {
   isOpen: boolean
   onClose: () => void
@@ -16,186 +19,190 @@ interface ChangeAssignmentModalProps {
 }
 
 export function ChangeAssignmentModal({ isOpen, onClose, tripId }: ChangeAssignmentModalProps) {
-  const { trips, vehicles, drivers, changeTripAssignment } = useAppStore()
+  const { trips, changeTripException } = useVendorBookings()
+  const { vehicles, drivers } = useFleetData()
   const trip: Trip | undefined = useMemo(() => trips.find((t) => t.id === tripId), [trips, tripId])
 
-  const [vehicleId, setVehicleId] = useState<string>('')
-  const [driverId, setDriverId] = useState<string>('')
+  const inException = Boolean(trip?.exceptionFlag && (!trip?.disruption || !trip.disruption.resolvedAt))
+
+  // Report form (trip not yet in exception).
   const [reason, setReason] = useState<DisruptionReason | ''>('')
-  const [notes, setNotes] = useState<string>('')
-  const [resolve, setResolve] = useState(false)
+  // Action while already in exception.
+  const [action, setAction] = useState<ExceptionAction>('update')
+  const [vehicleId, setVehicleId] = useState('')
+  const [driverId, setDriverId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [eta, setEta] = useState('')
 
   useEffect(() => {
     if (!isOpen || !trip) return
+    setReason('')
+    setAction('update')
     setVehicleId('')
     setDriverId('')
-    setReason(trip.disruption?.reason ?? '')
-    setNotes(trip.disruption?.notes ?? '')
-    setResolve(false)
+    setNotes('')
+    setEta(trip.disruption?.revisedEta ?? '')
   }, [isOpen, trip])
 
   if (!isOpen || !trip) return null
 
-  const reasonRequiresVehicle = reason === 'VEHICLE_BREAKDOWN' || reason === 'VEHICLE_OR_DRIVER_BREAKDOWN'
-  const reasonRequiresDriver = reason === 'DRIVER_BREAKDOWN' || reason === 'VEHICLE_OR_DRIVER_BREAKDOWN'
-
-  // Replacement must keep the booking's vehicle type (the type the booking was created with).
-  const expectedVehicleType = trip.assignedVehicle.type && trip.assignedVehicle.type !== '—' ? trip.assignedVehicle.type : null
+  const expectedType = trip.assignedVehicle.type && trip.assignedVehicle.type !== '—' ? trip.assignedVehicle.type : null
+  // Only Active + Compliant fleet can be assigned; exclude the current ones.
   const availableVehicles = vehicles.filter(
-    (v) => v.id !== trip.assignedVehicle.id && (!expectedVehicleType || v.vehicleType === expectedVehicleType),
+    (v) => v.id !== trip.assignedVehicle.id && v.operationalStatus === 'ACTIVE' && v.complianceStatus === 'COMPLIANT' && (!expectedType || v.vehicleType === expectedType),
   )
-  const availableDrivers = drivers.filter((d) => d.id !== trip.assignedDriver.id)
+  const availableDrivers = drivers.filter((d) => d.id !== trip.assignedDriver.id && d.currentStatus === 'ACTIVE' && d.complianceStatus === 'COMPLIANT')
 
-  const canSubmit =
-    resolve ||
-    (reason !== '' &&
-      (!reasonRequiresVehicle || vehicleId !== '') &&
-      (!reasonRequiresDriver || driverId !== ''))
+  const canSubmit = inException
+    ? action === 'resolve'
+      ? true
+      : action === 'update'
+        ? Boolean(notes.trim() || eta)
+        : Boolean(vehicleId || driverId) // replace
+    : reason !== '' // report
 
   const handleConfirm = () => {
-    changeTripAssignment(trip.id, {
-      vehicleId: vehicleId || undefined,
-      driverId: driverId || undefined,
-      issueReason: reason || undefined,
-      notes: notes.trim() || undefined,
-      resolve,
-    })
+    if (!inException) {
+      changeTripException(trip.id, { mode: 'report', reason: reason || undefined, notes: notes.trim() || undefined, revisedEta: eta || undefined })
+    } else if (action === 'resolve') {
+      changeTripException(trip.id, { mode: 'resolve', notes: notes.trim() || undefined })
+    } else if (action === 'replace') {
+      changeTripException(trip.id, { mode: 'replace', vehicleId: vehicleId || undefined, driverId: driverId || undefined, notes: notes.trim() || undefined, revisedEta: eta || undefined })
+    } else {
+      changeTripException(trip.id, { mode: 'update', notes: notes.trim() || undefined, revisedEta: eta || undefined })
+    }
     onClose()
   }
+
+  const ActionTab = ({ value, icon, label }: { value: ExceptionAction; icon: ReactNode; label: string }) => (
+    <button
+      type="button"
+      onClick={() => setAction(value)}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+        action === value ? 'border-primary bg-primary/5 text-primary' : 'border-gray-200 text-gray-600 hover:border-primary/40'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
       <div className="my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-6 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Users className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+            <AlertTriangle className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Change assignment</h3>
-            <p className="text-sm text-gray-500">{trip.id} · re-assign vehicle and/or driver</p>
+            <h3 className="text-lg font-semibold text-gray-900">{inException ? 'Manage breakdown' : 'Report breakdown'}</h3>
+            <p className="text-sm text-gray-500">{trip.id} · booking stays In Transit</p>
           </div>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          {/* Current */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm">
+          {/* Current assignment */}
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs">
             <p className="font-semibold text-gray-700">Current</p>
-            <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+            <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
                 <p className="text-gray-500">Vehicle</p>
                 <p className="font-mono font-semibold text-text">{trip.assignedVehicle.registrationNumber}</p>
-                <p className="text-gray-500">{trip.assignedVehicle.type}</p>
               </div>
               <div>
                 <p className="text-gray-500">Driver</p>
                 <p className="font-semibold text-text">{trip.assignedDriver.name}</p>
-                <p className="text-gray-500">{trip.assignedDriver.mobile}</p>
               </div>
             </div>
+            {inException && trip.disruption && (
+              <p className="mt-2 text-amber-700">
+                In exception: {REASON_OPTIONS.find((r) => r.value === trip.disruption?.reason)?.label ?? 'Breakdown'}
+                {trip.disruption.revisedEta ? ` · Revised ETA ${trip.disruption.revisedEta}` : ''}
+              </p>
+            )}
           </div>
 
-          {/* Issue */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Issue type</label>
-            <select
-              value={reason}
-              onChange={(e) => setReason(e.target.value as DisruptionReason | '')}
-              disabled={resolve}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:bg-gray-100"
-            >
-              <option value="">— Select issue —</option>
-              {REASON_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
+          {/* Report (not yet in exception) */}
+          {!inException && (
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">What broke down?</label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value as DisruptionReason | '')}
+                className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
+              >
+                <option value="">— Select —</option>
+                {REASON_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {/* New vehicle */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              New vehicle {reasonRequiresVehicle && <span className="text-danger">*</span>}
-            </label>
-            <select
-              value={vehicleId}
-              onChange={(e) => setVehicleId(e.target.value)}
-              disabled={resolve}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:bg-gray-100"
-            >
-              <option value="">— Keep current vehicle —</option>
-              {availableVehicles.map((v) => (
-                <option key={v.id} value={v.id}>{v.registrationNumber} · {v.vehicleType}</option>
-              ))}
-            </select>
-          </div>
+          {/* Actions while in exception */}
+          {inException && (
+            <div className="flex gap-2">
+              <ActionTab value="update" icon={<Wrench className="h-4 w-4" />} label="Repair / ETA" />
+              <ActionTab value="replace" icon={<Truck className="h-4 w-4" />} label="Replace" />
+              <ActionTab value="resolve" icon={<CheckCircle2 className="h-4 w-4" />} label="Resolve" />
+            </div>
+          )}
 
-          {/* New driver */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-              New driver {reasonRequiresDriver && <span className="text-danger">*</span>}
-            </label>
-            <select
-              value={driverId}
-              onChange={(e) => setDriverId(e.target.value)}
-              disabled={resolve}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:bg-gray-100"
-            >
-              <option value="">— Keep current driver —</option>
-              {availableDrivers.map((d) => (
-                <option key={d.id} value={d.id}>{d.name} · {d.mobile}</option>
-              ))}
-            </select>
-          </div>
+          {/* Replace fields */}
+          {inException && action === 'replace' && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Replacement vehicle</label>
+                <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                  <option value="">— Keep current vehicle —</option>
+                  {availableVehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber} · {v.vehicleType}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Replacement driver</label>
+                <select value={driverId} onChange={(e) => setDriverId(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+                  <option value="">— Keep current driver —</option>
+                  {availableDrivers.map((d) => <option key={d.id} value={d.id}>{d.name} · {d.mobile}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
 
-          {/* Notes */}
+          {/* Revised ETA — for report, update, replace (not resolve) */}
+          {(!inException || action !== 'resolve') && (
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Revised ETA {inException && action === 'update' && <span className="text-gray-400">(or repair note)</span>}</label>
+              <input type="datetime-local" value={eta} onChange={(e) => setEta(e.target.value)} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary" />
+            </div>
+          )}
+
+          {/* Notes — always */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-gray-500">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Add context for the dispatcher (optional)"
+              rows={2}
+              placeholder={action === 'resolve' && inException ? 'How was it resolved? (optional)' : 'Add context (optional)'}
               className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary"
             />
           </div>
 
-          {/* Resolve */}
-          {trip.disruption && !trip.disruption.resolvedAt && (
-            <label className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700">
-              <input
-                type="checkbox"
-                checked={resolve}
-                onChange={(e) => setResolve(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="font-semibold">Mark disruption resolved</span>
-            </label>
-          )}
-
-          {!canSubmit && reason && !resolve && (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Select a replacement {reasonRequiresVehicle && 'vehicle'}
-                {reasonRequiresVehicle && reasonRequiresDriver && ' and '}
-                {reasonRequiresDriver && 'driver'} for the chosen issue.
-              </span>
-            </div>
+          {inException && action === 'resolve' && (
+            <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+              Marks the breakdown resolved and removes the booking from Exception — it stays In Transit.
+            </p>
           )}
         </div>
 
         <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 bg-white px-6 py-4">
-          <button
-            onClick={onClose}
-            className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
+          <button onClick={onClose} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
           <button
             disabled={!canSubmit}
             onClick={handleConfirm}
             className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {resolve ? 'Resolve disruption' : 'Confirm change'}
+            {!inException ? 'Report breakdown' : action === 'resolve' ? 'Mark resolved' : action === 'replace' ? 'Confirm replacement' : 'Save update'}
           </button>
         </div>
       </div>

@@ -1,5 +1,17 @@
 import { createContext, useContext, type PropsWithChildren } from 'react'
-import type { Driver, Indent, Trip, Vehicle, Invoice, Dispute, InvoiceLineItem, CompanyInfo, BankDetails } from '@vendor/types'
+import type { Driver, Indent, Trip, Vehicle, Invoice, Dispute, InvoiceLineItem, CompanyInfo, BankDetails, DisruptionReason } from '@vendor/types'
+
+/** A vendor breakdown/exception action on an in-transit booking. */
+export interface VendorTripExceptionInput {
+  /** report = open exception; update = repair note / push ETA; replace = swap
+   *  vehicle/driver; resolve = close exception. Only resolve clears it. */
+  mode: 'report' | 'update' | 'replace' | 'resolve'
+  reason?: DisruptionReason
+  notes?: string
+  revisedEta?: string
+  vehicleId?: string
+  driverId?: string
+}
 
 /**
  * Invoice-document profile the tenant configures for this vendor at onboarding
@@ -152,6 +164,9 @@ export interface TenantDataBridge {
   createResubmissionInvoice: (oldInvoiceId: string, lineItems: InvoiceLineItem[], invoiceNumber?: string) => void
   /** Vendor withdraws (closes) a resubmission-required invoice. */
   closeInvoice: (invoiceId: string) => void
+  /** Vendor reports/updates/resolves a breakdown exception on an in-transit
+   *  booking — moves the tenant booking into/out of the EXCEPTION state. */
+  changeBookingException: (bookingRef: string, input: VendorTripExceptionInput) => void
 }
 
 const TenantDataBridgeContext = createContext<TenantDataBridge | null>(null)

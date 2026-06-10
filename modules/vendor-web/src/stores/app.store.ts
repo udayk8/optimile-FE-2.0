@@ -141,6 +141,7 @@ interface AppState {
     driverId?: string
     issueReason?: DisruptionReason
     notes?: string
+    revisedEta?: string
     resolve?: boolean
   }) => void
   addCapacityDeclaration: (declaration: CapacityDeclaration) => void
@@ -975,7 +976,7 @@ export const useAppStore = create<AppState>((set) => ({
   addCapacityDeclaration: (declaration) =>
     set((state) => ({ capacity: [declaration, ...state.capacity] })),
 
-  changeTripAssignment: (tripId, { vehicleId, driverId, issueReason, notes, resolve }) =>
+  changeTripAssignment: (tripId, { vehicleId, driverId, issueReason, notes, revisedEta, resolve }) =>
     set((state) => {
       const tripIndex = state.trips.findIndex((t) => t.id === tripId)
       if (tripIndex === -1) return state
@@ -999,18 +1000,30 @@ export const useAppStore = create<AppState>((set) => ({
       }
 
       if (resolve) {
+        // Only Resolve clears the exception. Status stays IN_TRANSIT.
         updatedTrip.disruption = trip.disruption ? { ...trip.disruption, resolvedAt: now } : undefined
         updatedTrip.exceptionFlag = false
         updatedTrip.slaFlag = 'ON_TIME'
       } else if (issueReason) {
+        // Report a breakdown — opens the exception (still IN_TRANSIT).
         updatedTrip.disruption = {
           reason: issueReason,
           reportedAt: trip.disruption?.reportedAt ?? now,
           notes: notes ?? trip.disruption?.notes,
+          revisedEta: revisedEta ?? trip.disruption?.revisedEta,
         }
         updatedTrip.exceptionFlag = true
-      } else if (notes && trip.disruption) {
-        updatedTrip.disruption = { ...trip.disruption, notes }
+        updatedTrip.slaFlag = 'DELAYED'
+      } else if (trip.disruption) {
+        // Update (repair note / push ETA) OR change vehicle-driver — both keep the
+        // exception open; only an explicit Resolve closes it.
+        updatedTrip.disruption = {
+          ...trip.disruption,
+          notes: notes ?? trip.disruption.notes,
+          revisedEta: revisedEta ?? trip.disruption.revisedEta,
+        }
+        updatedTrip.exceptionFlag = true
+        updatedTrip.slaFlag = 'DELAYED'
       }
 
       const updatedTrips = [...state.trips]

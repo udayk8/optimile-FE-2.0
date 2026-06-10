@@ -275,6 +275,8 @@ export interface TripDisruption {
   reason: DisruptionReason
   reportedAt: string
   notes?: string
+  /** Vendor-pushed revised ETA while recovering — does not resolve the exception. */
+  revisedEta?: string
   resolvedAt?: string
 }
 

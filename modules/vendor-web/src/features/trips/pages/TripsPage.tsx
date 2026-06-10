@@ -448,7 +448,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Vehicle</th>
                       <th className="px-5 py-3 font-bold">Driver</th>
-                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
                   </thead>
@@ -467,9 +466,13 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedVehicle.registrationNumber}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.assignedDriver.name}</td>
-                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/in-transit/${trip.id}`)}>View Details</Button>
+                          <div className="inline-flex items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => setReassignTripId(trip.id)}>
+                              <Wrench className="mr-1 h-3.5 w-3.5" /> Report Breakdown
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/in-transit/${trip.id}`)}>View Details</Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -498,7 +501,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
-                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
@@ -511,7 +513,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.origin.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
-                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/pending-pod/${trip.id}`)}>View Details</Button>
                         </td>
@@ -543,7 +544,6 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Destination</th>
                       <th className="px-5 py-3 font-bold">Delivered</th>
                       <th className="px-5 py-3 font-bold">Freight</th>
-                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 text-right font-bold">Actions</th>
                     </tr>
                   </thead>
@@ -557,7 +557,6 @@ export default function TripsPage() {
                         <td className="px-5 py-4 text-sm text-text">{trip.laneDetails.destination.city}</td>
                         <td className="px-5 py-4 text-sm text-text">{trip.deliveredDate ? formatDate(trip.deliveredDate) : '—'}</td>
                         <td className="px-5 py-4 text-sm text-text"><CurrencyDisplay amount={trip.freightRate} /></td>
-                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/completed/${trip.id}`)}>View Details</Button>
                         </td>
@@ -631,9 +630,9 @@ export default function TripsPage() {
                       <th className="px-5 py-3 font-bold">Customer</th>
                       <th className="px-5 py-3 font-bold">Source</th>
                       <th className="px-5 py-3 font-bold">Destination</th>
-                      <th className="px-5 py-3 font-bold">Issue</th>
+                      <th className="px-5 py-3 font-bold">Exception</th>
+                      <th className="px-5 py-3 font-bold">Revised ETA</th>
                       <th className="px-5 py-3 font-bold">Vehicle / Driver</th>
-                      <th className="px-5 py-3 font-bold text-right">Advance</th>
                       <th className="px-5 py-3 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
@@ -662,14 +661,16 @@ export default function TripsPage() {
                           )}
                         </td>
                         <td className="px-5 py-4 text-sm text-text">
+                          {trip.disruption?.revisedEta ? formatDateTime(trip.disruption.revisedEta) : <span className="text-gray-400">—</span>}
+                        </td>
+                        <td className="px-5 py-4 text-sm text-text">
                           <div>{trip.assignedVehicle.registrationNumber}</div>
                           <div className="text-xs text-gray-500">{trip.assignedDriver.name}</div>
                         </td>
-                        <td className="px-5 py-4 text-right text-sm text-text"><CurrencyDisplay amount={trip.advance ?? 0} /></td>
                         <td className="px-5 py-4 text-right">
                           <div className="inline-flex items-center gap-2">
                             <Button size="sm" variant="outline" onClick={() => setReassignTripId(trip.id)}>
-                              <Wrench className="mr-1 h-3.5 w-3.5" /> Change Assignment
+                              <Wrench className="mr-1 h-3.5 w-3.5" /> Manage Breakdown
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => navigate(`/vendor/bookings/exception/${trip.id}`)}>View Details</Button>
                           </div>

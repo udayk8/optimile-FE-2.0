@@ -9,7 +9,8 @@ import type {
   VehicleFuelType,
 } from "@/types/fleet";
 import type { BookingExpenseRecord, BookingRecord } from "@/modules/tms/booking/types";
-import type { TenantDataBridge, VendorInvoiceSubmitPayload, VendorExpenseInput } from "@vendor/integration/tenant-data-bridge";
+import type { TenantDataBridge, VendorInvoiceSubmitPayload, VendorExpenseInput, VendorTripExceptionInput } from "@vendor/integration/tenant-data-bridge";
+import type { BookingReassignmentReason } from "@/modules/tms/booking/types";
 import type {
   ComplianceDocument as VendorComplianceDocument,
   Driver as VendorDriver,
@@ -127,6 +128,8 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
     listTenantBookings,
     getTenantBookingById,
     updateTenantBooking,
+    transitionTenantBookingStatus,
+    reassignTenantBooking,
     listTenantCustomers,
     listTenantCustomerAddresses,
     listTenantLrs,
@@ -431,6 +434,51 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       updateTenantBooking(record.id, { expenses: [...(record.expenses ?? []), nextExpense] });
     };
 
+    // Vendor breakdown/exception on an in-transit booking → moves the tenant
+    // booking through EXCEPTION ↔ IN_TRANSIT and records reassignments. Only
+    // "resolve" returns it to IN_TRANSIT; report/replace/update keep it EXCEPTION.
+    const mapDisruptionReason = (r?: string): BookingReassignmentReason =>
+      r === "DRIVER_BREAKDOWN" ? "DRIVER_UNAVAILABLE" : "VEHICLE_BREAKDOWN";
+    const changeBookingException = (bookingRef: string, input: VendorTripExceptionInput) => {
+      const booking = tenantBookings.find((b) => b.bookingId === bookingRef || b.id === bookingRef);
+      if (!booking || booking.assignment?.vendorId !== vendorId) return;
+      const actor = vendorName ?? "Vendor";
+      const note = [input.reason, input.revisedEta ? `Revised ETA: ${input.revisedEta}` : "", input.notes]
+        .filter(Boolean)
+        .join(" · ");
+      try {
+        if (input.mode === "resolve") {
+          transitionTenantBookingStatus(booking.id, { status: "IN_TRANSIT", actor, note: note || "Exception resolved" });
+          return;
+        }
+        if (input.mode === "replace") {
+          if (booking.status !== "EXCEPTION") {
+            transitionTenantBookingStatus(booking.id, { status: "EXCEPTION", actor, note: note || "Breakdown — reassigning" });
+          }
+          const vehicle = tenantVehicles.find((v) => v.id === input.vehicleId);
+          const driver = tenantDrivers.find((d) => d.id === input.driverId);
+          reassignTenantBooking(booking.id, {
+            changeType: input.vehicleId && input.driverId ? "VEHICLE_DRIVER" : input.driverId ? "DRIVER" : "VEHICLE",
+            vehicleId: input.vehicleId ?? null,
+            vehicleLabel: vehicle?.registrationNumber ?? null,
+            driverId: input.driverId ?? null,
+            driverName: driver?.name ?? null,
+            reason: mapDisruptionReason(input.reason),
+            remark: note || "Vehicle/driver replaced after breakdown",
+            effectiveAt: new Date().toISOString(),
+            actor,
+          });
+          return;
+        }
+        // report / update — ensure the booking is in EXCEPTION (update keeps it).
+        if (booking.status !== "EXCEPTION") {
+          transitionTenantBookingStatus(booking.id, { status: "EXCEPTION", actor, note: note || "Breakdown reported" });
+        }
+      } catch (error) {
+        window.alert((error as Error).message);
+      }
+    };
+
     // ── Vendor (AP) invoices — this vendor's slice of the shared collection ──
     const myInvoiceRecords = allVendorInvoices.filter((r) => r.vendorId === vendorId);
     const vendorInvoices: VendorInvoice[] = myInvoiceRecords.map((r) => ({
@@ -552,6 +600,7 @@ export function useVendorTenantDataBridge(): TenantDataBridge | null {
       assignVehicleResolved,
       getBookingDetail,
       addBookingExpense,
+      changeBookingException,
       vendorInvoices,
       vendorDisputes,
       submitInvoice,

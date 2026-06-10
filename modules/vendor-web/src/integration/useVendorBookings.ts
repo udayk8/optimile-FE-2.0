@@ -1,5 +1,5 @@
 import { useAppStore } from '@vendor/stores/app.store'
-import { useTenantBridge, type VendorBookingDetail } from '@vendor/integration/tenant-data-bridge'
+import { useTenantBridge, type VendorBookingDetail, type VendorTripExceptionInput } from '@vendor/integration/tenant-data-bridge'
 import type { Indent, Trip } from '@vendor/types'
 
 // A PENDING indent's SLA is 2h from when it was sent. Once the slaDeadline
@@ -26,6 +26,8 @@ export interface VendorBookingsData {
     bookingId: string,
     input: { label: string; amount: number; expenseType: string; paymentMode?: string; paidBy?: string; notes?: string },
   ) => void
+  /** Report / update / replace / resolve a breakdown exception (persists cross-module when embedded). */
+  changeTripException: (tripId: string, input: VendorTripExceptionInput) => void
   /** True when the record came from the cross-module tenant bridge (vs local mock data). */
   isBridgeRecord: (id: string) => boolean
 }
@@ -43,6 +45,18 @@ export function useVendorBookings(): VendorBookingsData {
   const declineIndent = useAppStore((state) => state.declineIndent)
   const assignVehicleToTrip = useAppStore((state) => state.assignVehicleToTrip)
   const addTripExpense = useAppStore((state) => state.addTripExpense)
+  const changeTripAssignment = useAppStore((state) => state.changeTripAssignment)
+
+  // Map the unified exception payload onto the local store action.
+  const localException = (tripId: string, input: VendorTripExceptionInput) =>
+    changeTripAssignment(tripId, {
+      vehicleId: input.mode === 'replace' ? input.vehicleId : undefined,
+      driverId: input.mode === 'replace' ? input.driverId : undefined,
+      issueReason: input.mode === 'report' ? input.reason : undefined,
+      notes: input.notes,
+      revisedEta: input.revisedEta,
+      resolve: input.mode === 'resolve',
+    })
 
   // Embedded → MERGE the vendor's real tenant bookings (bridge) with the local
   // mock demo dataset, so a freshly onboarded / demo vendor like Mahesh sees the
@@ -69,10 +83,12 @@ export function useVendorBookings(): VendorBookingsData {
       getBookingDetail: bridge.getBookingDetail,
       addBookingExpense: (id, input) =>
         mockTripIds.has(id) ? addTripExpense(id, input) : bridge.addBookingExpense(id, input),
+      changeTripException: (id, input) =>
+        mockTripIds.has(id) ? localException(id, input) : bridge.changeBookingException(id, input),
       isBridgeRecord: (id) => bridgeIds.has(id),
     }
   }
 
   // Standalone (no bridge): local mock demo dataset only.
-  return { indents: dropExpiredPendingIndents(indents), trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, addBookingExpense: addTripExpense, isBridgeRecord: () => false }
+  return { indents: dropExpiredPendingIndents(indents), trips, acceptIndent, declineIndent, assignVehicle: assignVehicleToTrip, getBookingDetail: () => null, addBookingExpense: addTripExpense, changeTripException: localException, isBridgeRecord: () => false }
 }
