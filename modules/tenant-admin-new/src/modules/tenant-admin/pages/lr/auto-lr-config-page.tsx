@@ -207,6 +207,68 @@ export function TenantAutoLRConfigPage() {
     }
   }
 
+  // Simple mode: no hierarchy levels → show only Format + Counter.
+  // Scope/governance/delegation steps are irrelevant when there is only one level.
+  const isSimpleMode = hierarchyLevels.length === 0;
+
+  if (isSimpleMode) {
+    const generatedCount = store.lrs.filter((r) => r.configId === autoConfig?.id).length;
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-[14px] font-semibold text-slate-900">Auto LR</h1>
+          <Button size="sm" onClick={saveConfig} disabled={!canEdit}>Save</Button>
+        </div>
+        {message ? <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div> : null}
+
+        <SectionCard step={1} title="LR Format">
+          <div className="flex flex-wrap items-end gap-4">
+            <Field label="Prefix">
+              <Input value={form.prefix} onChange={(e) => setForm((c) => ({ ...c, prefix: e.target.value }))} disabled={!canEdit} />
+            </Field>
+            <Field label="Year">
+              <Select value={form.yearFormat} onChange={(e) => setForm((c) => ({ ...c, yearFormat: e.target.value as AutoConfigForm["yearFormat"] }))} disabled={!canEdit}>
+                <option value="NONE">None</option>
+                <option value="YY">Short (26)</option>
+                <option value="YYYY">Full (2026)</option>
+              </Select>
+            </Field>
+            <Field label="Separator">
+              <Input value={form.numberSeparator} maxLength={2} onChange={(e) => setForm((c) => ({ ...c, numberSeparator: e.target.value }))} disabled={!canEdit} className="w-16" />
+            </Field>
+            <Field label="Running Number Length">
+              <Input type="number" min={1} max={10} value={String(form.zeroPaddingLength)} onChange={(e) => setForm((c) => ({ ...c, zeroPaddingLength: Math.max(1, Number(e.target.value || 1)) }))} disabled={!canEdit} />
+            </Field>
+            <div className="mb-0.5 font-mono text-base font-bold text-slate-900">{currentFormatPreview}</div>
+          </div>
+        </SectionCard>
+
+        <SectionCard step={2} title="LR Generation Rule">
+          <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            LR numbers are generated <span className="font-semibold text-slate-900">automatically by the system</span> when a vehicle is assigned to a delivery. No manual generation is required.
+          </div>
+        </SectionCard>
+
+        <SectionCard step={3} title="Current Counter">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border bg-white px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Current Running Number</div>
+              <div className="mt-1.5 font-mono text-xl font-bold text-slate-900">
+                {String(generatedCount).padStart(form.zeroPaddingLength, "0")}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-white px-4 py-3">
+              <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Next LR Number</div>
+              <div className="mt-1.5 font-mono text-xl font-bold text-slate-900">
+                {runtimePreview?.nextNumber ?? currentFormatPreview}
+              </div>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">

@@ -19,6 +19,7 @@ import type {
   ManualLRCustomerPolicy,
   ManualLRChildFormatMode,
   ManualLRDistributionStrategy,
+  ManualLRInsufficientStockPolicy,
   ManualLRNumberingPolicy,
   ManualLRWorkflowPermissionScope,
   ManualLRWorkflowMode,
@@ -34,6 +35,7 @@ type ManualConfigForm = {
   zeroPaddingLength: number;
   distributionStrategy: ManualLRDistributionStrategy;
   workflowMode: ManualLRWorkflowMode;
+  insufficientStockPolicy: ManualLRInsufficientStockPolicy;
   numberingPolicy: ManualLRNumberingPolicy;
   customerLrPolicy: ManualLRCustomerPolicy;
   allowCustomerFallback: boolean;
@@ -159,6 +161,10 @@ export function TenantManualLRConfigPage() {
         ? managedRuleLevelId || current.ownershipLevelId
         : "";
       if (!managedLevelId) {
+        // TENANT (Company Root Only) mode keeps its per-level Distribution Method
+        // rules in childGovernanceRules — managed explicitly by selectDistributionMethod.
+        // Do NOT clear them here, or a parent's save would wipe a child level's setting.
+        if (current.scopeType === "TENANT") return current;
         return current.childGovernanceRules.length ? { ...current, childGovernanceRules: [] } : current;
       }
       const existingRule = current.childGovernanceRules.find((rule) => rule.childLevelId === managedLevelId);
@@ -267,6 +273,7 @@ export function TenantManualLRConfigPage() {
       zeroPaddingLength: form.zeroPaddingLength,
       distributionStrategy: form.distributionStrategy,
       workflowMode: form.workflowMode,
+      insufficientStockPolicy: form.insufficientStockPolicy,
       numberingPolicy: form.numberingPolicy,
       customerLrPolicy: form.customerLrPolicy,
       allowCustomerFallback: form.allowCustomerFallback,
@@ -334,6 +341,81 @@ export function TenantManualLRConfigPage() {
     return normalizeStoredChildCode(overridePrefix, currentAuthorityFormat.prefix, currentAuthorityFormat.numberSeparator);
   }
 
+  // ── Distribution Method (Company Root Only / scopeType TENANT) ──────────────
+  // The choice is RELATIVE to the logged-in manager. Company Root configures its
+  // relationship with the topmost level via the global workflowMode. A lower
+  // level (e.g. Region) configures its own immediate child (e.g. Branch) by
+  // writing that child's governance rule, so each parent→child link has its own
+  // Direct vs Request+Approval setting.
+  const distributionChildLevel = availableTargetLevels[0] ?? null;
+  const distributionChildLevelId = distributionChildLevel?.id ?? "";
+  const distributionChildLabel = distributionChildLevel?.name ?? "lower levels";
+  const distributionChildRule =
+    form.childGovernanceRules.find((rule) => rule.childLevelId === distributionChildLevelId) ?? null;
+  const distributionIsApproval = isAtCompanyRoot
+    ? form.workflowMode === "APPROVAL_BASED"
+    : distributionChildRule
+      ? Boolean(distributionChildRule.childCanRequestLr)
+      : form.workflowMode === "APPROVAL_BASED";
+
+  function selectDistributionMethod(method: "DIRECT" | "APPROVAL") {
+    setForm((current) => {
+      const workflowMode = method === "APPROVAL" ? "APPROVAL_BASED" : "CONTROLLED_ALLOCATION";
+      // Company Root drives the global method (its link with the top level).
+      if (isAtCompanyRoot || !distributionChildLevelId) {
+        return { ...current, workflowMode };
+      }
+      // Lower-level manager: persist the choice on the immediate child's rule.
+      const patch =
+        method === "APPROVAL"
+          ? {
+              parentCanGenerateLr: true,
+              parentCanAllocateLrToChild: false,
+              canAllocateChildLr: false,
+              childCanRequestLr: true,
+              canApproveChildRequests: true,
+              childCanConsumeLr: true,
+              canConsumeParentLr: true,
+              approvalRequired: true,
+              allocationRequired: false,
+              canTransferLr: true,
+            }
+          : {
+              parentCanGenerateLr: true,
+              parentCanAllocateLrToChild: true,
+              canAllocateChildLr: true,
+              childCanRequestLr: false,
+              canApproveChildRequests: false,
+              childCanConsumeLr: true,
+              canConsumeParentLr: true,
+              approvalRequired: false,
+              allocationRequired: true,
+              canTransferLr: false,
+            };
+      const exists = current.childGovernanceRules.some((rule) => rule.childLevelId === distributionChildLevelId);
+      const childGovernanceRules = exists
+        ? current.childGovernanceRules.map((rule) =>
+            rule.childLevelId === distributionChildLevelId ? { ...rule, ...patch } : rule,
+          )
+        : [
+            ...current.childGovernanceRules,
+            {
+              childLevelId: distributionChildLevelId,
+              canMaintainOwnSequence: false,
+              canDefineChildFormat: false,
+              canConfigureChildWorkflow: false,
+              canDelegateChildGovernance: false,
+              inheritParentFormat: true,
+              formatMode: "GLOBAL_PARENT_FORMAT" as const,
+              ...patch,
+            },
+          ];
+      // Lower-level managers must NOT touch the global workflowMode (that is the
+      // Company Root → top-level setting). Only persist their child's rule.
+      return { ...current, childGovernanceRules };
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -376,8 +458,12 @@ export function TenantManualLRConfigPage() {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <ScopeOption
             active={form.scopeType === "TENANT"}
-            title="Company Root only"
-            description={`${tenant.name} generates all LR numbers`}
+            title={isAtCompanyRoot ? "Company Root only" : `${currentLevelLabel} only`}
+            description={
+              isAtCompanyRoot
+                ? `${tenant.name} generates all LR numbers`
+                : `${currentScopeLabel} generates and controls all ${distributionChildLabel} LR`
+            }
             onClick={() => setForm((current) => ({ ...current, scopeType: "TENANT", ownershipLevelId: "" }))}
             disabled={!canEdit}
           />
@@ -399,13 +485,86 @@ export function TenantManualLRConfigPage() {
         ) : null}
       </SectionCard>
 
+      {/* Step 3 — Distribution Method (level-relative): how the current authority
+          hands LR to its immediate child level. */}
+      {form.scopeType === "TENANT" && distributionChildLevelId ? (
+        <SectionCard step={3} title={`Distribution Method — ${currentLevelLabel} → ${distributionChildLabel}`}>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ScopeOption
+              active={!distributionIsApproval}
+              title="Direct Allocation"
+              description={`${currentLevelLabel} directly assigns LR stock to ${distributionChildLabel}. No request workflow.`}
+              onClick={() => selectDistributionMethod("DIRECT")}
+              disabled={!canEdit}
+            />
+            <ScopeOption
+              active={distributionIsApproval}
+              title="Request + Approval"
+              description={`${distributionChildLabel} must request LR stock. ${currentLevelLabel} approves or rejects each request.`}
+              onClick={() => selectDistributionMethod("APPROVAL")}
+              disabled={!canEdit}
+            />
+          </div>
+          <div className="mt-3 rounded-lg border border-dashed bg-slate-50/60 px-3 py-2.5 text-[12px] text-slate-600 space-y-1">
+            {!distributionIsApproval ? (
+              <>
+                <p><span className="font-semibold text-slate-800">{currentLevelLabel}:</span> Generate LR · Allocate LR · View inventory</p>
+                <p><span className="font-semibold text-slate-800">{distributionChildLabel}:</span> View assigned inventory · Consume LR for bookings only</p>
+                <p className="text-slate-400 mt-1">Request and approval workflow is hidden in this mode.</p>
+              </>
+            ) : (
+              <>
+                <p><span className="font-semibold text-slate-800">{currentLevelLabel}:</span> Generate LR · Approve or reject requests</p>
+                <p><span className="font-semibold text-slate-800">{distributionChildLabel}:</span> Request LR stock · View request status · Consume LR for bookings</p>
+                <p className="text-slate-400 mt-1">Direct allocation is disabled. Every {distributionChildLabel} starts with zero inventory until a request is approved.</p>
+              </>
+            )}
+          </div>
+        </SectionCard>
+      ) : null}
+
+      {/* Root behaviour when stock is insufficient (Company Root Only). Drives
+          the hierarchy request escalation flow: how the Company Root resolves a
+          (possibly escalated) request it cannot fully satisfy from stock. */}
+      {form.scopeType === "TENANT" ? (
+        <SectionCard step={4} title="When stock is insufficient (Company Root)">
+          <p className="mb-2 text-[12px] text-slate-500">
+            Applies when an approval reaches the Company Root and there is not enough available LR to fully satisfy it.
+            Lower levels with no stock escalate upstream automatically.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <ScopeOption
+              active={form.insufficientStockPolicy === "REJECT"}
+              title="Reject Request"
+              description="Do not generate. The request is rejected when stock runs out."
+              onClick={() => setForm((current) => ({ ...current, insufficientStockPolicy: "REJECT" }))}
+              disabled={!canEdit}
+            />
+            <ScopeOption
+              active={form.insufficientStockPolicy === "ASK"}
+              title="Ask Before Generating"
+              description="Prompt the approver to use available stock, generate new LR, or mix."
+              onClick={() => setForm((current) => ({ ...current, insufficientStockPolicy: "ASK" }))}
+              disabled={!canEdit}
+            />
+            <ScopeOption
+              active={form.insufficientStockPolicy === "AUTO_GENERATE"}
+              title="Auto Generate Missing LR (Recommended)"
+              description="Generate the shortfall, allocate the full quantity, and approve — no extra clicks."
+              onClick={() => setForm((current) => ({ ...current, insufficientStockPolicy: "AUTO_GENERATE" }))}
+              disabled={!canEdit}
+            />
+          </div>
+        </SectionCard>
+      ) : null}
+
       {/* Step 3 — Governance (only when distributed) */}
       {form.scopeType === "HIERARCHY" && managedChildRule ? (
         <SectionCard step={3} title={`Governance — ${currentLevelLabel} → ${childLevelLabel}`}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border bg-slate-50 px-3 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">{currentLevelLabel}</div>
-              <div className="flex flex-wrap gap-1.5">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">{currentLevelLabel}</div>
+              <div className="flex flex-wrap gap-1">
                 <ActionToggleButton label="Request" active={currentLevelOriginRule?.childCanRequestLr ?? false} disabled onClick={() => undefined} />
                 <ActionToggleButton label="Use" active={currentLevelOriginRule?.childCanConsumeLr ?? !currentGovernanceLevel} disabled onClick={() => undefined} />
                 <ActionToggleButton label="Generate" active={managedChildRule.parentCanGenerateLr} disabled={!canEdit} onClick={() => updateManagedChildRule(setForm, managedChildRule.childLevelId, { parentCanGenerateLr: !managedChildRule.parentCanGenerateLr })} />
@@ -413,43 +572,14 @@ export function TenantManualLRConfigPage() {
                 <ActionToggleButton label="Approve Requests" active={managedChildRule.canApproveChildRequests} disabled={!canEdit} onClick={() => updateManagedChildRule(setForm, managedChildRule.childLevelId, { canApproveChildRequests: !managedChildRule.canApproveChildRequests })} />
               </div>
             </div>
-            <div className="rounded-lg border bg-slate-50 px-3 py-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">{childLevelLabel}</div>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="rounded-lg border bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">{childLevelLabel}</div>
+              <div className="flex flex-wrap gap-1">
                 <ActionToggleButton label="Request" active={managedChildRule.childCanRequestLr} disabled={!canEdit} onClick={() => updateManagedChildRule(setForm, managedChildRule.childLevelId, { childCanRequestLr: !managedChildRule.childCanRequestLr })} />
                 <ActionToggleButton label="Use" active={managedChildRule.childCanConsumeLr} disabled={!canEdit} onClick={() => updateManagedChildRule(setForm, managedChildRule.childLevelId, { childCanConsumeLr: !managedChildRule.childCanConsumeLr, canConsumeParentLr: !managedChildRule.childCanConsumeLr })} />
                 <ActionToggleButton label="Manage Child" active={managedChildRule.canDelegateChildGovernance} disabled={!canEdit || !childCanConfigureNextLevel} onClick={() => updateManagedChildRule(setForm, managedChildRule.childLevelId, { canDelegateChildGovernance: !managedChildRule.canDelegateChildGovernance })} />
               </div>
             </div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Field label={`${currentLevelLabel} → ${childLevelLabel}`}>
-              <Select
-                value={resolveStandardFlowValue(managedChildRule)}
-                onChange={(event) =>
-                  applyStandardFlow(setForm, managedChildRule.childLevelId, event.target.value as "DIRECT_CONSUME" | "REQUEST_ALLOCATE" | "REQUEST_APPROVE_ALLOCATE")
-                }
-                disabled={!canEdit}
-              >
-                <option value="DIRECT_CONSUME">Generate → Use</option>
-                <option value="REQUEST_ALLOCATE">Request → Allocate → Use</option>
-                <option value="REQUEST_APPROVE_ALLOCATE">Request → Approve → Allocate → Use</option>
-              </Select>
-            </Field>
-            {childCanConfigureNextLevel ? (
-              <Field label={`${childLevelLabel} → ${childCanConfigureNextLevel.name}`}>
-                <Select
-                  value={managedChildRule.canDelegateChildGovernance ? "YES" : "NO"}
-                  onChange={(event) => updateManagedChildRule(setForm, managedChildRule.childLevelId, { canDelegateChildGovernance: event.target.value === "YES" })}
-                  disabled={!canEdit}
-                >
-                  <option value="NO">Use only</option>
-                  <option value="YES">Can configure</option>
-                </Select>
-              </Field>
-            ) : (
-              <div className="flex items-end pb-1 text-xs text-slate-400">{childLevelLabel} is the lowest level</div>
-            )}
           </div>
         </SectionCard>
       ) : null}
@@ -505,7 +635,7 @@ export function TenantManualLRConfigPage() {
             </div>
           ) : (
             <>
-              <div className={`hidden md:grid gap-2 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground mb-1 ${managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? "md:grid-cols-[1fr_140px_80px_140px]" : "md:grid-cols-[1fr_140px_80px_1fr]"}`}>
+              <div className={`hidden md:grid gap-2 px-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 mb-0.5 ${managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? "md:grid-cols-[1fr_140px_80px_140px]" : "md:grid-cols-[1fr_140px_80px_1fr]"}`}>
                 <div>Place</div>
                 <div>{managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? "Code" : "Prefix"}</div>
                 <div>Pad</div>
@@ -523,7 +653,7 @@ export function TenantManualLRConfigPage() {
                   return (
                     <div
                       key={orgUnit.id}
-                      className={`rounded-xl border bg-white p-3 grid gap-2 ${managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? "md:grid-cols-[1fr_140px_80px_140px]" : "md:grid-cols-[1fr_140px_80px_1fr]"} md:items-end`}
+                      className={`rounded-xl border bg-white px-3 py-2 grid gap-2 ${managedChildRule.formatMode === "FULL_CHILD_FORMAT" ? "md:grid-cols-[1fr_140px_80px_140px]" : "md:grid-cols-[1fr_140px_80px_1fr]"} md:items-center`}
                     >
                       <div className="text-sm font-semibold text-slate-950">{orgUnit.name}</div>
                       <Field label={managedChildRule.formatMode === "PARENT_PREFIX_CHILD_SUFFIX" ? "Code" : "Prefix"}>
@@ -564,11 +694,12 @@ export function TenantManualLRConfigPage() {
                 })}
               </div>
               {finalPreviewRows.length > 1 ? (
-                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                <div className="mt-3 flex flex-wrap gap-2">
                   {finalPreviewRows.map((row) => (
-                    <div key={row.label} className="rounded-xl border bg-slate-50/70 px-3 py-2">
-                      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{row.label}</div>
-                      <div className="mt-1 font-mono text-sm font-semibold text-slate-950">{row.preview}</div>
+                    <div key={row.label} className="flex items-center gap-2 rounded-lg border bg-slate-50 px-2.5 py-1.5">
+                      <span className="text-[11px] text-slate-500">{row.label}</span>
+                      <span className="h-3 w-px bg-slate-200" />
+                      <span className="font-mono text-xs font-semibold text-slate-900">{row.preview}</span>
                     </div>
                   ))}
                 </div>
@@ -586,11 +717,12 @@ function buildFormState(config: ReturnType<typeof getManualConfigShape>): Manual
     scopeType: config?.scopeType === "HIERARCHY" ? "HIERARCHY" : "TENANT",
     ownershipLevelId: config?.ownershipLevelId ?? "",
     prefix: config?.prefix ?? "LR",
-    yearFormat: config?.yearFormat ?? "YYYY",
+    yearFormat: "NONE",
     numberSeparator: config?.numberSeparator ?? "-",
     zeroPaddingLength: config?.zeroPaddingLength ?? 6,
     distributionStrategy: config?.distributionStrategy ?? "DISTRIBUTED",
     workflowMode: config?.workflowMode ?? "APPROVAL_BASED",
+    insufficientStockPolicy: config?.insufficientStockPolicy ?? "AUTO_GENERATE",
     numberingPolicy: config?.numberingPolicy ?? "STRICT_FORMAT",
     customerLrPolicy: config?.customerLrPolicy ?? "NOT_CUSTOMER_SPECIFIC",
     allowCustomerFallback: config?.allowCustomerFallback ?? true,
@@ -618,7 +750,7 @@ function buildFormState(config: ReturnType<typeof getManualConfigShape>): Manual
     placeFormatOverrides: (config?.placeFormatOverrides ?? []).map((override) => ({
       orgUnitId: override.orgUnitId,
       prefix: override.prefix,
-      yearFormat: override.yearFormat ?? "YYYY",
+      yearFormat: "NONE",
       numberSeparator: override.numberSeparator ?? "-",
       zeroPaddingLength: override.zeroPaddingLength ?? 6,
       numberingPolicy: override.numberingPolicy ?? "STRICT_FORMAT",
@@ -648,20 +780,27 @@ function ActionToggleButton({ label, active, disabled, onClick }: { label: strin
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-full border px-3 py-1.5 text-xs transition ${active ? "border-sky-300 bg-sky-100 text-sky-900" : "border-slate-200 bg-slate-50 text-slate-600"}`}
+      className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition ${active ? "border-sky-400 bg-sky-50 text-sky-900" : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"}`}
     >
+      <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${active ? "border-sky-500 bg-sky-500" : "border-slate-300 bg-white"}`}>
+        {active ? (
+          <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+            <path d="M1.5 4L3.2 5.8L6.5 2.2" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : null}
+      </span>
       {label}
     </button>
   );
 }
 
-function FormatStrategyCard({ title, description, example, checked, disabled, onChange }: { title: string; description: string; example: string; checked: boolean; disabled: boolean; onChange: () => void }) {
+function FormatStrategyCard({ title, example, checked, disabled, onChange }: { title: string; description: string; example: string; checked: boolean; disabled: boolean; onChange: () => void }) {
   return (
-    <label className={`cursor-pointer rounded-xl border px-3 py-3 ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-      <div className="text-sm font-semibold text-slate-950">{title}</div>
-      <div className="mt-2 rounded-lg border bg-white/80 px-2.5 py-1.5 font-mono text-[11px] text-slate-900">{example}</div>
-      <div className="mt-2">
-        <input type="radio" checked={checked} onChange={onChange} disabled={disabled} />
+    <label className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 ${checked ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+      <input type="radio" checked={checked} onChange={onChange} disabled={disabled} className="shrink-0" />
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-slate-800">{title}</div>
+        <div className="mt-1 font-mono text-[11px] text-slate-500">{example}</div>
       </div>
     </label>
   );
@@ -670,7 +809,7 @@ function FormatStrategyCard({ title, description, example, checked, disabled, on
 function SectionCard({ step, title, children }: { step: number; title: string; children: ReactNode }) {
   return (
     <div className="rounded-xl border bg-white p-4">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">{step}</span>
         <span className="text-sm font-semibold text-slate-900">{title}</span>
       </div>

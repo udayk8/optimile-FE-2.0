@@ -94,6 +94,12 @@ export function TenantManualLrOperationsPage() {
   const [reservedDestinationId, setReservedDestinationId] = useState("");
   const [reservedStartPoolId, setReservedStartPoolId] = useState("");
   const [reservedEndPoolId, setReservedEndPoolId] = useState("");
+  // Pagination for the LR Inventory / Number List. The pool list can run into
+  // hundreds/thousands of rows once a Company Root generates master stock, so
+  // the table is paged client-side. Same control style as the customer address
+  // / booking lists.
+  const INVENTORY_PAGE_SIZE = 25;
+  const [inventoryPage, setInventoryPage] = useState(1);
 
   const ownershipLevelName =
     activeConfig?.ownershipLevelId
@@ -111,6 +117,14 @@ export function TenantManualLrOperationsPage() {
     [activeConfig?.ownershipLevelId, orgUnits],
   );
   const managedDestinationOrgUnits = useMemo(() => {
+    // Company Root Only (scopeType TENANT) has no ownership level, so there is
+    // no fixed "managed level". Company Root allocates directly to any lower
+    // place. Top business places (e.g. a Region) can legitimately have no
+    // parent, so every place is a valid destination; the allocation UI already
+    // excludes the active place.
+    if (activeConfig?.scopeType === "TENANT") {
+      return orgUnits.filter((unit) => unit.id !== activeOrgUnit?.id);
+    }
     if (!managedLevelId) {
       return ownershipOrgUnits;
     }
@@ -120,7 +134,7 @@ export function TenantManualLrOperationsPage() {
     return orgUnits.filter(
       (unit) => unit.hierarchyLevelId === managedLevelId && unit.parentOrgUnitId === activeOrgUnit.id,
     );
-  }, [activeOrgUnit, managedLevelId, orgUnits, ownershipOrgUnits]);
+  }, [activeConfig?.scopeType, activeOrgUnit, managedLevelId, orgUnits, ownershipOrgUnits]);
   // Pre-generated / Customer LR place governance (isolated — does NOT affect the
   // Manual allocation/transfer dropdowns, which keep using managedDestinationOrgUnits).
   // Scope = the user's active place + ALL its child places (descendants). Never a
@@ -152,8 +166,17 @@ export function TenantManualLrOperationsPage() {
       .sort((left, right) => left.name.localeCompare(right.name))
       .map((unit) => ({ id: unit.id, name: unit.name }));
   }, [activeOrgUnit, orgUnits]);
+  // Company Root Only (scopeType TENANT): expose Generate + Consumption so the
+  // Company Root can create master stock and lower levels can see booking usage.
+  // Every workflow-sensitive tab is still gated by canRunWorkflowAction, which
+  // resolves per Distribution Method (Direct Allocation vs Request + Approval).
+  // Other scope types keep their existing hierarchy tab set untouched.
+  const companyRootOnlyMode = activeConfig?.scopeType === "TENANT";
+  const allowedTabKeys = companyRootOnlyMode
+    ? ["inventory", "upload", "reserved", "allocation", "requests", "consumption"]
+    : ["inventory", "reserved", "allocation", "requests", "transfer"];
   const visibleTabs = manualLrTabDefinitions.filter((tab) => {
-    if (!["inventory", "reserved", "allocation", "requests", "transfer"].includes(tab.key)) {
+    if (!allowedTabKeys.includes(tab.key)) {
       return false;
     }
     if (tab.key === "allocation") {
@@ -162,23 +185,49 @@ export function TenantManualLrOperationsPage() {
     if (tab.key === "transfer") {
       return canRunWorkflowAction("TRANSFER_LR");
     }
+    if (tab.key === "requests") {
+      // Show if the user can submit requests OR approve/process them
+      return canRunWorkflowAction("REQUEST_LR") || canRunWorkflowAction("APPROVE_LR");
+    }
     if (!tab.action) {
       return access.canViewPage("LR_DASHBOARD");
     }
     return canRunWorkflowAction(tab.action);
   });
-  const canSubmitRequest = Boolean(assignedLevel && currentLevelGovernanceRule?.childCanRequestLr);
+  const canSubmitRequest = canRunWorkflowAction("REQUEST_LR");
   const canProcessRequests = Boolean(
     canRunWorkflowAction("ALLOCATE_LR") || canRunWorkflowAction("APPROVE_LR"),
   );
   const canActOnRequest = (request: TenantLrAllocationRequestRecord) => {
-    if (!canProcessRequests || request.status !== "PENDING") {
+    // PENDING (a direct request) and AWAITING_PARENT_APPROVAL (an escalated
+    // child request now sitting with this parent) are both actionable.
+    const actionableStatus = request.status === "PENDING" || request.status === "AWAITING_PARENT_APPROVAL";
+    if (!canProcessRequests || !actionableStatus) {
       return false;
     }
     if (!activeOrgUnit) {
       return !request.targetOrgUnitId;
     }
     return request.targetOrgUnitId === activeOrgUnit.id;
+  };
+  // Approver-side stock + hierarchy helpers for the escalation flow. The
+  // approver place is the request's target (where the current user is acting).
+  const isRootApprover = (request: TenantLrAllocationRequestRecord) => {
+    if (!request.targetOrgUnitId) return true; // tenant / company level
+    return !orgUnitMap.get(request.targetOrgUnitId)?.parentOrgUnitId;
+  };
+  const approverAvailableFor = (request: TenantLrAllocationRequestRecord) => {
+    const approverPlaceId = request.targetOrgUnitId ?? null;
+    return allManualPools.filter((pool) => {
+      const holder = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+      if (holder !== approverPlaceId) return false;
+      if (!["AVAILABLE", "ALLOCATED"].includes(pool.status)) return false;
+      const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+      if (request.customerId) {
+        return poolType === "CUSTOMER_RESERVED" && pool.customerId === request.customerId;
+      }
+      return poolType === "GENERAL" && !pool.customerId;
+    }).length;
   };
   const selectedTab = visibleTabs.find((tab) => tab.key === activeTab) ?? visibleTabs[0] ?? null;
   const requiresExplicitPlace = availableActiveOrgUnits.length > 1 && !session.activeTenantOrgUnitId;
@@ -211,11 +260,19 @@ export function TenantManualLrOperationsPage() {
   const scopedManualPools = useMemo(
     () => {
       const result = store.lrPools.filter(
-        (pool) =>
-          pool.configId === activeConfig?.id &&
-          (!visibleOwnershipOrgUnitIds.length ||
-            pool.ownerLevelId == null ||
-            visibleOwnershipOrgUnitIds.includes(pool.ownerLevelId)),
+        (pool) => {
+          if (pool.configId !== activeConfig?.id) return false;
+          // Visibility follows the CURRENT HOLDER, not the generator. A parent
+          // still sees the stock it pushed to children (holder is a descendant,
+          // which is inside visibleOwnershipOrgUnitIds); a child sees only its
+          // own held stock. Holder falls back to owner for un-allocated pools.
+          const holder = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId;
+          return (
+            !visibleOwnershipOrgUnitIds.length ||
+            holder == null ||
+            visibleOwnershipOrgUnitIds.includes(holder)
+          );
+        },
       );
       if (!result.length && store.lrPools.length > 0) {
         // eslint-disable-next-line no-console
@@ -322,6 +379,17 @@ export function TenantManualLrOperationsPage() {
       .toLowerCase()
       .includes(query);
   });
+  // Reset to the first page whenever the inventory filters, search, or scope
+  // view change so the user never lands on an out-of-range empty page.
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [search, inventoryPoolTypeFilter, inventoryCustomerFilter, inventoryPlaceFilter, inventoryStatusFilter, inventoryView, activeOrgUnit?.id]);
+  const inventoryTotalPages = Math.max(1, Math.ceil(filteredPools.length / INVENTORY_PAGE_SIZE));
+  const inventoryPageIndex = Math.min(inventoryPage, inventoryTotalPages);
+  const pagedInventoryPools = filteredPools.slice(
+    (inventoryPageIndex - 1) * INVENTORY_PAGE_SIZE,
+    inventoryPageIndex * INVENTORY_PAGE_SIZE,
+  );
   const relevantRequests = store.lrRequests.filter(
     (request) =>
       request.configId === activeConfig?.id &&
@@ -329,6 +397,60 @@ export function TenantManualLrOperationsPage() {
         request.sourceOrgUnitId === activeOrgUnit.id ||
         request.targetOrgUnitId === activeOrgUnit.id),
   );
+  // Hierarchy-aware inventory counts for the current viewer, driven purely by
+  // the CURRENT HOLDER (currentPlaceId) + status — so a child consuming never
+  // changes a parent's numbers. "Me" = the active place (or the tenant/company
+  // level when no active place). "Children" = every place below me.
+  const inventorySummary = useMemo(() => {
+    const myId = activeOrgUnit?.id ?? null;
+    const descendants = new Set<string>();
+    if (activeOrgUnit) {
+      const childrenOf = new Map<string, OrgUnit[]>();
+      orgUnits.forEach((unit) => {
+        if (!unit.parentOrgUnitId) return;
+        const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+        list.push(unit);
+        childrenOf.set(unit.parentOrgUnitId, list);
+      });
+      const queue = [...(childrenOf.get(activeOrgUnit.id) ?? [])];
+      while (queue.length) {
+        const unit = queue.shift();
+        if (!unit || descendants.has(unit.id)) continue;
+        descendants.add(unit.id);
+        (childrenOf.get(unit.id) ?? []).forEach((child) => queue.push(child));
+      }
+    }
+    let availableWithMe = 0;
+    let reservedWithMe = 0;
+    let consumedMine = 0;
+    let allocatedToChildren = 0;
+    scopedManualPools.forEach((pool) => {
+      const holder = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+      const isMine = holder === myId;
+      const isChild = myId === null ? holder !== null : descendants.has(holder ?? "");
+      const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+      if (isMine) {
+        if (pool.status === "USED") consumedMine += 1;
+        else if (["AVAILABLE", "ALLOCATED"].includes(pool.status)) {
+          if (poolType === "CUSTOMER_RESERVED") reservedWithMe += 1;
+          else availableWithMe += 1;
+        }
+      } else if (isChild) {
+        allocatedToChildren += 1;
+      }
+    });
+    const pendingApproval = relevantRequests
+      .filter((request) => request.status === "PENDING" && (!myId || request.sourceOrgUnitId === myId))
+      .reduce((sum, request) => sum + (request.requestedCount ?? 0), 0);
+    return {
+      total: scopedManualPools.length,
+      availableWithMe,
+      reservedWithMe,
+      consumedMine,
+      allocatedToChildren,
+      pendingApproval,
+    };
+  }, [activeOrgUnit, orgUnits, scopedManualPools, relevantRequests]);
   // Hierarchy context for the current view — parent unit + immediate
   // children of the active place. Used by the context strip and the
   // parent-side allocation summary so users can see where they sit in
@@ -445,12 +567,348 @@ export function TenantManualLrOperationsPage() {
   const manualConfig = activeConfig;
   const activePlaceFormat = resolveManualLrFormatForOrgUnit(manualConfig, activeOrgUnit?.id ?? null, orgUnits);
 
+  // Simple mode: Company Root only tenant with no hierarchy levels configured.
+  // All hierarchy-based features (allocation, requests, transfer, place selectors)
+  // are hidden and a streamlined Dashboard / Generate / Customer LR / Inventory
+  // layout is rendered instead. Existing multi-level tenants are unaffected.
+  // Simple mode activates when no hierarchy levels exist — regardless of LR type.
+  // Allocation, Requests and Transfer tabs are hidden because there are no child
+  // levels to allocate to, request from, or transfer between.
+  const isSimpleMode = hierarchyLevels.length === 0;
+  const rootFormat = resolveManualLrFormat(manualConfig);
+  const simpleAllPools = allManualPools;
+  const simpleAvailablePools = simpleAllPools.filter((pool) => ["AVAILABLE", "ALLOCATED"].includes(pool.status));
+  const simpleConsumedPools = simpleAllPools.filter((pool) => pool.status === "USED");
+  const simpleGeneralPools = simpleAllPools
+    .filter((pool) => ["AVAILABLE", "ALLOCATED"].includes(pool.status) && !pool.customerId)
+    .sort((a, b) => a.lrNumber.localeCompare(b.lrNumber));
+  const simpleReservedStartIndex = simpleGeneralPools.findIndex((pool) => pool.id === reservedStartPoolId);
+  const simpleReservedEndIndex = simpleGeneralPools.findIndex((pool) => pool.id === reservedEndPoolId);
+  const simpleReservedCount =
+    simpleReservedStartIndex >= 0 && simpleReservedEndIndex >= simpleReservedStartIndex
+      ? simpleReservedEndIndex - simpleReservedStartIndex + 1
+      : 0;
+
+  async function handleSimpleGenerate() {
+    const start = Number(rangeStart);
+    const end = Number(rangeEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || start < 1) {
+      setMessage("Enter a valid start and end number."); return;
+    }
+    if (selectedPoolType === "CUSTOMER_RESERVED" && !selectedCustomerId) {
+      setMessage("Select a customer for customer reserved LR."); return;
+    }
+    const existing = new Set(store.lrPools.map((p) => p.lrNumber.toUpperCase()));
+    let dupes = 0;
+    const validRows: string[] = [];
+    Array.from({ length: end - start + 1 }, (_, i) => buildManualLrNumber(rootFormat, start + i)).forEach((lr) => {
+      if (existing.has(lr.toUpperCase())) { dupes++; } else { validRows.push(lr); }
+    });
+    if (!validRows.length) { setMessage(`All ${end - start + 1} numbers already exist.`); return; }
+    const now = new Date().toISOString();
+    const actor = currentUser?.name ?? currentRole?.name ?? "Tenant User";
+    const records: TenantLrPoolRecord[] = validRows.map((lrNumber, i) => ({
+      id: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+      lrNumberId: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+      tenantId: tenant.id, configId: manualConfig.id, lrNumber,
+      poolType: selectedPoolType, status: "AVAILABLE",
+      customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
+      vendorId: null, ownerPlaceId: null, currentPlaceId: null, ownerLevelId: null,
+      ownerUserId: currentUser?.id ?? null, bookingId: null, deliveryId: null,
+      usedAt: null, voidReason: null, createdBy: actor,
+      auditEvents: [{ id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`, action: "CREATED",
+        poolType: selectedPoolType, customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
+        fromPlaceId: null, toPlaceId: null, actor, role: currentRole?.name ?? actor, timestamp: now, note: "Generated" }],
+      createdAt: now, updatedAt: now,
+    }));
+    await lrManagement.upsertPools(records);
+    setMessage(`Generated ${records.length} LR numbers.${dupes ? ` ${dupes} duplicates skipped.` : ""}`);
+  }
+
+  async function handleSimpleCustomerLr() {
+    if (!reservedCustomerId) { setMessage("Select a customer."); return; }
+    if (simpleReservedStartIndex < 0 || simpleReservedEndIndex < simpleReservedStartIndex) {
+      setMessage("Select valid Start LR and End LR from the available general pool."); return;
+    }
+    const selected = simpleGeneralPools.slice(simpleReservedStartIndex, simpleReservedEndIndex + 1);
+    let seq = getNextManualLrSequence(store.lrPools.filter((p) => p.configId === manualConfig.id)) + 1;
+    const now = new Date().toISOString();
+    const actor = currentUser?.name ?? currentRole?.name ?? "Tenant User";
+    const records: TenantLrPoolRecord[] = selected.map((pool) => ({
+      ...pool, lrNumber: buildManualLrNumber(rootFormat, seq++),
+      poolType: "CUSTOMER_RESERVED", customerId: reservedCustomerId,
+      ownerPlaceId: null, currentPlaceId: null, ownerLevelId: null, updatedAt: now,
+      auditEvents: [...(pool.auditEvents ?? []), {
+        id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`, action: "CUSTOMER_RESERVED_ALLOCATED",
+        poolType: "CUSTOMER_RESERVED", customerId: reservedCustomerId,
+        fromPlaceId: null, toPlaceId: null, actor, role: currentRole?.name ?? actor, timestamp: now, note: "Customer LR",
+      }],
+    }));
+    if (!records.length) { setMessage("No general LR available to convert."); return; }
+    await lrManagement.upsertPools(records);
+    setMessage(`Reserved ${records.length} LR numbers for ${store.customerMap.get(reservedCustomerId)?.name ?? "customer"}.`);
+  }
+
+  async function handleSimpleVoid() {
+    const pool = simpleAllPools.find((p) => p.id === voidPoolId);
+    if (!pool) { setMessage("Select an LR number."); return; }
+    if (!voidReason.trim()) { setMessage("Reason is required."); return; }
+    const actor = currentUser?.name ?? currentRole?.name ?? "Tenant User";
+    await lrManagement.upsertPools([{
+      ...pool, status: voidStatus, voidReason,
+      auditEvents: [...(pool.auditEvents ?? []), {
+        id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`, action: voidStatus,
+        poolType: pool.poolType ?? "GENERAL", customerId: pool.customerId ?? null,
+        fromPlaceId: null, toPlaceId: null, actor, role: currentRole?.name ?? actor,
+        timestamp: new Date().toISOString(), note: voidReason,
+      }], updatedAt: new Date().toISOString(),
+    }]);
+    setMessage(`LR ${pool.lrNumber} marked as ${voidStatus}.`);
+  }
+
+  if (isSimpleMode) {
+    const simpleTabs = ["Dashboard", "Generate LR", "Customer LR", "LR Inventory", "Void / Lost / Damaged", "Audit"];
+    const simpleActiveTab = simpleTabs.find((t) => t === activeTab) ?? simpleTabs[0];
+    const simpleQuantity = Math.max(0, Number(rangeEnd) - Number(rangeStart) + 1);
+    const simpleFilteredPools = simpleAllPools.filter((pool) => {
+      if (inventoryStatusFilter !== "ALL" && pool.status !== inventoryStatusFilter) return false;
+      const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+      if (inventoryPoolTypeFilter !== "ALL" && poolType !== inventoryPoolTypeFilter) return false;
+      if (inventoryCustomerFilter !== "ALL" && (pool.customerId ?? "") !== inventoryCustomerFilter) return false;
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return [pool.lrNumber, poolType, pool.customerId ?? "", pool.status, pool.bookingId ?? ""].join(" ").toLowerCase().includes(q);
+    });
+    const simpleTotalPages = Math.max(1, Math.ceil(simpleFilteredPools.length / INVENTORY_PAGE_SIZE));
+    const simplePageIndex = Math.min(inventoryPage, simpleTotalPages);
+    const pagedSimplePools = simpleFilteredPools.slice(
+      (simplePageIndex - 1) * INVENTORY_PAGE_SIZE,
+      simplePageIndex * INVENTORY_PAGE_SIZE,
+    );
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-[14px] font-semibold text-slate-900">Manual LR</h1>
+        </div>
+
+        {message ? (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{message}</div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-[12px] shadow-sm">
+          <LrStat label="Total LR" value={String(simpleAllPools.length)} />
+          <LrStat label="Available" value={String(simpleAvailablePools.length)} tone="green" />
+          <LrStat label="Consumed" value={String(simpleConsumedPools.length)} tone="slate" />
+        </div>
+
+        <Tabs tabs={simpleTabs} active={simpleActiveTab} onChange={setActiveTab} />
+
+        {simpleActiveTab === "Dashboard" ? (
+          <TenantPanel title="Manual LR Dashboard" description="">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <TenantSummaryCard label="Total LR" value={String(simpleAllPools.length)} />
+              <TenantSummaryCard label="Available" value={String(simpleAvailablePools.length)} />
+              <TenantSummaryCard label="Consumed" value={String(simpleConsumedPools.length)} />
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <TenantSummaryCard label="Void" value={String(simpleAllPools.filter((p) => p.status === "VOID").length)} />
+              <TenantSummaryCard label="Lost" value={String(simpleAllPools.filter((p) => p.status === "LOST").length)} />
+              <TenantSummaryCard label="Damaged" value={String(simpleAllPools.filter((p) => p.status === "DAMAGED").length)} />
+            </div>
+            <div className="mt-4">
+              <RecentAuditPanel items={recentAudit.slice(0, 6)} />
+            </div>
+          </TenantPanel>
+        ) : null}
+
+        {simpleActiveTab === "Generate LR" ? (
+          <TenantPanel title="Generate LR" description="">
+            <div className="rounded-lg border bg-slate-50 px-3 py-2 text-[12px] text-slate-600 mb-4">
+              Format: <span className="font-mono font-semibold text-slate-900">{buildManualLrPreview(rootFormat)}</span>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-4">
+              <SimpleField label="Start Number">
+                <Input type="number" min={1} value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
+              </SimpleField>
+              <SimpleField label="End Number">
+                <Input type="number" min={1} value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
+              </SimpleField>
+              <SimpleField label="Quantity">
+                <Input value={simpleQuantity > 0 ? String(simpleQuantity) : "—"} disabled />
+              </SimpleField>
+              <SimpleField label="Pool Type">
+                <Select value={selectedPoolType} onChange={(e) => setSelectedPoolType(e.target.value as TenantLrPoolType)}>
+                  <option value="GENERAL">General</option>
+                  <option value="CUSTOMER_RESERVED">Customer Reserved</option>
+                </Select>
+              </SimpleField>
+            </div>
+            {selectedPoolType === "CUSTOMER_RESERVED" ? (
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <SimpleField label="Customer">
+                  <Select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)}>
+                    <option value="">Select customer</option>
+                    {store.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </Select>
+                </SimpleField>
+              </div>
+            ) : null}
+            <div className="mt-4">
+              <Button onClick={handleSimpleGenerate} disabled={!canRunWorkflowAction("UPLOAD_LR")}>Generate</Button>
+            </div>
+          </TenantPanel>
+        ) : null}
+
+        {simpleActiveTab === "Customer LR" ? (
+          <TenantPanel title="Customer LR" description="Reserve a range from the general LR pool for a specific customer.">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <SimpleField label="Customer">
+                <Select value={reservedCustomerId} onChange={(e) => setReservedCustomerId(e.target.value)}>
+                  <option value="">Select customer</option>
+                  {store.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+              </SimpleField>
+              <SimpleField label="Start LR">
+                <Select value={reservedStartPoolId} onChange={(e) => { setReservedStartPoolId(e.target.value); }}>
+                  <option value="">Select start LR</option>
+                  {simpleGeneralPools.map((p) => <option key={p.id} value={p.id}>{p.lrNumber}</option>)}
+                </Select>
+              </SimpleField>
+              <SimpleField label="End LR">
+                <Select value={reservedEndPoolId} onChange={(e) => setReservedEndPoolId(e.target.value)}>
+                  <option value="">Select end LR</option>
+                  {simpleGeneralPools.map((p) => <option key={p.id} value={p.id}>{p.lrNumber}</option>)}
+                </Select>
+              </SimpleField>
+              <SimpleField label="Quantity">
+                <Input value={simpleReservedCount > 0 ? String(simpleReservedCount) : "—"} disabled />
+              </SimpleField>
+            </div>
+            <div className="mt-4">
+              <Button onClick={handleSimpleCustomerLr} disabled={!canRunWorkflowAction("UPLOAD_LR")}>Generate Customer LR</Button>
+            </div>
+          </TenantPanel>
+        ) : null}
+
+        {simpleActiveTab === "LR Inventory" ? (
+          <TenantPanel title="LR Inventory" description="">
+            <TenantFilterBar
+              searchValue={search}
+              searchPlaceholder="Search LR number, status, booking…"
+              onSearchChange={setSearch}
+              trailing={
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <Select value={inventoryPoolTypeFilter} onChange={(e) => setInventoryPoolTypeFilter(e.target.value as "ALL" | TenantLrPoolType)}>
+                    <option value="ALL">All types</option>
+                    <option value="GENERAL">General</option>
+                    <option value="CUSTOMER_RESERVED">Customer Reserved</option>
+                  </Select>
+                  <Select value={inventoryCustomerFilter} onChange={(e) => setInventoryCustomerFilter(e.target.value)}>
+                    <option value="ALL">All customers</option>
+                    {store.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </Select>
+                  <Select value={inventoryStatusFilter} onChange={(e) => setInventoryStatusFilter(e.target.value)}>
+                    <option value="ALL">All statuses</option>
+                    {["AVAILABLE", "USED", "VOID", "LOST", "DAMAGED"].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </Select>
+                  <span className="text-xs text-slate-500">{simpleFilteredPools.length} records</span>
+                </div>
+              }
+            />
+            <div className="mt-3 overflow-x-auto rounded-xl border">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    {["LR Number", "Type", "Customer", "Status", "Booking", "Created Date"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-600">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {pagedSimplePools.map((pool) => {
+                    const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+                    return (
+                      <tr key={pool.id}>
+                        <td className="px-4 py-2.5 font-mono text-xs">{pool.lrNumber}</td>
+                        <td className="px-4 py-2.5 text-xs">{poolType === "CUSTOMER_RESERVED" ? "Customer" : "General"}</td>
+                        <td className="px-4 py-2.5 text-xs">{store.customerMap.get(pool.customerId ?? "")?.name ?? "—"}</td>
+                        <td className="px-4 py-2.5">
+                          <Badge variant={getManualLrStatusTone(getManualLrUiStatus(pool)) as never}>{getManualLrUiStatus(pool)}</Badge>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{pool.bookingId ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">{new Date(pool.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    );
+                  })}
+                  {!simpleFilteredPools.length ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No LR inventory found.</td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
+              {simpleTotalPages > 1 ? (
+                <div className="flex items-center justify-between gap-3 border-t px-4 py-2.5 text-[12px] text-slate-600">
+                  <span>Page {simplePageIndex} of {simpleTotalPages} · {simpleFilteredPools.length} LR</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" disabled={simplePageIndex <= 1} onClick={() => setInventoryPage((current) => Math.max(1, current - 1))}>
+                      Previous
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={simplePageIndex >= simpleTotalPages} onClick={() => setInventoryPage((current) => Math.min(simpleTotalPages, current + 1))}>
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </TenantPanel>
+        ) : null}
+
+        {simpleActiveTab === "Void / Lost / Damaged" ? (
+          <ActionCard title="Void / Lost / Damaged" description="Remove unused LR numbers from available inventory." icon={<AlertTriangle className="size-4" />}>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <SimpleField label="LR Number">
+                <Select value={voidPoolId} onChange={(e) => setVoidPoolId(e.target.value)}>
+                  <option value="">Select LR number</option>
+                  {simpleAvailablePools.map((p) => <option key={p.id} value={p.id}>{p.lrNumber}</option>)}
+                </Select>
+              </SimpleField>
+              <SimpleField label="Status">
+                <Select value={voidStatus} onChange={(e) => setVoidStatus(e.target.value as typeof voidStatus)}>
+                  <option value="VOID">Void</option>
+                  <option value="LOST">Lost</option>
+                  <option value="DAMAGED">Damaged</option>
+                </Select>
+              </SimpleField>
+              <SimpleField label="Reason">
+                <Input value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
+              </SimpleField>
+            </div>
+            <div className="mt-4">
+              <Button onClick={handleSimpleVoid} disabled={!canRunWorkflowAction("VOID_LR")}>Update LR Status</Button>
+            </div>
+          </ActionCard>
+        ) : null}
+
+        {simpleActiveTab === "Audit" ? (
+          <TenantPanel title="Audit Trail" description="">
+            <RecentAuditPanel items={recentAudit} full />
+          </TenantPanel>
+        ) : null}
+      </div>
+    );
+  }
+
   async function handleUpload() {
     if (!canRunWorkflowAction("UPLOAD_LR")) {
       setMessage("You do not have permission to perform this LR action.");
       return;
     }
-    if (requiresExplicitPlace || !activeOrgUnit) {
+    // Company Root Only: the Company Root admin has no assigned place, so it
+    // generates into the tenant-level master pool (ownerLevelId = null). Other
+    // modes still require an explicit active place.
+    if (!companyRootOnlyMode && (requiresExplicitPlace || !activeOrgUnit)) {
       setMessage("Select the active place before uploading LR inventory.");
       return;
     }
@@ -529,9 +987,9 @@ export function TenantManualLrOperationsPage() {
       status: "AVAILABLE",
       customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
       vendorId: null,
-      ownerPlaceId: activeOrgUnit.id,
-      currentPlaceId: activeOrgUnit.id,
-      ownerLevelId: activeOrgUnit.id,
+      ownerPlaceId: activeOrgUnit?.id ?? null,
+      currentPlaceId: activeOrgUnit?.id ?? null,
+      ownerLevelId: activeOrgUnit?.id ?? null,
       ownerUserId: currentUser?.id ?? null,
       bookingId: null,
       deliveryId: null,
@@ -544,7 +1002,7 @@ export function TenantManualLrOperationsPage() {
         poolType: selectedPoolType,
         customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
         fromPlaceId: null,
-        toPlaceId: activeOrgUnit.id,
+        toPlaceId: activeOrgUnit?.id ?? null,
         actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
         role: currentRole?.name ?? "Tenant User",
         timestamp: now,
@@ -597,31 +1055,47 @@ export function TenantManualLrOperationsPage() {
     );
     let destinationSequence = getNextManualLrSequence(destinationExisting) + 1;
     await lrManagement.upsertPools(
-      selected.map((pool) => ({
-        ...pool,
-        lrNumber: buildManualLrNumber(destinationFormat, destinationSequence++),
-        poolType: allocationPoolType,
-        customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
-        ownerPlaceId: allocationDestinationId,
-        currentPlaceId: allocationDestinationId,
-        ownerLevelId: allocationDestinationId,
-        auditEvents: [
-          ...(pool.auditEvents ?? []),
-          {
-            id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
-            action: "ALLOCATED",
+      selected.map((pool) => {
+        const fromPlaceId = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+        const auditEvent = {
+          id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
+          action: "ALLOCATED" as const,
+          poolType: allocationPoolType,
+          customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
+          fromPlaceId,
+          toPlaceId: allocationDestinationId,
+          actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
+          role: currentRole?.name ?? "Tenant User",
+          timestamp: new Date().toISOString(),
+          note: "Manual allocation",
+        };
+        // Company Root Only inventory model: allocation MOVES the holder only.
+        // The Owner (Generated By) and the LR number stay with the original
+        // generator, so parent counts (Generated / Allocated To Children) are
+        // never deducted when a child consumes — only currentPlaceId changes.
+        if (companyRootOnlyMode) {
+          return {
+            ...pool,
             poolType: allocationPoolType,
             customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
-            fromPlaceId: pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-            toPlaceId: allocationDestinationId,
-            actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
-            role: currentRole?.name ?? "Tenant User",
-            timestamp: new Date().toISOString(),
-            note: "Manual allocation",
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      })),
+            currentPlaceId: allocationDestinationId,
+            auditEvents: [...(pool.auditEvents ?? []), auditEvent],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        // Other scope types keep the existing re-own + re-number behaviour.
+        return {
+          ...pool,
+          lrNumber: buildManualLrNumber(destinationFormat, destinationSequence++),
+          poolType: allocationPoolType,
+          customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
+          ownerPlaceId: allocationDestinationId,
+          currentPlaceId: allocationDestinationId,
+          ownerLevelId: allocationDestinationId,
+          auditEvents: [...(pool.auditEvents ?? []), auditEvent],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
     );
     await lrManagement.appendAuditLog({
       actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
@@ -701,7 +1175,12 @@ export function TenantManualLrOperationsPage() {
       setMessage("Enter a valid requested quantity.");
       return;
     }
-    const parentUnit = orgUnitMap.get(activeOrgUnit.parentOrgUnitId ?? "");
+    // Requests route to the IMMEDIATE parent place. In per-level Company Root
+    // Only governance, each level requests from the level directly above it
+    // (Branch → Region → Company Root). A top business place with no parent
+    // routes to the tenant/company level (targetOrgUnitId = null), which the
+    // Company Root admin approves.
+    const parentUnit = orgUnitMap.get(activeOrgUnit.parentOrgUnitId ?? "") ?? null;
     await lrManagement.createRequest({
       tenantId: tenant.id,
       sourceLevelId: activeOrgUnit.hierarchyLevelId,
@@ -819,6 +1298,50 @@ export function TenantManualLrOperationsPage() {
       setMessage("LR request rejected.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Reject failed.");
+    }
+  }
+
+  const actorName = () => currentUser?.name ?? currentRole?.name ?? "Tenant User";
+
+  // Non-root approval: fulfil (part of) a request by moving the approver's own
+  // available stock down to the requester. Never generates.
+  async function handleApproveAvailable(requestId: string, count: number) {
+    try {
+      const updated = await lrManagement.allocateRequest(requestId, count, actorName(), "Approved from available stock.");
+      setMessage(
+        `Allocated ${updated.allocatedCount ?? updated.approvedCount} LR from available stock to ${orgUnitMap.get((updated.originOrgUnitId ?? updated.sourceOrgUnitId) ?? "")?.name ?? "requester"}.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Allocation failed.");
+    }
+  }
+
+  // Allocate everything the approver holds and raise a linked child request to
+  // the parent for the remaining quantity.
+  async function handleEscalateRequest(requestId: string) {
+    try {
+      const updated = await lrManagement.escalateRequest(requestId, actorName(), "Escalated remaining quantity to parent.");
+      const escalatedTo = orgUnitMap.get(updated.escalatedToOrgUnitId ?? "")?.name ?? "parent / company level";
+      setMessage(
+        `Allocated ${updated.allocatedCount ?? 0} from available stock and escalated ${updated.escalatedCount ?? 0} to ${escalatedTo}.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Escalation failed.");
+    }
+  }
+
+  // Root approval with an explicit available/generate split (or auto mix).
+  async function handleApproveWithSource(
+    requestId: string,
+    source: { useAvailableCount?: number; generateCount?: number },
+  ) {
+    try {
+      const updated = await lrManagement.approveRequestWithSource(requestId, source, actorName(), "Approved with source selection.");
+      setMessage(
+        `Approved ${updated.approvedCount} LR (allocated ${updated.allocatedCount ?? 0}, generated ${updated.generatedCount ?? 0}).`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Approval failed.");
     }
   }
 
@@ -1061,6 +1584,22 @@ export function TenantManualLrOperationsPage() {
                   </div>
                 }
               />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <InventoryStat
+                  label={activeOrgUnit && activeOrgUnit.parentOrgUnitId ? "Total Received" : "Total Generated"}
+                  value={inventorySummary.total}
+                  hint="Whole stock history in my scope"
+                />
+                <InventoryStat label="Available With Me" value={inventorySummary.availableWithMe} tone="green" hint="Stock I hold and can use" />
+                <InventoryStat label="Allocated To Children" value={inventorySummary.allocatedToChildren} tone="sky" hint="Stock now held by lower levels" />
+                <InventoryStat label="Consumed" value={inventorySummary.consumedMine} tone="slate" hint="Used on my bookings" />
+                <InventoryStat
+                  label={inventorySummary.reservedWithMe ? "Reserved" : "Pending Approval"}
+                  value={inventorySummary.reservedWithMe || inventorySummary.pendingApproval}
+                  tone="amber"
+                  hint={inventorySummary.reservedWithMe ? "Customer-reserved with me" : "Requested, awaiting approval"}
+                />
+              </div>
               {isCompanyRoot ? (
                 <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
                   <span className="font-medium">Company Root LR Inventory</span> — {activeOrgUnit?.name}. LR is generated and consumed directly at Company Root; no child request/approval is required.
@@ -1094,8 +1633,8 @@ export function TenantManualLrOperationsPage() {
                         "LR Number",
                         "Pool Type",
                         "Customer",
-                        "Owning Place",
-                        "Current Place",
+                        "Owner (Generated By)",
+                        "Current Holder",
                         "Status",
                         "Booking ID",
                         "Approved From",
@@ -1108,7 +1647,7 @@ export function TenantManualLrOperationsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredPools.map((pool) => {
+                    {pagedInventoryPools.map((pool) => {
                       const approval = getPoolApprovalContext(pool);
                       const owningPlaceName = orgUnitMap.get(pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool";
                       const currentPlaceName = orgUnitMap.get(pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool";
@@ -1150,8 +1689,77 @@ export function TenantManualLrOperationsPage() {
                     ) : null}
                   </tbody>
                 </table>
+                {inventoryTotalPages > 1 ? (
+                  <div className="flex items-center justify-between gap-3 border-t px-4 py-2.5 text-[12px] text-slate-600">
+                    <span>Page {inventoryPageIndex} of {inventoryTotalPages} · {filteredPools.length} LR</span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" disabled={inventoryPageIndex <= 1} onClick={() => setInventoryPage((current) => Math.max(1, current - 1))}>
+                        Previous
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={inventoryPageIndex >= inventoryTotalPages} onClick={() => setInventoryPage((current) => Math.min(inventoryTotalPages, current + 1))}>
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </TenantPanel>
+          ) : null}
+
+          {selectedTab?.key === "upload" ? (
+            <ActionCard
+              title="Generate / Create LR"
+              description="Company Root generates the master LR stock. Use Allocation (Direct mode) or Approvals (Request + Approval mode) to push stock to lower levels."
+              icon={<Package className="size-4" />}
+            >
+              <div className="mb-4 rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                Format: <span className="font-mono font-semibold text-slate-900">{buildManualLrPreview(activePlaceFormat)}</span>
+                {activeOrgUnit ? (
+                  <> · Owner place: <span className="font-semibold text-slate-900">{activeOrgUnit.name}</span></>
+                ) : null}
+              </div>
+              <div className="grid gap-4 md:grid-cols-4">
+                <Field label="Start number">
+                  <Input type="number" min={1} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} />
+                </Field>
+                <Field label="End number">
+                  <Input type="number" min={1} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
+                </Field>
+                <Field label="Quantity">
+                  <Input
+                    value={(() => {
+                      const quantity = Number(rangeEnd) - Number(rangeStart) + 1;
+                      return Number.isFinite(quantity) && quantity > 0 ? String(quantity) : "—";
+                    })()}
+                    disabled
+                  />
+                </Field>
+                <Field label="Pool type">
+                  <Select value={selectedPoolType} onChange={(event) => setSelectedPoolType(event.target.value as TenantLrPoolType)}>
+                    <option value="GENERAL">General</option>
+                    <option value="CUSTOMER_RESERVED">Customer Reserved</option>
+                  </Select>
+                </Field>
+              </div>
+              {selectedPoolType === "CUSTOMER_RESERVED" ? (
+                <Field label="Customer" className="mt-4 md:max-w-xs">
+                  <Select value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)}>
+                    <option value="">Select customer</option>
+                    {store.customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button onClick={() => void handleUpload()} disabled={!canRunWorkflowAction("UPLOAD_LR") || (!companyRootOnlyMode && requiresExplicitPlace)}>
+                  Generate LR
+                </Button>
+                {!companyRootOnlyMode && requiresExplicitPlace ? (
+                  <span className="text-sm text-muted-foreground">Select the active place above before generating.</span>
+                ) : null}
+              </div>
+            </ActionCard>
           ) : null}
 
           {selectedTab?.key === "reserved" ? (
@@ -1271,6 +1879,7 @@ export function TenantManualLrOperationsPage() {
               ) : null}
               <RequestTable
                 requests={relevantRequests}
+                allConfigRequests={store.lrRequests.filter((request) => request.configId === activeConfig?.id)}
                 orgUnitMap={orgUnitMap}
                 orgUnitsForRequestTable={orgUnits}
                 config={activeConfig}
@@ -1279,8 +1888,13 @@ export function TenantManualLrOperationsPage() {
                 canApproveRequests={canRunWorkflowAction("APPROVE_LR")}
                 canAllocateRequests={canRunWorkflowAction("ALLOCATE_LR")}
                 canActOnRequest={canActOnRequest}
+                isRootApprover={isRootApprover}
+                approverAvailableFor={approverAvailableFor}
                 onAllocate={handleRequestAllocation}
                 onApprove={(requestId) => handleInlineRequestDecision(requestId, true)}
+                onApproveAvailable={handleApproveAvailable}
+                onApproveWithSource={handleApproveWithSource}
+                onEscalate={handleEscalateRequest}
                 onReject={(requestId) => handleInlineRequestDecision(requestId, false)}
               />
             </ActionCard>
@@ -1592,6 +2206,15 @@ function hierarchyLevelLabelFromOptions(value: string | null) {
   return value && value.trim() ? value : "Tenant";
 }
 
+function SimpleField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-1.5">
+      <label className="text-xs font-medium text-slate-700">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function Field({
   label,
   children,
@@ -1671,8 +2294,174 @@ function LowStockPanel({
   );
 }
 
+function requestStatusBadgeVariant(status: TenantLrAllocationRequestRecord["status"]) {
+  switch (status) {
+    case "APPROVED":
+      return "accent";
+    case "PENDING":
+    case "AWAITING_PARENT_APPROVAL":
+      return "warning";
+    case "PARTIALLY_APPROVED":
+      return "accent";
+    case "REJECTED":
+      return "danger";
+    case "ESCALATED":
+    default:
+      return "secondary";
+  }
+}
+
+function formatRequestStatusLabel(status: TenantLrAllocationRequestRecord["status"]) {
+  return status.replace(/_/g, " ");
+}
+
+// Walk the escalation linkage to render the full chain (Branch -> Region -> Root).
+// Starts at the original request and follows each escalated child downstream.
+function buildRequestChainLabel(
+  request: TenantLrAllocationRequestRecord,
+  allRequests: TenantLrAllocationRequestRecord[],
+  orgUnitMap: Map<string, { name: string }>,
+) {
+  const originId = request.originRequestId ?? request.id;
+  let node = allRequests.find((item) => item.id === originId) ?? request;
+  const chain: TenantLrAllocationRequestRecord[] = [node];
+  let guard = 0;
+  while (guard < 16) {
+    const child = allRequests.find((item) => item.parentRequestId === node.id);
+    if (!child) break;
+    chain.push(child);
+    node = child;
+    guard += 1;
+  }
+  const placeName = (id: string | null | undefined, fallback: string) =>
+    (id ? orgUnitMap.get(id)?.name : null) ?? fallback;
+  const hops = chain.map((item) => placeName(item.sourceOrgUnitId, item.branchName ?? "Requester"));
+  const topApprover = placeName(chain[chain.length - 1].targetOrgUnitId, "Company Root");
+  return [...hops, topApprover].join(" → ");
+}
+
+function RequestActionCell({
+  request,
+  available,
+  isRoot,
+  policy,
+  canApproveRequests,
+  canAllocateRequests,
+  onAllocate,
+  onApprove,
+  onApproveAvailable,
+  onApproveWithSource,
+  onEscalate,
+  onReject,
+}: {
+  request: TenantLrAllocationRequestRecord;
+  available: number;
+  isRoot: boolean;
+  policy: "REJECT" | "ASK" | "AUTO_GENERATE";
+  canApproveRequests: boolean;
+  canAllocateRequests: boolean;
+  onAllocate: (requestId: string) => void;
+  onApprove: (requestId: string) => void;
+  onApproveAvailable: (requestId: string, count: number) => void;
+  onApproveWithSource: (requestId: string, source: { useAvailableCount?: number; generateCount?: number }) => void;
+  onEscalate: (requestId: string) => void;
+  onReject: (requestId: string) => void;
+}) {
+  const requested = request.requestedCount;
+  const gap = Math.max(0, requested - available);
+  const id = request.id;
+  const reject = <Button size="sm" variant="outline" onClick={() => onReject(id)}>Reject</Button>;
+
+  // Allocate-only role (no approve right): move available stock, escalate the rest.
+  if (!canApproveRequests && canAllocateRequests) {
+    if (available >= requested) {
+      return <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => onApproveAvailable(id, requested)}>Allocate {requested}</Button></div>;
+    }
+    return (
+      <div className="flex flex-wrap gap-2">
+        {available > 0 ? <Button size="sm" onClick={() => onApproveAvailable(id, available)}>Allocate {available}</Button> : null}
+        <Button size="sm" variant="outline" onClick={() => onEscalate(id)}>Escalate Remaining {gap}</Button>
+      </div>
+    );
+  }
+
+  if (isRoot) {
+    // Company Root: the only level allowed to generate new LR.
+    if (available >= requested) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => onApprove(id)}>Approve</Button>
+          {reject}
+        </div>
+      );
+    }
+    if (policy === "REJECT") {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] text-amber-700">Insufficient stock · policy: reject</span>
+          {reject}
+        </div>
+      );
+    }
+    if (policy === "AUTO_GENERATE") {
+      // Use whatever is on hand, generate only the shortfall, approve — one click.
+      return (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => onApproveWithSource(id, { useAvailableCount: available, generateCount: gap })}>
+            Approve &amp; Auto-Generate {gap}
+          </Button>
+          {reject}
+        </div>
+      );
+    }
+    // ASK before generating — explicit approval source selection.
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] text-slate-500">Available {available} · need {requested}</span>
+        <div className="flex flex-wrap gap-2">
+          {available > 0 ? (
+            <Button size="sm" variant="outline" onClick={() => onApproveWithSource(id, { useAvailableCount: available, generateCount: 0 })}>
+              Use {available}
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={() => onApproveWithSource(id, { useAvailableCount: 0, generateCount: requested })}>
+            Generate {requested}
+          </Button>
+          {available > 0 ? (
+            <Button size="sm" onClick={() => onApproveWithSource(id, { useAvailableCount: available, generateCount: gap })}>
+              Mixed {available}+{gap}
+            </Button>
+          ) : null}
+          {reject}
+        </div>
+      </div>
+    );
+  }
+
+  // Non-root approver: allocate own stock; escalate the shortfall upstream.
+  if (available >= requested) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => onApproveAvailable(id, requested)}>Approve</Button>
+        {reject}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] text-amber-700">Available {available} · need {requested}</span>
+      <div className="flex flex-wrap gap-2">
+        {available > 0 ? <Button size="sm" onClick={() => onApproveAvailable(id, available)}>Approve {available}</Button> : null}
+        <Button size="sm" onClick={() => onEscalate(id)}>Escalate Remaining {gap}</Button>
+        {reject}
+      </div>
+    </div>
+  );
+}
+
 function RequestTable({
   requests,
+  allConfigRequests,
   orgUnitMap,
   orgUnitsForRequestTable,
   config,
@@ -1681,11 +2470,17 @@ function RequestTable({
   canApproveRequests,
   canAllocateRequests,
   canActOnRequest,
+  isRootApprover,
+  approverAvailableFor,
   onAllocate,
   onApprove,
+  onApproveAvailable,
+  onApproveWithSource,
+  onEscalate,
   onReject,
 }: {
   requests: TenantLrAllocationRequestRecord[];
+  allConfigRequests: TenantLrAllocationRequestRecord[];
   orgUnitMap: Map<string, { name: string }>;
   orgUnitsForRequestTable: OrgUnit[];
   config: ReturnType<typeof useManualLrContext>["activeConfig"];
@@ -1694,16 +2489,22 @@ function RequestTable({
   canApproveRequests: boolean;
   canAllocateRequests: boolean;
   canActOnRequest: (request: TenantLrAllocationRequestRecord) => boolean;
+  isRootApprover: (request: TenantLrAllocationRequestRecord) => boolean;
+  approverAvailableFor: (request: TenantLrAllocationRequestRecord) => number;
   onAllocate: (requestId: string) => void;
   onApprove: (requestId: string) => void;
+  onApproveAvailable: (requestId: string, count: number) => void;
+  onApproveWithSource: (requestId: string, source: { useAvailableCount?: number; generateCount?: number }) => void;
+  onEscalate: (requestId: string) => void;
   onReject: (requestId: string) => void;
 }) {
+  const policy = config?.insufficientStockPolicy ?? "AUTO_GENERATE";
   return (
     <div className="mt-6 overflow-x-auto rounded-2xl border">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
         <thead className="bg-slate-50">
           <tr>
-            {["Requester", "Type", "Customer", "Format", "Approver place", "Requested", "Approved", "Status", "Updated", ...(canProcessRequests ? ["Action"] : [])].map((label) => (
+            {["Requester", "Type", "Customer", "Format", "Approver place", "Request chain", "Requested", "Approved", "Status", "Updated", ...(canProcessRequests ? ["Action"] : [])].map((label) => (
               <th key={label} className="px-4 py-3 text-left font-medium text-slate-600">{label}</th>
             ))}
           </tr>
@@ -1718,26 +2519,34 @@ function RequestTable({
                 {request.sourceOrgUnitId && config ? buildManualLrPreview(resolveManualLrFormatForOrgUnit(config, request.sourceOrgUnitId, orgUnitsForRequestTable)) : "--"}
               </td>
               <td className="px-4 py-3">{orgUnitMap.get(request.targetOrgUnitId ?? "")?.name ?? "Tenant / Company Level"}</td>
+              <td className="px-4 py-3 text-xs text-slate-600">{buildRequestChainLabel(request, allConfigRequests, orgUnitMap)}</td>
               <td className="px-4 py-3">{request.requestedCount}</td>
-              <td className="px-4 py-3">{request.approvedCount}</td>
-              <td className="px-4 py-3"><Badge variant={request.status === "APPROVED" ? "accent" : request.status === "PENDING" ? "warning" : "secondary"}>{request.status}</Badge></td>
+              <td className="px-4 py-3">
+                {request.approvedCount}
+                {request.escalatedCount ? <span className="ml-1 text-[11px] text-slate-400">(+{request.escalatedCount} escalated)</span> : null}
+              </td>
+              <td className="px-4 py-3"><Badge variant={requestStatusBadgeVariant(request.status) as never}>{formatRequestStatusLabel(request.status)}</Badge></td>
               <td className="px-4 py-3">{new Date(request.updatedAt).toLocaleString()}</td>
               {canProcessRequests ? (
                 <td className="px-4 py-3">
                   {canActOnRequest(request) ? (
-                    <div className="flex flex-wrap gap-2">
-                      {canApproveRequests ? (
-                        <>
-                          <Button size="sm" onClick={() => onApprove(request.id)}>Approve</Button>
-                          <Button size="sm" variant="outline" onClick={() => onReject(request.id)}>Reject</Button>
-                        </>
-                      ) : canAllocateRequests ? (
-                        <Button size="sm" onClick={() => onAllocate(request.id)}>Allocate</Button>
-                      ) : null}
-                    </div>
+                    <RequestActionCell
+                      request={request}
+                      available={approverAvailableFor(request)}
+                      isRoot={isRootApprover(request)}
+                      policy={policy}
+                      canApproveRequests={canApproveRequests}
+                      canAllocateRequests={canAllocateRequests}
+                      onAllocate={onAllocate}
+                      onApprove={onApprove}
+                      onApproveAvailable={onApproveAvailable}
+                      onApproveWithSource={onApproveWithSource}
+                      onEscalate={onEscalate}
+                      onReject={onReject}
+                    />
                   ) : (
                     <span className="text-xs text-muted-foreground">
-                      {request.status === "PENDING" ? "Waiting for upper level" : "Done"}
+                      {request.status === "PENDING" || request.status === "AWAITING_PARENT_APPROVAL" ? "Waiting for upper level" : "Done"}
                     </span>
                   )}
                 </td>
@@ -1746,7 +2555,7 @@ function RequestTable({
           ))}
           {!requests.length ? (
             <tr>
-              <td colSpan={canProcessRequests ? 10 : 9} className="px-4 py-8 text-center text-muted-foreground">No LR requests found for the current scope.</td>
+              <td colSpan={canProcessRequests ? 11 : 10} className="px-4 py-8 text-center text-muted-foreground">No LR requests found for the current scope.</td>
             </tr>
           ) : null}
         </tbody>
@@ -1804,5 +2613,27 @@ function LrStat({ label, value, tone = "slate" }: { label: string; value: string
       <span className={`text-[15px] font-bold ${colors}`}>{value}</span>
       <span className="text-[11px] text-slate-500">{label}</span>
     </span>
+  );
+}
+
+function InventoryStat({
+  label,
+  value,
+  hint,
+  tone = "slate",
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  tone?: "green" | "amber" | "sky" | "slate";
+}) {
+  const valueColor =
+    tone === "green" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "sky" ? "text-sky-700" : "text-slate-900";
+  return (
+    <div className="rounded-2xl border bg-white px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${valueColor}`}>{value}</div>
+      {hint ? <div className="mt-0.5 text-[11px] text-slate-400">{hint}</div> : null}
+    </div>
   );
 }

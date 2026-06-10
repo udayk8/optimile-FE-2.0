@@ -94,6 +94,11 @@ export function TenantManualLrOperationsPage() {
   const [reservedDestinationId, setReservedDestinationId] = useState("");
   const [reservedStartPoolId, setReservedStartPoolId] = useState("");
   const [reservedEndPoolId, setReservedEndPoolId] = useState("");
+  // Pagination for the LR Inventory / Number List. The pool list can run into
+  // hundreds/thousands of rows once a Company Root generates master stock, so
+  // the table is paged client-side.
+  const INVENTORY_PAGE_SIZE = 25;
+  const [inventoryPage, setInventoryPage] = useState(1);
 
   const ownershipLevelName =
     activeConfig?.ownershipLevelId
@@ -108,6 +113,14 @@ export function TenantManualLrOperationsPage() {
     [activeConfig?.ownershipLevelId, orgUnits],
   );
   const managedDestinationOrgUnits = useMemo(() => {
+    // Company Root Only (scopeType TENANT) has no ownership level, so there is
+    // no fixed "managed level". Company Root allocates directly to any lower
+    // place. Top business places (e.g. a Region) can legitimately have no
+    // parent, so every place is a valid destination; the allocation UI already
+    // excludes the active place.
+    if (activeConfig?.scopeType === "TENANT") {
+      return orgUnits.filter((unit) => unit.id !== activeOrgUnit?.id);
+    }
     if (!managedLevelId) {
       return ownershipOrgUnits;
     }
@@ -117,7 +130,7 @@ export function TenantManualLrOperationsPage() {
     return orgUnits.filter(
       (unit) => unit.hierarchyLevelId === managedLevelId && unit.parentOrgUnitId === activeOrgUnit.id,
     );
-  }, [activeOrgUnit, managedLevelId, orgUnits, ownershipOrgUnits]);
+  }, [activeConfig?.scopeType, activeOrgUnit, managedLevelId, orgUnits, ownershipOrgUnits]);
   const reservedDestinationOptions = useMemo(
     () => [
       ...(activeOrgUnit ? [{ id: activeOrgUnit.id, name: activeOrgUnit.name }] : []),
@@ -125,8 +138,17 @@ export function TenantManualLrOperationsPage() {
     ],
     [activeOrgUnit, managedDestinationOrgUnits],
   );
+  // Company Root Only (scopeType TENANT): expose Generate + Consumption so the
+  // Company Root can create master stock and lower levels can see booking usage.
+  // Every workflow-sensitive tab is still gated by canRunWorkflowAction, which
+  // resolves per Distribution Method (Direct Allocation vs Request + Approval).
+  // Other scope types keep their existing hierarchy tab set untouched.
+  const companyRootOnlyMode = activeConfig?.scopeType === "TENANT";
+  const allowedTabKeys = companyRootOnlyMode
+    ? ["inventory", "upload", "reserved", "allocation", "requests", "consumption"]
+    : ["inventory", "reserved", "allocation", "requests", "transfer"];
   const visibleTabs = manualLrTabDefinitions.filter((tab) => {
-    if (!["inventory", "reserved", "allocation", "requests", "transfer"].includes(tab.key)) {
+    if (!allowedTabKeys.includes(tab.key)) {
       return false;
     }
     if (tab.key === "allocation") {
@@ -135,12 +157,16 @@ export function TenantManualLrOperationsPage() {
     if (tab.key === "transfer") {
       return canRunWorkflowAction("TRANSFER_LR");
     }
+    if (tab.key === "requests") {
+      // Show if the user can submit requests OR approve/process them
+      return canRunWorkflowAction("REQUEST_LR") || canRunWorkflowAction("APPROVE_LR");
+    }
     if (!tab.action) {
       return access.canViewPage("LR_DASHBOARD");
     }
     return canRunWorkflowAction(tab.action);
   });
-  const canSubmitRequest = Boolean(assignedLevel && currentLevelGovernanceRule?.childCanRequestLr);
+  const canSubmitRequest = canRunWorkflowAction("REQUEST_LR");
   const canProcessRequests = Boolean(
     canRunWorkflowAction("ALLOCATE_LR") || canRunWorkflowAction("APPROVE_LR"),
   );
@@ -156,16 +182,41 @@ export function TenantManualLrOperationsPage() {
   const selectedTab = visibleTabs.find((tab) => tab.key === activeTab) ?? visibleTabs[0] ?? null;
   const requiresExplicitPlace = availableActiveOrgUnits.length > 1 && !session.activeTenantOrgUnitId;
   const assignedOrgUnitIds = assignedOrgUnits.map((orgUnit) => orgUnit.id);
+  // Visible scope = assigned places + all their descendants, so a parent sees
+  // the stock it pushed to children (for "Allocated To Children") and a child
+  // sees only its own held stock.
+  const visibleOwnershipOrgUnitIds = useMemo(() => {
+    if (!assignedOrgUnitIds.length) return [] as string[];
+    const childrenOf = new Map<string, OrgUnit[]>();
+    orgUnits.forEach((unit) => {
+      if (!unit.parentOrgUnitId) return;
+      const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+      list.push(unit);
+      childrenOf.set(unit.parentOrgUnitId, list);
+    });
+    const seen = new Set<string>();
+    const queue = [...assignedOrgUnitIds];
+    while (queue.length) {
+      const id = queue.shift();
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      (childrenOf.get(id) ?? []).forEach((child) => queue.push(child.id));
+    }
+    return Array.from(seen);
+  }, [assignedOrgUnitIds, orgUnits]);
   const scopedManualPools = useMemo(
     () =>
-      store.lrPools.filter(
-        (pool) =>
-          pool.configId === activeConfig?.id &&
-          (!assignedOrgUnitIds.length ||
-            pool.ownerLevelId == null ||
-            assignedOrgUnitIds.includes(pool.ownerLevelId)),
-      ),
-    [activeConfig?.id, assignedOrgUnitIds, store.lrPools],
+      store.lrPools.filter((pool) => {
+        if (pool.configId !== activeConfig?.id) return false;
+        // Visibility follows the CURRENT HOLDER (currentPlaceId), not the owner.
+        const holder = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId;
+        return (
+          !visibleOwnershipOrgUnitIds.length ||
+          holder == null ||
+          visibleOwnershipOrgUnitIds.includes(holder)
+        );
+      }),
+    [activeConfig?.id, visibleOwnershipOrgUnitIds, store.lrPools],
   );
   const manualPools = useMemo(
     () =>
@@ -234,6 +285,17 @@ export function TenantManualLrOperationsPage() {
       .toLowerCase()
       .includes(query);
   });
+  // Reset to the first page whenever the inventory filters, search, or scope
+  // view change so the user never lands on an out-of-range empty page.
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [search, inventoryPoolTypeFilter, inventoryCustomerFilter, inventoryPlaceFilter, inventoryStatusFilter, inventoryView, activeOrgUnit?.id]);
+  const inventoryTotalPages = Math.max(1, Math.ceil(filteredPools.length / INVENTORY_PAGE_SIZE));
+  const inventoryPageIndex = Math.min(inventoryPage, inventoryTotalPages);
+  const pagedInventoryPools = filteredPools.slice(
+    (inventoryPageIndex - 1) * INVENTORY_PAGE_SIZE,
+    inventoryPageIndex * INVENTORY_PAGE_SIZE,
+  );
   const relevantRequests = store.lrRequests.filter(
     (request) =>
       request.configId === activeConfig?.id &&
@@ -241,6 +303,59 @@ export function TenantManualLrOperationsPage() {
         request.sourceOrgUnitId === activeOrgUnit.id ||
         request.targetOrgUnitId === activeOrgUnit.id),
   );
+  // Hierarchy-aware inventory counts for the current viewer, driven by the
+  // CURRENT HOLDER (currentPlaceId) + status, so a child consuming never changes
+  // a parent's numbers.
+  const inventorySummary = useMemo(() => {
+    const myId = activeOrgUnit?.id ?? null;
+    const descendants = new Set<string>();
+    if (activeOrgUnit) {
+      const childrenOf = new Map<string, OrgUnit[]>();
+      orgUnits.forEach((unit) => {
+        if (!unit.parentOrgUnitId) return;
+        const list = childrenOf.get(unit.parentOrgUnitId) ?? [];
+        list.push(unit);
+        childrenOf.set(unit.parentOrgUnitId, list);
+      });
+      const queue = [...(childrenOf.get(activeOrgUnit.id) ?? [])];
+      while (queue.length) {
+        const unit = queue.shift();
+        if (!unit || descendants.has(unit.id)) continue;
+        descendants.add(unit.id);
+        (childrenOf.get(unit.id) ?? []).forEach((child) => queue.push(child));
+      }
+    }
+    let availableWithMe = 0;
+    let reservedWithMe = 0;
+    let consumedMine = 0;
+    let allocatedToChildren = 0;
+    scopedManualPools.forEach((pool) => {
+      const holder = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+      const isMine = holder === myId;
+      const isChild = myId === null ? holder !== null : descendants.has(holder ?? "");
+      const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+      if (isMine) {
+        if (pool.status === "USED") consumedMine += 1;
+        else if (["AVAILABLE", "ALLOCATED"].includes(pool.status)) {
+          if (poolType === "CUSTOMER_RESERVED") reservedWithMe += 1;
+          else availableWithMe += 1;
+        }
+      } else if (isChild) {
+        allocatedToChildren += 1;
+      }
+    });
+    const pendingApproval = relevantRequests
+      .filter((request) => request.status === "PENDING" && (!myId || request.sourceOrgUnitId === myId))
+      .reduce((sum, request) => sum + (request.requestedCount ?? 0), 0);
+    return {
+      total: scopedManualPools.length,
+      availableWithMe,
+      reservedWithMe,
+      consumedMine,
+      allocatedToChildren,
+      pendingApproval,
+    };
+  }, [activeOrgUnit, orgUnits, scopedManualPools, relevantRequests]);
   const recentAudit = store.auditLogs.filter(
     (entry) =>
       entry.entityType.includes("lr") ||
@@ -302,7 +417,10 @@ export function TenantManualLrOperationsPage() {
       setMessage("You do not have permission to perform this LR action.");
       return;
     }
-    if (requiresExplicitPlace || !activeOrgUnit) {
+    // Company Root Only: the Company Root admin has no assigned place, so it
+    // generates into the tenant-level master pool (ownerLevelId = null). Other
+    // modes still require an explicit active place.
+    if (!companyRootOnlyMode && (requiresExplicitPlace || !activeOrgUnit)) {
       setMessage("Select the active place before uploading LR inventory.");
       return;
     }
@@ -381,9 +499,9 @@ export function TenantManualLrOperationsPage() {
       status: "AVAILABLE",
       customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
       vendorId: null,
-      ownerPlaceId: activeOrgUnit.id,
-      currentPlaceId: activeOrgUnit.id,
-      ownerLevelId: activeOrgUnit.id,
+      ownerPlaceId: activeOrgUnit?.id ?? null,
+      currentPlaceId: activeOrgUnit?.id ?? null,
+      ownerLevelId: activeOrgUnit?.id ?? null,
       ownerUserId: currentUser?.id ?? null,
       bookingId: null,
       deliveryId: null,
@@ -396,7 +514,7 @@ export function TenantManualLrOperationsPage() {
         poolType: selectedPoolType,
         customerId: selectedPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || null : null,
         fromPlaceId: null,
-        toPlaceId: activeOrgUnit.id,
+        toPlaceId: activeOrgUnit?.id ?? null,
         actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
         role: currentRole?.name ?? "Tenant User",
         timestamp: now,
@@ -449,31 +567,45 @@ export function TenantManualLrOperationsPage() {
     );
     let destinationSequence = getNextManualLrSequence(destinationExisting) + 1;
     await lrManagement.upsertPools(
-      selected.map((pool) => ({
-        ...pool,
-        lrNumber: buildManualLrNumber(destinationFormat, destinationSequence++),
-        poolType: allocationPoolType,
-        customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
-        ownerPlaceId: allocationDestinationId,
-        currentPlaceId: allocationDestinationId,
-        ownerLevelId: allocationDestinationId,
-        auditEvents: [
-          ...(pool.auditEvents ?? []),
-          {
-            id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
-            action: "ALLOCATED",
+      selected.map((pool) => {
+        const fromPlaceId = pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+        const auditEvent = {
+          id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
+          action: "ALLOCATED" as const,
+          poolType: allocationPoolType,
+          customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
+          fromPlaceId,
+          toPlaceId: allocationDestinationId,
+          actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
+          role: currentRole?.name ?? "Tenant User",
+          timestamp: new Date().toISOString(),
+          note: "Manual allocation",
+        };
+        // Company Root Only inventory model: allocation MOVES the holder only.
+        // Owner (Generated By) and the LR number stay with the original generator
+        // so parent counts are never deducted when a child consumes.
+        if (companyRootOnlyMode) {
+          return {
+            ...pool,
             poolType: allocationPoolType,
             customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
-            fromPlaceId: pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null,
-            toPlaceId: allocationDestinationId,
-            actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
-            role: currentRole?.name ?? "Tenant User",
-            timestamp: new Date().toISOString(),
-            note: "Manual allocation",
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      })),
+            currentPlaceId: allocationDestinationId,
+            auditEvents: [...(pool.auditEvents ?? []), auditEvent],
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return {
+          ...pool,
+          lrNumber: buildManualLrNumber(destinationFormat, destinationSequence++),
+          poolType: allocationPoolType,
+          customerId: allocationPoolType === "CUSTOMER_RESERVED" ? selectedCustomerId || pool.customerId || null : null,
+          ownerPlaceId: allocationDestinationId,
+          currentPlaceId: allocationDestinationId,
+          ownerLevelId: allocationDestinationId,
+          auditEvents: [...(pool.auditEvents ?? []), auditEvent],
+          updatedAt: new Date().toISOString(),
+        };
+      }),
     );
     await lrManagement.appendAuditLog({
       actor: currentUser?.name ?? currentRole?.name ?? "Tenant User",
@@ -550,7 +682,12 @@ export function TenantManualLrOperationsPage() {
       setMessage("Enter a valid requested quantity.");
       return;
     }
-    const parentUnit = orgUnitMap.get(activeOrgUnit.parentOrgUnitId ?? "");
+    // Requests route to the IMMEDIATE parent place. In per-level Company Root
+    // Only governance, each level requests from the level directly above it
+    // (Branch → Region → Company Root). A top business place with no parent
+    // routes to the tenant/company level (targetOrgUnitId = null), which the
+    // Company Root admin approves.
+    const parentUnit = orgUnitMap.get(activeOrgUnit.parentOrgUnitId ?? "") ?? null;
     await lrManagement.createRequest({
       tenantId: tenant.id,
       sourceLevelId: activeOrgUnit.hierarchyLevelId,
@@ -840,6 +977,18 @@ export function TenantManualLrOperationsPage() {
                   </div>
                 }
               />
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <InventoryStat label={activeOrgUnit && activeOrgUnit.parentOrgUnitId ? "Total Received" : "Total Generated"} value={inventorySummary.total} hint="Whole stock history in my scope" />
+                <InventoryStat label="Available With Me" value={inventorySummary.availableWithMe} tone="green" hint="Stock I hold and can use" />
+                <InventoryStat label="Allocated To Children" value={inventorySummary.allocatedToChildren} tone="sky" hint="Stock now held by lower levels" />
+                <InventoryStat label="Consumed" value={inventorySummary.consumedMine} tone="slate" hint="Used on my bookings" />
+                <InventoryStat
+                  label={inventorySummary.reservedWithMe ? "Reserved" : "Pending Approval"}
+                  value={inventorySummary.reservedWithMe || inventorySummary.pendingApproval}
+                  tone="amber"
+                  hint={inventorySummary.reservedWithMe ? "Customer-reserved with me" : "Requested, awaiting approval"}
+                />
+              </div>
               <div className="mt-4 rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <span className="font-medium">Visible LR scope:</span>{" "}
                 {inventoryView === "ACTIVE_PLACE"
@@ -852,17 +1001,18 @@ export function TenantManualLrOperationsPage() {
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50">
                     <tr>
-                      {["LR Number", "Pool Type", "Customer", "Current Place", "Status", "Booking ID", "Created By", "Updated"].map((label) => (
+                      {["LR Number", "Pool Type", "Customer", "Owner (Generated By)", "Current Holder", "Status", "Booking ID", "Created By", "Updated"].map((label) => (
                         <th key={label} className="px-4 py-3 text-left font-medium text-slate-600">{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredPools.map((pool) => (
+                    {pagedInventoryPools.map((pool) => (
                       <tr key={pool.id}>
                         <td className="px-4 py-3 font-mono">{pool.lrNumber}</td>
                         <td className="px-4 py-3">{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")).replace("_", " ")}</td>
                         <td className="px-4 py-3">{store.customerMap.get(pool.customerId ?? "")?.name ?? "--"}</td>
+                        <td className="px-4 py-3">{orgUnitMap.get(pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool"}</td>
                         <td className="px-4 py-3">{orgUnitMap.get(pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? "")?.name ?? "Tenant Pool"}</td>
                         <td className="px-4 py-3">
                           <Badge variant={getManualLrStatusTone(getManualLrUiStatus(pool)) as never}>
@@ -876,15 +1026,84 @@ export function TenantManualLrOperationsPage() {
                     ))}
                     {!filteredPools.length ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                           No LR inventory is visible for the selected role scope and place view.
                         </td>
                       </tr>
                     ) : null}
                   </tbody>
                 </table>
+                {inventoryTotalPages > 1 ? (
+                  <div className="flex items-center justify-between gap-3 border-t px-4 py-2.5 text-[12px] text-slate-600">
+                    <span>Page {inventoryPageIndex} of {inventoryTotalPages} · {filteredPools.length} LR</span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="outline" size="sm" disabled={inventoryPageIndex <= 1} onClick={() => setInventoryPage((current) => Math.max(1, current - 1))}>
+                        Previous
+                      </Button>
+                      <Button variant="outline" size="sm" disabled={inventoryPageIndex >= inventoryTotalPages} onClick={() => setInventoryPage((current) => Math.min(inventoryTotalPages, current + 1))}>
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </TenantPanel>
+          ) : null}
+
+          {selectedTab?.key === "upload" ? (
+            <ActionCard
+              title="Generate / Create LR"
+              description="Company Root generates the master LR stock. Use Allocation (Direct mode) or Approvals (Request + Approval mode) to push stock to lower levels."
+              icon={<Package className="size-4" />}
+            >
+              <div className="mb-4 rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                Format: <span className="font-mono font-semibold text-slate-900">{buildManualLrPreview(activePlaceFormat)}</span>
+                {activeOrgUnit ? (
+                  <> · Owner place: <span className="font-semibold text-slate-900">{activeOrgUnit.name}</span></>
+                ) : null}
+              </div>
+              <div className="grid gap-4 md:grid-cols-4">
+                <Field label="Start number">
+                  <Input type="number" min={1} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} />
+                </Field>
+                <Field label="End number">
+                  <Input type="number" min={1} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
+                </Field>
+                <Field label="Quantity">
+                  <Input
+                    value={(() => {
+                      const quantity = Number(rangeEnd) - Number(rangeStart) + 1;
+                      return Number.isFinite(quantity) && quantity > 0 ? String(quantity) : "—";
+                    })()}
+                    disabled
+                  />
+                </Field>
+                <Field label="Pool type">
+                  <Select value={selectedPoolType} onChange={(event) => setSelectedPoolType(event.target.value as TenantLrPoolType)}>
+                    <option value="GENERAL">General</option>
+                    <option value="CUSTOMER_RESERVED">Customer Reserved</option>
+                  </Select>
+                </Field>
+              </div>
+              {selectedPoolType === "CUSTOMER_RESERVED" ? (
+                <Field label="Customer" className="mt-4 md:max-w-xs">
+                  <Select value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)}>
+                    <option value="">Select customer</option>
+                    {store.customers.map((customer) => (
+                      <option key={customer.id} value={customer.id}>{customer.name}</option>
+                    ))}
+                  </Select>
+                </Field>
+              ) : null}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button onClick={() => void handleUpload()} disabled={!canRunWorkflowAction("UPLOAD_LR") || (!companyRootOnlyMode && requiresExplicitPlace)}>
+                  Generate LR
+                </Button>
+                {!companyRootOnlyMode && requiresExplicitPlace ? (
+                  <span className="text-sm text-muted-foreground">Select the active place above before generating.</span>
+                ) : null}
+              </div>
+            </ActionCard>
           ) : null}
 
           {selectedTab?.key === "reserved" ? (
@@ -1321,6 +1540,28 @@ function Field({
     <div className={`grid gap-2 ${className ?? ""}`}>
       <label className="text-sm font-medium">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function InventoryStat({
+  label,
+  value,
+  hint,
+  tone = "slate",
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  tone?: "green" | "amber" | "sky" | "slate";
+}) {
+  const valueColor =
+    tone === "green" ? "text-emerald-700" : tone === "amber" ? "text-amber-700" : tone === "sky" ? "text-sky-700" : "text-slate-900";
+  return (
+    <div className="rounded-2xl border bg-white px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${valueColor}`}>{value}</div>
+      {hint ? <div className="mt-0.5 text-[11px] text-slate-400">{hint}</div> : null}
     </div>
   );
 }

@@ -118,6 +118,10 @@ export type ManualLRCustomerPolicy =
   | "STRICT_CUSTOMER_SPECIFIC_CONSUMPTION";
 export type ManualLRDistributionStrategy = "CENTRALIZED" | "DISTRIBUTED" | "HYBRID";
 export type ManualLRWorkflowMode = "DIRECT_USAGE" | "CONTROLLED_ALLOCATION" | "APPROVAL_BASED";
+// Root behaviour when an approver (ultimately the Company Root) does not hold
+// enough LR stock to fully satisfy a request. Used by the hierarchy request
+// escalation flow. Defaults to AUTO_GENERATE when unset.
+export type ManualLRInsufficientStockPolicy = "REJECT" | "ASK" | "AUTO_GENERATE";
 export type ManualLRChildFormatMode =
   | "GLOBAL_PARENT_FORMAT"
   | "PARENT_PREFIX_CHILD_SUFFIX"
@@ -210,6 +214,7 @@ export interface TenantLRConfig {
   ownershipLevelId?: string | null;
   distributionStrategy?: ManualLRDistributionStrategy;
   workflowMode?: ManualLRWorkflowMode;
+  insufficientStockPolicy?: ManualLRInsufficientStockPolicy;
   numberingPolicy?: ManualLRNumberingPolicy;
   customerLrPolicy?: ManualLRCustomerPolicy;
   allowCustomerFallback?: boolean;
@@ -247,6 +252,7 @@ export interface TenantLRConfigInput {
   ownershipLevelId?: string | null;
   distributionStrategy?: ManualLRDistributionStrategy;
   workflowMode?: ManualLRWorkflowMode;
+  insufficientStockPolicy?: ManualLRInsufficientStockPolicy;
   numberingPolicy?: ManualLRNumberingPolicy;
   customerLrPolicy?: ManualLRCustomerPolicy;
   allowCustomerFallback?: boolean;

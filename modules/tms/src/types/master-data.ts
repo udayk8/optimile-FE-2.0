@@ -106,6 +106,7 @@ export type ManualLRCustomerPolicy =
   | "STRICT_CUSTOMER_SPECIFIC_CONSUMPTION";
 export type ManualLRDistributionStrategy = "CENTRALIZED" | "DISTRIBUTED" | "HYBRID";
 export type ManualLRWorkflowMode = "DIRECT_USAGE" | "CONTROLLED_ALLOCATION" | "APPROVAL_BASED";
+export type ManualLRInsufficientStockPolicy = "REJECT" | "ASK" | "AUTO_GENERATE";
 export type ManualLRChildFormatMode =
   | "GLOBAL_PARENT_FORMAT"
   | "PARENT_PREFIX_CHILD_SUFFIX"
@@ -198,6 +199,7 @@ export interface TenantLRConfig {
   ownershipLevelId?: string | null;
   distributionStrategy?: ManualLRDistributionStrategy;
   workflowMode?: ManualLRWorkflowMode;
+  insufficientStockPolicy?: ManualLRInsufficientStockPolicy;
   numberingPolicy?: ManualLRNumberingPolicy;
   customerLrPolicy?: ManualLRCustomerPolicy;
   allowCustomerFallback?: boolean;
@@ -235,6 +237,7 @@ export interface TenantLRConfigInput {
   ownershipLevelId?: string | null;
   distributionStrategy?: ManualLRDistributionStrategy;
   workflowMode?: ManualLRWorkflowMode;
+  insufficientStockPolicy?: ManualLRInsufficientStockPolicy;
   numberingPolicy?: ManualLRNumberingPolicy;
   customerLrPolicy?: ManualLRCustomerPolicy;
   allowCustomerFallback?: boolean;

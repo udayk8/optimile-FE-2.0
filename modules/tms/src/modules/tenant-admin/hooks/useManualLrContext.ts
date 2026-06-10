@@ -136,6 +136,17 @@ export function useManualLrContext() {
       currentLevelGovernanceRule,
       managedChildGovernanceRule,
       isTenantRoot: !assignedLevel,
+      configScopeType: config.scopeType,
+      configWorkflowMode: config.workflowMode,
+      // Company Root = a user with NO assigned hierarchy level (Tenant Admin at
+      // company/tenant level). Region/Branch users always carry a hierarchy
+      // level. parentOrgUnitId is unreliable here because top business places
+      // (e.g. a Region) legitimately have no parent.
+      isCompanyRoot: !assignedLevel,
+      // Whether this user has a child level below it (i.e. it manages someone).
+      // A level that manages a child inherits the global Distribution Method
+      // until it explicitly overrides its child's rule.
+      hasManagedChildLevel: Boolean(managedLevelId),
     });
     const allowedByGovernance = governedByConfig ?? allowedByWorkflow;
     return allowedByGovernance && (allowedByPageAction || hasWorkspaceAccess);
@@ -172,8 +183,54 @@ function resolveGovernedWorkflowAction(params: {
   currentLevelGovernanceRule: NonNullable<TenantLRConfig["childGovernanceRules"]>[number] | null;
   managedChildGovernanceRule: NonNullable<TenantLRConfig["childGovernanceRules"]>[number] | null;
   isTenantRoot: boolean;
+  configScopeType?: TenantLRConfig["scopeType"] | null;
+  configWorkflowMode?: TenantLRConfig["workflowMode"] | null;
+  isCompanyRoot?: boolean;
+  hasManagedChildLevel?: boolean;
 }) {
-  const { action, currentLevelGovernanceRule, managedChildGovernanceRule, isTenantRoot } = params;
+  const { action, currentLevelGovernanceRule, managedChildGovernanceRule, isTenantRoot, configScopeType, configWorkflowMode, isCompanyRoot, hasManagedChildLevel } = params;
+
+  // Company Root Only — PER-LEVEL governance. Each parent→child relationship
+  // carries its own Distribution Method stored in childGovernanceRules[child]:
+  //   • As a CHILD  → currentLevelGovernanceRule decides if I may request/consume.
+  //   • As a PARENT → managedChildGovernanceRule decides if I may generate /
+  //     allocate / approve for my immediate child.
+  // Company Root (no hierarchy level) is the implicit top: its relationship with
+  // the topmost level falls back to the global Distribution Method (workflowMode),
+  // since there is no child rule above the first level yet.
+  if (configScopeType === "TENANT") {
+    const isLowerLevel = !isCompanyRoot;
+    const globalMethod = configWorkflowMode ?? "APPROVAL_BASED";
+    const childRule = managedChildGovernanceRule; // my immediate child's rule (parent side)
+    const ownRule = currentLevelGovernanceRule;   // the rule my parent set for my level (child side)
+
+    if (action === "CONSUME_LR") {
+      return ownRule?.childCanConsumeLr ?? true;
+    }
+    if (action === "REQUEST_LR") {
+      if (!isLowerLevel) return false; // Company Root never requests
+      if (ownRule) return Boolean(ownRule.childCanRequestLr);
+      return globalMethod === "APPROVAL_BASED"; // top level ↔ Company Root
+    }
+    // A level that manages a child (or Company Root) acts as a parent. Without an
+    // explicit child rule it inherits the global Distribution Method, so the chain
+    // works at any depth out of the box and is only overridden when a manager
+    // sets its own child's method.
+    const actsAsParent = isCompanyRoot || Boolean(hasManagedChildLevel);
+    if (action === "UPLOAD_LR") {
+      if (childRule) return Boolean(childRule.parentCanGenerateLr);
+      return actsAsParent;
+    }
+    if (action === "ALLOCATE_LR") {
+      if (childRule) return Boolean(childRule.parentCanAllocateLrToChild);
+      return actsAsParent && globalMethod === "CONTROLLED_ALLOCATION";
+    }
+    if (action === "APPROVE_LR") {
+      if (childRule) return Boolean(childRule.canApproveChildRequests);
+      return actsAsParent && globalMethod === "APPROVAL_BASED";
+    }
+  }
+
   if (action === "UPLOAD_LR") {
     return managedChildGovernanceRule?.parentCanGenerateLr ?? (isTenantRoot ? true : null);
   }

@@ -668,7 +668,15 @@ export type TenantLrAllocationRequestStatus =
   | "APPROVED"
   | "REJECTED"
   | "PARTIALLY_APPROVED"
-  | "CANCELLED";
+  | "CANCELLED"
+  // Hierarchy request escalation flow:
+  // ESCALATED — this request was partially fulfilled and the remaining quantity
+  //   was pushed to the approver's parent as a linked child request.
+  // AWAITING_PARENT_APPROVAL — an escalated child request that is pending at the
+  //   parent (treated as actionable/pending in the parent's approval queue).
+  | "ESCALATED"
+  | "AWAITING_PARENT_APPROVAL";
+export type TenantLrApprovalSource = "AVAILABLE" | "GENERATED" | "MIXED";
 export type TenantLrTransferStatus = "PENDING" | "COMPLETED" | "REJECTED" | "CANCELLED";
 
 export interface TenantLrRecord {
@@ -748,6 +756,26 @@ export interface TenantLrAllocationRequestRecord {
   branchCode?: string | null;
   lastSequenceNumber?: string | null;
   rejectionReason?: string | null;
+  // --- Hierarchy request escalation linkage (additive) ---
+  // The immediate request this one was escalated from (Region's child request
+  // points to the Branch request). null for a normal, non-escalated request.
+  parentRequestId?: string | null;
+  // The original request at the bottom of the chain (the Branch request). Lets
+  // any level resolve the full chain and route fulfilled LR back to the origin.
+  originRequestId?: string | null;
+  // The org unit that should ultimately receive the LR (the original requester).
+  // Defaults to sourceOrgUnitId for non-escalated requests.
+  originOrgUnitId?: string | null;
+  // Quantity that was escalated upstream from this request.
+  escalatedCount?: number | null;
+  escalatedBy?: string | null;
+  // The parent org unit the remaining quantity was escalated to.
+  escalatedToOrgUnitId?: string | null;
+  // How an approval was fulfilled: from available stock, freshly generated, or a
+  // mix. Set on approval; primarily meaningful at the Company Root.
+  approvalSource?: TenantLrApprovalSource | null;
+  generatedCount?: number | null;
+  allocatedCount?: number | null;
 }
 
 export interface TenantLrTransferRecord {

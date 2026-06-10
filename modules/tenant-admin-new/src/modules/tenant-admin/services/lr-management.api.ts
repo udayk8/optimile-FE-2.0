@@ -29,6 +29,25 @@ export const lrManagementApi = {
   ) {
     throw new Error("lrManagementApi.approveRequest is not implemented");
   },
+  async allocateRequest(
+    _requestId: string,
+    _allocateCount: number,
+    _actor: string,
+    _note?: string,
+  ) {
+    throw new Error("lrManagementApi.allocateRequest is not implemented");
+  },
+  async escalateRequest(_requestId: string, _actor: string, _note?: string) {
+    throw new Error("lrManagementApi.escalateRequest is not implemented");
+  },
+  async approveRequestWithSource(
+    _requestId: string,
+    _source: { useAvailableCount?: number; generateCount?: number },
+    _actor: string,
+    _note?: string,
+  ) {
+    throw new Error("lrManagementApi.approveRequestWithSource is not implemented");
+  },
   async rejectRequest(_requestId: string, _actor: string, _note?: string) {
     throw new Error("lrManagementApi.rejectRequest is not implemented");
   },

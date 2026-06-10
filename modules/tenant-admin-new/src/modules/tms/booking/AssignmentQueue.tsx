@@ -692,11 +692,10 @@ export function AssignmentQueuePage() {
                 !vehicleId ||
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
-                  (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
-                  (assignMethod === "MANUAL" && !manualReason.trim()) ||
-                  autoLrBlocked ||
-                  !activeLrOrgUnitId
-                }
+                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (assignMethod === "MANUAL" && !manualReason.trim()) ||
+                autoLrBlocked
+              }
             >
               Assign
             </Button>
@@ -941,25 +940,6 @@ export function AssignmentQueuePage() {
                 {canUseAutoLr ? <option value="AUTO">Auto LR</option> : null}
               </Select>
             </CompactField>
-          <CompactField label="Active Place">
-            <Select
-              value={activeLrOrgUnitId}
-              onChange={(event) =>
-                setSession({
-                  ...session,
-                  tenantId: tenant.id,
-                  activeTenantOrgUnitId: event.target.value || null,
-                })
-              }
-            >
-              <option value="">{availableLrOrgUnits.length > 1 ? "Select active LR place" : activeLrOrgUnit?.name ?? "No place"}</option>
-              {availableLrOrgUnits.map((orgUnit) => (
-                  <option key={orgUnit.id} value={orgUnit.id}>
-                    {orgUnit.name}
-                  </option>
-                ))}
-            </Select>
-          </CompactField>
             {selectedLrMode !== "AUTO" ? (
               <>
                 <CompactField label="Manual LR Selection">
@@ -976,8 +956,8 @@ export function AssignmentQueuePage() {
                   </Select>
                 </div>
                 </CompactField>
-                <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  Active place: {activeLrOrgUnit?.name ?? "Not selected"} | Available manual LR count: {availableManualPools.length} | Source: {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved LR" : "General LR"}
+                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  Available: <span className="font-semibold text-slate-900">{availableManualPools.length}</span> LR numbers · Source: {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved LR" : "General LR"}
                 </div>
               </>
             ) : (
@@ -1030,6 +1010,22 @@ export function AssignmentQueuePage() {
               </div>
             </div>
           ) : null}
+          <div className="md:col-span-2 flex justify-end pt-2 border-t border-slate-100">
+            <Button
+              onClick={submitAssignment}
+              disabled={
+                !vendorId ||
+                !vehicleId ||
+                !driverId ||
+                Number(vendorFreight) <= 0 ||
+                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (assignMethod === "MANUAL" && !manualReason.trim()) ||
+                autoLrBlocked
+              }
+            >
+              Assign Vehicle
+            </Button>
+          </div>
         </div>
       </Dialog>
     </div>

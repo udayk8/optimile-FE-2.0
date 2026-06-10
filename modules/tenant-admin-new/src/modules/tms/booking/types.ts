@@ -566,7 +566,10 @@ export type TenantLrAllocationRequestStatus =
   | "APPROVED"
   | "REJECTED"
   | "PARTIALLY_APPROVED"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "ESCALATED"
+  | "AWAITING_PARENT_APPROVAL";
+export type TenantLrApprovalSource = "AVAILABLE" | "GENERATED" | "MIXED";
 export type TenantLrTransferStatus = "PENDING" | "COMPLETED" | "REJECTED" | "CANCELLED";
 
 export interface TenantLrRecord {
@@ -643,6 +646,15 @@ export interface TenantLrAllocationRequestRecord {
   branchCode?: string | null;
   lastSequenceNumber?: string | null;
   rejectionReason?: string | null;
+  parentRequestId?: string | null;
+  originRequestId?: string | null;
+  originOrgUnitId?: string | null;
+  escalatedCount?: number | null;
+  escalatedBy?: string | null;
+  escalatedToOrgUnitId?: string | null;
+  approvalSource?: TenantLrApprovalSource | null;
+  generatedCount?: number | null;
+  allocatedCount?: number | null;
 }
 
 export interface TenantLrTransferRecord {

@@ -185,6 +185,9 @@ export function TenantManualLRConfigPage() {
           ? managedRuleLevelId || current.ownershipLevelId
           : "";
       if (!managedLevelId) {
+        // TENANT (Company Root Only) keeps its per-level Distribution Method rules
+        // in childGovernanceRules — do NOT clear, or a parent save wipes a child's setting.
+        if (current.scopeType === "TENANT") return current;
         return current.childGovernanceRules.length
           ? { ...current, childGovernanceRules: [] }
           : current;
@@ -457,6 +460,78 @@ export function TenantManualLRConfigPage() {
     return normalizeStoredChildCode(overridePrefix, currentAuthorityFormat.prefix, currentAuthorityFormat.numberSeparator);
   }
 
+  // ── Distribution Method (Company Root Only / scopeType TENANT), level-relative ──
+  // Company Root configures the top level via the global workflowMode; a lower
+  // level (e.g. Region) configures its immediate child (e.g. Branch) by writing
+  // that child's governance rule, so each parent→child link has its own method.
+  const isAtCompanyRoot = !currentGovernanceLevel;
+  const distributionChildLevel = availableTargetLevels[0] ?? null;
+  const distributionChildLevelId = distributionChildLevel?.id ?? "";
+  const distributionChildLabel = distributionChildLevel?.name ?? "lower levels";
+  const distributionChildRule =
+    form.childGovernanceRules.find((rule) => rule.childLevelId === distributionChildLevelId) ?? null;
+  const distributionIsApproval = isAtCompanyRoot
+    ? form.workflowMode === "APPROVAL_BASED"
+    : distributionChildRule
+      ? Boolean(distributionChildRule.childCanRequestLr)
+      : form.workflowMode === "APPROVAL_BASED";
+
+  function selectDistributionMethod(method: "DIRECT" | "APPROVAL") {
+    setForm((current) => {
+      const workflowMode = method === "APPROVAL" ? "APPROVAL_BASED" : "CONTROLLED_ALLOCATION";
+      if (isAtCompanyRoot || !distributionChildLevelId) {
+        return { ...current, workflowMode };
+      }
+      const patch =
+        method === "APPROVAL"
+          ? {
+              parentCanGenerateLr: true,
+              parentCanAllocateLrToChild: false,
+              canAllocateChildLr: false,
+              childCanRequestLr: true,
+              canApproveChildRequests: true,
+              childCanConsumeLr: true,
+              canConsumeParentLr: true,
+              approvalRequired: true,
+              allocationRequired: false,
+              canTransferLr: true,
+            }
+          : {
+              parentCanGenerateLr: true,
+              parentCanAllocateLrToChild: true,
+              canAllocateChildLr: true,
+              childCanRequestLr: false,
+              canApproveChildRequests: false,
+              childCanConsumeLr: true,
+              canConsumeParentLr: true,
+              approvalRequired: false,
+              allocationRequired: true,
+              canTransferLr: false,
+            };
+      const exists = current.childGovernanceRules.some((rule) => rule.childLevelId === distributionChildLevelId);
+      const childGovernanceRules = exists
+        ? current.childGovernanceRules.map((rule) =>
+            rule.childLevelId === distributionChildLevelId ? { ...rule, ...patch } : rule,
+          )
+        : [
+            ...current.childGovernanceRules,
+            {
+              childLevelId: distributionChildLevelId,
+              canMaintainOwnSequence: false,
+              canDefineChildFormat: false,
+              canConfigureChildWorkflow: false,
+              canDelegateChildGovernance: false,
+              inheritParentFormat: true,
+              formatMode: "GLOBAL_PARENT_FORMAT" as const,
+              ...patch,
+            },
+          ];
+      // Lower-level managers must NOT touch the global workflowMode (that is the
+      // Company Root → top-level setting). Only persist their child's rule.
+      return { ...current, childGovernanceRules };
+    });
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -510,6 +585,52 @@ export function TenantManualLRConfigPage() {
             {currentGovernanceLevel && !canConfigureImmediateChildFromParent ? (
               <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-3 text-sm text-amber-900">
                 Parent set this level as consume only for lower-level LR.
+              </div>
+            ) : null}
+            {form.scopeType === "TENANT" && distributionChildLevelId ? (
+              <div className="rounded-xl border bg-white px-3 py-3 space-y-2.5">
+                <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                  Distribution Method — {currentLevelLabel} → {distributionChildLabel}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => selectDistributionMethod("DIRECT")}
+                    disabled={!canEdit}
+                    className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition ${!distributionIsApproval ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                  >
+                    <span className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 rounded-full border-2 transition ${!distributionIsApproval ? "border-sky-500 bg-sky-500" : "border-slate-300"}`} />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">Direct Allocation</div>
+                      <div className="text-[11px] text-slate-500">{currentLevelLabel} assigns LR stock to {distributionChildLabel} directly. No request workflow.</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectDistributionMethod("APPROVAL")}
+                    disabled={!canEdit}
+                    className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition ${distributionIsApproval ? "border-sky-400 bg-sky-50" : "border-slate-200 bg-white hover:border-slate-300"}`}
+                  >
+                    <span className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 rounded-full border-2 transition ${distributionIsApproval ? "border-sky-500 bg-sky-500" : "border-slate-300"}`} />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">Request + Approval</div>
+                      <div className="text-[11px] text-slate-500">{distributionChildLabel} request LR; {currentLevelLabel} approves each request.</div>
+                    </div>
+                  </button>
+                </div>
+                <div className="rounded-lg border border-dashed bg-slate-50/60 px-2.5 py-2 text-[11px] text-slate-600 space-y-1">
+                  {!distributionIsApproval ? (
+                    <>
+                      <p><span className="font-semibold text-slate-800">{currentLevelLabel}:</span> Generate LR · Allocate LR</p>
+                      <p><span className="font-semibold text-slate-800">{distributionChildLabel}:</span> View inventory · Consume LR for bookings only</p>
+                    </>
+                  ) : (
+                    <>
+                      <p><span className="font-semibold text-slate-800">{currentLevelLabel}:</span> Generate LR · Approve or reject requests</p>
+                      <p><span className="font-semibold text-slate-800">{distributionChildLabel}:</span> Request LR · Consume LR for bookings</p>
+                    </>
+                  )}
+                </div>
               </div>
             ) : null}
             {form.scopeType !== "HIERARCHY" || !managedChildRule ? (

@@ -29,6 +29,23 @@ type TenantLrManagementService = {
     actor: string,
     note?: string,
   ) => Promise<TenantLrAllocationRequestRecord>;
+  allocateRequest: (
+    requestId: string,
+    allocateCount: number,
+    actor: string,
+    note?: string,
+  ) => Promise<TenantLrAllocationRequestRecord>;
+  escalateRequest: (
+    requestId: string,
+    actor: string,
+    note?: string,
+  ) => Promise<TenantLrAllocationRequestRecord>;
+  approveRequestWithSource: (
+    requestId: string,
+    source: { useAvailableCount?: number; generateCount?: number },
+    actor: string,
+    note?: string,
+  ) => Promise<TenantLrAllocationRequestRecord>;
   rejectRequest: (
     requestId: string,
     actor: string,
@@ -57,6 +74,16 @@ export function useTenantLrManagementService() {
           actor: string,
           note?: string,
         ) => lrManagementApi.approveRequest(requestId, approvedCount, actor, note),
+        allocateRequest: (requestId: string, allocateCount: number, actor: string, note?: string) =>
+          lrManagementApi.allocateRequest(requestId, allocateCount, actor, note),
+        escalateRequest: (requestId: string, actor: string, note?: string) =>
+          lrManagementApi.escalateRequest(requestId, actor, note),
+        approveRequestWithSource: (
+          requestId: string,
+          source: { useAvailableCount?: number; generateCount?: number },
+          actor: string,
+          note?: string,
+        ) => lrManagementApi.approveRequestWithSource(requestId, source, actor, note),
         rejectRequest: (requestId: string, actor: string, note?: string) =>
           lrManagementApi.rejectRequest(requestId, actor, note),
         createTransfer: (input: CreateLrTransferInput) => lrManagementApi.createTransfer(input),
@@ -77,6 +104,16 @@ export function useTenantLrManagementService() {
         actor: string,
         note?: string,
       ) => store.approveTenantLrRequest(requestId, approvedCount, actor, note),
+      allocateRequest: async (requestId: string, allocateCount: number, actor: string, note?: string) =>
+        store.allocateTenantLrRequest(requestId, allocateCount, actor, note),
+      escalateRequest: async (requestId: string, actor: string, note?: string) =>
+        store.escalateTenantLrRequest(requestId, actor, note),
+      approveRequestWithSource: async (
+        requestId: string,
+        source: { useAvailableCount?: number; generateCount?: number },
+        actor: string,
+        note?: string,
+      ) => store.approveTenantLrRequestWithSource(requestId, source, actor, note),
       rejectRequest: async (requestId: string, actor: string, note?: string) =>
         store.rejectTenantLrRequest(requestId, actor, note),
       createTransfer: async (input: CreateLrTransferInput) => store.createTenantLrTransfer(input),

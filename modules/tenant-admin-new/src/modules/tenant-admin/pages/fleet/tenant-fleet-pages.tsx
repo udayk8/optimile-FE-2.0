@@ -479,6 +479,7 @@ function VehicleModal({
   isOpen,
   onClose,
   initialVehicle,
+  activeVendors,
   activeVehicleTypes,
   onCreate,
   onUpdate,
@@ -667,12 +668,25 @@ function VehicleModal({
             <Field label="Ownership">
               <Select
                 value={form.ownershipType}
-                onChange={(e) => setField("ownershipType", e.target.value as "OWN" | "VENDOR")}
+                onChange={(e) => {
+                  setField("ownershipType", e.target.value as "OWN" | "VENDOR");
+                  if (e.target.value === "OWN") setField("vendorId", "");
+                }}
               >
                 <option value="OWN">OWN</option>
                 <option value="VENDOR">VENDOR</option>
               </Select>
             </Field>
+            {form.ownershipType === "VENDOR" ? (
+              <Field label="Vendor">
+                <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
+                  <option value="">Select vendor</option>
+                  {activeVendors.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </Select>
+              </Field>
+            ) : null}
             <Field label="Tracking Type">
               <Select value={form.trackingType} onChange={(e) => setField("trackingType", e.target.value as VehicleTrackingType)}>
                 {TRACKING_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -936,6 +950,7 @@ function DriverModal({
   isOpen,
   onClose,
   initialDriver,
+  activeVendors,
   onCreate,
   onUpdate,
 }: DriverModalProps) {
@@ -1081,6 +1096,14 @@ function DriverModal({
             </Field>
             <Field label="Aadhaar (masked)">
               <Input value={form.aadhaarMasked} onChange={(e) => setField("aadhaarMasked", e.target.value)} placeholder="XXXX-XXXX-1234" />
+            </Field>
+            <Field label="Vendor">
+              <Select value={form.vendorId} onChange={(e) => setField("vendorId", e.target.value)}>
+                <option value="">Own Fleet (no vendor)</option>
+                {activeVendors.map((v) => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </Select>
             </Field>
           </div>
         </Section>

@@ -386,6 +386,26 @@ interface MockStoreValue {
     actor: string,
     note?: string,
   ) => TenantLrAllocationRequestRecord;
+  // Non-root approval: fulfil by moving the approver's own available stock.
+  allocateTenantLrRequest: (
+    requestId: string,
+    allocateCount: number,
+    actor: string,
+    note?: string,
+  ) => TenantLrAllocationRequestRecord;
+  // Allocate everything held + raise a linked child request upstream for the rest.
+  escalateTenantLrRequest: (
+    requestId: string,
+    actor: string,
+    note?: string,
+  ) => TenantLrAllocationRequestRecord;
+  // Root approval with an explicit source split (available stock + generation).
+  approveTenantLrRequestWithSource: (
+    requestId: string,
+    source: { useAvailableCount?: number; generateCount?: number },
+    actor: string,
+    note?: string,
+  ) => TenantLrAllocationRequestRecord;
   rejectTenantLrRequest: (
     requestId: string,
     actor: string,
@@ -3221,6 +3241,7 @@ function normalizeTenantLRConfig(config: TenantLRConfig): TenantLRConfig {
     ownershipLevelId: config.ownershipLevelId ?? null,
     distributionStrategy: (config.distributionStrategy ?? "DISTRIBUTED") as ManualLRDistributionStrategy,
     workflowMode: (config.workflowMode ?? "APPROVAL_BASED") as ManualLRWorkflowMode,
+    insufficientStockPolicy: config.insufficientStockPolicy ?? "AUTO_GENERATE",
     numberingPolicy: config.numberingPolicy ?? "STRICT_FORMAT",
     customerLrPolicy: config.customerLrPolicy ?? "NOT_CUSTOMER_SPECIFIC",
     allowCustomerFallback: config.allowCustomerFallback ?? true,
@@ -3432,6 +3453,16 @@ function normalizeTenantLrRequest(record: TenantLrAllocationRequestRecord): Tena
     decidedAt: record.decidedAt ?? null,
     note: record.note ?? null,
     rejectionReason: record.rejectionReason ?? null,
+    // Hierarchy escalation linkage (additive; null for legacy / non-escalated).
+    parentRequestId: record.parentRequestId ?? null,
+    originRequestId: record.originRequestId ?? null,
+    originOrgUnitId: record.originOrgUnitId ?? record.sourceOrgUnitId ?? null,
+    escalatedCount: record.escalatedCount ?? null,
+    escalatedBy: record.escalatedBy ?? null,
+    escalatedToOrgUnitId: record.escalatedToOrgUnitId ?? null,
+    approvalSource: record.approvalSource ?? null,
+    generatedCount: record.generatedCount ?? null,
+    allocatedCount: record.allocatedCount ?? null,
   };
 }
 
@@ -3655,6 +3686,166 @@ function appendPoolAuditEvent(
       },
     ],
   };
+}
+
+// Hierarchy request escalation: move up to `count` of the approver's currently
+// held, available stock to a destination place by changing ONLY the holder
+// (currentPlaceId). Owner / LR number are preserved so parent inventory counts
+// are never deducted when stock flows down (Company Root Only model). Returns
+// the rewritten pool list and how many were actually moved.
+function allocateHeldPoolsToDestination(params: {
+  pools: TenantLrPoolRecord[];
+  configId: string | null;
+  approverPlaceId: string | null;
+  destinationPlaceId: string | null;
+  count: number;
+  customerId?: string | null;
+  actor: string;
+  role?: string | null;
+  now: string;
+  note?: string | null;
+}): { pools: TenantLrPoolRecord[]; allocatedCount: number } {
+  const { pools, configId, approverPlaceId, destinationPlaceId, count, customerId, actor, role, now, note } = params;
+  if (count <= 0) {
+    return { pools, allocatedCount: 0 };
+  }
+  const wantCustomerReserved = Boolean(customerId);
+  const holderOf = (pool: TenantLrPoolRecord) =>
+    pool.currentPlaceId ?? pool.ownerPlaceId ?? pool.ownerLevelId ?? null;
+  const eligibleIds = new Set<string>();
+  for (const pool of pools) {
+    if (eligibleIds.size >= count) break;
+    if (configId && pool.configId !== configId) continue;
+    if (holderOf(pool) !== approverPlaceId) continue;
+    if (!["AVAILABLE", "ALLOCATED"].includes(pool.status)) continue;
+    const poolType = pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL");
+    if (wantCustomerReserved) {
+      if (poolType !== "CUSTOMER_RESERVED" || pool.customerId !== customerId) continue;
+    } else if (poolType !== "GENERAL" || pool.customerId) {
+      continue;
+    }
+    eligibleIds.add(pool.id);
+  }
+  if (!eligibleIds.size) {
+    return { pools, allocatedCount: 0 };
+  }
+  const nextPools = pools.map((pool) =>
+    eligibleIds.has(pool.id)
+      ? appendPoolAuditEvent(
+          {
+            ...pool,
+            // Holder moves to the destination; owner/level/number unchanged.
+            currentPlaceId: destinationPlaceId,
+            status: "AVAILABLE",
+            updatedAt: now,
+          },
+          {
+            action: "REQUEST_APPROVED_ALLOCATION",
+            poolType: pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL"),
+            customerId: pool.customerId ?? null,
+            fromPlaceId: approverPlaceId,
+            toPlaceId: destinationPlaceId,
+            actor,
+            role: role ?? actor,
+            timestamp: now,
+            note: note ?? null,
+          },
+        )
+      : pool,
+  );
+  return { pools: nextPools, allocatedCount: eligibleIds.size };
+}
+
+// Generate `count` fresh LR pools owned by `destinationPlaceId`, using that
+// place's configured format and continuing its existing sequence. This is the
+// generation half of an approval — only ever used by the Company Root in the
+// escalation model. Mirrors the long-standing approve-time generation so the
+// existing Request + Approval flow is unchanged.
+function generatePoolsForRequest(params: {
+  pools: TenantLrPoolRecord[];
+  config: TenantLRConfig | null;
+  configId: string;
+  tenantId: string;
+  destinationPlaceId: string | null;
+  count: number;
+  customerId?: string | null;
+  ownerUserId?: string | null;
+  fromPlaceId?: string | null;
+  actor: string;
+  now: string;
+  orgUnits: OrgUnit[];
+  note?: string | null;
+}): TenantLrPoolRecord[] {
+  const { pools, config, configId, tenantId, destinationPlaceId, count, customerId, ownerUserId, fromPlaceId, actor, now, orgUnits, note } = params;
+  if (count <= 0) {
+    return pools;
+  }
+  const nextPools = [...pools];
+  const destinationFormat = resolveStoreLrFormatForOrgUnit(config, destinationPlaceId, orgUnits);
+  const destinationSequence =
+    nextPools
+      .filter((pool) => pool.configId === configId && pool.ownerLevelId === (destinationPlaceId ?? null))
+      .map((pool) => {
+        const match = pool.lrNumber.match(/(\d+)(?!.*\d)/);
+        return match ? Number(match[1]) : 0;
+      })
+      .reduce((max, value) => Math.max(max, value), 0) + 1;
+  const formatForGeneration = destinationFormat ?? config ?? {
+    prefix: "LR",
+    yearFormat: "YYYY" as const,
+    numberSeparator: "-",
+    zeroPaddingLength: 6,
+  };
+  const poolType: "GENERAL" | "CUSTOMER_RESERVED" = customerId ? "CUSTOMER_RESERVED" : "GENERAL";
+  for (let index = 0; index < count; index += 1) {
+    nextPools.push(
+      normalizeStoredTenantLrPools([
+        {
+          id: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+          lrNumberId: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
+          tenantId,
+          configId,
+          lrNumber: buildStoreFormattedLrNumber(formatForGeneration, destinationSequence + index),
+          poolType,
+          status: "AVAILABLE",
+          customerId: customerId ?? null,
+          vendorId: null,
+          ownerPlaceId: destinationPlaceId ?? null,
+          currentPlaceId: destinationPlaceId ?? null,
+          ownerLevelId: destinationPlaceId ?? null,
+          ownerUserId: ownerUserId ?? null,
+          bookingId: null,
+          deliveryId: null,
+          usedAt: null,
+          voidReason: null,
+          createdBy: actor,
+          auditEvents: [
+            {
+              id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
+              action: "REQUEST_APPROVED_GENERATED",
+              poolType,
+              customerId: customerId ?? null,
+              fromPlaceId: fromPlaceId ?? null,
+              toPlaceId: destinationPlaceId ?? null,
+              actor,
+              role: actor,
+              timestamp: now,
+              note: note ?? null,
+            },
+          ],
+          createdAt: now,
+          updatedAt: now,
+        },
+      ])[0],
+    );
+  }
+  return rewritePoolsToOwnerFormat({
+    pools: nextPools,
+    config,
+    ownerLevelId: destinationPlaceId,
+    orgUnits,
+    timestamp: now,
+  });
 }
 
 function matchesBookingId(booking: BookingRecord, bookingId: string) {
@@ -5536,30 +5727,33 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
             manualLrPoolPreference:
               input.manualLrPoolPreference ?? existing.manualLrPoolPreference ?? "GENERAL",
           };
-        // Auto LR hard quota: available = Σ approved (APPROVED requests owned by
-        // the place) − already-generated AUTO LR at the place. Block at 0.
+        // Auto LR quota gate: only enforced when hierarchy org units exist.
+        // Company-root-only tenants have no approval flow — Auto LR generates freely.
         if (bookingForAssignment.lrType === "AUTO") {
-          const placeId = input.orgUnitId ?? null;
-          const approvedQuota = tenantLrRequests
-            .filter(
-              (request) =>
-                request.tenantId === existing.tenantId &&
-                request.status === "APPROVED" &&
-                request.lrType === "AUTO" &&
-                (request.sourceOrgUnitId ?? null) === placeId,
-            )
-            .reduce((sum, request) => sum + (request.approvedCount || 0), 0);
-          const generatedAtPlace = tenantLrs.filter(
-            (record) =>
-              record.tenantId === existing.tenantId &&
-              record.type === "AUTO" &&
-              (record.orgUnitId ?? null) === placeId,
-          ).length;
-          if (approvedQuota - generatedAtPlace <= 0) {
-            const placeName = orgUnits.find((unit) => unit.id === placeId)?.name ?? "this place";
-            throw new Error(
-              `Auto LR is not available for the booking place: ${placeName}. Please allocate Auto LR quota before assignment.`,
-            );
+          const tenantOrgUnits = orgUnits.filter((unit) => unit.tenantId === existing.tenantId);
+          if (tenantOrgUnits.length > 0) {
+            const placeId = input.orgUnitId ?? null;
+            const approvedQuota = tenantLrRequests
+              .filter(
+                (request) =>
+                  request.tenantId === existing.tenantId &&
+                  request.status === "APPROVED" &&
+                  request.lrType === "AUTO" &&
+                  (request.sourceOrgUnitId ?? null) === placeId,
+              )
+              .reduce((sum, request) => sum + (request.approvedCount || 0), 0);
+            const generatedAtPlace = tenantLrs.filter(
+              (record) =>
+                record.tenantId === existing.tenantId &&
+                record.type === "AUTO" &&
+                (record.orgUnitId ?? null) === placeId,
+            ).length;
+            if (approvedQuota - generatedAtPlace <= 0) {
+              const placeName = tenantOrgUnits.find((unit) => unit.id === placeId)?.name ?? "this place";
+              throw new Error(
+                `Auto LR is not available for the booking place: ${placeName}. Please allocate Auto LR quota before assignment.`,
+              );
+            }
           }
         }
         const lrAssignment = buildTenantLrAssignmentsForBooking({
@@ -6622,6 +6816,14 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           : null;
         const now = new Date().toISOString();
         const boundedApprovedCount = Math.max(0, Math.min(approvedCount, existing.requestedCount));
+        // Where the LR should land: the original requester at the bottom of the
+        // chain (originOrgUnitId), which defaults to sourceOrgUnitId for normal
+        // (non-escalated) requests — so this path is byte-for-byte unchanged for
+        // the existing Request + Approval flow.
+        const fulfillmentPlaceId = existing.originOrgUnitId ?? existing.sourceOrgUnitId ?? null;
+        const canGenerateForApproval =
+          (configForRequest?.lrType === "MANUAL" || configForRequest?.lrType === "PRE_GENERATED") &&
+          Boolean(existing.configId);
         const updated = normalizeTenantLrRequest({
           ...existing,
           approvedCount: boundedApprovedCount,
@@ -6631,142 +6833,344 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
               : boundedApprovedCount < existing.requestedCount
                 ? "PARTIALLY_APPROVED"
                 : "APPROVED",
+          approvalSource: boundedApprovedCount > 0 ? "GENERATED" : existing.approvalSource ?? null,
+          generatedCount: boundedApprovedCount,
+          allocatedCount: 0,
           decidedAt: now,
           updatedAt: now,
           note: note ?? existing.note ?? null,
         });
-        setTenantLrRequests((current) => current.map((item) => (item.id === requestId ? updated : item)));
-        setTenantLrPools((current) => {
-          // Per explicit product requirement: approval is an inventory
-          // CREATION event, not a move event. Always generate fresh LR
-          // numbers at the requesting place using its configured format.
-          const nextPools = [...current];
-          const canGenerateForApproval =
-            (configForRequest?.lrType === "MANUAL" || configForRequest?.lrType === "PRE_GENERATED") &&
-            Boolean(existing.configId);
-
-          // Diagnostic: surface every input to the generation decision so
-          // a silent miss is visible in the browser console.
-          // eslint-disable-next-line no-console
-          console.log("[LR APPROVE]", {
-            requestId,
-            tenantId: existing.tenantId,
-            requesterOrgUnitId: existing.sourceOrgUnitId,
-            approverOrgUnitId: existing.targetOrgUnitId,
-            configId: existing.configId,
-            configFound: Boolean(configForRequest),
-            configLrType: configForRequest?.lrType ?? null,
-            approvedCount: updated.approvedCount,
-            existingPoolCount: current.length,
-            canGenerateForApproval,
-          });
-
-          if (!canGenerateForApproval || updated.approvedCount <= 0) {
-            // eslint-disable-next-line no-console
-            console.warn("[LR APPROVE] Generation SKIPPED — pools unchanged", {
-              reason: !canGenerateForApproval
-                ? "config not MANUAL/PRE_GENERATED or configId missing"
-                : "approvedCount <= 0",
-            });
-            return nextPools;
-          }
-
-          const requesterFormat = resolveStoreLrFormatForOrgUnit(
-            configForRequest,
-            existing.sourceOrgUnitId,
-            orgUnits,
-          );
-          // Continue from the last sequence number already issued for this
-          // (config, owner place) tuple so a second approval doesn't
-          // restart at 000001.
-          const requesterSequence =
-            nextPools
-              .filter(
-                (pool) =>
-                  pool.configId === existing.configId &&
-                  pool.ownerLevelId === (existing.sourceOrgUnitId ?? null),
-              )
-              .map((pool) => {
-                const match = pool.lrNumber.match(/(\d+)(?!.*\d)/);
-                return match ? Number(match[1]) : 0;
-              })
-              .reduce((max, value) => Math.max(max, value), 0) + 1;
-
-          const formatForGeneration = requesterFormat ?? configForRequest ?? {
-            prefix: "LR",
-            yearFormat: "YYYY" as const,
-            numberSeparator: "-",
-            zeroPaddingLength: 6,
-          };
-          const poolType: "GENERAL" | "CUSTOMER_RESERVED" = existing.customerId ? "CUSTOMER_RESERVED" : "GENERAL";
-          for (let index = 0; index < updated.approvedCount; index += 1) {
-            nextPools.push(
-              normalizeStoredTenantLrPools([
-                {
-                  id: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
-                  lrNumberId: `lr-pool-${Math.random().toString(36).slice(2, 9)}`,
-                  tenantId: existing.tenantId,
-                  configId: existing.configId!,
-                  lrNumber: buildStoreFormattedLrNumber(formatForGeneration, requesterSequence + index),
-                  poolType,
-                  status: "AVAILABLE",
-                  customerId: existing.customerId ?? null,
-                  vendorId: null,
-                  ownerPlaceId: existing.sourceOrgUnitId ?? null,
-                  currentPlaceId: existing.sourceOrgUnitId ?? null,
-                  ownerLevelId: existing.sourceOrgUnitId ?? null,
-                  ownerUserId: existing.sourceUserId ?? null,
-                  bookingId: null,
-                  deliveryId: null,
-                  usedAt: null,
-                  voidReason: null,
-                  createdBy: actor,
-                  auditEvents: [
-                    {
-                      id: `lr-audit-${Math.random().toString(36).slice(2, 9)}`,
-                      action: "REQUEST_APPROVED_GENERATED",
-                      poolType,
-                      customerId: existing.customerId ?? null,
-                      fromPlaceId: existing.targetOrgUnitId ?? null,
-                      toPlaceId: existing.sourceOrgUnitId ?? null,
-                      actor,
-                      role: actor,
-                      timestamp: now,
-                      note: existing.id,
-                    },
-                  ],
-                  createdAt: now,
+        // Close the escalation chain: when fully approved, walk up the
+        // parentRequestId links and mark each ancestor APPROVED so the original
+        // requester's request reads end-to-end (Branch -> Region -> Root -> Approved).
+        setTenantLrRequests((current) => {
+          const byId = new Map(current.map((item) => [item.id, item] as const));
+          byId.set(updated.id, updated);
+          if (updated.status === "APPROVED") {
+            let cursorId = updated.parentRequestId ?? null;
+            let guard = 0;
+            while (cursorId && guard < 16) {
+              const ancestor = byId.get(cursorId);
+              if (!ancestor) break;
+              byId.set(
+                ancestor.id,
+                normalizeTenantLrRequest({
+                  ...ancestor,
+                  status: "APPROVED",
+                  approvedCount: ancestor.requestedCount,
+                  decidedAt: now,
                   updatedAt: now,
-                },
-              ])[0],
-            );
+                }),
+              );
+              cursorId = ancestor.parentRequestId ?? null;
+              guard += 1;
+            }
           }
-          const rewritten = rewritePoolsToOwnerFormat({
+          return current.map((item) => byId.get(item.id) ?? item);
+        });
+        setTenantLrPools((current) => {
+          if (!canGenerateForApproval || updated.approvedCount <= 0) {
+            return current;
+          }
+          return generatePoolsForRequest({
+            pools: current,
+            config: configForRequest,
+            configId: existing.configId!,
+            tenantId: existing.tenantId,
+            destinationPlaceId: fulfillmentPlaceId,
+            count: updated.approvedCount,
+            customerId: existing.customerId ?? null,
+            ownerUserId: existing.sourceUserId ?? null,
+            fromPlaceId: existing.targetOrgUnitId ?? null,
+            actor,
+            now,
+            orgUnits,
+            note: existing.id,
+          });
+        });
+        setPlatformAuditLogs((current) => [
+          {
+            id: `p-log-${Date.now()}`,
+            actor,
+            action: "approved LR request",
+            entityType: "lr_request",
+            entityName: existing.branchName ?? existing.sourceOrgUnitId ?? existing.targetOrgUnitId ?? existing.id,
+            tenantId: existing.tenantId,
+            timestamp: now,
+            result: "success",
+          },
+          ...current,
+        ]);
+        return updated;
+      },
+      allocateTenantLrRequest: (requestId, allocateCount, actor, note) => {
+        // Non-root approval: fulfil a request by MOVING the approver's own
+        // available stock down to the requester (holder change only). The
+        // approver can never allocate more than it holds, so callers cap
+        // allocateCount at the approver's available quantity.
+        const existing = tenantLrRequests.find((item) => item.id === requestId);
+        if (!existing) {
+          throw new Error("LR request not found.");
+        }
+        const now = new Date().toISOString();
+        const approverPlaceId = existing.targetOrgUnitId ?? null;
+        const fulfillmentPlaceId = existing.originOrgUnitId ?? existing.sourceOrgUnitId ?? null;
+        // Compute against the current pool snapshot so the actual moved count is
+        // known synchronously (the request status depends on it).
+        const allocation = allocateHeldPoolsToDestination({
+          pools: tenantLrPools,
+          configId: existing.configId ?? null,
+          approverPlaceId,
+          destinationPlaceId: fulfillmentPlaceId,
+          count: Math.max(0, Math.min(allocateCount, existing.requestedCount)),
+          customerId: existing.customerId ?? null,
+          actor,
+          now,
+          note: existing.id,
+        });
+        const movedCount = allocation.allocatedCount;
+        setTenantLrPools(allocation.pools);
+        const updated = normalizeTenantLrRequest({
+          ...existing,
+          approvedCount: movedCount,
+          status: movedCount === 0 ? "REJECTED" : movedCount < existing.requestedCount ? "PARTIALLY_APPROVED" : "APPROVED",
+          approvalSource: movedCount > 0 ? "AVAILABLE" : existing.approvalSource ?? null,
+          allocatedCount: movedCount,
+          generatedCount: 0,
+          decidedAt: now,
+          updatedAt: now,
+          note: note ?? existing.note ?? null,
+        });
+        setTenantLrRequests((current) => {
+          const byId = new Map(current.map((item) => [item.id, item] as const));
+          byId.set(updated.id, updated);
+          if (updated.status === "APPROVED") {
+            let cursorId = updated.parentRequestId ?? null;
+            let guard = 0;
+            while (cursorId && guard < 16) {
+              const ancestor = byId.get(cursorId);
+              if (!ancestor) break;
+              byId.set(
+                ancestor.id,
+                normalizeTenantLrRequest({
+                  ...ancestor,
+                  status: "APPROVED",
+                  approvedCount: ancestor.requestedCount,
+                  decidedAt: now,
+                  updatedAt: now,
+                }),
+              );
+              cursorId = ancestor.parentRequestId ?? null;
+              guard += 1;
+            }
+          }
+          return current.map((item) => byId.get(item.id) ?? item);
+        });
+        setPlatformAuditLogs((current) => [
+          {
+            id: `p-log-${Date.now()}`,
+            actor,
+            action: "allocated LR from request",
+            entityType: "lr_request",
+            entityName: existing.branchName ?? existing.sourceOrgUnitId ?? existing.id,
+            tenantId: existing.tenantId,
+            timestamp: now,
+            result: "success",
+          },
+          ...current,
+        ]);
+        return updated;
+      },
+      escalateTenantLrRequest: (requestId, actor, note) => {
+        // Approver cannot fully satisfy the request: allocate everything it holds
+        // to the requester and raise a linked child request to its own parent for
+        // the remaining quantity.
+        const existing = tenantLrRequests.find((item) => item.id === requestId);
+        if (!existing) {
+          throw new Error("LR request not found.");
+        }
+        const now = new Date().toISOString();
+        const approverPlaceId = existing.targetOrgUnitId ?? null;
+        const approverUnit = approverPlaceId ? orgUnits.find((unit) => unit.id === approverPlaceId) ?? null : null;
+        const parentUnit = approverUnit?.parentOrgUnitId
+          ? orgUnits.find((unit) => unit.id === approverUnit.parentOrgUnitId) ?? null
+          : null;
+        const fulfillmentPlaceId = existing.originOrgUnitId ?? existing.sourceOrgUnitId ?? null;
+        const allocation = allocateHeldPoolsToDestination({
+          pools: tenantLrPools,
+          configId: existing.configId ?? null,
+          approverPlaceId,
+          destinationPlaceId: fulfillmentPlaceId,
+          count: existing.requestedCount,
+          customerId: existing.customerId ?? null,
+          actor,
+          now,
+          note: existing.id,
+        });
+        const movedCount = allocation.allocatedCount;
+        setTenantLrPools(allocation.pools);
+        const remaining = Math.max(0, existing.requestedCount - movedCount);
+        const childId = `lr-request-${Math.random().toString(36).slice(2, 9)}`;
+        const originRequestId = existing.originRequestId ?? existing.id;
+        const originOrgUnitId = existing.originOrgUnitId ?? existing.sourceOrgUnitId ?? null;
+        const updatedParent = normalizeTenantLrRequest({
+          ...existing,
+          approvedCount: movedCount,
+          status: "ESCALATED",
+          escalatedCount: remaining,
+          escalatedBy: actor,
+          escalatedToOrgUnitId: parentUnit?.id ?? null,
+          allocatedCount: movedCount,
+          approvalSource: movedCount > 0 ? "AVAILABLE" : existing.approvalSource ?? null,
+          updatedAt: now,
+          note: note ?? existing.note ?? null,
+        });
+        const childRequest = remaining > 0
+          ? normalizeTenantLrRequest({
+              id: childId,
+              tenantId: existing.tenantId,
+              sourceLevelId: approverUnit?.hierarchyLevelId ?? existing.targetLevelId,
+              targetLevelId: parentUnit?.hierarchyLevelId ?? approverUnit?.hierarchyLevelId ?? existing.targetLevelId,
+              requestedCount: remaining,
+              approvedCount: 0,
+              status: "AWAITING_PARENT_APPROVAL",
+              createdAt: now,
+              updatedAt: now,
+              decidedAt: null,
+              note: `Escalated from ${existing.branchName ?? existing.sourceOrgUnitId ?? existing.id}`,
+              sourceOrgUnitId: approverPlaceId,
+              targetOrgUnitId: parentUnit?.id ?? null,
+              sourceUserId: existing.targetUserId ?? null,
+              targetUserId: null,
+              lrType: existing.lrType ?? "MANUAL",
+              configId: existing.configId ?? null,
+              customerId: existing.customerId ?? null,
+              branchName: approverUnit?.name ?? null,
+              branchCode: approverPlaceId ? approverPlaceId.toUpperCase() : null,
+              lastSequenceNumber: null,
+              rejectionReason: null,
+              parentRequestId: existing.id,
+              originRequestId,
+              originOrgUnitId,
+              escalatedBy: actor,
+            })
+          : null;
+        setTenantLrRequests((current) => {
+          const mapped = current.map((item) => (item.id === existing.id ? updatedParent : item));
+          return childRequest ? [childRequest, ...mapped] : mapped;
+        });
+        setPlatformAuditLogs((current) => [
+          {
+            id: `p-log-${Date.now()}`,
+            actor,
+            action: remaining > 0 ? "escalated LR request" : "allocated LR from request",
+            entityType: "lr_request",
+            entityName: existing.branchName ?? existing.sourceOrgUnitId ?? existing.id,
+            tenantId: existing.tenantId,
+            timestamp: now,
+            result: "success",
+          },
+          ...current,
+        ]);
+        return updatedParent;
+      },
+      approveTenantLrRequestWithSource: (requestId, source, actor, note) => {
+        // Root (or any approver) approval with an explicit source split:
+        // move `useAvailableCount` of held stock + generate `generateCount`
+        // fresh LR. Generation is only meaningful at the Company Root.
+        const existing = tenantLrRequests.find((item) => item.id === requestId);
+        if (!existing) {
+          throw new Error("LR request not found.");
+        }
+        const configForRequest = existing.configId
+          ? tenantLRConfigs.find((config) => config.id === existing.configId) ?? null
+          : null;
+        const now = new Date().toISOString();
+        const approverPlaceId = existing.targetOrgUnitId ?? null;
+        const fulfillmentPlaceId = existing.originOrgUnitId ?? existing.sourceOrgUnitId ?? null;
+        const wantAllocate = Math.max(0, source.useAvailableCount ?? 0);
+        const wantGenerate = Math.max(0, source.generateCount ?? 0);
+        const canGenerate =
+          (configForRequest?.lrType === "MANUAL" || configForRequest?.lrType === "PRE_GENERATED") &&
+          Boolean(existing.configId);
+        // Compute against the current snapshot so the moved count is known
+        // synchronously, then commit the combined result.
+        let movedCount = 0;
+        let nextPools = tenantLrPools;
+        if (wantAllocate > 0) {
+          const allocated = allocateHeldPoolsToDestination({
+            pools: nextPools,
+            configId: existing.configId ?? null,
+            approverPlaceId,
+            destinationPlaceId: fulfillmentPlaceId,
+            count: wantAllocate,
+            customerId: existing.customerId ?? null,
+            actor,
+            now,
+            note: existing.id,
+          });
+          nextPools = allocated.pools;
+          movedCount = allocated.allocatedCount;
+        }
+        if (wantGenerate > 0 && canGenerate) {
+          nextPools = generatePoolsForRequest({
             pools: nextPools,
             config: configForRequest,
-            ownerLevelId: existing.sourceOrgUnitId,
+            configId: existing.configId!,
+            tenantId: existing.tenantId,
+            destinationPlaceId: fulfillmentPlaceId,
+            count: wantGenerate,
+            customerId: existing.customerId ?? null,
+            ownerUserId: existing.sourceUserId ?? null,
+            fromPlaceId: existing.targetOrgUnitId ?? null,
+            actor,
+            now,
             orgUnits,
-            timestamp: now,
+            note: existing.id,
           });
-          const ownedByRequester = rewritten.filter(
-            (pool) =>
-              pool.configId === existing.configId &&
-              pool.ownerLevelId === existing.sourceOrgUnitId,
-          );
-          const generatedThisCall = ownedByRequester.slice(-updated.approvedCount);
-          // eslint-disable-next-line no-console
-          console.log("[LR APPROVE] Generated", {
-            generatedCount: updated.approvedCount,
-            firstGeneratedLr: generatedThisCall[0]?.lrNumber ?? null,
-            lastGeneratedLr: generatedThisCall[generatedThisCall.length - 1]?.lrNumber ?? null,
-            poolsBefore: current.length,
-            poolsAfter: rewritten.length,
-            requesterPoolsTotal: ownedByRequester.length,
-            sampleOwnerLevelId: generatedThisCall[0]?.ownerLevelId ?? null,
-            sampleCurrentPlaceId: generatedThisCall[0]?.currentPlaceId ?? null,
-            sampleConfigId: generatedThisCall[0]?.configId ?? null,
-          });
-          return rewritten;
+        }
+        if (nextPools !== tenantLrPools) {
+          setTenantLrPools(nextPools);
+        }
+        const generatedCount = wantGenerate > 0 && canGenerate ? wantGenerate : 0;
+        const approvedTotal = Math.min(existing.requestedCount, movedCount + generatedCount);
+        const approvalSource: "AVAILABLE" | "GENERATED" | "MIXED" =
+          movedCount > 0 && generatedCount > 0 ? "MIXED" : generatedCount > 0 ? "GENERATED" : "AVAILABLE";
+        const updated = normalizeTenantLrRequest({
+          ...existing,
+          approvedCount: approvedTotal,
+          status: approvedTotal === 0 ? "REJECTED" : approvedTotal < existing.requestedCount ? "PARTIALLY_APPROVED" : "APPROVED",
+          approvalSource: approvedTotal > 0 ? approvalSource : existing.approvalSource ?? null,
+          allocatedCount: movedCount,
+          generatedCount,
+          decidedAt: now,
+          updatedAt: now,
+          note: note ?? existing.note ?? null,
+        });
+        setTenantLrRequests((current) => {
+          const byId = new Map(current.map((item) => [item.id, item] as const));
+          byId.set(updated.id, updated);
+          if (updated.status === "APPROVED") {
+            let cursorId = updated.parentRequestId ?? null;
+            let guard = 0;
+            while (cursorId && guard < 16) {
+              const ancestor = byId.get(cursorId);
+              if (!ancestor) break;
+              byId.set(
+                ancestor.id,
+                normalizeTenantLrRequest({
+                  ...ancestor,
+                  status: "APPROVED",
+                  approvedCount: ancestor.requestedCount,
+                  decidedAt: now,
+                  updatedAt: now,
+                }),
+              );
+              cursorId = ancestor.parentRequestId ?? null;
+              guard += 1;
+            }
+          }
+          return current.map((item) => byId.get(item.id) ?? item);
         });
         setPlatformAuditLogs((current) => [
           {

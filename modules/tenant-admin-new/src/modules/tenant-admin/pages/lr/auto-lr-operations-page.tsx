@@ -30,6 +30,9 @@ export function TenantAutoLrOperationsPage() {
   const store = useAppStore(tenant.id);
   const lrManagement = useTenantLrManagementService();
   const [activeTab, setActiveTab] = useState<AutoLrTabKey>("governance");
+  const [simpleActiveTab, setSimpleActiveTab] = useState("Dashboard");
+  const [lrSearch, setLrSearch] = useState("");
+  const [lrPage, setLrPage] = useState(1);
   const [requestCount, setRequestCount] = useState("25");
   const [requestReason, setRequestReason] = useState("");
   const [message, setMessage] = useState("");
@@ -143,6 +146,173 @@ export function TenantAutoLrOperationsPage() {
     );
   }
   const resolvedAutoConfig = autoConfig;
+
+  // Simple mode: no hierarchy levels → hide allocation/requests/transfer/place columns.
+  // Applies to both Manual and Auto LR — driven by hierarchy depth, not LR type.
+  const isSimpleMode = hierarchyLevels.length === 0;
+
+  if (isSimpleMode) {
+    const bookingMap = new Map(store.bookings.map((b) => [b.id, b]));
+    const activeBookingStatuses = new Set(["CONFIRMED", "VEHICLE_ASSIGNED", "IN_TRANSIT", "LOADING", "LOADED"]);
+    const totalGenerated = generatedRecords.length;
+    const activeCount = generatedRecords.filter((r) => activeBookingStatuses.has(bookingMap.get(r.bookingId ?? "")?.status ?? "")).length;
+    const completedCount = generatedRecords.filter((r) => bookingMap.get(r.bookingId ?? "")?.status === "DELIVERED").length;
+    const cancelledCount = generatedRecords.filter((r) => bookingMap.get(r.bookingId ?? "")?.status === "CANCELLED").length;
+    const formatPreview = runtimePreview?.formatPreview ?? buildManualLrPreview(activeFormat ?? resolvedAutoConfig);
+    const nextNumber = runtimePreview?.nextNumber ?? formatPreview;
+    const pad = resolvedAutoConfig.zeroPaddingLength ?? 6;
+
+    const lrStatusLabel = (status: string) => (({
+      VEHICLE_ASSIGNED: "Assigned", IN_TRANSIT: "In Transit", LOADING: "Loading",
+      LOADED: "Loaded", DELIVERED: "Delivered", CANCELLED: "Cancelled",
+      CONFIRMED: "Confirmed", PENDING_ASSIGNMENT: "Pending",
+    } as Record<string, string>)[status] ?? status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+
+    const lrStatusVariant = (status: string): "accent" | "success" | "secondary" | "warning" => {
+      if (status === "DELIVERED") return "success";
+      if (status === "CANCELLED") return "secondary";
+      if (["IN_TRANSIT", "LOADING", "LOADED"].includes(status)) return "warning";
+      return "accent";
+    };
+
+    const PAGE_SIZE = 10;
+    const allSortedRecords = [...generatedRecords].reverse();
+    const filteredLrRecords = allSortedRecords.filter((r) => {
+      if (!lrSearch.trim()) return true;
+      const booking = bookingMap.get(r.bookingId ?? "");
+      const q = lrSearch.toLowerCase();
+      return [r.lrNumber, booking?.bookingId ?? r.bookingId ?? "",
+        store.customerMap.get(booking?.customerId ?? "")?.name ?? "", booking?.status ?? ""]
+        .join(" ").toLowerCase().includes(q);
+    });
+    const totalPages = Math.max(1, Math.ceil(filteredLrRecords.length / PAGE_SIZE));
+    const currentPage = Math.min(lrPage, totalPages);
+    const pagedRecords = filteredLrRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const simpleTabs = ["Dashboard", "LR Log"];
+
+    return (
+      <div className="space-y-3">
+        {/* Tab bar */}
+        <div className="flex gap-0 border-b border-slate-200">
+          {simpleTabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setSimpleActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium transition border-b-2 -mb-px ${
+                simpleActiveTab === tab
+                  ? "border-sky-500 text-sky-700"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {simpleActiveTab === "Dashboard" ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border bg-white px-4 py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">LR Format</p>
+                <p className="font-mono text-base font-bold text-slate-900">{formatPreview}</p>
+                <p className="mt-1 text-[11px] text-slate-400">Auto-generated on vehicle assignment</p>
+              </div>
+              <div className="rounded-xl border bg-white px-4 py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Current Counter</p>
+                <p className="font-mono text-2xl font-bold text-slate-900">{String(totalGenerated).padStart(pad, "0")}</p>
+                <p className="mt-1 text-[11px] text-slate-400">{totalGenerated} LR{totalGenerated !== 1 ? "s" : ""} issued so far</p>
+              </div>
+              <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-4">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-sky-400 mb-1.5">Next LR Number</p>
+                <p className="font-mono text-base font-bold text-sky-900">{nextNumber}</p>
+                <p className="mt-1 text-[11px] text-sky-600">Will be issued on next vehicle assignment</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {simpleActiveTab === "LR Log" ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <Input
+                value={lrSearch}
+                onChange={(e) => { setLrSearch(e.target.value); setLrPage(1); }}
+                placeholder="Search LR number, booking, customer…"
+                className="max-w-xs"
+              />
+              <span className="text-xs text-slate-500">{filteredLrRecords.length} record{filteredLrRecords.length !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border bg-white">
+              <table className="min-w-full divide-y divide-slate-100 text-sm">
+                <thead>
+                  <tr className="bg-slate-50">
+                    {["LR Number", "Booking Number", "Customer", "Generated On", "Status"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {pagedRecords.length ? pagedRecords.map((record) => {
+                    const booking = bookingMap.get(record.bookingId ?? "");
+                    const customerName = store.customerMap.get(booking?.customerId ?? "")?.name ?? "—";
+                    const status = booking?.status ?? record.status;
+                    return (
+                      <tr key={record.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 font-mono text-xs font-semibold text-slate-800">
+                            {record.lrNumber}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-medium text-slate-700">{booking?.bookingId ?? record.bookingId ?? "—"}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">{customerName}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {new Date(record.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant={lrStatusVariant(status)}>{lrStatusLabel(status)}</Badge>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-400">
+                        {lrSearch ? "No records match your search." : "No Auto LR has been generated yet."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 ? (
+              <div className="flex items-center justify-between gap-2 px-1">
+                <span className="text-xs text-slate-500">Page {currentPage} of {totalPages}</span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLrPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLrPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-slate-300 disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   async function handleRequest() {
     if (!activeOrgUnit) {
@@ -455,6 +625,16 @@ function AutoRequestTable({
   );
 }
 
+
+function SimpleStatCard({ label, value, tone }: { label: string; value: string; tone?: "sky" | "green" | "slate" }) {
+  const colors = tone === "sky" ? "text-sky-700" : tone === "green" ? "text-emerald-700" : "text-slate-700";
+  return (
+    <div className="rounded-xl border bg-white px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">{label}</div>
+      <div className={`mt-1 text-xl font-bold ${colors}`}>{value}</div>
+    </div>
+  );
+}
 
 function AutoLrKV({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (

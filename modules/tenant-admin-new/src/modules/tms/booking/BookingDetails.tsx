@@ -280,6 +280,7 @@ export function BookingDetailsPage() {
   const [reassignmentVendorFreight, setReassignmentVendorFreight] = useState("");
   const [reassignmentInvoiceDocument, setReassignmentInvoiceDocument] = useState("");
   const [reassignmentEwayBillDocument, setReassignmentEwayBillDocument] = useState("");
+  const [assignmentError, setAssignmentError] = useState("");
   const [reassignmentError, setReassignmentError] = useState("");
   const [activeBreakdownEventId, setActiveBreakdownEventId] = useState<string | null>(null);
   const [breakdownActionType, setBreakdownActionType] = useState<"SELECT" | "REPAIR" | "REPLACE" | "CONTINUE">("SELECT");
@@ -930,22 +931,23 @@ export function BookingDetailsPage() {
 
   function resetAssignmentDialog() {
     setAssignmentOpen(false);
+    setAssignmentError("");
     setVendorId("");
     setVehicleId("");
     setDriverId("");
     setVendorFreight("");
     setVendorFreightSource("MANUAL");
     setVendorRateWarning("");
-      setMatchedVendorRateCardId(null);
-      setMatchedVendorRateType(null);
-      setBuyingRateLabel(null);
-      setManualReason("");
-      setPreferredLrNumber("");
-      if (bookingRecord.lrType === "AUTO") {
-        setSelectedLrMode("AUTO");
-      } else {
-        setSelectedLrMode(bookingRecord.manualLrPoolPreference === "PRE_GENERATED" ? "PRE_GENERATED" : "MANUAL");
-      }
+    setMatchedVendorRateCardId(null);
+    setMatchedVendorRateType(null);
+    setBuyingRateLabel(null);
+    setManualReason("");
+    setPreferredLrNumber("");
+    if (bookingRecord.lrType === "AUTO") {
+      setSelectedLrMode("AUTO");
+    } else {
+      setSelectedLrMode(bookingRecord.manualLrPoolPreference === "PRE_GENERATED" ? "PRE_GENERATED" : "MANUAL");
+    }
   }
 
   function openReassignmentDialog() {
@@ -1594,12 +1596,9 @@ export function BookingDetailsPage() {
     if (!selectedVehicle || !selectedDriver || !vendorId || Number(vendorFreight) <= 0) {
       return;
     }
-    if (!activeLrOrgUnitId) {
+    if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
       return;
     }
-      if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
-        return;
-      }
     // Manual assignment on a contract booking bypasses the default L1/lowest
     // contract — reason required.
     if (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) {
@@ -1633,8 +1632,12 @@ export function BookingDetailsPage() {
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
         manualAssignmentReason: assignMethod === "MANUAL" && !isSpotBooking ? manualReason.trim() : null,
       };
-    assignBooking(bookingRecord.id, assignment);
-    resetAssignmentDialog();
+    try {
+      assignBooking(bookingRecord.id, assignment);
+      resetAssignmentDialog();
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : "Assignment failed. Please check your selections and try again.");
+    }
   }
 
   function submitReassignment() {
@@ -3703,15 +3706,19 @@ export function BookingDetailsPage() {
                 !vehicleId ||
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
-                  (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
-                  (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) ||
-                  !activeLrOrgUnitId
-                }
+                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim())
+              }
             >
               Assign Vehicle
             </Button>
           ) : null}
         </div>
+        {assignmentError ? (
+          <div className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-800">
+            {assignmentError}
+          </div>
+        ) : null}
         <div className="px-4 py-3.5">
         <div className="space-y-3">
           {/* Assignment method — Contract Vendor (recommendation engine) is default; SPOT is manual-only. */}
@@ -3891,25 +3898,6 @@ export function BookingDetailsPage() {
                     ))}
                   </Select>
                 </CompactField>
-                <CompactField label="Active Place">
-                  <Select
-                    value={activeLrOrgUnitId}
-                    onChange={(event) =>
-                      setSession({
-                        ...session,
-                        tenantId: tenant.id,
-                        activeTenantOrgUnitId: event.target.value || null,
-                      })
-                    }
-                  >
-                    <option value="">{availableLrOrgUnits.length > 1 ? "Select active LR place" : activeLrOrgUnit?.name ?? "No place"}</option>
-                    {availableLrOrgUnits.map((orgUnit) => (
-                      <option key={orgUnit.id} value={orgUnit.id}>
-                        {orgUnit.name}
-                      </option>
-                    ))}
-                  </Select>
-                </CompactField>
               </div>
             </div>
 
@@ -3963,13 +3951,9 @@ export function BookingDetailsPage() {
                         ))}
                       </Select>
                     </CompactField>
-                    {requiresActiveLrScope ? (
-                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        ⚠ Select active place to view LR numbers.
-                      </div>
-                    ) : availableManualPools.length > 0 ? (
+                    {availableManualPools.length > 0 ? (
                       <p className="px-1 text-[11px] text-gray-500">
-                        Available LR at <span className="font-medium text-gray-700">{activeLrOrgUnit?.name ?? "place"}</span>: <span className="font-medium text-gray-700">{availableManualPools.length}</span>
+                        Available: <span className="font-medium text-gray-700">{availableManualPools.length}</span> LR numbers
                       </p>
                     ) : null}
                   </>
@@ -3999,6 +3983,29 @@ export function BookingDetailsPage() {
               </div>
             </div>
           </div>
+          {assignmentError ? (
+            <div className="mx-4 mb-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              {assignmentError}
+            </div>
+          ) : null}
+          {showAssignmentFields ? (
+            <div className="flex justify-end border-t border-slate-100 px-4 py-3">
+              <Button
+                size="sm"
+                onClick={submitAssignment}
+                disabled={
+                  !vendorId ||
+                  !vehicleId ||
+                  !driverId ||
+                  Number(vendorFreight) <= 0 ||
+                  (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                  (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim())
+                }
+              >
+                Assign Vehicle
+              </Button>
+            </div>
+          ) : null}
           </>
           ) : null}
         </div>
