@@ -87,7 +87,17 @@ export default function TripDetailPage() {
     if (!haveType.has('INVOICE_COPY')) defaults.push({ id: `${trip.id}-inv`, type: 'INVOICE_COPY', title: 'Invoice copy', fileName: `invoice-${trip.id.toLowerCase()}.pdf`, fileUrl: `/docs/invoice-${trip.id.toLowerCase()}.pdf`, createdAt: trip.createdAt })
     return [...defaults, ...tripDocs]
   })()
-  const visibleTabs: DetailTab[] = ['freight', 'documents']
+  // Driver expenses + advance are shown (read-only) from In-Transit onward.
+  const showExpenseTab = Boolean(
+    trip && (['IN_TRANSIT', 'DESTINATION_REACHED'].includes(trip.status) || trip.status === 'POD_PENDING' || trip.status === 'COMPLETED' || trip.exceptionFlag),
+  )
+  const tripExpenses = trip?.expenses ?? []
+  const tripAdvances = trip?.advanceItems ?? []
+  const visibleTabs: DetailTab[] = [
+    'freight',
+    ...(showExpenseTab ? (['expense', 'advance'] as DetailTab[]) : []),
+    'documents',
+  ]
   const effectiveDetailTab: DetailTab = visibleTabs.includes(detailTab) ? detailTab : 'freight'
 
   // Mock/demo bookings have no shared-booking record, so build the same
@@ -265,6 +275,8 @@ export default function TripDetailPage() {
             }`}
           >
             {tab === 'freight' && 'Freight details'}
+            {tab === 'expense' && 'Expenses'}
+            {tab === 'advance' && 'Advance'}
             {tab === 'documents' && 'Documents'}
           </button>
         ))}
@@ -296,6 +308,74 @@ export default function TripDetailPage() {
                     {indent ? <SLACountdown deadline={indent.slaDeadline} /> : trip?.podStatus === 'CONFIRMED' ? 'POD confirmed' : 'Pending POD'}
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {effectiveDetailTab === 'expense' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" /> Expenses
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tripExpenses.length === 0 ? (
+                  <EmptyState title="No expenses for this booking" />
+                ) : (
+                  <>
+                    {tripExpenses.map((expense) => (
+                      <div key={expense.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div>
+                          <div className="font-semibold text-text">{expense.label || expense.expenseType || 'Expense'}</div>
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            {[expense.expenseType, expense.paymentMode, expense.paidBy && `Paid by ${expense.paidBy}`, expense.dateTime && formatDate(expense.dateTime)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </div>
+                        </div>
+                        <div className="font-bold text-text"><CurrencyDisplay amount={expense.amount} /></div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
+                      <span className="font-semibold text-text">Total Expenses</span>
+                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.approvedExpenses ?? 0} /></span>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {effectiveDetailTab === 'advance' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-primary" /> Advance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {tripAdvances.length === 0 ? (
+                  <EmptyState title="No advance recorded for this booking" />
+                ) : (
+                  <>
+                    {tripAdvances.map((adv) => (
+                      <div key={adv.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div>
+                          <div className="font-semibold text-text">{adv.label || 'Advance'}</div>
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            {[adv.paymentMode, adv.paidBy && `Paid by ${adv.paidBy}`, adv.dateTime && formatDate(adv.dateTime)].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        <div className="font-bold text-text"><CurrencyDisplay amount={adv.amount} /></div>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-4">
+                      <span className="font-semibold text-text">Total Advance</span>
+                      <span className="font-bold text-text"><CurrencyDisplay amount={trip?.advance ?? 0} /></span>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
