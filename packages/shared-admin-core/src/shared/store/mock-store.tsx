@@ -5766,6 +5766,7 @@ export function MockStoreProvider({ children }: PropsWithChildren) {
           actorUserId: input.actorUserId ?? null,
           selectedConfigId: input.lrConfigId ?? null,
           preferredLrNumber: input.preferredLrNumber ?? null,
+          preferredLrNumbersByDelivery: input.preferredLrNumbersByDelivery ?? undefined,
           orgUnits,
           timestamp,
         });

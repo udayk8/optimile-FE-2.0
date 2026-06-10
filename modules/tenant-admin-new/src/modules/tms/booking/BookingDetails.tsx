@@ -218,6 +218,9 @@ export function BookingDetailsPage() {
   const [matchedVendorRateType, setMatchedVendorRateType] = useState<"PER_TRIP" | "PER_KM" | "PER_MT" | null>(null);
   const [buyingRateLabel, setBuyingRateLabel] = useState<string | null>(null);
   const [preferredLrNumber, setPreferredLrNumber] = useState("");
+  // LR is consumed per delivery (one unique LR per delivery), not per booking.
+  // deliveryId -> chosen LR number, for MANUAL / PRE_GENERATED modes.
+  const [deliveryLrSelections, setDeliveryLrSelections] = useState<Record<string, string>>({});
   const [selectedLrMode, setSelectedLrMode] = useState<"MANUAL" | "PRE_GENERATED" | "AUTO">("MANUAL");
   const [expenseLabel, setExpenseLabel] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
@@ -943,6 +946,7 @@ export function BookingDetailsPage() {
     setBuyingRateLabel(null);
     setManualReason("");
     setPreferredLrNumber("");
+    setDeliveryLrSelections({});
     if (bookingRecord.lrType === "AUTO") {
       setSelectedLrMode("AUTO");
     } else {
@@ -1192,6 +1196,39 @@ export function BookingDetailsPage() {
         : availableManualPools[0]?.lrNumber ?? "",
     );
   }, [availableManualPools]);
+
+  // Pre-fill a distinct available LR for each delivery, preserving any still-valid
+  // manual picks. Each LR is handed to at most one delivery.
+  const assignDeliveryIdsKey = (bookingRecord.deliveries ?? []).map((delivery) => delivery.id).join(",");
+  useEffect(() => {
+    const deliveries = bookingRecord.deliveries ?? [];
+    setDeliveryLrSelections((current) => {
+      const next: Record<string, string> = {};
+      const used = new Set<string>();
+      deliveries.forEach((delivery) => {
+        const chosen = current[delivery.id];
+        if (chosen && !used.has(chosen) && availableManualPools.some((pool) => pool.lrNumber === chosen)) {
+          next[delivery.id] = chosen;
+          used.add(chosen);
+        }
+      });
+      deliveries.forEach((delivery) => {
+        if (next[delivery.id]) return;
+        const pick = availableManualPools.find((pool) => !used.has(pool.lrNumber));
+        if (pick) {
+          next[delivery.id] = pick.lrNumber;
+          used.add(pick.lrNumber);
+        }
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableManualPools, assignDeliveryIdsKey]);
+
+  const allDeliveriesHaveLr =
+    selectedLrMode === "AUTO" ||
+    ((bookingRecord.deliveries ?? []).length > 0 &&
+      (bookingRecord.deliveries ?? []).every((delivery) => Boolean(deliveryLrSelections[delivery.id])));
 
   useEffect(() => {
     if (!assignmentOpen) {
@@ -1596,7 +1633,7 @@ export function BookingDetailsPage() {
     if (!selectedVehicle || !selectedDriver || !vendorId || Number(vendorFreight) <= 0) {
       return;
     }
-    if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
+    if (selectedLrMode !== "AUTO" && !allDeliveriesHaveLr) {
       return;
     }
     // Manual assignment on a contract booking bypasses the default L1/lowest
@@ -1604,6 +1641,7 @@ export function BookingDetailsPage() {
     if (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim()) {
       return;
     }
+    const firstDeliveryId = (bookingRecord.deliveries ?? [])[0]?.id ?? null;
     const assignment: BookingAssignmentInput = {
       vendorId: normalizedVendorId,
       vendorName: vendorId === OWN_FLEET_VENDOR ? "Own Fleet" : vendorMap.get(vendorId)?.name ?? "Vendor",
@@ -1628,7 +1666,9 @@ export function BookingDetailsPage() {
       actorUserId: currentUser?.id ?? null,
         lrType: selectedLrMode === "AUTO" ? "AUTO" : "MANUAL",
         lrConfigId: selectedAssignmentLrConfig?.id ?? null,
-        preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
+        preferredLrNumber:
+          selectedLrMode === "AUTO" ? null : (firstDeliveryId ? deliveryLrSelections[firstDeliveryId] ?? null : preferredLrNumber || null),
+        preferredLrNumbersByDelivery: selectedLrMode === "AUTO" ? undefined : deliveryLrSelections,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
         manualAssignmentReason: assignMethod === "MANUAL" && !isSpotBooking ? manualReason.trim() : null,
       };
@@ -3706,7 +3746,7 @@ export function BookingDetailsPage() {
                 !vehicleId ||
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
-                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (selectedLrMode !== "AUTO" && !allDeliveriesHaveLr) ||
                 (assignMethod === "MANUAL" && !isSpotBooking && !manualReason.trim())
               }
             >
@@ -3939,27 +3979,53 @@ export function BookingDetailsPage() {
                 </CompactField>
                 {selectedLrMode !== "AUTO" ? (
                   <>
-                    <CompactField label="Manual LR Selection">
-                      <Select value={preferredLrNumber} onChange={(event) => setPreferredLrNumber(event.target.value)}>
-                        <option value="">
-                          {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
-                        </option>
-                        {availableManualPools.map((pool) => (
-                          <option key={pool.id} value={pool.lrNumber}>
-                            {pool.lrNumber}{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED" ? " • Reserved" : " • General"}
-                          </option>
-                        ))}
-                      </Select>
-                    </CompactField>
-                    {availableManualPools.length > 0 ? (
-                      <p className="px-1 text-[11px] text-gray-500">
-                        Available: <span className="font-medium text-gray-700">{availableManualPools.length}</span> LR numbers
-                      </p>
-                    ) : null}
+                    <div className="flex items-center justify-between px-1">
+                      <span className="text-[11px] font-medium text-slate-600">
+                        Manual LR Selection — one unique LR per delivery
+                      </span>
+                      {availableManualPools.length > 0 ? (
+                        <span className="text-[11px] text-gray-500">
+                          Available: <span className="font-medium text-gray-700">{availableManualPools.length}</span>
+                        </span>
+                      ) : null}
+                    </div>
+                    {(bookingRecord.deliveries ?? []).map((delivery, deliveryIndex) => {
+                      const chosen = deliveryLrSelections[delivery.id] ?? "";
+                      const takenByOthers = new Set(
+                        Object.entries(deliveryLrSelections)
+                          .filter(([id]) => id !== delivery.id)
+                          .map(([, lr]) => lr),
+                      );
+                      const options = availableManualPools.filter(
+                        (pool) => pool.lrNumber === chosen || !takenByOthers.has(pool.lrNumber),
+                      );
+                      return (
+                        <CompactField key={delivery.id} label={`D${delivery.deliveryNo ?? deliveryIndex + 1} LR`}>
+                          <Select
+                            value={chosen}
+                            onChange={(event) =>
+                              setDeliveryLrSelections((current) => ({ ...current, [delivery.id]: event.target.value }))
+                            }
+                          >
+                            <option value="">
+                              {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
+                            </option>
+                            {options.map((pool) => (
+                              <option key={pool.id} value={pool.lrNumber}>
+                                {pool.lrNumber}
+                                {(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED"
+                                  ? " • Reserved"
+                                  : " • General"}
+                              </option>
+                            ))}
+                          </Select>
+                        </CompactField>
+                      );
+                    })}
                   </>
                 ) : (
                   <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-                    Auto LR will be generated during assignment for <span className="font-medium">{activeLrOrgUnit?.name ?? "the active place"}</span>.
+                    Auto LR will be generated per delivery during assignment for <span className="font-medium">{activeLrOrgUnit?.name ?? "the active place"}</span>.
                   </div>
                 )}
                 {selectedLrMode !== "AUTO" && !selectedLrConfig ? (

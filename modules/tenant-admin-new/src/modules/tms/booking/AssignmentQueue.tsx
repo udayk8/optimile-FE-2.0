@@ -74,6 +74,8 @@ export function AssignmentQueuePage() {
   // Reason required when bypassing the default L1/lowest contract (manual assign).
   const [manualReason, setManualReason] = useState("");
   const [preferredLrNumber, setPreferredLrNumber] = useState("");
+  // One unique LR per delivery (deliveryId -> LR number) for MANUAL / PRE_GENERATED.
+  const [deliveryLrSelections, setDeliveryLrSelections] = useState<Record<string, string>>({});
   const [selectedLrMode, setSelectedLrMode] = useState<"MANUAL" | "PRE_GENERATED" | "AUTO">("MANUAL");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -417,6 +419,7 @@ export function AssignmentQueuePage() {
       setBuyingRateLabel(null);
       setManualReason("");
       setPreferredLrNumber("");
+      setDeliveryLrSelections({});
       applyBookingLrPreference();
   }
 
@@ -427,6 +430,38 @@ export function AssignmentQueuePage() {
         : availableManualPools[0]?.lrNumber ?? "",
     );
   }, [availableManualPools]);
+
+  // Pre-fill a distinct available LR per delivery; keep still-valid manual picks.
+  const assignDeliveryIdsKey = (assigningBooking?.deliveries ?? []).map((delivery) => delivery.id).join(",");
+  useEffect(() => {
+    const deliveries = assigningBooking?.deliveries ?? [];
+    setDeliveryLrSelections((current) => {
+      const next: Record<string, string> = {};
+      const used = new Set<string>();
+      deliveries.forEach((delivery) => {
+        const chosen = current[delivery.id];
+        if (chosen && !used.has(chosen) && availableManualPools.some((pool) => pool.lrNumber === chosen)) {
+          next[delivery.id] = chosen;
+          used.add(chosen);
+        }
+      });
+      deliveries.forEach((delivery) => {
+        if (next[delivery.id]) return;
+        const pick = availableManualPools.find((pool) => !used.has(pool.lrNumber));
+        if (pick) {
+          next[delivery.id] = pick.lrNumber;
+          used.add(pick.lrNumber);
+        }
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableManualPools, assignDeliveryIdsKey]);
+
+  const allDeliveriesHaveLr =
+    selectedLrMode === "AUTO" ||
+    ((assigningBooking?.deliveries ?? []).length > 0 &&
+      (assigningBooking?.deliveries ?? []).every((delivery) => Boolean(deliveryLrSelections[delivery.id])));
   useEffect(() => {
     if (assigningBookingId) {
       applyBookingLrPreference();
@@ -511,13 +546,14 @@ export function AssignmentQueuePage() {
     if (!activeLrOrgUnitId) {
       return;
     }
-      if (selectedLrMode !== "AUTO" && !preferredLrNumber) {
+      if (selectedLrMode !== "AUTO" && !allDeliveriesHaveLr) {
         return;
       }
     // Manual assignment bypasses the default L1/lowest contract — reason required.
     if (assignMethod === "MANUAL" && !manualReason.trim()) {
       return;
     }
+    const firstDeliveryId = (assigningBooking.deliveries ?? [])[0]?.id ?? null;
 
     assignBooking(assigningBooking.id, {
       vendorId: normalizedVendorId,
@@ -543,7 +579,9 @@ export function AssignmentQueuePage() {
       actorUserId: currentUser?.id ?? null,
         lrType: selectedLrMode === "AUTO" ? "AUTO" : "MANUAL",
         lrConfigId: selectedAssignmentLrConfig?.id ?? null,
-        preferredLrNumber: selectedLrMode === "AUTO" ? null : preferredLrNumber,
+        preferredLrNumber:
+          selectedLrMode === "AUTO" ? null : (firstDeliveryId ? deliveryLrSelections[firstDeliveryId] ?? null : preferredLrNumber || null),
+        preferredLrNumbersByDelivery: selectedLrMode === "AUTO" ? undefined : deliveryLrSelections,
         manualLrPoolPreference: selectedLrMode === "PRE_GENERATED" ? "PRE_GENERATED" : "GENERAL",
         manualAssignmentReason: assignMethod === "MANUAL" ? manualReason.trim() : null,
       });
@@ -692,7 +730,7 @@ export function AssignmentQueuePage() {
                 !vehicleId ||
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
-                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (selectedLrMode !== "AUTO" && !allDeliveriesHaveLr) ||
                 (assignMethod === "MANUAL" && !manualReason.trim()) ||
                 autoLrBlocked
               }
@@ -942,22 +980,48 @@ export function AssignmentQueuePage() {
             </CompactField>
             {selectedLrMode !== "AUTO" ? (
               <>
-                <CompactField label="Manual LR Selection">
-                  <div className="space-y-2">
-                    <Select value={preferredLrNumber} onChange={(event) => setPreferredLrNumber(event.target.value)}>
-                    <option value="">
-                      {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
-                  </option>
-                  {availableManualPools.map((pool) => (
-                    <option key={pool.id} value={pool.lrNumber}>
-                      {pool.lrNumber}{(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED" ? " • Reserved" : " • General"}
-                    </option>
-                  ))}
-                  </Select>
-                </div>
-                </CompactField>
-                <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  Available: <span className="font-semibold text-slate-900">{availableManualPools.length}</span> LR numbers · Source: {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved LR" : "General LR"}
+                <div className="md:col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-600">Manual LR Selection — one unique LR per delivery</span>
+                    <span className="text-xs text-slate-500">
+                      Available: <span className="font-semibold text-slate-900">{availableManualPools.length}</span> · {selectedLrMode === "PRE_GENERATED" ? "Customer Reserved" : "General"}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {(assigningBooking?.deliveries ?? []).map((delivery, deliveryIndex) => {
+                      const chosen = deliveryLrSelections[delivery.id] ?? "";
+                      const takenByOthers = new Set(
+                        Object.entries(deliveryLrSelections)
+                          .filter(([id]) => id !== delivery.id)
+                          .map(([, lr]) => lr),
+                      );
+                      const options = availableManualPools.filter(
+                        (pool) => pool.lrNumber === chosen || !takenByOthers.has(pool.lrNumber),
+                      );
+                      return (
+                        <CompactField key={delivery.id} label={`D${delivery.deliveryNo ?? deliveryIndex + 1} LR`}>
+                          <Select
+                            value={chosen}
+                            onChange={(event) =>
+                              setDeliveryLrSelections((current) => ({ ...current, [delivery.id]: event.target.value }))
+                            }
+                          >
+                            <option value="">
+                              {requiresActiveLrScope ? "Select active place first" : "Select LR number"}
+                            </option>
+                            {options.map((pool) => (
+                              <option key={pool.id} value={pool.lrNumber}>
+                                {pool.lrNumber}
+                                {(pool.poolType ?? (pool.customerId ? "CUSTOMER_RESERVED" : "GENERAL")) === "CUSTOMER_RESERVED"
+                                  ? " • Reserved"
+                                  : " • General"}
+                              </option>
+                            ))}
+                          </Select>
+                        </CompactField>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             ) : (
@@ -1018,7 +1082,7 @@ export function AssignmentQueuePage() {
                 !vehicleId ||
                 !driverId ||
                 Number(vendorFreight) <= 0 ||
-                (selectedLrMode !== "AUTO" && !preferredLrNumber) ||
+                (selectedLrMode !== "AUTO" && !allDeliveriesHaveLr) ||
                 (assignMethod === "MANUAL" && !manualReason.trim()) ||
                 autoLrBlocked
               }

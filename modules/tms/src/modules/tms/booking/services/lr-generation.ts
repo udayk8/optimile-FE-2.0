@@ -292,6 +292,7 @@ export function buildTenantLrAssignmentsForBooking(input: {
   actorUserId?: string | null;
   selectedConfigId?: string | null;
   preferredLrNumber?: string | null;
+  preferredLrNumbersByDelivery?: Record<string, string | null>;
   orgUnits?: OrgUnit[];
   timestamp?: string;
 }) {
@@ -325,13 +326,35 @@ export function buildTenantLrAssignmentsForBooking(input: {
         )
       ),
   );
-  const availablePools = input.preferredLrNumber
-    ? [
-        ...matchingPools.filter((pool) => pool.lrNumber === input.preferredLrNumber),
-        ...matchingPools.filter((pool) => pool.lrNumber !== input.preferredLrNumber),
-      ]
-    : matchingPools;
-  let poolIndex = 0;
+  // Per-delivery LR consumption: each delivery gets its own unique LR. For
+  // MANUAL / PRE_GENERATED the dispatcher can pick a specific LR per delivery
+  // (preferredLrNumbersByDelivery); anything not chosen falls back to the legacy
+  // single preferredLrNumber (first delivery) or the next available pool in
+  // order. A pool is never handed to two deliveries. AUTO generates instead.
+  const perDelivery = input.preferredLrNumbersByDelivery ?? {};
+  const usedPoolIds = new Set<string>();
+  const pickPoolForDelivery = (deliveryId: string, index: number) => {
+    if (selectedConfig?.lrType === "AUTO") {
+      return null;
+    }
+    const preferred =
+      perDelivery[deliveryId] ?? (index === 0 ? input.preferredLrNumber ?? null : null);
+    if (preferred) {
+      const exact = matchingPools.find(
+        (pool) => pool.lrNumber === preferred && !usedPoolIds.has(pool.id),
+      );
+      if (exact) {
+        usedPoolIds.add(exact.id);
+        return exact;
+      }
+    }
+    const next = matchingPools.find((pool) => !usedPoolIds.has(pool.id));
+    if (next) {
+      usedPoolIds.add(next.id);
+      return next;
+    }
+    return null;
+  };
 
   const records = (input.booking.deliveries ?? []).map((delivery, index) => {
     const existing = existingByDelivery.get(delivery.id) ?? null;
@@ -339,8 +362,7 @@ export function buildTenantLrAssignmentsForBooking(input: {
       return existing;
     }
 
-    const poolRecord =
-      selectedConfig?.lrType === "AUTO" ? null : availablePools[poolIndex++] ?? null;
+    const poolRecord = pickPoolForDelivery(delivery.id, index);
     const lrNumber = poolRecord?.lrNumber ?? (
       selectedConfig
         ? selectedConfig.lrType === "AUTO" && input.orgUnits

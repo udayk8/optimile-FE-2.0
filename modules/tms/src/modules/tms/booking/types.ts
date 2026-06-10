@@ -960,6 +960,11 @@ export interface BookingAssignmentInput {
   lrType?: "AUTO" | "MANUAL" | "PRE_GENERATED";
   lrConfigId?: string | null;
   preferredLrNumber?: string | null;
+  /** Per-delivery LR selection (deliveryId -> LR number) for MANUAL / PRE_GENERATED.
+   *  Each delivery gets its own unique LR. AUTO ignores this and generates one
+   *  LR per delivery automatically. Falls back to preferredLrNumber / sequential
+   *  pool order for any delivery not listed here. */
+  preferredLrNumbersByDelivery?: Record<string, string | null>;
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
   /** Why the dispatcher bypassed the default L1/lowest contract — required for
    *  manual assignment (deviation from the recommended contract vendor). */

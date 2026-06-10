@@ -799,6 +799,7 @@ export interface BookingAssignmentInput {
   lrType?: "AUTO" | "MANUAL" | "PRE_GENERATED";
   lrConfigId?: string | null;
   preferredLrNumber?: string | null;
+  preferredLrNumbersByDelivery?: Record<string, string | null>;
   manualLrPoolPreference?: "GENERAL" | "PRE_GENERATED";
 }
 
